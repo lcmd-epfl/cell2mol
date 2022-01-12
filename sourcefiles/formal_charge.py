@@ -396,12 +396,19 @@ def get_poscharges_unique_species (unique_species):
             print("    ---------------")
             print("          ", met.label, met.coord_sphere)
             met.poscharge = get_metal_poscharge(met.label)
-            if any((lig.natoms == 2 and "C" in lig.labels and "O" in lig.labels) for lig in mol.ligandlist):
-                if int(0) not in met.poscharge: 
-                    met.poscharge.append(int(0))
-            if any((lig.hapticity) for lig in mol.ligandlist):
-                if int(0) not in met.poscharge:
-                    met.poscharge.append(int(0))
+
+            list_of_zero_OS = ["Fe", "Ni", "Ru"]
+            if met.label in list_of_zero_OS:
+                # In some cases, it adds 0 as possible metal charge
+                # -if it has CO ligands
+                if any((lig.natoms == 2 and "C" in lig.labels and "O" in lig.labels) for lig in mol.ligandlist):
+                    if int(0) not in met.poscharge:
+                        met.poscharge.append(int(0))
+                # -if it has any ligand with hapticity
+                if any((lig.hapticity) for lig in mol.ligandlist):
+                    if int(0) not in met.poscharge:
+                        met.poscharge.append(int(0))
+
             print("Possible charges received for metal:", met.poscharge)
                                    
     return unique_species, Warning
