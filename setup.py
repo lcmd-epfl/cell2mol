@@ -12,7 +12,7 @@ setup(
     name="cell2mol",
     packages=["cell2mol"],
     version="1.0",
-    description="Automated Generator of Volcano Plots",
+    description="Cell characterization",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="svela-bs, rlaplaza, choglass, lcmd-epfl",
