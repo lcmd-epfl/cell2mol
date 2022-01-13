@@ -278,7 +278,7 @@ def savemolecules(moleclist, output_dir, print_types, option_print_repeated=True
                 print_molecule(mol, mol.name, "dict", output_dir)
             if hasattr(mol, "object"):
                 if print_mol:
-                    print_molecule(mol, name, "mol", output_dir)
+                    print_molecule(mol, mol.name, "mol", output_dir)
 
 
 ###########
