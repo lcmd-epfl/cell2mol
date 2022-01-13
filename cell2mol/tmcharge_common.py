@@ -5,7 +5,7 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
-from elementdata import ElementData
+from cell2mol.elementdata import ElementData
 
 elemdatabase = ElementData()
 

@@ -1,51 +1,16 @@
 #!/usr/bin/env python
 
-import os
 import numpy as np
-import sys
-import networkx as nx
 import copy
-import scipy
-import time
 import itertools
-import random
-import math
-from math import fsum
 import pickle
 
-import cellconversions
-from cellconversions import frac2cart_fromparam
-from cellconversions import cart2frac
-from cellconversions import det3
-from cellconversions import translate
+from cell2mol.tmcharge_common import atom, molecule, ligand, metal, group
+from cell2mol.xyz2mol import int_atom, xyz2mol
 
-import tmcharge_common
-from tmcharge_common import getelementcount
-from tmcharge_common import getHvcount
-from tmcharge_common import get_adjacency_types
-from tmcharge_common import getradii
-from tmcharge_common import getcentroid
-from tmcharge_common import find_groups_within_ligand
-from tmcharge_common import checkchemistry
-from tmcharge_common import getconec
-from tmcharge_common import getblocks
-from tmcharge_common import inv
-from tmcharge_common import extract_from_matrix
+from cell2mol.elementdata import ElementData
 
-# Imports Classes
-import tmcharge_common
-from tmcharge_common import atom
-from tmcharge_common import molecule
-from tmcharge_common import ligand
-from tmcharge_common import metal
-from tmcharge_common import group
-
-
-import xyz2mol
-from xyz2mol import int_atom
-from xyz2mol import xyz2mol
-from xyz2mol import get_atomic_valences
-
+elemdatabase = ElementData()
 
 #############################
 ### Loads Rdkit & xyz2mol ###
