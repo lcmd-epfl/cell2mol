@@ -7,13 +7,12 @@ import time
 import os
 import re
 import pandas as pd
+import itertools
 from tmcharge_common import Cell
 from formal_charge import get_metal_poscharge
 
 def bond_valence_sum (cell, bv_para, mode):
-    
-    # If mode = 'average' : 
-    
+
     for mol in cell.moleclist:
 
         if mol.type == "Complex":
@@ -93,9 +92,23 @@ def bond_valence_sum (cell, bv_para, mode):
                     Warning = False
                 return final_charge, Warning
 
-file = open(f"{output_dir}/Cell_{refcode}.gmol",'rb')
-object_file = pickle.load(file)
 
 
-bond_valence_sum (object_file, bv_para, 'single')
 
+
+if __name__ == "__main__":
+
+    pwd = os.getcwd()
+    refcode = "EGITOF"
+    print(refcode)
+
+
+    # Import and creat DataFrame bond valence parameters 2020
+    bv_para= pd.read_csv("bvparm2020.txt",delimiter="\t")
+
+    output_dir = refcode
+    
+    file = open(f"{output_dir}/Cell_{refcode}.gmol",'rb')
+    object_file = pickle.load(file)
+
+    bond_valence_sum (object_file, bv_para, 'smallest_delta')
