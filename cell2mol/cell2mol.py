@@ -7,9 +7,9 @@ import time
 import pickle
 
 # Import modules
-import cell2mol.cell_reconstruct
-import cell2mol.formal_charge
-import cell2mol.getmissingH
+import cell2mol.cell_reconstruct as cell_reconstruct
+import cell2mol.formal_charge as formal_charge
+import cell2mol.getmissingH as getmissingH
 from cell2mol.tmcharge_common import Cell, getcentroid
 from cell2mol.cellconversions import cart2frac, frac2cart_fromparam
 from cell2mol.readwrite import readinfo, print_unit_cell
