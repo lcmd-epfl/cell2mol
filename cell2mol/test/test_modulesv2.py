@@ -8,8 +8,8 @@ def test_modules1():
   assert addone(10) == 11
   assert subtwo(8) == 6 
 
-def test_cell2mol ():
-  
+def test_cell2mol():
+  pass  
 #   cell2mol()
 
 # if __name__== "__main__":
