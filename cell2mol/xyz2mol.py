@@ -24,7 +24,7 @@ from rdkit import Chem
 from rdkit.Chem import AllChem, rdmolops
 import sys
 
-from elementdata import ElementData
+from cell2mol.elementdata import ElementData
 
 elemdatabase = ElementData()
 
