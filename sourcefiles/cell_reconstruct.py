@@ -1,14 +1,9 @@
 import os
 import numpy as np
 import sys
-import networkx as nx
 import copy
 import scipy
-import time
 import itertools
-import random
-import math
-from math import fsum
 import pickle
 
 from scipy import sparse
@@ -20,7 +15,6 @@ from cellconversions import frac2cart_fromparam
 from cellconversions import cart2frac
 from cellconversions import det3
 from cellconversions import translate
-
 
 import tmcharge_common
 from tmcharge_common import getelementcount
@@ -35,7 +29,7 @@ from tmcharge_common import getblocks
 from tmcharge_common import inv
 from tmcharge_common import extract_from_matrix
 
-#Imports Classes
+# Imports Classes
 import tmcharge_common
 from tmcharge_common import atom
 from tmcharge_common import molecule
@@ -44,349 +38,455 @@ from tmcharge_common import metal
 from tmcharge_common import group
 
 from elementdata import ElementData
+
 elemdatabase = ElementData()
 
 
+def get_reference_molecules(labels, pos, debug=0):
+    ## Retrieves the reference molecules from the information in the .cif file
+    # Molecules are extracted from the adjacency matrix, and the results are evaluated. How? Well, the adjacency matrix is constructed using a covalent factor.
+    # This factor is taken as 1.3, but it can occasionally be too small or too large. If it is too small, it results on some atoms being detached from their molecule.
+    # If an isolated atom is found, and is not a H, or a Halogen or alkaline atom, then the covalent factor can be increased.
 
-def get_reference_molecules(labels, pos):
-    
-    debug = 1
-    Warning = False 
-    
-    # Tries to adjust factor of the covalent radii
-    found_covalent_factor = False  
+    # Something similar happens for the Metal atoms. The coordination of an atom to the metal is also evaluated from the adjacency matrix. Again, the covalent factor might fail.
+    # This function evaluates that the coordination number of the metal makes 'sense'. That is, is a commmon number for the metal atom. Common coordination numbers are in the function metalcoordcheck
+    # If the coordination number is too big, or too small, it the covalent factor of the metal-ligand bonds gets modified. This factor is called metal_factor
+
+    # The covalent and metal factors are stored in all molecule objects, and used throughout the analysis of the whole crystal structure.
+    #:return listofreferences: list of reference molecules saved as objects
+    #:return covalent_factor: value between 1.3 and 1.6 that will be used to construct the adjacency matrix of the crystal structure
+    #:return metal_factor: value between 1.2 and 0.8 that multiplies the covalent radii of the metal atoms in the crystal structure
+    #:return Warning: boolean warning. Typically, a warning in this function is raised when getmolecs finds steric clashes in any of the reference molecules
+
+    Warning = False
+
+    # Parameters to adjust the covalent factor
+    found_covalent_factor = False
     max_covalent_factor = 1.6
     min_covalent_factor = 1.3
     increase_covalent_factor = 0.02
-    
+
+    # Parameters to adjust the metal factor
     found_metal_factor = False
     max_metal_factor = 1.2
     min_metal_factor = 0.8
     change_metal_factor = 0.02
-    
+
+    # Initial Values
     covalent_factor = min_covalent_factor
     metal_factor = 1.0
-    
-    #Initiates while that adjusts the two factors (metal and covalent)
+
+    # Initiates while that adjusts the two factors (metal and covalent)
     found_both_factors = False
     maxiter = 20
     iteration = 1
     # execute as long as found_both_factor = False, iteration <= maxiter, and Warning = False
     while (not found_both_factors) and (iteration <= maxiter) and not Warning:
-        
-        #Tries to find the reference molecules
+
+        # Tries to find the reference molecules
         print("")
-        if (debug == 1): print("GETREFS: sending listofreferences with", covalent_factor, metal_factor)
-        
-        
-        Warning, listofreferences = getmolecs(labels, pos, covalent_factor, metal_factor)        
-        
-        #Condition to accept the covalent_factor:
+        if debug >= 1:
+            print(
+                "GETREFS: sending listofreferences with", covalent_factor, metal_factor
+            )
+
+        Warning, listofreferences = getmolecs(
+            labels, pos, covalent_factor, metal_factor
+        )
+
+        # Condition to accept the covalent_factor:
         valid_list_of_references = True
-        
+
         for ref in listofreferences:
-            if (ref.natoms == 1):
-                if ((elemdatabase.elementgroup[ref.atoms[0].label] and ref.atoms[0].label != "H") or elemdatabase.elementgroup[ref.atoms[0].label] == 2 or elemdatabase.elementgroup[ref.atoms[0].label] == 17): 
+            if ref.natoms == 1:
+                if (
+                    (
+                        elemdatabase.elementgroup[ref.atoms[0].label]
+                        and ref.atoms[0].label != "H"
+                    )
+                    or elemdatabase.elementgroup[ref.atoms[0].label] == 2
+                    or elemdatabase.elementgroup[ref.atoms[0].label] == 17
+                ):
                     pass
                 else:
-                    if (debug == 1): print("GETREFS: found ref molecule with only one atom", ref.labels)
+                    if debug >= 1:
+                        print(
+                            "GETREFS: found ref molecule with only one atom", ref.labels
+                        )
                     valid_list_of_references = False
-                
+
         if not valid_list_of_references:
-            if (covalent_factor < max_covalent_factor):
+            if covalent_factor < max_covalent_factor:
                 found_covalent_factor = False
                 covalent_factor += increase_covalent_factor
-                if (debug == 1): print("GETREFS: Increasing covalent_factor to:", covalent_factor)
-            else: 
-                print("GETREFS: Reached Maximum Covalent_factor:", max_covalent_factor)                
+                if debug >= 1:
+                    print("GETREFS: Increasing covalent_factor to:", covalent_factor)
+            else:
+                print("GETREFS: Reached Maximum Covalent_factor:", max_covalent_factor)
                 Warning = True
         else:
             found_covalent_factor = True
-            
-        #Condition to accept the metal_factor. Runs for all complexes in the list of reference molecules:
+
+        # Condition to accept the metal_factor. Runs for all complexes in the list of reference molecules:
         glist = []
         ilist = []
         dlist = []
         for ref in listofreferences:
-            if (ref.type == "Complex"):
-                #print("sending", ref.type, ref.natoms, ref.labels)
-                ref.ligandlist, ref.metalist = splitcomplex(ref, covalent_factor, metal_factor)                
-                
+            if ref.type == "Complex":
+                ref.ligandlist, ref.metalist = splitcomplex(
+                    ref, covalent_factor, metal_factor
+                )
+
                 for lig in ref.ligandlist:
-                    print("Lig in Ref molec", lig.natoms, lig.labels, lig.totmconnec) #, len(lig.metalatoms))                
-                
+                    print(
+                        "Lig in Ref molec", lig.natoms, lig.labels, lig.totmconnec
+                    )  # , len(lig.metalatoms))
+
                 # Checks Hapticity
                 potential_hapticity = get_hapticity(ref)
                 print("Potential hapticity=", potential_hapticity)
-                
+
                 # Checks Shared Ligands in Polymetallic complexes
-                if any(len(lig.metalatoms) >= 2 for lig in ref.ligandlist): 
+                if any(len(lig.metalatoms) >= 2 for lig in ref.ligandlist):
                     ispolymetallic_and_shared = True
                     print("Molecule is polymetallic and has shared ligands")
                 else:
-                    ispolymetallic_and_shared = False                   
+                    ispolymetallic_and_shared = False
 
-                if not potential_hapticity and not ispolymetallic_and_shared:   #then tries to adjust the metal_factor
+                if (
+                    not potential_hapticity and not ispolymetallic_and_shared
+                ):  # then tries to adjust the metal_factor
                     for a in ref.atoms:
-                        if (a.block == 'd' or a.block == 'f'):
-                            if (debug == 1): print("GETREFS: sending", a.label, a.mconnec, "to coordcheck")
-                            good, increase, decrease = metalcoordcheck(a.label, a.mconnec)
+                        if a.block == "d" or a.block == "f":
+                            if debug >= 1:
+                                print(
+                                    "GETREFS: sending",
+                                    a.label,
+                                    a.mconnec,
+                                    "to coordcheck",
+                                )
+                            good, increase, decrease = metalcoordcheck(
+                                a.label, a.mconnec
+                            )
                             glist.append(good)
                             ilist.append(increase)
                             dlist.append(decrease)
-                            if (debug == 1): print("GETREFS: received", good, increase, decrease, "from coordcheck")        
+                            if debug >= 1:
+                                print(
+                                    "GETREFS: received",
+                                    good,
+                                    increase,
+                                    decrease,
+                                    "from coordcheck",
+                                )
                 else:
                     glist.append(True)
                     ilist.append(False)
                     dlist.append(False)
-        
+
         if len(glist) > 0:
-            if (any((item == True for item in ilist)) and all((item2 == False for item2 in dlist)) and (metal_factor < max_metal_factor)):
+            if (
+                any((item == True for item in ilist))
+                and all((item2 == False for item2 in dlist))
+                and (metal_factor < max_metal_factor)
+            ):
                 metal_factor += change_metal_factor
-                if (debug == 1): print("GETREFS: Increasing metal_factor to:", metal_factor)
-            if (all((item == False for item in ilist)) and any((item2 == True for item2 in dlist)) and (metal_factor > min_metal_factor)):
+                if debug >= 1:
+                    print("GETREFS: Increasing metal_factor to:", metal_factor)
+            if (
+                all((item == False for item in ilist))
+                and any((item2 == True for item2 in dlist))
+                and (metal_factor > min_metal_factor)
+            ):
                 metal_factor -= change_metal_factor
-                if (debug == 1): print("GETREFS: Decreasing metal_factor to:", metal_factor)
-            if (all((item == True for item in glist))):
+                if debug >= 1:
+                    print("GETREFS: Decreasing metal_factor to:", metal_factor)
+            if all((item == True for item in glist)):
                 found_metal_factor = True
-                if (debug == 1): print("GETREFS: Metal_factor set at:", metal_factor)
-                    
-        if found_covalent_factor and found_metal_factor: 
+                if debug >= 1:
+                    print("GETREFS: Metal_factor set at:", metal_factor)
+
+        if found_covalent_factor and found_metal_factor:
             found_both_factors = True
             Warning = False
-            print("GETREFS: Found both factors. Breaking")
+            if debug >= 1:
+                print("GETREFS: Found both factors. Breaking")
             break
         elif (metal_factor > max_metal_factor) or (metal_factor < min_metal_factor):
-            print("GETREFS: metal_factor outside the limits", metal_factor)
+            if debug >= 1:
+                print("GETREFS: metal_factor outside the limits", metal_factor)
             Warning = True
             break
         else:
             iteration += 1
             continue
-            
-        if (iteration == maxiter):
-            Warning = True      
-            
-    #if (debug == 1): print("GETREFS: final lists G/I/D:", glist, ilist, dlist)
+
+        if iteration == maxiter:
+            Warning = True
+
     return listofreferences, covalent_factor, metal_factor, Warning
 
-#######################################################
-def metalcoordcheck(label,coordination):
 
-    debug = 0
-    
+#######################################################
+def metalcoordcheck(label, coordination, debug=0):
+    ## Function that receives the label of a metal atom, and a proposed coordination number, and tells whether this coordination is too high, low, or correct.
+    # It uses a database of common coordination numbers from paper below
+    #:return good, increase, decrease: booleans for what to do with this metal
+
     from collections import defaultdict
+
     # Data Obtained from:
     # Venkataraman, D.; Du, Y.; Wilson, S. R.; Hirsch, K. A.; Zhang, P.; Moore, J. S. A
-    # Coordination Geometry Table of the D-Block Elements and Their Ions. 
-    # J. Chem. Educ. 1997, 74, 915. 
+    # Coordination Geometry Table of the D-Block Elements and Their Ions.
+    # J. Chem. Educ. 1997, 74, 915.
 
     good = False
     increase = False
     decrease = False
-    
-    #atnum = int_atom(label)
-    #print("Metalchargecheck:",label[0])
+
     atnum = elemdatabase.elementnr[label]
-    if (debug == 1): print("Metalcoordcheck function: got atnum", atnum, "for label", label)
+    if debug >= 1:
+        print("Metalcoordcheck function: got atnum", atnum, "for label", label)
 
     coordnum = defaultdict(list)
-    #adding 1st-row transition metals.
-    coordnum[21] = [6]      # Sc
-    coordnum[22] = [3,4,6]  # Ti
-    coordnum[23] = [3,4,5,6]   # V
-    coordnum[24] = [4,5,6]     # Cr
-    coordnum[25] = [3,4,5,6]  #Mn #some strange cases of heptacoordination in Mn exist. Not sure is a good idea to have it
-    coordnum[26] = [3,4,5,6]   # Fe
-    coordnum[27] = [3,4,6]     # Co
-    coordnum[28] = [3,4,5,6]   # Ni
-    coordnum[29] = [3,4,5,6]   # Cu
-    coordnum[30] = [3,4,6]      # Zn
+    # adding 1st-row transition metals.
+    coordnum[21] = [6]  # Sc
+    coordnum[22] = [3, 4, 6]  # Ti
+    coordnum[23] = [3, 4, 5, 6]  # V
+    coordnum[24] = [4, 5, 6]  # Cr
+    coordnum[25] = [
+        3,
+        4,
+        5,
+        6,
+    ]  # Mn #some strange cases of heptacoordination in Mn exist. Not sure is a good idea to have it
+    coordnum[26] = [3, 4, 5, 6]  # Fe
+    coordnum[27] = [3, 4, 6]  # Co
+    coordnum[28] = [3, 4, 5, 6]  # Ni
+    coordnum[29] = [3, 4, 5, 6]  # Cu
+    coordnum[30] = [3, 4, 6]  # Zn
     # 2nd-row transition metals.
-    coordnum[39] = [6]    # Y
-    coordnum[40] = [4,6]    # Zr
-    coordnum[41] = [4,6]    # Nb
-    coordnum[42] = [4,5,6]    # Mo
-    coordnum[43] = [5,6]    # Tc
-    coordnum[44] = [3,4,5,6]    # Ru
-    coordnum[45] = [4,5,6]    # Rh
-    coordnum[46] = [4,5]    # Pd
-    coordnum[47] = [2,3,4]    # Ag
-    coordnum[48] = [4,6]    # Cd
+    coordnum[39] = [6]  # Y
+    coordnum[40] = [4, 6]  # Zr
+    coordnum[41] = [4, 6]  # Nb
+    coordnum[42] = [4, 5, 6]  # Mo
+    coordnum[43] = [5, 6]  # Tc
+    coordnum[44] = [3, 4, 5, 6]  # Ru
+    coordnum[45] = [4, 5, 6]  # Rh
+    coordnum[46] = [4, 5]  # Pd
+    coordnum[47] = [2, 3, 4]  # Ag
+    coordnum[48] = [4, 6]  # Cd
     # 3rd-row transition metals.
-    coordnum[57] = []    # La
-    coordnum[72] = [6]    # Hf
-    coordnum[73] = [5,6]    # Ta
-    coordnum[74] = [4,5,6]    # W
-    coordnum[75] = [4,5,6]    # Re
-    coordnum[76] = [4,5,6]    # Os
-    coordnum[77] = [3,4,5,6]    # Ir
-    coordnum[78] = [4,5,6]    # Pt
-    coordnum[79] = [2,4]    # Au
-    coordnum[80] = [2,3,4,5]    # Hg
+    coordnum[57] = []  # La
+    coordnum[72] = [6]  # Hf
+    coordnum[73] = [5, 6]  # Ta
+    coordnum[74] = [4, 5, 6]  # W
+    coordnum[75] = [4, 5, 6]  # Re
+    coordnum[76] = [4, 5, 6]  # Os
+    coordnum[77] = [3, 4, 5, 6]  # Ir
+    coordnum[78] = [4, 5, 6]  # Pt
+    coordnum[79] = [2, 4]  # Au
+    coordnum[80] = [2, 3, 4, 5]  # Hg
 
-    if (len(coordnum[atnum]) == 0): 
-        print("Metalcoordcheck function: Atom with label",label,"has an empty list of possible coordination")
-
-    if any((coordination == c) for c in coordnum[atnum]):
-        good = True
-        increase = False
-        decrease = False
-    elif (coordination > np.max(coordnum[atnum])):
-        good = False
-        increase = False
-        decrease = True
-    elif (coordination < np.min(coordnum[atnum])):
-        good = False
-        increase = True
-        decrease = False
-    elif (all((coordination != c) for c in coordnum[atnum]) and (coordination <= np.max(coordnum[atnum])) and (coordination >= np.min(coordnum[atnum]))):
-        good = False
-        increase = True
-        decrease = False
+    if len(coordnum[atnum]) == 0:
+        print(
+            "Metalcoordcheck function: Atom with label",
+            label,
+            "has an empty list of possible coordination",
+        )
     else:
-        print("Metalcoordcheck function: Atom with label",label,"has strange coordination value:", coordination, coordnum[atnum])
-                                                                                                             
+        if any((coordination == c) for c in coordnum[atnum]):
+            good = True
+            increase = False
+            decrease = False
+        elif coordination > np.max(coordnum[atnum]):
+            good = False
+            increase = False
+            decrease = True
+        elif coordination < np.min(coordnum[atnum]):
+            good = False
+            increase = True
+            decrease = False
+        elif (
+            all((coordination != c) for c in coordnum[atnum])
+            and (coordination <= np.max(coordnum[atnum]))
+            and (coordination >= np.min(coordnum[atnum]))
+        ):
+            good = False
+            increase = True
+            decrease = False
+        else:
+            print(
+                "Metalcoordcheck function: Atom with label",
+                label,
+                "has strange coordination value:",
+                coordination,
+                coordnum[atnum],
+            )
+
     return good, increase, decrease
 
+
 #######################################################
-def getmolecs(labels, pos, factor=1.3, metal_factor=1.0):  ##Simplified Version of the getmolecs
-    
+def getmolecs(labels, pos, factor=1.3, metal_factor=1.0, debug=0):  
+    ##Simplified Version of the getmolecs
+    ## Function that identifies connected groups of atoms from their positions and labels.
+    #:return mlist. List of molecules saved as objects
+
     Warning = False
-    
+
     # Gets the covalent radii, and modifies that of the metal if necessary
     radii = getradii(labels)
 
-    if (metal_factor != 1.0):
+    # Modifies the radii for metal atoms, if necessary
+    if metal_factor != 1.0:
         for idx, r in enumerate(radii):
-            if (elemdatabase.elementblock[labels[idx]] == 'd' or elemdatabase.elementblock[labels[idx]] == 'f'):
-                radii[idx] = r * metal_factor   #the covalent radii of the metal is modified
-                if (debug >= 1): print("GETMOLECS: new radii for", labels[idx], radii[idx])   
-    
+            if (
+                elemdatabase.elementblock[labels[idx]] == "d"
+                or elemdatabase.elementblock[labels[idx]] == "f"
+            ):
+                radii[idx] = (
+                    r * metal_factor
+                )  # the covalent radii of the metal is modified
+
     # Computes the adjacency matrix of what is received
     status, conmat, connec, mconmat, mconnec = getconec(labels, pos, factor, radii)
 
-    if (status == 1):
+    # status indicates whether the adjacency matrix could be built normally, or errors were detected. Typically, those errors are steric clashes
+    if status == 1:
         Warning = False
-        degree = np.diag(connec)  # creates a matrix with connec as diagonal values. Needed for the laplacian
-        lap = conmat - degree   #computes laplacian
+        degree = np.diag(
+            connec
+        )  # creates a matrix with connec as diagonal values. Needed for the laplacian
+        lap = conmat - degree  # computes laplacian
 
-        #creates block matrix
+        # creates block matrix
         graph = csr_matrix(lap)
         perm = reverse_cuthill_mckee(graph)
-        gp1 = graph[perm,:]
-        gp2 = gp1[:,perm]
-        dense=gp2.toarray()
+        gp1 = graph[perm, :]
+        gp2 = gp1[:, perm]
+        dense = gp2.toarray()
 
-        #detects blocks in the block diagonal matrix called "dense"
+        # detects blocks in the block diagonal matrix called "dense"
         startlist, endlist = getblocks(dense)
 
         nmolec = len(startlist)
-        
-        #keeps track of the atom movement within the matrix. Needed later
-        atomlist= np.zeros((len(dense)))
-        for b in range(0,nmolec):
-            for i in range(0,len(dense)):
+
+        # keeps track of the atom movement within the matrix. Needed later
+        atomlist = np.zeros((len(dense)))
+        for b in range(0, nmolec):
+            for i in range(0, len(dense)):
                 if (i >= startlist[b]) and (i <= endlist[b]):
-                    atomlist[i]=b+1
+                    atomlist[i] = b + 1
         invperm = inv(perm)
         atomlistperm = [int(atomlist[i]) for i in invperm]
 
-        #assigns atoms to molecules
+        # assigns atoms to molecules
         mlist = []
-        for b in range(0,nmolec):
+        for b in range(0, nmolec):
             fraglist = []
             labelist = []
             poslist = []
             radiilist = []
 
-            #print("doing", b)
-            for i in range(0,len(atomlistperm)):
-                if (atomlistperm[i] == b+1):
+            for i in range(0, len(atomlistperm)):
+                if atomlistperm[i] == b + 1:
                     fraglist.append(i)
                     labelist.append(labels[i])
                     poslist.append(pos[i])
                     radiilist.append(radii[i])
-            
-            #Generates conmat and mconmat for the molecule
+
+            # Generates conmat and mconmat for the molecule
             nidx = 0
             njdx = 0
             nat = len(fraglist)
-#             print(f"length of fragment is {nat}\n")
             conmatlist = np.empty((nat, nat))
             mconmatlist = np.empty((nat, nat))
-            for idx in range(0,len(atomlistperm)):
-                if (atomlistperm[idx] == b+1):
-                    for jdx in range(0,len(atomlistperm)):
-                        if (atomlistperm[jdx] == b+1):
-#                             print(nidx,njdx,idx,jdx)
-                            conmatlist[nidx,njdx] = conmat[idx,jdx]
-                            mconmatlist[nidx,njdx] = mconmat[idx,jdx]
+            for idx in range(0, len(atomlistperm)):
+                if atomlistperm[idx] == b + 1:
+                    for jdx in range(0, len(atomlistperm)):
+                        if atomlistperm[jdx] == b + 1:
+                            conmatlist[nidx, njdx] = conmat[idx, jdx]
+                            mconmatlist[nidx, njdx] = mconmat[idx, jdx]
                             njdx += 1
                     njdx = 0
                     nidx += 1
-            
-            #Creates the objects
-            molec = molecule(b, fraglist, labelist, poslist, radiilist) #Creates Object Molecule
-            molec.information(factor, metal_factor)           #Creates Information about the construction
-            molec.adjacencies(conmatlist, mconmatlist)      #Creates the Connectivity Information           
-            mlist.append(molec)                              #Appends it to the final list of molecules
-    #  status = 1 #good molecule, no clashes yet      
-    if (status == 0):
+
+            # Creates the objects
+            molec = molecule(
+                b, fraglist, labelist, poslist, radiilist
+            )  # Creates Object Molecule
+            molec.information(
+                factor, metal_factor
+            )  # Creates Information about the construction
+            molec.adjacencies(
+                conmatlist, mconmatlist
+            )  # Creates the Connectivity Information
+            mlist.append(molec)  # Appends it to the final list of molecules
+
+    # If 0, prints the coordinates for debugging
+    elif status == 0:
         Warning = True
         mlist = []
-        print("GETMOLECS: steric clashes found. Printing Molecule")
-        for idx, lab in enumerate(labels): 
-            #print(lab, pos[idx])
-            print("%s   %.6f   %.6f   %.6f" % (lab, pos[idx][0], pos[idx][1], pos[idx][2]))
+        print("GETMOLECS: steric clashes found. Printing Coordinates")
+        for idx, lab in enumerate(labels):
+            print(
+                "%s   %.6f   %.6f   %.6f" % (lab, pos[idx][0], pos[idx][1], pos[idx][2])
+            )
         print("")
-            
+
     return Warning, mlist
 
+
 #######################################################
-def splitcomplex(molecule, factor = 1.3, metal_factor = 1.0):   ##Similar to getmolecs
-    
-    if hasattr(molecule, 'factor'):
+def splitcomplex(molecule, factor=1.3, metal_factor=1.0):  
+    ## Similar function to getmolecs, but with a prelude in which the molecule (it must be a molecule of type "Complex"), is split into ligands and metals.
+    #:return ligandlist, metalist. List of ligands and metals, respectively, saved as objects
+
+    if hasattr(molecule, "factor"):
         factor = molecule.factor
-    
-    if hasattr(molecule, 'metal_factor'):
+
+    if hasattr(molecule, "metal_factor"):
         metal_factor = molecule.metal_factor
-    
+
     origatoms = molecule.natoms
-    #variables for complex without metal (metalfree)
+    # variables for complex without metal (metalfree)
     mfreeradii = []
     mfreelabels = []
     mfreepos = []
     mfreeconnec = []
     mfreeatlist = []
-    
-    #variables for metal atoms
+
+    # variables for metal atoms
     metalist = []
     matoms = []
 
-    #Splits the variables into metal and metal-free
+    # Splits the variables into metal and metal-free
     number_of_metal_atoms = 0
     for idx, a in enumerate(molecule.atoms):
-        if (a.block == 'd' or a.block == 'f'):
-            matoms.append(a)                    #This information is for the ligands. To generate lig.metalatoms
+        if a.block == "d" or a.block == "f":
+            matoms.append(
+                a
+            )  # This information is for the ligands. To generate lig.metalatoms
             number_of_metal_atoms += 1
             met = metal(number_of_metal_atoms, idx, a.label, a.coord, a.radii)
             met.information(factor, metal_factor)
-            
-            #Extracts the metal adjacency from the molecule.adjacency matrix
-            tmp_mconnec = extract_from_matrix(list([idx]), molecule.mconnec,1)
+
+            # Extracts the metal adjacency from the molecule.adjacency matrix
+            tmp_mconnec = extract_from_matrix(list([idx]), molecule.mconnec, 1)
             tmp_mconnec = tmp_mconnec.astype(int)
             met.adjacencies(tmp_mconnec)
             metalist.append(met)
-            
-            connec_atoms_label = []   #collects the labels of all atoms connected to this metal
-            #print(molecule.mconmat)
+
+            connec_atoms_label = (
+                []
+            )  # collects the labels of all atoms connected to this metal
+            # print(molecule.mconmat)
             for jdx, at2 in enumerate(molecule.atoms):
                 if molecule.mconmat[idx, jdx] == 1:
                     connec_atoms_label.append(str(at2.label))
             met.coord_sphere = connec_atoms_label
-            met.coord_sphere_ID = getelementcount(connec_atoms_label)        
-            
+            met.coord_sphere_ID = getelementcount(connec_atoms_label)
         else:
             mfreelabels.append(a.label)
             mfreepos.append(a.coord)
@@ -394,257 +494,273 @@ def splitcomplex(molecule, factor = 1.3, metal_factor = 1.0):   ##Similar to get
             mfreeradii.append(a.radii)
             mfreeatlist.append(idx)
 
-    #print("SPLIT: Metal and ligand atoms:", len(mlabels), len(mfreelabels), mfreeradii)
     # Uses the Metal-free coordinates to find the ligands. Notice that, when creating their metal connectivity, it uses that of the original molecule
-    status, conmat, connec, dummy, dummy = getconec(mfreelabels, mfreepos, factor, mfreeradii)
-    
-    
-    if (status == 1):
-        degree = np.diag(connec)  # creates a matrix with connec as diagonal values. Needed for the laplacian
-        lap = conmat - degree   #computes laplacian
+    status, conmat, connec, dummy, dummy = getconec(
+        mfreelabels, mfreepos, factor, mfreeradii
+    )
+
+    if status == 1:
+        degree = np.diag(
+            connec
+        )  # creates a matrix with connec as diagonal values. Needed for the laplacian
+        lap = conmat - degree  # computes laplacian
 
         graph = csr_matrix(lap)
         perm = reverse_cuthill_mckee(graph)
-        gp1 = graph[perm,:]
-        gp2 = gp1[:,perm]
-        dense=gp2.toarray()
+        gp1 = graph[perm, :]
+        gp2 = gp1[:, perm]
+        dense = gp2.toarray()
 
         startlist, endlist = getblocks(dense)
         nmolec = len(startlist)
 
-        atomlist= np.zeros((len(dense)))
-        for b in range(0,nmolec):
-            for i in range(0,len(dense)):
+        atomlist = np.zeros((len(dense)))
+        for b in range(0, nmolec):
+            for i in range(0, len(dense)):
                 if (i >= startlist[b]) and (i <= endlist[b]):
-                    atomlist[i]=b+1
-        
-        
+                    atomlist[i] = b + 1
+
         invperm = inv(perm)
         atomlistperm = [int(atomlist[i]) for i in invperm]
 
         ligandlist = []
-        for b in range(0,nmolec):
+        for b in range(0, nmolec):
             atlist = []
             labelist = []
             poslist = []
             radiilist = []
-            for i in range(0,len(atomlistperm)):
-                if (atomlistperm[i] == b+1):
+            for i in range(0, len(atomlistperm)):
+                if atomlistperm[i] == b + 1:
                     atlist.append(mfreeatlist[i])
-                    labelist.append(mfreelabels[i])   #replace by molecule.labels
+                    labelist.append(mfreelabels[i])  # replace by molecule.labels
                     poslist.append(mfreepos[i])
                     radiilist.append(mfreeradii[i])
-            
-            tmp_conmat = extract_from_matrix(atlist, molecule.conmat,dimension=2)
-            tmp_mconnec = extract_from_matrix(atlist, molecule.mconnec,dimension=1)
+
+            tmp_conmat = extract_from_matrix(atlist, molecule.conmat, dimension=2)
+            tmp_mconnec = extract_from_matrix(atlist, molecule.mconnec, dimension=1)
             tmp_conmat = tmp_conmat.astype(int)
             tmp_mconnec = tmp_mconnec.astype(int)
 
-            #Creates the Ligands
-            lig = ligand(b, atlist, labelist, poslist, radiilist)     #Creates Object Molecule
-            lig.information(factor, metal_factor)                     #Creates Information about the construction
-            lig.adjacencies(tmp_conmat, tmp_mconnec)                  #Creates the Adjacency Information
-            for a in matoms:                                          # only adds metal atoms that are connected to the ligand
+            # Creates the Ligands
+            lig = ligand(
+                b, atlist, labelist, poslist, radiilist
+            )  # Creates Object Molecule
+            lig.information(
+                factor, metal_factor
+            )  # Creates Information about the construction
+            lig.adjacencies(
+                tmp_conmat, tmp_mconnec
+            )  # Creates the Adjacency Information
+            for a in matoms:  # only adds metal atoms that are connected to the ligand
                 for idx, ligat in enumerate(lig.atoms):
                     if lig.atlist[idx] in a.adjacency:
-                        lig.metalatoms.append(a)                      #Saves Metal-Atom Information to the Ligand Object
-            ligandlist.append(lig)                                    #Appends it to the final list of ligand
-    
-    finatoms = 0
-    for lig in ligandlist:
-        finatoms += lig.natoms
-    for met in metalist:
-        finatoms += met.natom
-    
-    if origatoms != finatoms:
-        print("WARNING: different initial and final atoms in splitcomplex, for molecule", molecule.natoms, molecule.labels)
-                
+                        lig.metalatoms.append(
+                            a
+                        )  # Saves Metal-Atom Information to the Ligand Object
+            ligandlist.append(lig)  # Appends it to the final list of ligand
+
     return ligandlist, metalist
 
+
 #######################################################
-def determine_molec_or_frag (blocklist, refmoleclist):
-    
+def determine_molec_or_frag(blocklist, refmoleclist):
+
     natoms_ini = 0
-    
+
     fraglist = []
-    Hlist = []    
+    Hlist = []
 
     for b in blocklist:
         b.frac = cart2frac(b.coord, cellvec)
         b.centroid = getcentroid(b.frac)
         natoms_ini += b.natoms
 
-
     for idx, block in enumerate(blocklist):
         if any((block.elemcountvec == ref.elemcountvec).all() for ref in refmoleclist):
-            if any((atom.block == 'd' or atom.block == 'f') for atom in block.atoms): 
+            if any((atom.block == "d" or atom.block == "f") for atom in block.atoms):
                 block.type = "Complex"
             else:
                 block.type = "Molecule"
             moleclist.append(block)
-        else:    
+        else:
             if (block.natoms == 1) and (block.numH == 1):
                 block.type = "H"
                 Hlist.append(block)
             else:
                 block.type = "Fragment"
                 fraglist.append(block)
-    
+
     return fraglist, Hlist
+
 
 #######################################################
 def additem(item, vector):
     if item not in vector:
-        vector.append(item)        
+        vector.append(item)
     return vector
+
 
 #######################################################
 def absolute_value(num):
     sum = 0
-    for i in num: sum += np.abs(i)        
+    for i in num:
+        sum += np.abs(i)
     return abs(sum)
+
 
 #######################################################
 def tmatgenerator(centroid, thres=0.40, full=False):
+    # This function generates a list of the translations that a fragment should undergo depending on the centroid of its fractional coordinates
+    # For instance, if the centroid of a fragment is at 0.9 in any given axis, it is unlikely that a one-cell-length translation along such axis (resulting in 1.9) would help.
+    # Also, a fragment right at the center of the unit cell (centroid=(0.5, 0.5, 0.5) is unlikely to require reconstruction
+    # The threshold defines the window. If thres=0.4, the function will suggest positive translation for any fragment between 0 and 0.4, and negative translation between 0.6 and 1.0.
+    # If full is asked, then all translations are applied
 
-    tmax = (1 - thres)
+    tmax = 1 - thres
     tmin = thres
-    
+
     if not full:
         tmatrix = []
         tmatrix = additem((0, 0, 0), tmatrix)
 
         # X positive
-        if (centroid[0] >= tmax):
+        if centroid[0] >= tmax:
             tmatrix = additem((-1, 0, 0), tmatrix)
-            if (centroid[1] >= tmax):
+            if centroid[1] >= tmax:
                 tmatrix = additem((-1, -1, 0), tmatrix)
                 tmatrix = additem((0, -1, 0), tmatrix)
-                if (centroid[2] >= tmax):
+                if centroid[2] >= tmax:
                     tmatrix = additem((-1, -1, -1), tmatrix)
                     tmatrix = additem((0, -1, -1), tmatrix)
                     tmatrix = additem((0, 0, -1), tmatrix)
-                if (centroid[2] <= tmin):
-                #elif (centroid[2] <= tmin):
+                if centroid[2] <= tmin:
                     tmatrix = additem((-1, -1, 1), tmatrix)
                     tmatrix = additem((0, -1, 1), tmatrix)
                     tmatrix = additem((0, 0, 1), tmatrix)
-            if (centroid[1] <= tmin):
+            if centroid[1] <= tmin:
                 tmatrix = additem((-1, 1, 0), tmatrix)
                 tmatrix = additem((0, 1, 0), tmatrix)
-                if (centroid[2] >= tmax):
+                if centroid[2] >= tmax:
                     tmatrix = additem((-1, 1, -1), tmatrix)
                     tmatrix = additem((0, 1, -1), tmatrix)
                     tmatrix = additem((0, 0, -1), tmatrix)
-                if (centroid[2] <= tmin):
+                if centroid[2] <= tmin:
                     tmatrix = additem((-1, 1, 1), tmatrix)
                     tmatrix = additem((0, 1, 1), tmatrix)
                     tmatrix = additem((0, 0, 1), tmatrix)
-            if (centroid[2] >= tmax):
+            if centroid[2] >= tmax:
                 tmatrix = additem((-1, 0, -1), tmatrix)
                 tmatrix = additem((0, 0, -1), tmatrix)
-            if (centroid[2] <= tmin):
+            if centroid[2] <= tmin:
                 tmatrix = additem((-1, 0, 1), tmatrix)
                 tmatrix = additem((0, 0, 1), tmatrix)
 
-        if (centroid[1] >= tmax):
+        if centroid[1] >= tmax:
             tmatrix = additem((0, -1, 0), tmatrix)
-            if (centroid[2] >= tmax):
+            if centroid[2] >= tmax:
                 tmatrix = additem((0, -1, -1), tmatrix)
                 tmatrix = additem((0, 0, -1), tmatrix)
-            if (centroid[2] <= tmin):
+            if centroid[2] <= tmin:
                 tmatrix = additem((0, -1, 1), tmatrix)
                 tmatrix = additem((0, 0, 1), tmatrix)
 
-        if (centroid[2] >= tmax):
+        if centroid[2] >= tmax:
             tmatrix = additem((0, 0, -1), tmatrix)
 
-        if (centroid[0] <= tmin):
+        if centroid[0] <= tmin:
             tmatrix = additem((1, 0, 0), tmatrix)
-            if (centroid[1] <= tmin):
+            if centroid[1] <= tmin:
                 tmatrix = additem((1, 1, 0), tmatrix)
                 tmatrix = additem((0, 1, 0), tmatrix)
-                if (centroid[2] <= tmin):
+                if centroid[2] <= tmin:
                     tmatrix = additem((1, 1, 1), tmatrix)
                     tmatrix = additem((0, 1, 1), tmatrix)
                     tmatrix = additem((0, 0, 1), tmatrix)
-                if (centroid[2] >= tmax):
+                if centroid[2] >= tmax:
                     tmatrix = additem((1, 1, -1), tmatrix)
                     tmatrix = additem((0, 1, -1), tmatrix)
                     tmatrix = additem((0, 0, -1), tmatrix)
-            if (centroid[1] >= tmax):
+            if centroid[1] >= tmax:
                 tmatrix = additem((1, -1, 0), tmatrix)
                 tmatrix = additem((0, -1, 0), tmatrix)
-                if (centroid[2] >= tmax):
+                if centroid[2] >= tmax:
                     tmatrix = additem((1, -1, -1), tmatrix)
-                if (centroid[2] <= tmin):
+                if centroid[2] <= tmin:
                     tmatrix = additem((1, -1, 1), tmatrix)
-            if (centroid[2] <= tmin):
+            if centroid[2] <= tmin:
                 tmatrix = additem((1, 0, 1), tmatrix)
                 tmatrix = additem((0, 0, 1), tmatrix)
-            if (centroid[2] >= tmax):
+            if centroid[2] >= tmax:
                 tmatrix = additem((1, 0, -1), tmatrix)
                 tmatrix = additem((0, 0, -1), tmatrix)
 
-        if (centroid[1] <= tmin):
+        if centroid[1] <= tmin:
             tmatrix = additem((0, 1, 0), tmatrix)
-            if (centroid[2] <= tmin):
+            if centroid[2] <= tmin:
                 tmatrix = additem((0, 1, 1), tmatrix)
                 tmatrix = additem((0, 0, 1), tmatrix)
-            if (centroid[2] >= tmax):
+            if centroid[2] >= tmax:
                 tmatrix = additem((0, 1, -1), tmatrix)
                 tmatrix = additem((0, 0, -1), tmatrix)
-        if (centroid[2] <= tmin):
-            tmatrix = additem((0, 0, 1), tmatrix)         
+        if centroid[2] <= tmin:
+            tmatrix = additem((0, 0, 1), tmatrix)
 
         if (centroid[0] > tmin) and (centroid[0] < tmax):
-            if (centroid[1] <= tmin):
+            if centroid[1] <= tmin:
                 tmatrix = additem((0, 1, 0), tmatrix)
-                if (centroid[2] >= tmax):
+                if centroid[2] >= tmax:
                     tmatrix = additem((0, 1, -1), tmatrix)
-                if (centroid[2] <= tmin):
+                if centroid[2] <= tmin:
                     tmatrix = additem((0, 1, 1), tmatrix)
-            if (centroid[1] >= tmax):
+            if centroid[1] >= tmax:
                 tmatrix = additem((0, -1, 0), tmatrix)
-                if (centroid[2] >= tmax):
+                if centroid[2] >= tmax:
                     tmatrix = additem((0, -1, -1), tmatrix)
-                if (centroid[2] <= tmin):
+                if centroid[2] <= tmin:
                     tmatrix = additem((0, -1, 1), tmatrix)
-            if (centroid[2] <= tmin):
+            if centroid[2] <= tmin:
                 tmatrix = additem((0, 0, 1), tmatrix)
-                if (centroid[1] >= tmax):
+                if centroid[1] >= tmax:
                     tmatrix = additem((0, -1, 1), tmatrix)
-                if (centroid[1] <= tmin):
+                if centroid[1] <= tmin:
                     tmatrix = additem((0, 1, 1), tmatrix)
-            if (centroid[2] >= tmax):
+            if centroid[2] >= tmax:
                 tmatrix = additem((0, 0, -1), tmatrix)
-                if (centroid[1] >= tmax):
+                if centroid[1] >= tmax:
                     tmatrix = additem((0, -1, -1), tmatrix)
-                if (centroid[1] <= tmin):
+                if centroid[1] <= tmin:
                     tmatrix = additem((0, 1, -1), tmatrix)
     elif full:
         import itertools
+
         x = [-1, 0, 1]
         tmatrix = [p for p in itertools.product(x, repeat=3)]
-        
-    tmatrix.sort(key = absolute_value)
-#     if (thres == 1.0):
-#         print("TMATGENERATOR: centroid and tmatrix:", centroid, tmatrix)
-    
+
+    tmatrix.sort(key=absolute_value)
+
     return tmatrix
 
 
 #######################################################
 def sequential(fragmentlist, refmoleclist, cellvec, debug, factor, metal_factor, typ="All"):
-       
-    if (debug == 1): print("Entered sequential with", len(fragmentlist), "fragments to reconstruct")
-    
-    #Finds How many atoms, at max, can a molecule have. It is used to skip meaningless combinations
-    maxatoms=0
+    # Crappy function that controls the reconstruction process. It is called sequential because pairs of fragments are sent one by one. Ideally, a parallel version would be desirable.
+    # Given a list of fragments(fragmentlist), a list of reference molecules(refmoleclist), and some other minor parameters, the function sends pairs of fragments and evaluates if they...
+    # ...form a bigger fragment. If so, the bigger fragment is evaluated. If it coincides with one of the molecules in refmoleclist, than it means that it is a full molecule that requires no further work.
+    # ...if it does not, then it means that requires further reconstruction, and is again introduced in the loop.
+    # typ is a variable that defines how to combine the fragments. To speed up the process, this function is called twice in main.
+    # -First, to combine heavy fragments among themselves (typ="Heavy")
+    # -Second, to combie heavy fragments with H atoms (typ="All")
+    #:return molecsfoundlist, remainingfragments: lists of molecules and fragments, respectively, saved as objects
+
+    if debug >= 1:
+        print("Entered sequential with", len(fragmentlist), "fragments to reconstruct")
+
+    # Finds How many atoms, at max, can a molecule have. It is used to skip meaningless combinations
+    maxatoms = 0
     for ref in refmoleclist:
         if ref.natoms > maxatoms:
-            maxatoms = ref.natoms        
-    
+            maxatoms = ref.natoms
+
     molecsfoundlist = []
     remainingfragments = []
     ###################################################
@@ -660,10 +776,13 @@ def sequential(fragmentlist, refmoleclist, cellvec, debug, factor, metal_factor,
     lastiter = 0
     lastitermargin = maxiter
     ###################################################
-    
+
+    ###################################################
+    # Lists (list1 and list2) are created here depending on variable "typ"
+    ###################################################
     for frag in fragmentlist:
         frag.tmatrix = tmatgenerator(frag.centroid, threshold_tmat)
-    
+
     remlist = []
     Hlist = []
     for frag in fragmentlist:
@@ -673,97 +792,159 @@ def sequential(fragmentlist, refmoleclist, cellvec, debug, factor, metal_factor,
         else:
             frag.type = "Heavy"
             remlist.append(frag)
-    
-    if (debug == 1): 
-        print("Found", len(remlist), "and", len(Hlist), "Heavy and Hydrogen fragments, respectively")
-    
-    if (typ == "Heavy"):
+
+    if debug >= 1:
+        print(
+            "Found",
+            len(remlist),
+            "and",
+            len(Hlist),
+            "Heavy and Hydrogen fragments, respectively",
+        )
+
+    if typ == "Heavy":
         list1 = remlist.copy()
         list2 = remlist.copy()
-    elif (typ == "All"):
+    elif typ == "All":
         list1 = remlist.copy()
-        list2 = Hlist.copy()  
-    
+        list2 = Hlist.copy()
 
-    ## Initial Fragments
+    ## Initial Fragment indices for each list
     Frag1_toallocate = 0
-    Frag2_toallocate = 0   
-    
+    Frag2_toallocate = 0
+
     #################
     ### MAIN LOOP ###
-    #################    
-    while ((len(list1) > 0) and (len(list2) > 0)):
+    #################
+    while (len(list1) > 0) and (len(list2) > 0):
 
-        ####
-        #This part decides which molecules in the two lists are sent to combine
+        #################
+        #  This part decides which molecules in the two lists are sent to combine
+        #################
         STOP = False
         Last_Attempt = False
-        
-        if (niter > 1): Frag2_toallocate += 1
-        
-        if (Frag2_toallocate > len(list2)-1):   #Reaches the end of the second list. Restarts it and moves forward in the first list
+
+        if niter > 1:
+            Frag2_toallocate += 1
+
+        if (
+            Frag2_toallocate > len(list2) - 1
+        ):  # Reaches the end of the second list. Restarts it and moves forward in the first list
             Frag1_toallocate += 1
             Frag2_toallocate = 0
-            
-        if (Frag1_toallocate > len(list1)-1):   #Reaches the end of the first list. Restarts both
+
+        if (
+            Frag1_toallocate > len(list1) - 1
+        ):  # Reaches the end of the first list. Restarts both
             Frag1_toallocate = 0
             Frag2_toallocate = 0
-        
-        if (typ == "Heavy"): 
-            if (Frag1_toallocate == Frag2_toallocate): Frag2_toallocate += 1
 
-        if (typ == "Heavy"): 
-            if ((Frag1_toallocate >= len(list1)-1) and (Frag2_toallocate >= len(list2)-2)):
+        if typ == "Heavy":
+            if Frag1_toallocate == Frag2_toallocate:
+                Frag2_toallocate += 1
+
+        if typ == "Heavy":
+            if (Frag1_toallocate >= len(list1) - 1) and (
+                Frag2_toallocate >= len(list2) - 2
+            ):
                 STOP = True
-        elif (typ == "All"): 
-            if ((Frag1_toallocate >= len(list1)-1) and (Frag2_toallocate >= len(list2)-1)):
+        elif typ == "All":
+            if (Frag1_toallocate >= len(list1) - 1) and (
+                Frag2_toallocate >= len(list2) - 1
+            ):
                 STOP = True
-        ####
-        
-        #if (STOP == False):
-        if (debug == 1): print(" ")
-        if (debug == 1): print("Fragments to allocate this iteration:", Frag1_toallocate, Frag2_toallocate, 
-                               "out of", len(list1)-1, len(list2)-1)
+        #################
+
+        #################
+        #  This part handles sublist, keeplist1 and keeplist2. They are necessary to handle the results of the function "Combine", which is called later.
+        #################
+        if debug >= 1:
+            print(" ")
+        if debug >= 1:
+            print(
+                "Fragments to allocate this iteration:",
+                Frag1_toallocate,
+                Frag2_toallocate,
+                "out of",
+                len(list1) - 1,
+                len(list2) - 1,
+            )
 
         sublist = []
         keeplist1 = []
         keeplist2 = []
-        if (typ == "Heavy"): 
+        if typ == "Heavy":
             for i in range(0, len(list1)):
-                if (i == Frag1_toallocate):
+                if i == Frag1_toallocate:
                     sublist.append(list1[i])
-                elif (i != Frag2_toallocate): 
+                elif i != Frag2_toallocate:
                     keeplist1.append(list1[i])
             for i in range(0, len(list2)):
-                if (i == Frag2_toallocate):
+                if i == Frag2_toallocate:
                     sublist.append(list2[i])
-                elif (i != Frag1_toallocate):
+                elif i != Frag1_toallocate:
                     keeplist2.append(list2[i])
-        elif (typ == "All"):
+        elif typ == "All":
             for i in range(0, len(list1)):
-                if (i == Frag1_toallocate):
+                if i == Frag1_toallocate:
                     sublist.append(list1[i])
-                elif (i != Frag1_toallocate): 
+                elif i != Frag1_toallocate:
                     keeplist1.append(list1[i])
             for i in range(0, len(list2)):
-                if (i == Frag2_toallocate):
+                if i == Frag2_toallocate:
                     sublist.append(list2[i])
-                elif (i != Frag2_toallocate):
+                elif i != Frag2_toallocate:
                     keeplist2.append(list2[i])
-                    
-        if (list1[Frag1_toallocate].natoms+list2[Frag2_toallocate].natoms <= maxatoms):
 
-            if (debug == 1): 
-                print("SEQUENTIAL",typ,"iteration", niter, "with", len(list1), "and", 
-                      len(list2), "Remaining in each list") 
-            if (debug == 1): 
-                print("SEQUENTIAL",typ,"sending", list1[Frag1_toallocate].labels, "and", 
-                      list2[Frag2_toallocate].labels, "to combine") 
-            goodlist, avglist, badlist = combine(sublist, refmoleclist, cellvec, 
-                                                 threshold_tmat, factor, metal_factor)
+        #################
+        #  This part evaluates that the fragments that are going to be combined, can form one of the reference molecules. The resulting number of atoms is used.
+        #################
+        if list1[Frag1_toallocate].natoms + list2[Frag2_toallocate].natoms > maxatoms:
+            if debug >= 1:
+                print(
+                    "SEQUENTIAL",
+                    typ,
+                    "SKIPPED",
+                    list1[Frag1_toallocate].natoms,
+                    "and",
+                    list2[Frag2_toallocate].natoms,
+                )
+        else:
+            if debug >= 1:
+                print(
+                    "SEQUENTIAL",
+                    typ,
+                    "iteration",
+                    niter,
+                    "with",
+                    len(list1),
+                    "and",
+                    len(list2),
+                    "Remaining in each list",
+                )
+            if debug >= 1:
+                print(
+                    "SEQUENTIAL",
+                    typ,
+                    "sending",
+                    list1[Frag1_toallocate].labels,
+                    "and",
+                    list2[Frag2_toallocate].labels,
+                    "to combine",
+                )
 
-            if (len(goodlist) > 0) or (len(avglist) > 0):   
-                #it means that the function combine worked. Thus, it restarts the fragments to allocate
+            #################
+            #  Here, the function "combine" is called. It will try cell translations of one fragment, and check whether it eventually combines with the second fragment into either a bigger fragment or a molecule
+            #################
+            goodlist, avglist, badlist = combine(
+                sublist, refmoleclist, cellvec, threshold_tmat, factor, metal_factor
+            )
+
+            #################
+            #  This part handles the results of combine
+            #################
+            if (len(goodlist) > 0) or (len(avglist) > 0):
+                # it means that the function combine worked. Thus, it restarts the fragments to allocate
                 lastiter = niter
                 Frag1_toallocate = 0
                 Frag2_toallocate = 0
@@ -772,7 +953,7 @@ def sequential(fragmentlist, refmoleclist, cellvec, debug, factor, metal_factor,
             for g in goodlist:
                 g.type = assigntype(g, refmoleclist)
                 molecsfoundlist.append(g)
-            if (len(goodlist) >= 1):
+            if len(goodlist) >= 1:
                 print("SEQUENTIAL: Molecules found so far:")
                 for i, item in enumerate(molecsfoundlist):
                     print(i, item.natoms, item.labels)
@@ -782,16 +963,16 @@ def sequential(fragmentlist, refmoleclist, cellvec, debug, factor, metal_factor,
             list2 = []
             for a in avglist:
                 list1.append(a)
-                if (typ == "Heavy"): 
-                    list2.append(a) 
+                if typ == "Heavy":
+                    list2.append(a)
 
-            if (len(badlist) > 1):
-                if (typ == "Heavy"):
+            if len(badlist) > 1:
+                if typ == "Heavy":
                     list1.append(badlist[0])
                     list1.append(badlist[1])
                     list2.append(badlist[0])
                     list2.append(badlist[1])
-                elif (typ != "Heavy"):
+                elif typ != "Heavy":
                     list1.append(badlist[0])
                     list2.append(badlist[1])
 
@@ -801,77 +982,79 @@ def sequential(fragmentlist, refmoleclist, cellvec, debug, factor, metal_factor,
             for k2 in keeplist2:
                 list2.append(k2)
 
-            if (len(list1) + len(list2) == 0):
-                print('FINISHED succesfully')
+            if len(list1) + len(list2) == 0:
+                print("FINISHED succesfully")
                 break
 
-            if (typ == "Heavy"):
-                if (len(list1) == 1):
+            if typ == "Heavy":
+                if len(list1) == 1:
                     for l in list1:
                         remainingfragments.append(l)
-                        print('FINISHED with Remaining Fragment')
+                        print("FINISHED with Remaining Fragment")
                     break
 
             if (len(list1) == 0) and (len(list2) == 0):
-                print('FINISHED succesfully')
+                print("FINISHED succesfully")
                 break
 
-        else:
-            if (debug == 1): print("SEQUENTIAL",typ,"SKIPPED", list1[Frag1_toallocate].natoms, "and", list2[Frag2_toallocate].natoms) 
-            
+        #################
+        #  This part decides whether the WHILE loop must finish.
+        #################
         niter += 1
-        if (niter > maxiter): 
-            #print("STOP: Maximum Number of Iterations Reached")
+        if niter > maxiter:
             STOP = True
-        if (niter > (lastiter + lastitermargin)):
-            #print("STOP: Too many failed attempts since lastiter")
+        if niter > (lastiter + lastitermargin):
             STOP = True
 
-        if STOP:            
-            if (threshold_tmat <= (1.0-increase_tmat)) or Last_Attempt:
+        if not STOP:
+            continue
+        else:
+            if (threshold_tmat <= (1.0 - increase_tmat)) or Last_Attempt:
                 STOP = False
-                #threshold_tmat = fsum([threshold_tmat, incr])
                 threshold_tmat += increase_tmat
-                if threshold_tmat >= 1: 
+                if threshold_tmat >= 1:
                     Last_Attempt = True
-                    print("Launching Last Attempt")
+                    if debug >= 1:
+                        print("Launching Last Attempt")
                 if not Last_Attempt:
-                    maxsize= 0
+                    maxsize = 0
                     for l in list1:
                         l.tmatrix = tmatgenerator(l.centroid, threshold_tmat)
-                        if len(l.tmatrix) > maxsize: maxsize = len(l.tmatrix)
+                        if len(l.tmatrix) > maxsize:
+                            maxsize = len(l.tmatrix)
                     for l in list2:
                         l.tmatrix = tmatgenerator(l.centroid, threshold_tmat)
-                        if len(l.tmatrix) > maxsize: maxsize = len(l.tmatrix)
-                    print(" Increased Threshold_tmat. Now:", threshold_tmat)
-                    print(" Maxsize of the translation matrix is=", maxsize) 
+                        if len(l.tmatrix) > maxsize:
+                            maxsize = len(l.tmatrix)
+                    if debug >= 1:
+                        print(" Increased Threshold_tmat. Now:", threshold_tmat)
+                    if debug >= 1:
+                        print(" Maxsize of the translation matrix is=", maxsize)
                 elif Last_Attempt:
                     for l in list1:
                         l.tmatrix = tmatgenerator(l.centroid, threshold_tmat, full=True)
-                        if len(l.tmatrix) != 27: print("error when generating the full tmatrix") 
                     for l in list2:
                         l.tmatrix = tmatgenerator(l.centroid, threshold_tmat, full=True)
-                        if len(l.tmatrix) != 27: print("error when generating the full tmatrix") 
-                    print("Trying Full Tmatrix for all Items in list") 
+                    if debug >= 1:
+                        print("Trying Full Tmatrix for all Items in list")
 
                 niter = 1
                 Frag1_toallocate = 0
                 Frag2_toallocate = 0
-
             else:
                 for l in list1:
-                    print("Sequential: list1 end:", l.labels)
-                    #print("Sequential: list1 end:", l.centroid, l.tmatrix)
+                    if debug >= 1:
+                        print("Sequential: list1 end:", l.labels)
                     remainingfragments.append(l)
                 for l in list2:
-                    if (typ == "All"): print("Sequential: list2 end:", l.labels)
-                    #print("Sequential: list2 end:", l.centroid, l.tmatrix)
-                    if (typ == "All"): remainingfragments.append(l)
+                    if typ == "All" and debug >= 1:
+                        print("Sequential: list2 end:", l.labels)
+                    if typ == "All":
+                        remainingfragments.append(l)
                 break
-        else:
-            continue
 
     return molecsfoundlist, remainingfragments
+
 
 #######################################################
 def combine(tobeallocated, references, cellvec, threshold_tmat, factor, metal_factor, debug=0):
@@ -880,93 +1063,109 @@ def combine(tobeallocated, references, cellvec, threshold_tmat, factor, metal_fa
     avglist = []
     badlist = []
     available = np.ones((len(tobeallocated)))
-    
-    mergedatoms = 0   #SERGI
+
+    mergedatoms = 0  # SERGI
     for mol in tobeallocated:
-        mergedatoms += mol.natoms #SERGI
-        #print("COMBINE received molec with:", mol.natoms)
-    
+        mergedatoms += mol.natoms  # SERGI
+        # print("COMBINE received molec with:", mol.natoms)
+
     combinations = [(1, 1)]
     # Main loop
     for idx, c in enumerate(combinations):
-        if (np.sum(c) <= np.sum(available)):
+        if np.sum(c) <= np.sum(available):
 
             mergelist = []
             goodcombination = True
             for jdx, times in enumerate(c):
                 if (times == 1) and (available[jdx] == 1):
-                    mergelist.append(jdx)        
+                    mergelist.append(jdx)
                 if (times == 1) and (available[jdx] == 0):
                     goodcombination = False
 
             if goodcombination:
-                found, newmoleclist = reconstruct(tobeallocated, mergelist, references, 
-                                                  cellvec, factor, metal_factor)
+                found, newmoleclist = reconstruct(
+                    tobeallocated, mergelist, references, cellvec, factor, metal_factor
+                )
 
-                if (found == 1):
+                if found == 1:
                     for m in mergelist:
                         available[m] = 0
-                
-                    if (newmoleclist[0].natoms != mergedatoms):
-                        if (debug == 1): 
-                            print("COMBINE WARNING: I sent", mergedatoms, 
-                                  "atoms but received a molecule with", newmoleclist[0].natoms)
+
+                    if newmoleclist[0].natoms != mergedatoms:
+                        if debug >= 1:
+                            print(
+                                "COMBINE WARNING: I sent",
+                                mergedatoms,
+                                "atoms but received a molecule with",
+                                newmoleclist[0].natoms,
+                            )
 
                     number = 0
                     newmolec = newmoleclist[0]
                     newmolec.frac = cart2frac(newmolec.coord, cellvec)
                     newmolec.centroid = getcentroid(newmolec.frac)
                     newmolec.tmatrix = tmatgenerator(newmolec.centroid, threshold_tmat)
-  
-                    #ASSIGNS NEWMOLEC TO EITHER: 
+
+                    # ASSIGNS NEWMOLEC TO EITHER:
                     #   - REC.FRAGMENT to continue reconstring later with H
-                    #   - Molec or Complex 
+                    #   - Molec or Complex
                     shit = 0
                     for ref in references:
-                        if ((ref.elemcountvec == newmolec.elemcountvec).all() and shit == 0):
-                            if ((ref.adjtypes == newmolec.adjtypes).all()):
+                        if (
+                            ref.elemcountvec == newmolec.elemcountvec
+                        ).all() and shit == 0:
+                            if (ref.adjtypes == newmolec.adjtypes).all():
                                 shit = 1
                                 newmolec.type = ref.type
                                 goodlist.append(newmolec)
-                                if (debug == 1): print("COMBINE: Fragment", newmolec.labels, "added to goodlist")
-                    if (shit == 0): 
+                                if debug >= 1:
+                                    print(
+                                        "COMBINE: Fragment",
+                                        newmolec.labels,
+                                        "added to goodlist",
+                                    )
+                    if shit == 0:
                         newmolec.type = "Rec. Fragment"
-                        avglist.append(newmolec)   
-                        if (debug == 1): print("COMBINE: Fragment", newmolec.labels, "added to avglist")
-                    
+                        avglist.append(newmolec)
+                        if debug >= 1:
+                            print(
+                                "COMBINE: Fragment", newmolec.labels, "added to avglist"
+                            )
+
         else:
             for kdx, a in enumerate(available):
-                if (a == 1): 
+                if a == 1:
                     badlist.append(tobeallocated[kdx])
             break
-    
-        if (idx == len(combinations)-1):
+
+        if idx == len(combinations) - 1:
             for kdx, a in enumerate(available):
-                if (a == 1): 
+                if a == 1:
                     badlist.append(tobeallocated[kdx])
             break
 
     return goodlist, avglist, badlist
 
+
 #######################################################
-def reconstruct(fraglist, listofids, reflist, cellvec, factor, metal_factor):        
-    #function also used fraglist
-    
+def reconstruct(fraglist, listofids, reflist, cellvec, factor, metal_factor):
+    # function also used fraglist
+
     tmatlist = []
     status = 0
-    
-    #finds biggest fragment and keeps it in the original cell
+
+    # finds biggest fragment and keeps it in the original cell
     sizes = []
-    for l in listofids:    
+    for l in listofids:
         size = fraglist[l].natoms
         sizes.append(size)
     keep = np.argmax(sizes)
-    
+
     listwithoutkeep = []
     for idx, frag in enumerate(listofids):
-        if (idx != keep):
+        if idx != keep:
             listwithoutkeep.append(frag)
-            
+
     for l in listwithoutkeep:
         tmatlist.append(fraglist[l].tmatrix)
 
@@ -982,17 +1181,19 @@ def reconstruct(fraglist, listofids, reflist, cellvec, factor, metal_factor):
 
             for kdx, mol in enumerate(tmol):
                 reclabels.extend(fraglist[listwithoutkeep[kdx]].labels)
-                if (mol != (0, 0, 0)):   
-                    #indicates that the molecule needs translation in direction defined by "tma"
-                    newcoord = translate(mol, fraglist[listwithoutkeep[kdx]].coord, cellvec)
-                    if (len(newcoord) != len(fraglist[listwithoutkeep[kdx]].coord)): 
+                if mol != (0, 0, 0):
+                    # indicates that the molecule needs translation in direction defined by "tma"
+                    newcoord = translate(
+                        mol, fraglist[listwithoutkeep[kdx]].coord, cellvec
+                    )
+                    if len(newcoord) != len(fraglist[listwithoutkeep[kdx]].coord):
                         print("error 1 in Reconstruct")
                     reccoord.extend(newcoord)
-                if (mol == (0, 0, 0)):
+                if mol == (0, 0, 0):
                     reccoord.extend(fraglist[listwithoutkeep[kdx]].coord)
-                    
+
             Warning, reclist = getmolecs(reclabels, reccoord, factor, metal_factor)
-            if (len(reclist) == 1):
+            if len(reclist) == 1:
                 status = checkchemistry(reclist[0], reflist, "Max")
                 break
     else:
@@ -1000,28 +1201,29 @@ def reconstruct(fraglist, listofids, reflist, cellvec, factor, metal_factor):
 
     return status, reclist
 
+
 #######################################################
-def indentify_frag_molec_H (blocklist, moleclist, refmoleclist, cellvec):
-    
+def indentify_frag_molec_H(blocklist, moleclist, refmoleclist, cellvec):
+
     init_natoms = 0
-    
+
     fraglist = []
     Hlist = []
-    
+
     # Convert blocks' coordinates and get centroid
     for b in blocklist:
         b.frac = cart2frac(b.coord, cellvec)
         b.centroid = getcentroid(b.frac)
         init_natoms += b.natoms
-    
+
     for idx, block in enumerate(blocklist):
         if any((block.elemcountvec == ref.elemcountvec).all() for ref in refmoleclist):
-            if any((atom.block == 'd' or atom.block == 'f') for atom in block.atoms): 
+            if any((atom.block == "d" or atom.block == "f") for atom in block.atoms):
                 block.type = "Complex"
             else:
                 block.type = "Molecule"
             moleclist.append(block)
-        else:    
+        else:
             if (block.natoms == 1) and (block.numH == 1):
                 block.type = "H"
                 Hlist.append(block)
@@ -1034,24 +1236,33 @@ def indentify_frag_molec_H (blocklist, moleclist, refmoleclist, cellvec):
     print("#################")
     for b in blocklist:
         print("Block in Info", b.natoms, b.labels, b.type)
-    print(len(blocklist),"Blocks sorted for reconstructrion as (Molec, Frag, H):",len(moleclist),len(fraglist),len(Hlist))
+    print(
+        len(blocklist),
+        "Blocks sorted for reconstructrion as (Molec, Frag, H):",
+        len(moleclist),
+        len(fraglist),
+        len(Hlist),
+    )
     print("With a total of", init_natoms, "atoms")
-    
+
     return moleclist, fraglist, Hlist, init_natoms
 
+
 #######################################################
-def fragments_reconstruct (moleclist, fraglist, Hlist, refmoleclist, cellvec, debug, factor, metal_factor):
-    
+def fragments_reconstruct(moleclist, fraglist, Hlist, refmoleclist, cellvec, debug, factor, metal_factor):
+
     Warning = False
-    
+
     # Reconstruct Heavy Fragments
-    if (len(fraglist) > 1): 
+    if len(fraglist) > 1:
         print("")
         print("##############################################")
-        print(len(fraglist),"molecules submitted to SEQUENTIAL with Heavy")
+        print(len(fraglist), "molecules submitted to SEQUENTIAL with Heavy")
         print("##############################################")
-        newmols, remfrag = sequential(fraglist, refmoleclist, cellvec, debug, factor, metal_factor,"Heavy")
-        print(len(newmols),len(remfrag),"molecules out of SEQUENTIAL with Heavy")
+        newmols, remfrag = sequential(
+            fraglist, refmoleclist, cellvec, debug, factor, metal_factor, "Heavy"
+        )
+        print(len(newmols), len(remfrag), "molecules out of SEQUENTIAL with Heavy")
         moleclist.extend(newmols)
         fraglist = []
         fraglist.extend(remfrag)
@@ -1059,14 +1270,16 @@ def fragments_reconstruct (moleclist, fraglist, Hlist, refmoleclist, cellvec, de
 
         print(" ")
         # Prints molecules after Heavy Fragment Reconstruction
-        if (len(newmols) > 0):
+        if len(newmols) > 0:
             for mol in newmols:
-                print("Molec reconstructed after Heavy", mol.natoms, mol.labels, mol.type)
+                print(
+                    "Molec reconstructed after Heavy", mol.natoms, mol.labels, mol.type
+                )
         else:
             print("NO Molecules reconstructed after Heavy")
-        if (len(remfrag) > 0):
+        if len(remfrag) > 0:
             for rem in remfrag:
-                print("Remaining after Heavy", rem.natoms, rem.labels, rem.type)        
+                print("Remaining after Heavy", rem.natoms, rem.labels, rem.type)
         else:
             print("NO remaining Molecules after Heavy")
 
@@ -1076,16 +1289,23 @@ def fragments_reconstruct (moleclist, fraglist, Hlist, refmoleclist, cellvec, de
         print("Only 0 or 1 heavy fragments. Skipping Heavy")
 
     # Reconstruct Hydrogens with remaining Fragments
-    if (len(remfrag) > 0 and len(Hlist) > 0):
+    if len(remfrag) > 0 and len(Hlist) > 0:
         print("")
         print("##############################################")
-        print(len(fraglist),"molecules submitted to sequential with All")
+        print(len(fraglist), "molecules submitted to sequential with All")
         print("##############################################")
-        finalmols, remfrag = sequential(fraglist, refmoleclist, cellvec, debug, factor, metal_factor, "All")
-        if (len(remfrag) > 0):
+        finalmols, remfrag = sequential(
+            fraglist, refmoleclist, cellvec, debug, factor, metal_factor, "All"
+        )
+        if len(remfrag) > 0:
             Warning = True
             for rem in remfrag:
-                print("Remaining after Hydrogen reconstruction", rem.natoms, rem.labels, rem.type)
+                print(
+                    "Remaining after Hydrogen reconstruction",
+                    rem.natoms,
+                    rem.labels,
+                    rem.type,
+                )
         else:
             print("NO remaining Molecules after Hydrogen reconstruction")
             Warning = False
@@ -1093,118 +1313,157 @@ def fragments_reconstruct (moleclist, fraglist, Hlist, refmoleclist, cellvec, de
     else:
         finalmols = fraglist.copy()  # IF not Hidrogen fragments, then is done
         remfrag = []
-            
+
     return moleclist, finalmols, Warning
 
+
 #######################################################
-def assigntype(molecule,references):
+def assigntype(molecule, references):
     Found = False
     for ref in references:
-        if ((ref.elemcountvec == molecule.elemcountvec).all() and (ref.adjtypes == molecule.adjtypes).all() and not Found):
+        if (
+            (ref.elemcountvec == molecule.elemcountvec).all()
+            and (ref.adjtypes == molecule.adjtypes).all()
+            and not Found
+        ):
             molectype = ref.type
             Found = True
     if not Found:
-        molectype = 'Other'
+        molectype = "Other"
         for a in molecule.atoms:
-            if (a.block == 'd') or (a.block == 'f'): molectype = 'Complex'
+            if (a.block == "d") or (a.block == "f"):
+                molectype = "Complex"
     return molectype
 
+
 #######################################################
-def split_complexes_reassign_type (cell, moleclist):    
-    
-    
+def split_complexes_reassign_type(cell, moleclist):
+
     if not all(cell.warning_list):
-        # Split Complexes 
+        # Split Complexes
         for mol in moleclist:
             if mol.type == "Complex":
-                mol.ligandlist, mol.metalist = splitcomplex(mol, mol.factor, mol.metal_factor) 
+                mol.ligandlist, mol.metalist = splitcomplex(
+                    mol, mol.factor, mol.metal_factor
+                )
                 dummy = get_hapticity(mol)
-       
-        #Reassign Type of molecules and store information
+
+        # Reassign Type of molecules and store information
         for mol in moleclist:
             mol.type = assigntype(mol, cell.refmoleclist)
             mol.refcode = cell.refcode
-            mol.name = str(cell.refcode+"_"+mol.type+"_"+str(moleclist.index(mol)))
+            mol.name = str(
+                cell.refcode + "_" + mol.type + "_" + str(moleclist.index(mol))
+            )
             if mol.type == "Complex":
                 for lig in mol.ligandlist:
                     lig.refcode = cell.refcode
-                    lig.name = str(cell.refcode+"_"+mol.type+"_"+str(moleclist.index(mol))+"_"+lig.type+"_"+str(mol.ligandlist.index(lig)))
+                    lig.name = str(
+                        cell.refcode
+                        + "_"
+                        + mol.type
+                        + "_"
+                        + str(moleclist.index(mol))
+                        + "_"
+                        + lig.type
+                        + "_"
+                        + str(mol.ligandlist.index(lig))
+                    )
                 for met in mol.metalist:
                     met.refcode = cell.refcode
-                    met.name = str(cell.refcode+"_"+mol.type+"_"+str(moleclist.index(mol))+"_"+met.type+"_"+str(mol.metalist.index(met)))
+                    met.name = str(
+                        cell.refcode
+                        + "_"
+                        + mol.type
+                        + "_"
+                        + str(moleclist.index(mol))
+                        + "_"
+                        + met.type
+                        + "_"
+                        + str(mol.metalist.index(met))
+                    )
 
     cell.moleclist = moleclist
-    
+
     return cell
 
-#######################################################
-def get_hapticity(molecule):
 
-    debug = 0
-    
-    if (molecule.type == "Complex"):
-        for lig in molecule.ligandlist: 
+#######################################################
+def get_hapticity(molecule, debug=0):
+    # This function evaluates whether a molecule has any ligand with hapticity and, if so, detects which type of hapticity
+    # The information is stored in both the molecule and ligand objects.
+    # This function also defines the number of groups in a ligand. A "group" is a group of adjacent atoms that is connected to the metal atom.
+    # For instance, a Cp ligand forms a group of 5 C atoms connected to the metal
+    # In turn, a Cp ligand that is substituted with a long functional group that is connected to the metal by, say, an O atom at the end of such functional group
+    # ... would generate 2 groups. The Cp, and the O atom.
+    # This information is useful in the subroutine that decides whether any element must be added to the group to generate a meaningful connectivity and charge. This is done somewhere else
+
+    if molecule.type == "Complex":
+        for lig in molecule.ligandlist:
             groups = find_groups_within_ligand(lig)
-#             print(len(groups), "groups found for ligand:", lig.labels)
-            
-            for g in groups:               
+
+            for g in groups:
                 has_hapticity = False
                 group_hapttype = []
-                
+
                 list_of_coord_atoms = []
                 for idx, a in enumerate(lig.atoms):
                     if idx in g and a.mconnec > 0:
                         list_of_coord_atoms.append(a.label)
 
-                numC = list_of_coord_atoms.count("C")     # Carbon is the most common connected atom in ligands with hapticity
-                numAs = list_of_coord_atoms.count("As")   # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)                    
-                numO = list_of_coord_atoms.count("O")     # For h4-Enone
+                numC = list_of_coord_atoms.count(
+                    "C"
+                )  # Carbon is the most common connected atom in ligands with hapticity
+                numAs = list_of_coord_atoms.count(
+                    "As"
+                )  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
+                numO = list_of_coord_atoms.count("O")  # For h4-Enone
                 ## Carbon-based Haptic Ligands
-                if numC == 2: 
+                if numC == 2:
                     group_hapttype = ["h2-Benzene", "h2-Butadiene"]
                     has_hapticity = True
-                elif numC == 3 and numO == 0: 
+                elif numC == 3 and numO == 0:
                     group_hapttype = ["h3-Allyl", "h3-Cp"]
                     has_hapticity = True
-                elif numC == 3 and numO == 1: 
+                elif numC == 3 and numO == 1:
                     group_hapttype = ["h4-Enone"]
-                    has_hapticity = True   
-                elif numC == 4: 
+                    has_hapticity = True
+                elif numC == 4:
                     group_hapttype = ["h4-Butadiene", "h4-Benzene"]
                     has_hapticity = True
-                elif numC == 5: 
+                elif numC == 5:
                     group_hapttype = ["h5-Cp"]
                     has_hapticity = True
-                elif numC == 6: 
+                elif numC == 6:
                     group_hapttype = ["h6-Benzene"]
                     has_hapticity = True
-                elif numC == 7: 
+                elif numC == 7:
                     group_hapttype = ["h7-Cicloheptatrienyl"]
                     has_hapticity = True
-                elif numC == 8: 
+                elif numC == 8:
                     group_hapttype = ["h8-Ciclooctatetraenyl"]
                     has_hapticity = True
 
                 # Other less common types of haptic ligands
-                elif numC == 0 and numAs == 5: 
+                elif numC == 0 and numAs == 5:
                     group_hapttype = ["h5-AsCp"]
                     has_hapticity = True
 
                 # Creates Group
                 newgroup = group(g, has_hapticity, group_hapttype)
                 lig.grouplist.append(newgroup)
-                
+
             # Sets Ligand hapticity
             if any(g.hapticity == True for g in lig.grouplist):
                 lig.hapticity = True
                 for g in lig.grouplist:
-                    #lig.haptgroups.append(g.atlist)
+                    # lig.haptgroups.append(g.atlist)
                     for typ in g.hapttype:
                         if typ not in lig.hapttype:
                             lig.hapttype.append(typ)
             else:
                 lig.hapticity = False
-                
+
         # Sets molecule hapticity
         if any(lig.hapticity == True for lig in molecule.ligandlist):
             molecule.hapticity = True
@@ -1214,10 +1473,11 @@ def get_hapticity(molecule):
                         molecule.hapttype.append(typ)
         else:
             molecule.hapticity = False
-            
-    elif (molecule.type != "Complex"):
+
+    elif molecule.type != "Complex":
         molecule.hapticity = False
 
     return molecule.hapticity
 
 
+################ END
