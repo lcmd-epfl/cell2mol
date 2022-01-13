@@ -7,12 +7,12 @@ import time
 import pickle
 
 # Import modules
-import cell_reconstruct
-import formal_charge
-import getmissingH
-from tmcharge_common import Cell, getcentroid
-from cellconversions import cart2frac, frac2cart_fromparam
-from readwrite import readinfo, print_unit_cell
+import cell2mol.cell_reconstruct
+import cell2mol.formal_charge
+import cell2mol.getmissingH
+from cell2mol.tmcharge_common import Cell, getcentroid
+from cell2mol.cellconversions import cart2frac, frac2cart_fromparam
+from cell2mol.readwrite import readinfo, print_unit_cell
 
 
 def get_refmoleclist_and_check_missingH(cell, reflabels, fracs):
