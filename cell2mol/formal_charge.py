@@ -409,7 +409,7 @@ def select_charge_distr(
         goodlist = tmplist.copy()
         if debug >= 1:
             print(
-                "    NEW SELECT FUNCTION: Case 1, only one entry in tmplist, so goodlist:",
+                "    NEW SELECT FUNCTION: Case 1, only one entry in tmplist, so goodlist is:",
                 goodlist,
             )
 
@@ -421,7 +421,7 @@ def select_charge_distr(
                 goodlist.append(idx)
         if debug >= 1:
             print(
-                "    NEW SELECT FUNCTION: Case 2, no entry in tmplist, so goodlist:",
+                "    NEW SELECT FUNCTION: Case 2, no entry in tmplist, so goodlist is any of the minimum with coincide:",
                 goodlist,
             )
 
@@ -481,14 +481,14 @@ def select_charge_distr(
 
         if debug >= 1:
             print(
-                "    NEW SELECT FUNCTION: Case 3, multiple entries in tmplist, so goodlist:",
+                "    NEW SELECT FUNCTION: Case 3, multiple entries in tmplist, so goodlist is:",
                 goodlist,
             )
 
-    ###### IF, at this stage, a clear option is not found. Then, resort to coincide.
+    ###### IF, at this stage, a clear option is not found. Then, resort to coincide. Even if the charge works, the connectivity is probably wrong
     if len(goodlist) == 0:
         if debug >= 1:
-            print("    SELECT FUNCTION: empty goodlist so going for last resort")
+            print("    SELECT FUNCTION: Case 4, empty goodlist so going for coincide as last resort")
         for idx, g in enumerate(coincide):
             if g:
                 goodlist.append(idx)
@@ -1181,17 +1181,20 @@ def define_sites(ligand, metalist, molecule, debug=0):
                             addedlist[idx] = 1
                             added_atoms += 1
                     else:
-                        # Checks for adjacent Atoms
-                        list_of_adj_atoms = []
-                        for i in a.adjacency:
-                            list_of_adj_atoms.append(ligand.labels[i])
-                        numN = list_of_adj_atoms.count("N")
-                        if numN == 2:  # triazole or tetrazole
-                            elemlist[idx] = "H"
-                            addedlist[idx] = 1
-                            added_atoms += 1
+                        if (a.connec >= 3):
+                            block[idx] = 1
                         else:
-                            needs_nonlocal = True
+                            # Checks for adjacent Atoms
+                            list_of_adj_atoms = []
+                            for i in a.adjacency:
+                                list_of_adj_atoms.append(ligand.labels[i])
+                            numN = list_of_adj_atoms.count("N") 
+                            if numN == 2:  # triazole or tetrazole
+                                elemlist[idx] = "H"
+                                addedlist[idx] = 1
+                                added_atoms += 1
+                            else:
+                                needs_nonlocal = True
                 # Phosphorous
                 elif (a.connec == 3) and a.label == "P":
                     block[idx] = 1
