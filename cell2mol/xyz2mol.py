@@ -95,7 +95,7 @@ def str_atom(atom):
     """
     convert integer atom to string atom
     """
-    atom = elemendatabase.elementsym[atom]
+    atom = elemdatabase.elementsym[atom]
     return atom
 
 
