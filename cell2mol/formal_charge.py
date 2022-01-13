@@ -4,6 +4,7 @@ import numpy as np
 import copy
 import itertools
 import pickle
+import sys
 
 from cell2mol.tmcharge_common import atom, molecule, ligand, metal, group
 from cell2mol.xyz2mol import int_atom, xyz2mol
@@ -19,7 +20,6 @@ elemdatabase = ElementData()
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdmolops
 from rdkit.Chem import rdchem
-from rdkit.Chem.Draw import IPythonConsole  # Needed to show molecules
 from rdkit.Chem import Draw
 from rdkit.Chem.Draw.MolDrawing import (
     MolDrawing,
@@ -31,10 +31,15 @@ from rdkit.Chem.rdmolops import SanitizeFlags
 from rdkit.Chem import PeriodicTable
 from pathlib import Path
 
-IPythonConsole.ipython_useSVG = False
+# IPythonConsole.ipython_useSVG = False
 
 from rdkit import rdBase
 
+if "ipykernel" in sys.modules:
+    try:
+        from rdkit.Chem.Draw import IPythonConsole
+    except ModuleNotFoundError:
+        pass
 print("RDKIT Version:", rdBase.rdkitVersion)
 rdBase.DisableLog("rdApp.*")
 
@@ -450,7 +455,9 @@ def select_charge_distr(
     ###### IF, at this stage, a clear option is not found. Then, resort to coincide. Even if the charge works, the connectivity is probably wrong
     if len(goodlist) == 0:
         if debug >= 1:
-            print("    SELECT FUNCTION: Case 4, empty goodlist so going for coincide as last resort")
+            print(
+                "    SELECT FUNCTION: Case 4, empty goodlist so going for coincide as last resort"
+            )
         for idx, g in enumerate(coincide):
             if g:
                 goodlist.append(idx)
@@ -1143,14 +1150,14 @@ def define_sites(ligand, metalist, molecule, debug=0):
                             addedlist[idx] = 1
                             added_atoms += 1
                     else:
-                        if (a.connec >= 3):
+                        if a.connec >= 3:
                             block[idx] = 1
                         else:
                             # Checks for adjacent Atoms
                             list_of_adj_atoms = []
                             for i in a.adjacency:
                                 list_of_adj_atoms.append(ligand.labels[i])
-                            numN = list_of_adj_atoms.count("N") 
+                            numN = list_of_adj_atoms.count("N")
                             if numN == 2:  # triazole or tetrazole
                                 elemlist[idx] = "H"
                                 addedlist[idx] = 1
