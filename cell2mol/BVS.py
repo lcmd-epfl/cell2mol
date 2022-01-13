@@ -8,8 +8,8 @@ import os
 import re
 import pandas as pd
 import itertools
-from tmcharge_common import Cell
-from formal_charge import get_metal_poscharge
+from cell2mol.tmcharge_common import Cell
+from cell2mol.formal_charge import get_metal_poscharge
 
 def bond_valence_sum (cell, bv_para, mode):
 
