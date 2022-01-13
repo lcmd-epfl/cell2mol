@@ -191,7 +191,7 @@ def split_infofile(infofile):
         exit()
 
 
-def main(infopath, refcode):
+def cell2mol(infopath, refcode):
 
     # Read reference molecules from info file
     labels, pos, reflabels, fracs, cellvec, cellparam = readinfo(infopath)
@@ -225,7 +225,7 @@ if __name__ == "__main__":
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    cell = main(infofile, refcode)
+    cell = cell2mol(infofile, refcode)
 
     # Print the Charges or Warnings
     if not any(cell.warning_list):
