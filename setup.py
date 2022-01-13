@@ -12,11 +12,16 @@ setup(
     name="cell2mol",
     packages=["cell2mol"],
     version="1.0",
-    description="Cell characterization",
+    description="Generator cell object from a cif file",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="svela-bs, rlaplaza, choglass, lcmd-epfl",
     url="https://github.com/lcmd-epfl/cell2mol/",
     classifiers=["Programming Language :: Python :: 3"],
     include_package_data=True,
+    entry_points={
+        "console_scripts": [
+            "cell2mol = cell2mol:main",
+        ],
+    },
 )
