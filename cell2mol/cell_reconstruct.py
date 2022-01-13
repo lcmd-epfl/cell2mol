@@ -327,7 +327,8 @@ def getmolecs(
 ):  ##Simplified Version of the getmolecs
 
     Warning = False
-
+    debug = 0
+    
     # Gets the covalent radii, and modifies that of the metal if necessary
     radii = getradii(labels)
 
@@ -569,37 +570,6 @@ def splitcomplex(molecule, factor=1.3, metal_factor=1.0):  ##Similar to getmolec
         )
 
     return ligandlist, metalist
-
-
-#######################################################
-def determine_molec_or_frag(blocklist, refmoleclist):
-
-    natoms_ini = 0
-
-    fraglist = []
-    Hlist = []
-
-    for b in blocklist:
-        b.frac = cart2frac(b.coord, cellvec)
-        b.centroid = getcentroid(b.frac)
-        natoms_ini += b.natoms
-
-    for idx, block in enumerate(blocklist):
-        if any((block.elemcountvec == ref.elemcountvec).all() for ref in refmoleclist):
-            if any((atom.block == "d" or atom.block == "f") for atom in block.atoms):
-                block.type = "Complex"
-            else:
-                block.type = "Molecule"
-            moleclist.append(block)
-        else:
-            if (block.natoms == 1) and (block.numH == 1):
-                block.type = "H"
-                Hlist.append(block)
-            else:
-                block.type = "Fragment"
-                fraglist.append(block)
-
-    return fraglist, Hlist
 
 
 #######################################################
