@@ -10,34 +10,14 @@ from scipy import sparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
 
-import cellconversions
-from cellconversions import frac2cart_fromparam
-from cellconversions import cart2frac
-from cellconversions import det3
-from cellconversions import translate
+from cell2mol.cellconversions import frac2cart_fromparam, cart2frac, translate
 
-import tmcharge_common
-from tmcharge_common import getelementcount
-from tmcharge_common import getHvcount
-from tmcharge_common import get_adjacency_types
-from tmcharge_common import getradii
-from tmcharge_common import getcentroid
-from tmcharge_common import find_groups_within_ligand
-from tmcharge_common import checkchemistry
-from tmcharge_common import getconec
-from tmcharge_common import getblocks
-from tmcharge_common import inv
-from tmcharge_common import extract_from_matrix
+from cell2mol.tmcharge_common import getelementcount, getradii, getcentroid, find_groups_within_ligand, checkchemistry, getconec, getblocks, inv, extract_from_matrix
 
 # Imports Classes
-import tmcharge_common
-from tmcharge_common import atom
-from tmcharge_common import molecule
-from tmcharge_common import ligand
-from tmcharge_common import metal
-from tmcharge_common import group
+from cell2mol.tmcharge_common import atom, molecule, ligand, metal, group
 
-from elementdata import ElementData
+from cell2mol.elementdata import ElementData
 
 elemdatabase = ElementData()
 
