@@ -6,7 +6,6 @@ import numpy as np
 
 from cell2mol.module1 import addone, subtwo
 from cell2mol.cell2mol import cell2mol, split_infofile
-from cell2mol.tmcharge_common import atom, ligand, metal, molecule, Cell
 
 def test_modules1():
     assert addone(10) == 11
@@ -19,15 +18,15 @@ def test_cell2mol():
     infopath = dir_path + "/infodata/" + infofile
     refcode = split_infofile(infofile)
     cell = cell2mol(infopath, refcode)
-    print(
-        "=====================================pytest====================================="
-    )
-    print(cell.version)
-    print(cell.refcode)
-    print(cell.cellvec)
-    print(cell.cellparam)
-    print(cell.labels)
-    print(cell.pos)
+    # print(
+    #     "=====================================pytest====================================="
+    # )
+    # print(cell.version)
+    # print(cell.refcode)
+    # print(cell.cellvec)
+    # print(cell.cellparam)
+    # print(cell.labels)
+    # print(cell.pos)
   
     return cell
 
