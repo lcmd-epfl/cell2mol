@@ -5,8 +5,9 @@ import os
 import numpy as np
 import pickle
 
+import cell2mol.tmcharge_common
 from cell2mol.cell2mol import cell2mol, split_infofile
-import cell2mol.tmcharge_common 
+ 
 
 def test_cell2mol():
     dir_path = os.path.dirname(os.path.realpath(__file__))
