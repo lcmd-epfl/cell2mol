@@ -30,10 +30,9 @@ def test_cell2mol():
 
     return cell
 
-cell = test_cell2mol()
 
-def test_check_cell (cell):
-    
+def test_check_cell ():
+    cell = test_cell2mol()
     assert cell.version == "V16"
     assert cell.refcode == "YOXKUS"
     assert cell.cellvec == [
@@ -475,7 +474,8 @@ def test_check_cell (cell):
         False,
     ]
 
-def test_check_cellrefmoleclist (cell):    
+def test_check_cellrefmoleclist (cell): 
+  cell = test_cell2mol()   
   for mol in cell.refmoleclist:
       assert mol.version == "V16"
       assert mol.refcode == "YOXKUS"
@@ -697,7 +697,30 @@ def test_check_cellrefmoleclist (cell):
           0.68,
       ]
       assert mol.natoms == 52
-
+      assert mol.elemcountvec == [ 0.  0.  0.  0. 24.  0.  0.  0.  0. 23.  0.  1.  0.  0.  0.  0.  0.  0.
+        1.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
+        0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
+        0.  0.  2.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
+        0.  0.  0.  0.  0.  0.  1.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
+        0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
+        0.  0.  0.  0.  0.  0.  0.  0.]
+      assert mol.Hvcountvec == [ 0.  0.  0.  0.  0.  0.  0.  0.  0. 23.  0.  1.  0.  0.  0.  0.  0.  0.
+        1.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
+        0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
+        0.  0.  2.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
+        0.  0.  0.  0.  0.  0.  1.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
+        0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
+        0.  0.  0.  0.  0.  0.  0.  0.]
+      assert mol.centroid == []
+      assert mol.tmatrix == []
+      assert mol.atnums == [75, 53, 53, 15, 6, 6, 6, 6, 6, 6, 1, 1, 1, 6, 1, 1, 1, 6, 1, 1, 1, 6, 1, 1, 1, 6, 1, 1, 6, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 8]
+      assert mol.type == 'Complex''
+      assert mol.eleccount == 366
+      assert mol.numH == 24
+      assert mol.hapticity == True
+      assert mol.possmiles == []
+      assert mol.factor == 1.3
+      assert mol.metal_factor == 1.0      
   # test_check_cell(cell)
   # test_check_cellrefmoleclist (cell)
 
