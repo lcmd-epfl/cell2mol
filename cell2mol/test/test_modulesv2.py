@@ -480,7 +480,8 @@ def test_check_cell():
     ]
 
 
-# def test_check_cellrefmoleclist():
+def test_check_cellrefmoleclist():
+  pass
 #     cell = test_cell2mol()
 #     for mol in cell.refmoleclist:
 #         assert mol.version == "V16"
