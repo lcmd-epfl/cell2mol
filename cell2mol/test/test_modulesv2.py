@@ -4,10 +4,9 @@ from array import array
 import os
 import numpy as np
 
-# from cell2mol.module1 import test_addone, test_subtwo
 from cell2mol.module1 import addone, subtwo
 from cell2mol.cell2mol import cell2mol, split_infofile
-
+from cell2mol.tmcharge_common import atom, ligand, metal, molecule, Cell
 
 def test_modules1():
     assert addone(10) == 11
@@ -32,7 +31,9 @@ def test_cell2mol():
 
 
 def test_check_cell():
+
     cell = test_cell2mol()
+    
     assert cell.version == "V16"
     assert cell.refcode == "YOXKUS"
     assert cell.cellvec == [
