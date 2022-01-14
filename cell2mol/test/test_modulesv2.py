@@ -476,7 +476,7 @@ def test_check_cell():
     ]
 
 
-def test_check_cellrefmoleclist(cell):
+def test_check_cellrefmoleclist():
     cell = test_cell2mol()
     for mol in cell.refmoleclist:
         assert mol.version == "V16"
