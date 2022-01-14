@@ -5,7 +5,7 @@ import os
 import numpy as np
 import pickle
 
-import cell2mol.tmcharge_common
+import cell2mol.tmcharge_common as tmcharge_common
 from cell2mol.cell2mol import cell2mol, split_infofile
  
 
@@ -27,7 +27,7 @@ def test_check_cell():
     print(cellpath)
     file = open(f"{cellpath}/Cell_{cell.refcode}.gmol",'rb')
     result = pickle.load(file)
-    
+    print("=======Result======")
     print(result.version)
     print(result.refcode)
     print(result.cellvec)
