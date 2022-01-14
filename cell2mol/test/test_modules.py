@@ -5,7 +5,7 @@ import os
 import numpy as np
 
 from cell2mol.module1 import addone, subtwo
-from cell2mol.c2m_driver import cell2mol, split_infofile
+from cell2mol.c2m_module import cell2mol, split_infofile
 
 
 def test_modules1():
