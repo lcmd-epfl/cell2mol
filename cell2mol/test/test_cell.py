@@ -6,7 +6,6 @@ import numpy as np
 import pickle
 
 from cell2mol.cell2mol import cell2mol, split_infofile
-from cell2mol.tmcharge_common import atom, ligand, metal, molecule, Cell
 
 def test_cell2mol():
     dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -14,15 +13,15 @@ def test_cell2mol():
     infopath = dir_path + "/infodata/" + infofile
     refcode = split_infofile(infofile)
     cell = cell2mol(infopath, refcode)
-    print(
-        "=====================================pytest====================================="
-    )
-    print(cell.version)
-    print(cell.refcode)
-    print(cell.cellvec)
-    print(cell.cellparam)
-    print(cell.labels)
-    print(cell.pos)
+    # print(
+    #     "=====================================pytest====================================="
+    # )
+    # print(cell.version)
+    # print(cell.refcode)
+    # print(cell.cellvec)
+    # print(cell.cellparam)
+    # print(cell.labels)
+    # print(cell.pos)
     
     return cell
 
@@ -32,6 +31,7 @@ def test_check_cell():
     
     dir_path = os.path.dirname(os.path.realpath(__file__))
     cellpath = dir_path + "/infodata" 
+    print(cellpath)
     file = open(f"{cellpath}/Cell_{cell.refcode}.gmol",'rb')
     result = pickle.load(file)
     
