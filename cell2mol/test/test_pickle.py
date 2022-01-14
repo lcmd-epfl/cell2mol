@@ -6,7 +6,7 @@ import numpy as np
 import pickle
 
 from cell2mol.tmcharge_common import Cell
-from cell2mol.c2m_driver import cell2mol, split_infofile
+from cell2mol.c2m_module import cell2mol, split_infofile
 
 
 def test_cell2mol():
@@ -20,23 +20,20 @@ def test_cell2mol():
 
 
 def test_check_cell():
-    pass
+    cell = test_cell2mol()
 
-
-#     cell = test_cell2mol()
-
-#     dir_path = os.path.dirname(os.path.realpath(__file__))
-#     cellpath = dir_path + "/infodata"
-#     print(cellpath)
-#     file = open(f"{cellpath}/Cell_{cell.refcode}.gmol",'rb')
-#     result = pickle.load(file)
-#     print("=======Result======")
-#     print(result.version)
-#     print(result.refcode)
-#     print(result.cellvec)
-#     print(result.cellparam)
-#     print(result.labels)
-#     print(result.pos)
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    cellpath = dir_path + "/infodata"
+    print(cellpath)
+    file = open(f"{cellpath}/Cell_{cell.refcode}.gmol",'rb')
+    result = pickle.load(file)
+    print("=======Result======")
+    print(result.version)
+    print(result.refcode)
+    print(result.cellvec)
+    print(result.cellparam)
+    print(result.labels)
+    print(result.pos)
 
 
 # assert cell.version == result.version
@@ -46,3 +43,6 @@ def test_check_cell():
 # assert cell.labels == result.labels
 # assert np.allclose(cell.pos, result.pos)
 # assert cell.warning_list == result.warning_list
+
+if __name__ == "__main__" :
+    test_check_cell()

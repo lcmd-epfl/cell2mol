@@ -5,7 +5,7 @@ import os
 import sys
 import cell2mol
 
-if __package__ == '':
+if __package__ == "":
     path = os.path.dirname(os.path.dirname(__file__))
     sys.path.insert(0, path)
 
