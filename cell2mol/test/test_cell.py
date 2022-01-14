@@ -30,14 +30,16 @@ def test_check_cell():
     
     dir_path = os.path.dirname(os.path.realpath(__file__))
     cellpath = dir_path + "/infodata" 
-    file = open(f"{output_dir}/Cell_{cell.refcode}.gmol",'rb')
+    file = open(f"{cellpath}/Cell_{cell.refcode}.gmol",'rb')
     result = pickle.load(file)
+    
     print(result.version)
     print(result.refcode)
     print(result.cellvec)
     print(result.cellparam)
     print(result.labels)
     print(result.pos)
+    
     assert cell.version == result.version
     assert cell.refcode == result.refcode
     assert cell.cellvec == result.cellvec
