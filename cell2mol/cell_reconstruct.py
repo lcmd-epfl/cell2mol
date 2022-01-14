@@ -1166,7 +1166,7 @@ def merge_fragments(fraglist, listofids, reflist, cellvec, factor, metal_factor)
 
 
 #######################################################
-def indentify_frag_molec_H(blocklist, moleclist, refmoleclist, cellvec):
+def identify_frag_molec_H(blocklist, moleclist, refmoleclist, cellvec):
 
     init_natoms = 0
 
