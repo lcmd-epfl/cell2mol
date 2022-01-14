@@ -1033,7 +1033,7 @@ def combine(tobeallocated, references, cellvec, threshold_tmat, factor, metal_fa
                     goodcombination = False
 
             if goodcombination:
-                found, newmoleclist = reconstruct(
+                found, newmoleclist = merge_fragments(
                     tobeallocated, mergelist, references, cellvec, factor, metal_factor
                 )
 
@@ -1098,7 +1098,7 @@ def combine(tobeallocated, references, cellvec, threshold_tmat, factor, metal_fa
 
 
 #######################################################
-def reconstruct(fraglist, listofids, reflist, cellvec, factor, metal_factor):
+def merge_fragments(fraglist, listofids, reflist, cellvec, factor, metal_factor):
     # function also used fraglist
 
     tmatlist = []

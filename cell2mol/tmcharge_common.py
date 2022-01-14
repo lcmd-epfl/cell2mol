@@ -677,12 +677,14 @@ class Cell(object):
     def print_Warning(self):
 
         reason_of_Warning = [
-            "Warning! Errors received from getting reference molecules",
+            "Warning! Errors received from getting reference molecules (disorder)",
             "Warning! Missing H atoms from C in reference molecules",
             "Warning! Missing H atoms from coordinated water in reference molecules",
+
             "Warning! Steric clashes while blocking molecules",
             "Warning! Remaining fragments after reconstruction",
             "Warning! No coincidence in the number of atoms between final and initial state",
+            
             "Warning! Empty list of possible charges received for molecule or ligand",
             "Warning! More than one possible charge distribution found",
             "Warning! No valid possible charge distribution found",
