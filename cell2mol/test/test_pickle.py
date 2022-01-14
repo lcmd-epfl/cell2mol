@@ -7,6 +7,7 @@ import pickle
 
 from cell2mol.cell2mol import cell2mol, split_infofile
 import cell2mol.tmcharge_common as tmcharge_common
+from tmcharge_common import atom, molecule, ligand, metal, Cell
 
 def test_cell2mol():
     dir_path = os.path.dirname(os.path.realpath(__file__))
