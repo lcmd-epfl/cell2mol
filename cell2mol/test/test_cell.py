@@ -27,19 +27,19 @@ def test_cell2mol():
 
 def test_check_cell():
     
-    cell = test_cell2mol()
+    # cell = test_cell2mol()
     
     # dir_path = os.path.dirname(os.path.realpath(__file__))
     # cellpath = dir_path + "/infodata" 
     # file = open(f"{cellpath}/Cell_{cell.refcode}.gmol",'rb')
     # result = pickle.load(file)
     
-    print(result.version)
-    print(result.refcode)
-    print(result.cellvec)
-    print(result.cellparam)
-    print(result.labels)
-    print(result.pos)
+    # print(result.version)
+    # print(result.refcode)
+    # print(result.cellvec)
+    # print(result.cellparam)
+    # print(result.labels)
+    # print(result.pos)
     pass
 
     # assert cell.version == result.version
