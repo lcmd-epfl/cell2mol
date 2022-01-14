@@ -12,7 +12,17 @@ from scipy.sparse.csgraph import reverse_cuthill_mckee
 
 from cell2mol.cellconversions import frac2cart_fromparam, cart2frac, translate
 
-from cell2mol.tmcharge_common import getelementcount, getradii, getcentroid, find_groups_within_ligand, checkchemistry, getconec, getblocks, inv, extract_from_matrix
+from cell2mol.tmcharge_common import (
+    getelementcount,
+    getradii,
+    getcentroid,
+    find_groups_within_ligand,
+    checkchemistry,
+    getconec,
+    getblocks,
+    inv,
+    extract_from_matrix,
+)
 
 # Imports Classes
 from cell2mol.tmcharge_common import atom, molecule, ligand, metal, group
@@ -308,7 +318,7 @@ def metalcoordcheck(label, coordination, debug=0):
 
 
 #######################################################
-def getmolecs(labels, pos, factor=1.3, metal_factor=1.0, debug=0):  
+def getmolecs(labels, pos, factor=1.3, metal_factor=1.0, debug=0):
     ##Simplified Version of the getmolecs
     ## Function that identifies connected groups of atoms from their positions and labels.
     #:return mlist. List of molecules saved as objects
@@ -419,7 +429,7 @@ def getmolecs(labels, pos, factor=1.3, metal_factor=1.0, debug=0):
 
 
 #######################################################
-def splitcomplex(molecule, factor=1.3, metal_factor=1.0):  
+def splitcomplex(molecule, factor=1.3, metal_factor=1.0):
     ## Similar function to getmolecs, but with a prelude in which the molecule (it must be a molecule of type "Complex"), is split into ligands and metals.
     #:return ligandlist, metalist. List of ligands and metals, respectively, saved as objects
 
@@ -540,7 +550,6 @@ def splitcomplex(molecule, factor=1.3, metal_factor=1.0):
             ligandlist.append(lig)  # Appends it to the final list of ligand
 
     return ligandlist, metalist
-
 
 
 #######################################################
@@ -692,7 +701,9 @@ def tmatgenerator(centroid, thres=0.40, full=False):
 
 
 #######################################################
-def sequential(fragmentlist, refmoleclist, cellvec, debug, factor, metal_factor, typ="All"):
+def sequential(
+    fragmentlist, refmoleclist, cellvec, debug, factor, metal_factor, typ="All"
+):
     # Crappy function that controls the reconstruction process. It is called sequential because pairs of fragments are sent one by one. Ideally, a parallel version would be desirable.
     # Given a list of fragments(fragmentlist), a list of reference molecules(refmoleclist), and some other minor parameters, the function sends pairs of fragments and evaluates if they...
     # ...form a bigger fragment. If so, the bigger fragment is evaluated. If it coincides with one of the molecules in refmoleclist, than it means that it is a full molecule that requires no further work.
@@ -1007,7 +1018,9 @@ def sequential(fragmentlist, refmoleclist, cellvec, debug, factor, metal_factor,
 
 
 #######################################################
-def combine(tobeallocated, references, cellvec, threshold_tmat, factor, metal_factor, debug=0):
+def combine(
+    tobeallocated, references, cellvec, threshold_tmat, factor, metal_factor, debug=0
+):
 
     goodlist = []
     avglist = []
@@ -1199,7 +1212,9 @@ def indentify_frag_molec_H(blocklist, moleclist, refmoleclist, cellvec):
 
 
 #######################################################
-def fragments_reconstruct(moleclist, fraglist, Hlist, refmoleclist, cellvec, debug, factor, metal_factor):
+def fragments_reconstruct(
+    moleclist, fraglist, Hlist, refmoleclist, cellvec, debug, factor, metal_factor
+):
 
     Warning = False
 

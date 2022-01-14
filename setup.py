@@ -19,9 +19,6 @@ setup(
     url="https://github.com/lcmd-epfl/cell2mol/",
     classifiers=["Programming Language :: Python :: 3"],
     include_package_data=True,
-    entry_points={
-        "console_scripts": [
-            "cell2mol = cell2mol:main",
-        ],
-    },
+    package_dir={"cell2mol": "cell2mol"},
+    entry_points={"console_scripts": ["cell2mol = cell2mol.c2m_driver:main"]},
 )

@@ -313,11 +313,11 @@ def readchargelist(chargelist):
         abs_atcharge.append(np.sum(tmp))
         total.append(np.sum(a))
 
-        if any(b > 0 for b in a) and any(b < 0 for b in a): 
+        if any(b > 0 for b in a) and any(b < 0 for b in a):
             zwitt.append(True)
         else:
             zwitt.append(False)
-    
+
     abstotal = []
     for a in total:
         abstotal.append(abs(a))
@@ -336,8 +336,12 @@ def select_charge_distr(
 
     nlists = len(uncorrected_chargelist)
 
-    uncorr_total, uncorr_abs_total, uncorr_abs_atcharge, uncorr_zwitt = readchargelist(uncorrected_chargelist)
-    corr_total, corr_abs_total, corr_abs_atcharge, corr_zwitt = readchargelist(corrected_chargelist)
+    uncorr_total, uncorr_abs_total, uncorr_abs_atcharge, uncorr_zwitt = readchargelist(
+        uncorrected_chargelist
+    )
+    corr_total, corr_abs_total, corr_abs_atcharge, corr_zwitt = readchargelist(
+        corrected_chargelist
+    )
 
     if debug >= 1:
         print("    NEW SELECT FUNCTION: uncorr_total:", uncorr_total)
@@ -345,7 +349,7 @@ def select_charge_distr(
         print("    NEW SELECT FUNCTION: uncorr_abs_total:", uncorr_abs_total)
     if debug >= 1:
         print("    NEW SELECT FUNCTION: uncorr_abs_atcharge:", uncorr_abs_atcharge)
-    if (debug >= 1): 
+    if debug >= 1:
         print("    NEW SELECT FUNCTION: uncorr_zwitt:", uncorr_zwitt)
 
     coincide = []
@@ -390,7 +394,12 @@ def select_charge_distr(
     elif len(tmplist) == 0:
         goodlist = []
         for idx in range(0, nlists):
-            if (idx in listofminabs) or (idx in listofmintot) and coincide[idx] and not uncorr_zwitt[idx]:
+            if (
+                (idx in listofminabs)
+                or (idx in listofmintot)
+                and coincide[idx]
+                and not uncorr_zwitt[idx]
+            ):
                 goodlist.append(idx)
         if debug >= 1:
             print(
@@ -768,7 +777,7 @@ def get_nitrosyl_geom(ligand):
     # Each case is treated differently
     #:return NO_type: "Linear" or "Bent"
 
-    from getmissingH import getangle
+    from cell2mol.missingH import getangle
 
     debug = 0
 
@@ -1256,7 +1265,7 @@ def define_sites(ligand, metalist, molecule, debug=0):
     ############################
     ###### NON-LOCAL PART ######
     ############################
-    # In some cases, the decision to add an element to a connected atom cannot be taken based on its adjacencies. 
+    # In some cases, the decision to add an element to a connected atom cannot be taken based on its adjacencies.
     # Then, a preliminary bond-order connectivity is generated with rdkit using charge=0.
     # this connectivity can contain errors, but is tipically enough to determine the bonds of the connected atom with the rest of the ligand
     if needs_nonlocal:
@@ -1305,13 +1314,18 @@ def define_sites(ligand, metalist, molecule, debug=0):
                     bond = b.GetBondTypeAsDouble()
                     bondlist.append(bond)
                     total_bond_order += bond
-                if (a.label == "O" or a.label == "S" or a.label == "Se") and total_bond_order < 2: 
+                if (
+                    a.label == "O" or a.label == "S" or a.label == "Se"
+                ) and total_bond_order < 2:
                     addH = True
-                elif a.label == "N" and total_bond_order < 3: 
+                elif a.label == "N" and total_bond_order < 3:
                     addH = True
-                elif a.label == "C" and total_bond_order < 4: 
+                elif a.label == "C" and total_bond_order < 4:
                     addH = True
-                if (debug >= 1): print(f"        DEFINE_SITES: Non-Local reports: {total_bond_order} for atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
+                if debug >= 1:
+                    print(
+                        f"        DEFINE_SITES: Non-Local reports: {total_bond_order} for atom {idx} with: a.mconnec={a.mconnec} and label={a.label}"
+                    )
             if addH and block[idx] == 0:
                 elemlist[idx] = "H"
                 added_atoms = added_atoms + 1
