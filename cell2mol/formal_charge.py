@@ -1250,6 +1250,9 @@ def define_sites(ligand, metalist, molecule, debug=0):
     ############################
     ###### NON-LOCAL PART ######
     ############################
+    # In some cases, the decision to add an element to a connected atom cannot be taken based on its adjacencies. 
+    # Then, a preliminary bond-order connectivity is generated with rdkit using charge=0.
+    # this connectivity can contain errors, but is tipically enough to determine the bonds of the connected atom with the rest of the ligand
     if needs_nonlocal:
         if debug >= 1:
             print(f"        DEFINE_SITES: Enters non-local")
@@ -1290,16 +1293,19 @@ def define_sites(ligand, metalist, molecule, debug=0):
             if a.mconnec == 1 and a.label not in avoid:
                 rdkitatom = tmpmol[0].GetAtomWithIdx(idx)
                 conjugated = False
+                total_bond_order = 0
                 bondlist = []
                 for b in rdkitatom.GetBonds():
                     bond = b.GetBondTypeAsDouble()
                     bondlist.append(bond)
-                if (len(bondlist) > 1) and any(b == 1.5 or b == 2.0 for b in bondlist):
-                    conjugated = True
-                if (not conjugated) and block[idx] == 0:
+                    total_bond_order += bond
+                if (a.label == "O" or a.label == "S" or a.label == "Se") and total_bond_order < 2: 
                     addH = True
-                elif (conjugated and (len(bondlist) <= 1)) and block[idx] == 0:
+                elif a.label == "N" and total_bond_order < 3: 
                     addH = True
+                elif a.label == "C" and total_bond_order < 4: 
+                    addH = True
+                if (debug >= 1): print(f"        DEFINE_SITES: Non-Local reports: {total_bond_order} for atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
             if addH and block[idx] == 0:
                 elemlist[idx] = "H"
                 added_atoms = added_atoms + 1
