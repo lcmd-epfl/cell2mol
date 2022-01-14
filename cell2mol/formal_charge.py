@@ -304,6 +304,7 @@ def readchargelist(chargelist):
     abs_atlist = []
     abs_atcharge = []
     total = []
+    zwitt = []
     for a in chargelist:
         tmp = []
         for b in a:
@@ -312,10 +313,10 @@ def readchargelist(chargelist):
         abs_atcharge.append(np.sum(tmp))
         total.append(np.sum(a))
 
-    if any(b > 0 for b in a) and any(b < 0 for b in a): 
-        zwitt.append(True)
-    else:
-        zwitt.append(False)
+        if any(b > 0 for b in a) and any(b < 0 for b in a): 
+            zwitt.append(True)
+        else:
+            zwitt.append(False)
     
     abstotal = []
     for a in total:
