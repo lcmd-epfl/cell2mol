@@ -312,11 +312,16 @@ def readchargelist(chargelist):
         abs_atcharge.append(np.sum(tmp))
         total.append(np.sum(a))
 
+    if any(b > 0 for b in a) and any(b < 0 for b in a): 
+        zwitt.append(True)
+    else:
+        zwitt.append(False)
+    
     abstotal = []
     for a in total:
         abstotal.append(abs(a))
 
-    return total, abstotal, abs_atcharge
+    return total, abstotal, abs_atcharge, zwitt
 
 
 #######################################################
@@ -330,10 +335,8 @@ def select_charge_distr(
 
     nlists = len(uncorrected_chargelist)
 
-    uncorr_total, uncorr_abs_total, uncorr_abs_atcharge = readchargelist(
-        uncorrected_chargelist
-    )
-    corr_total, corr_abs_total, corr_abs_atcharge = readchargelist(corrected_chargelist)
+    uncorr_total, uncorr_abs_total, uncorr_abs_atcharge, uncorr_zwitt = readchargelist(uncorrected_chargelist)
+    corr_total, corr_abs_total, corr_abs_atcharge, corr_zwitt = readchargelist(corrected_chargelist)
 
     if debug >= 1:
         print("    NEW SELECT FUNCTION: uncorr_total:", uncorr_total)
@@ -341,6 +344,8 @@ def select_charge_distr(
         print("    NEW SELECT FUNCTION: uncorr_abs_total:", uncorr_abs_total)
     if debug >= 1:
         print("    NEW SELECT FUNCTION: uncorr_abs_atcharge:", uncorr_abs_atcharge)
+    if (debug >= 1): 
+        print("    NEW SELECT FUNCTION: uncorr_zwitt:", uncorr_zwitt)
 
     coincide = []
     for idx, a in enumerate(uncorr_total):
@@ -371,7 +376,7 @@ def select_charge_distr(
     if debug >= 1:
         print("    NEW SELECT FUNCTION: tmplist:", tmplist)
 
-    # IF only one distribution meets the requirement. Then it is chosen
+    # CASE 1, IF only one distribution meets the requirement. Then it is chosen
     if len(tmplist) == 1:
         goodlist = tmplist.copy()
         if debug >= 1:
@@ -380,19 +385,19 @@ def select_charge_distr(
                 goodlist,
             )
 
-    # IF listofminabs and listofmintot do not have any value in common. Then only coincide is taken
+    # CASE 2, IF listofminabs and listofmintot do not have any value in common. Then we select from minima, coincide, and zwitt
     elif len(tmplist) == 0:
         goodlist = []
         for idx in range(0, nlists):
-            if (idx in listofminabs) or (idx in listofmintot) and coincide[idx]:
+            if (idx in listofminabs) or (idx in listofmintot) and coincide[idx] and not uncorr_zwitt[idx]:
                 goodlist.append(idx)
         if debug >= 1:
             print(
-                "    NEW SELECT FUNCTION: Case 2, no entry in tmplist, so goodlist is any of the minimum with coincide:",
+                "    NEW SELECT FUNCTION: Case 2, no entry in initial tmplist. We select from minima, coincide and zwitt:",
                 goodlist,
             )
 
-    # Complicated Case = IF more than one in list is correct. Then, I choose the one that delivered the expected charge and that delivers the minimum charge after H removal
+    # CASE 3, IF more than one in list is correct. Then, I choose the one that delivered the expected charge and that delivers the minimum charge after H removal
     elif len(tmplist) > 1:
 
         if debug >= 1:
@@ -452,11 +457,11 @@ def select_charge_distr(
                 goodlist,
             )
 
-    ###### IF, at this stage, a clear option is not found. Then, resort to coincide. Even if the charge works, the connectivity is probably wrong
+    ###### CASE 4. IF, at this stage, a clear option is not found. Then, resort to coincide. Even if the charge works, the connectivity is probably wrong
     if len(goodlist) == 0:
         if debug >= 1:
             print(
-                "    SELECT FUNCTION: Case 4, empty goodlist so going for coincide as last resort"
+                "    SELECT FUNCTION: Case 4, empty goodlist so going for coincide as our last resort"
             )
         for idx, g in enumerate(coincide):
             if g:
