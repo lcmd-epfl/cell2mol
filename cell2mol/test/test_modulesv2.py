@@ -14,9 +14,10 @@ def test_modules1():
 
 def test_cell2mol():
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    infofile = dir_path + "/infodata/YOXKUS.info"
+    infofile = "YOXKUS.info"
+    infopath = dir_path + "/infodata/" + infofile
     refcode = split_infofile(infofile)
-    cell = cell2mol(infofile, refcode)
+    cell = cell2mol(infopath, refcode)
     print("=====================================pytest=====================================")
     print(cell.version)
     print(cell.refcode)

@@ -67,7 +67,7 @@ def reconstruct(cell, reflabels, fracs):
         cell.warning_list.append(Warning)
 
     # Indentify blocks and Reconstruct Fragments
-    if not all(cell.warning_list):
+    if not any(cell.warning_list):
         (
             moleclist,
             fraglist,
@@ -90,7 +90,7 @@ def reconstruct(cell, reflabels, fracs):
         cell.warning_list.append(Warning)
 
     # Check final number of atoms
-    if not all(cell.warning_list):
+    if not any(cell.warning_list):
         moleclist.extend(finalmols)
         final_natoms = 0
         for mol in moleclist:
@@ -102,7 +102,7 @@ def reconstruct(cell, reflabels, fracs):
         cell.warning_list.append(Warning)
 
     # Split Complexes and Reassign Type
-    if not all(cell.warning_list):
+    if not any(cell.warning_list):
         cell = cell_reconstruct.split_complexes_reassign_type(cell, moleclist)
 
     return cell
