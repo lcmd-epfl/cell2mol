@@ -20,6 +20,7 @@ def test_cell2mol():
 
 
 def test_check_cell():
+    
     cell = test_cell2mol()
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -36,13 +37,13 @@ def test_check_cell():
     print(result.pos)
 
 
-# assert cell.version == result.version
-# assert cell.refcode == result.refcode
-# assert cell.cellvec == result.cellvec
-# assert cell.cellparam == result.cellparam
-# assert cell.labels == result.labels
-# assert np.allclose(cell.pos, result.pos)
-# assert cell.warning_list == result.warning_list
+    assert cell.version == result.version
+    assert cell.refcode == result.refcode
+    assert cell.cellvec == result.cellvec
+    assert cell.cellparam == result.cellparam
+    assert cell.labels == result.labels
+    assert np.allclose(cell.pos, result.pos)
+    assert cell.warning_list == result.warning_list
 
 if __name__ == "__main__" :
     test_check_cell()
