@@ -28,7 +28,8 @@ def test_cell2mol():
     print(cell.cellparam)
     print(cell.labels)
     print(cell.pos)
-
+  
+    return cell
 
 def test_check_cell():
 
