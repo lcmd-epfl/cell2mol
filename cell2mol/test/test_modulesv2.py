@@ -252,7 +252,7 @@ def test_check_cell():
         "O",
         "O",
     ]
-    assert np.allclse(
+    assert np.allclose(
         cell.pos,
         np.array(
             [
