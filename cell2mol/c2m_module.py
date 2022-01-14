@@ -5,7 +5,7 @@ import pickle
 # Import modules
 from cell2mol.cell_reconstruct import (
     getmolecs,
-    indentify_frag_molec_H,
+    identify_frag_molec_H,
     split_complexes_reassign_type,
     fragments_reconstruct,
     get_reference_molecules,
@@ -70,7 +70,7 @@ def reconstruct(cell, reflabels, fracs):
 
     # Indentify blocks and Reconstruct Fragments
     if not any(cell.warning_list):
-        (moleclist, fraglist, Hlist, init_natoms) = indentify_frag_molec_H(
+        (moleclist, fraglist, Hlist, init_natoms) = identify_frag_molec_H(
             blocklist, moleclist, cell.refmoleclist, cell.cellvec
         )
 
