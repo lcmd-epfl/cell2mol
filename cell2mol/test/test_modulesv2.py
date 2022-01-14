@@ -30,6 +30,8 @@ def test_cell2mol():
 
     return cell
 
+cell = test_cell2mol()
+
 def test_check_cell (cell):
     
     assert cell.version == "V16"
@@ -696,9 +698,12 @@ def test_check_cellrefmoleclist (cell):
       ]
       assert mol.natoms == 52
 
+  # test_check_cell(cell)
+  # test_check_cellrefmoleclist (cell)
 
-if __name__== "__main__":
-  # test_modules1()
-  cell = test_cell2mol()
-  test_check_cell(cell)
-  test_check_cellrefmoleclist (cell)
+
+# if __name__== "__main__":
+#   # test_modules1()
+#   cell = test_cell2mol()
+#   test_check_cell(cell)
+#   test_check_cellrefmoleclist (cell)
