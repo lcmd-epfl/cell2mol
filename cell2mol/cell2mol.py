@@ -29,7 +29,7 @@ def get_refmoleclist_and_check_missingH(cell, reflabels, fracs):
     cell.warning_list.append(Warning)
 
     # Check missing hydrogens in ref.molecules
-    if not all(cell.warning_list):
+    if not any(cell.warning_list):
         (
             Warning,
             ismissingH,
@@ -39,7 +39,7 @@ def get_refmoleclist_and_check_missingH(cell, reflabels, fracs):
         cell.warning_list.append(Missing_H_in_C)
         cell.warning_list.append(Missing_H_in_CoordWater)
 
-    if not all(cell.warning_list):
+    if not any(cell.warning_list):
         for mol in refmoleclist:
             mol.refcode = cell.refcode
             mol.name = str(cell.refcode + "_Reference_" + str(refmoleclist.index(mol)))
@@ -60,7 +60,7 @@ def reconstruct(cell, reflabels, fracs):
     )
 
     # Get blocks in the unit cells constructing the adjacency matrix (A)
-    if not all(cell.warning_list):
+    if not any(cell.warning_list):
         Warning, blocklist = cell_reconstruct.getmolecs(
             cell.labels, cell.pos, covalent_factor, metal_factor
         )
