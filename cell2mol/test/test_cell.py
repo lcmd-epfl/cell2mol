@@ -13,15 +13,6 @@ def test_cell2mol():
     infopath = dir_path + "/infodata/" + infofile
     refcode = split_infofile(infofile)
     cell = cell2mol(infopath, refcode)
-    # print(
-    #     "=====================================pytest====================================="
-    # )
-    # print(cell.version)
-    # print(cell.refcode)
-    # print(cell.cellvec)
-    # print(cell.cellparam)
-    # print(cell.labels)
-    # print(cell.pos)
     
     return cell
 
