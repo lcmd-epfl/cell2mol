@@ -379,7 +379,9 @@ class atom(object):
                 self.adjacency.append(conmat)
 
         elif type == "Ligand" or type == "Metal":
-            self.mconnec = mconmat  # this has to be improved, now it only receives a number, should receive a vector as above for "molecule"
+            self.mconnec = (
+                mconmat
+            )  # this has to be improved, now it only receives a number, should receive a vector as above for "molecule"
 
     # Bonds part is created after the formal charge for each molecule/ligand/metal is decided
     def bonds(self, start, end, order):
@@ -513,7 +515,9 @@ class ligand(object):
         self.version = "V16"
         self.refcode = ""  # V14
         self.name = name  # creates as ligand index, later modified
-        self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
+        self.atlist = (
+            atlist
+        )  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
         self.labels = labels  # elements
         self.coord = coord  # coordinates
         self.radii = radii
@@ -592,7 +596,9 @@ class ligand(object):
 class group(object):
     def __init__(self, atlist, hapticity, hapttype):
         self.version = "V16"
-        self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
+        self.atlist = (
+            atlist
+        )  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
         self.hapticity = hapticity
         self.hapttype = hapttype
 
@@ -604,7 +610,9 @@ class metal(object):
     def __init__(self, name, atlist, label, coord, radii):
         self.version = "V16"
         self.name = name  # creates as metal index, later modified
-        self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
+        self.atlist = (
+            atlist
+        )  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
         self.label = label
         self.coord = coord
         self.radii = radii
@@ -680,11 +688,9 @@ class Cell(object):
             "Warning! Errors received from getting reference molecules (disorder)",
             "Warning! Missing H atoms from C in reference molecules",
             "Warning! Missing H atoms from coordinated water in reference molecules",
-
             "Warning! Steric clashes while blocking molecules",
             "Warning! Remaining fragments after reconstruction",
             "Warning! No coincidence in the number of atoms between final and initial state",
-            
             "Warning! Empty list of possible charges received for molecule or ligand",
             "Warning! More than one possible charge distribution found",
             "Warning! No valid possible charge distribution found",
