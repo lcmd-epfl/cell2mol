@@ -17,8 +17,14 @@ def test_cell2mol():
     infofile = dir_path + "/infodata/YOXKUS.info"
     refcode = split_infofile(infofile)
     cell = cell2mol(infofile, refcode)
-
-    assert cell.refcode == "V16"
+    print("=====================================pytest=====================================")
+    print(cell.version)
+    print(cell.refcode)
+    print(cell.cellvec)
+    print(cell.cellparam)
+    print(cell.labels)
+    print(cell.pos)
+    assert cell.version == "V16"
     assert cell.refcode == "YOXKUS"
     assert cell.cellvec == [
         [15.136, 0.0, 0.0],
