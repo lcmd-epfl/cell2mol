@@ -19,7 +19,7 @@ def test_cell2mol():
     return cell
 
 def test_check_cell():
-    
+    pass
     cell = test_cell2mol()
     
     dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -34,7 +34,7 @@ def test_check_cell():
     print(result.cellparam)
     print(result.labels)
     print(result.pos)
-    pass
+
 
     # assert cell.version == result.version
     # assert cell.refcode == result.refcode
