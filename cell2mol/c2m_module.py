@@ -146,11 +146,12 @@ def determine_charge(cell):
                 final_charge_distribution, BVS_list, metal_indices_list
             )
             #             dist= list(dist)
-            if dist.ndim == 1:
-                warning_BVS = False
-                final_charge_distribution = [list(copy.deepcopy(dist))]
-                print(final_charge_distribution)
-                print("BVS worked")
+            if dist != None:
+                if dist.ndim == 1 :
+                    warning_BVS = False
+                    final_charge_distribution = [list(copy.deepcopy(dist))]
+                    print(final_charge_distribution)
+                    print("BVS worked")
             else:
                 warning_BVS = True
                 print("BVS didn't works")
