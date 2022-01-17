@@ -147,14 +147,14 @@ def determine_charge(cell):
             )
             #             dist= list(dist)
             if dist.ndim == 1:
-                Warning_BVS = False
+                warning_BVS = False
                 final_charge_distribution = [list(copy.deepcopy(dist))]
                 print(final_charge_distribution)
                 print("BVS worked")
             else:
-                Warning_BVS = True
+                warning_BVS = True
                 print("BVS didn't works")
-            cell.BVS(Warning_BVS)
+            cell.bvs(warning_BVS)
         else:
             Warning = False
         cell.warning_list.append(Warning)
@@ -167,7 +167,7 @@ def determine_charge(cell):
         cell.warning_list.append(Warning)
 
     # Only one possible charge distribution -> getcharge for the repeated species
-    if not any(cell.warning_list) or ("Warning_BVS" in locals() and not Warning_BVS):
+    if not any(cell.warning_list) or ("warning_BVS" in locals() and not warning_BVS):
         print("\nFINAL Charge Distribution:", final_charge_distribution)
         print("Assigning Charges and Preparing Molecules")
         cell.moleclist, Warning = prepare_mols(

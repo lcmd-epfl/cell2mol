@@ -652,8 +652,8 @@ class Cell(object):
         self.moleclist = []
         self.warning_list = warning_list
 
-    def BVS(self, Warning_BVS):
-        self.Warning_BVS = Warning_BVS
+    def bvs(self, warning_BVS):
+        self.warning_BVS = warning_BVS
 
     def print_charge_assignment(self):
         print(
