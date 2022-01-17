@@ -680,23 +680,21 @@ class Cell(object):
     def print_Warning(self):
 
         reason_of_Warning = [
-            "Warning! Errors received from getting reference molecules (disorder)",
-            "Warning! Missing H atoms from C in reference molecules",
-            "Warning! Missing H atoms from coordinated water in reference molecules",
-            "Warning! Steric clashes while blocking molecules",
-            "Warning! Remaining fragments after reconstruction",
-            "Warning! No coincidence in the number of atoms between final and initial state",
-            "Warning! Empty list of possible charges received for molecule or ligand",
-            "Warning! More than one possible charge distribution found",
-            "Warning! No valid possible charge distribution found",
-            "Warning! Total net charge does not exist among possible charges",
+            "Warning 1! Errors received from getting reference molecules (disorder)",
+            "Warning 2! Missing H atoms from C in reference molecules",
+            "Warning 3! Missing H atoms from coordinated water in reference molecules",
+            "Warning 4! Steric clashes while blocking molecules",
+            "Warning 5! Remaining fragments after reconstruction",
+            "Warning 6! No coincidence in the number of atoms between final and initial state",
+            "Warning 7! Empty list of possible charges received for molecule or ligand",
+            "Warning 8! More than one valid possible charge distribution found",
+            "Warning 9! No valid possible charge distribution found",
+            "Warning 10! Total net charge does not exist among possible charges",
         ]
-        print(
-            "===================================================Warning List==================================================="
-        )
+
         # printing original list
-        print("[Ref.code] : {}\n".format(self.refcode))
-        print("The Warning type list is : {}\n".format(str(self.warning_list)))
+        print("The Warning type list is : " + str(self.warning_list))
+
         res = [i for i, val in enumerate(self.warning_list) if val]
 
         # printing result
@@ -704,6 +702,7 @@ class Cell(object):
 
         if len(res) == 0:
             print("No Warnings!")
+
         else:
             for i in res:
                 print(reason_of_Warning[i])
