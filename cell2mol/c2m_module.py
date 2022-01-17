@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import pickle
+import copy
+import pandas as pd
 
 # Import modules
 from cell2mol.cell_reconstruct import (
@@ -21,6 +23,7 @@ from cell2mol.missingH import check_missingH
 from cell2mol.tmcharge_common import Cell, getcentroid
 from cell2mol.cellconversions import cart2frac, frac2cart_fromparam
 from cell2mol.readwrite import readinfo, print_unit_cell
+from cell2mol.BVS import bond_valence_sum, choose_final_dist_using_BVS
 
 
 def get_refmoleclist_and_check_missingH(cell, reflabels, fracs):
@@ -108,10 +111,11 @@ def reconstruct(cell, reflabels, fracs):
 def determine_charge(cell):
 
     # Indentify unique chemical spicies
-    (molec_indices, ligand_indices, unique_indices, unique_species) = classify_mols(
+    molec_indices, ligand_indices, unique_indices, unique_species = classify_mols(
         cell.moleclist
     )
     print(f"{len(unique_species)} Species (Ligand or Molecules) to Characterize")
+    print("unique_indices", unique_indices)
 
     unique_species, Warning = get_poscharges_unique_species(unique_species)
     cell.warning_list.append(Warning)
@@ -131,6 +135,26 @@ def determine_charge(cell):
             print(
                 "More than one Possible Distribution Found:", final_charge_distribution
             )
+            print("##############################################")
+            print("############## BVS implemented ###############")
+            print("##############################################")
+            bv_para = pd.read_csv("bvparm2020.txt", delimiter="\t")
+            BVS_list, metal_indices_list = bond_valence_sum(
+                unique_species, unique_indices, bv_para, final_charge_distribution
+            )
+            dist = choose_final_dist_using_BVS(
+                final_charge_distribution, BVS_list, metal_indices_list
+            )
+            #             dist= list(dist)
+            if dist.ndim == 1:
+                Warning_BVS = False
+                final_charge_distribution = [list(copy.deepcopy(dist))]
+                print(final_charge_distribution)
+                print("BVS worked")
+            else:
+                Warning_BVS = True
+                print("BVS didn't works")
+            cell.BVS(Warning_BVS)
         else:
             Warning = False
         cell.warning_list.append(Warning)
@@ -143,7 +167,7 @@ def determine_charge(cell):
         cell.warning_list.append(Warning)
 
     # Only one possible charge distribution -> getcharge for the repeated species
-    if not any(cell.warning_list):
+    if not any(cell.warning_list) or ("Warning_BVS" in locals() and not Warning_BVS):
         print("\nFINAL Charge Distribution:", final_charge_distribution)
         print("Assigning Charges and Preparing Molecules")
         cell.moleclist, Warning = prepare_mols(
@@ -197,7 +221,7 @@ def cell2mol(infopath, refcode):
     cell = reconstruct(cell, reflabels, fracs)
 
     # Charge Assignment
-    if not all(cell.warning_list):
+    if not any(cell.warning_list):
         print("Cell reconstruction successfully finished.\n")
         cell = determine_charge(cell)
     else:

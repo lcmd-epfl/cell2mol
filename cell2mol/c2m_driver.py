@@ -10,14 +10,17 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
 
     pwd = os.getcwd()
     infofile = "YOXKUS.info"
+    # infofile = "ISIPIJ.info"
     refcode = split_infofile(infofile)
     print(refcode)
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    infopath = dir_path + "/test/infodata/" + infofile
+    output_dir = dir_path + "/test/infodata/" + refcode
 
-    output_dir = refcode
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    cell = cell2mol(infofile, refcode)
+    cell = cell2mol(infopath, refcode)
 
     # Print the Charges or Warnings
     if not any(cell.warning_list):
