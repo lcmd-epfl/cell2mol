@@ -11,8 +11,8 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
 
     pwd = os.getcwd()
     # infofile = "YOXKUS.info" # no warning
-    # infofile = "ISIPIJ.info" # final distribtuion 2, BVS worked
-    infofile = "HACXOY.info" # final distribtuion 2
+    infofile = "ISIPIJ.info" # final distribtuion 2, BVS worked
+    # infofile = "HACXOY.info" # final distribtuion 2
     refcode = split_infofile(infofile)
     print(refcode)
     dir_path = os.path.dirname(os.path.realpath(__file__))

@@ -145,8 +145,8 @@ def determine_charge(cell):
             dist = choose_final_dist_using_BVS(
                 final_charge_distribution, BVS_list, metal_indices_list
             )
-            #             dist= list(dist)
-            if dist != None:
+            print("dist", dist)
+            if len(dist) != 0:
                 if dist.ndim == 1 :
                     warning_BVS = False
                     final_charge_distribution = [list(copy.deepcopy(dist))]
