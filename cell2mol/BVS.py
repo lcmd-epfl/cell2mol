@@ -95,8 +95,8 @@ def bond_valence_sum(
                         delta_comb = [sum(s) - charge for s in combination]
                         delta = min(delta_comb, key=abs)
                         print(
-                            "==================== Trial oxidation state: +{} ====================\n".format(
-                                delta + charge
+                            "====================Delta : {} , Trial oxidation state: +{} ====================\n".format(
+                                delta, delta + charge
                             )
                         )
                         delta = abs(delta)
@@ -134,8 +134,10 @@ def choose_final_dist_using_BVS(
     #         print(result)
     #         print(result.all())
     if result.all():
-        #         print(dist)
+        print("dist", dist)
         return dist
+    else:
+        return np.array([])
 
 
 if __name__ == "__main__":
