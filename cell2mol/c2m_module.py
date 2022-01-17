@@ -135,27 +135,6 @@ def determine_charge(cell):
             print(
                 "More than one Possible Distribution Found:", final_charge_distribution
             )
-            print("##############################################")
-            print("############## BVS implemented ###############")
-            print("##############################################")
-            bv_para = pd.read_csv("bvparm2020.txt", delimiter="\t")
-            BVS_list, metal_indices_list = bond_valence_sum(
-                unique_species, unique_indices, bv_para, final_charge_distribution
-            )
-            dist = choose_final_dist_using_BVS(
-                final_charge_distribution, BVS_list, metal_indices_list
-            )
-            print("dist", dist)
-            if len(dist) != 0:
-                if dist.ndim == 1 :
-                    warning_BVS = False
-                    final_charge_distribution = [list(copy.deepcopy(dist))]
-                    print(final_charge_distribution)
-                    print("BVS worked")
-            else:
-                warning_BVS = True
-                print("BVS didn't works")
-            cell.bvs(warning_BVS)
         else:
             Warning = False
         cell.warning_list.append(Warning)
@@ -168,7 +147,7 @@ def determine_charge(cell):
         cell.warning_list.append(Warning)
 
     # Only one possible charge distribution -> getcharge for the repeated species
-    if not any(cell.warning_list) or ("warning_BVS" in locals() and not warning_BVS):
+    if not any(cell.warning_list):
         print("\nFINAL Charge Distribution:", final_charge_distribution)
         print("Assigning Charges and Preparing Molecules")
         cell.moleclist, Warning = prepare_mols(
@@ -208,24 +187,39 @@ def split_infofile(infofile):
         exit()
 
 
-def cell2mol(infopath, refcode):
+def cell2mol(infopath, refcode, output_dir, step=3):
+    
+    if step == 1 or step ==3 :
+        # Read reference molecules from info file
+        labels, pos, reflabels, fracs, cellvec, cellparam = readinfo(infopath)
 
-    # Read reference molecules from info file
-    labels, pos, reflabels, fracs, cellvec, cellparam = readinfo(infopath)
-
-    # Initialize cell object
-    warning_list = []
-    cell = Cell(refcode, labels, pos, cellvec, cellparam, warning_list)
-    print("[Refcode]", cell.refcode)
-
-    # Cell Reconstruction
-    cell = reconstruct(cell, reflabels, fracs)
-
-    # Charge Assignment
-    if not any(cell.warning_list):
-        print("Cell reconstruction successfully finished.\n")
-        cell = determine_charge(cell)
-    else:
-        print("Cell reconstruction failed.\n")
-
+        # Initialize cell object
+        warning_list = []
+        cell = Cell(refcode, labels, pos, cellvec, cellparam, warning_list)
+        print("[Refcode]", cell.refcode)
+    
+    
+        # Cell Reconstruction
+        cell = reconstruct(cell, reflabels, fracs)
+    
+    elif step == 2 :
+        print("Cell loaded using pickle")
+        file = open(f"{output_dir}/Cell_{refcode}.gmol",'rb')
+        cell = pickle.load(file)
+        print("[Refcode]", cell.refcode, cell)
+    else :
+        print("Inproper step number")
+    
+    if step == 1:
+        pass
+    elif step == 2 or step ==3 :
+        # Charge Assignment
+        if not any(cell.warning_list):
+            print("Cell reconstruction successfully finished.\n")
+            cell = determine_charge(cell)
+        else:
+            print("Cell reconstruction failed.\n")
+    else :
+        print("Inproper step number")
+    
     return cell
