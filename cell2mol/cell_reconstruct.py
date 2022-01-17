@@ -1252,6 +1252,7 @@ def fragments_reconstruct(
 
     else:
         print("Only 0 or 1 heavy fragments. Skipping Heavy")
+        remfrag = fraglist.copy()
 
     # Reconstruct Hydrogens with remaining Fragments
     if len(remfrag) > 0 and len(Hlist) > 0:
