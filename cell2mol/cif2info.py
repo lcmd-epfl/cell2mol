@@ -22,6 +22,8 @@
 #  Author:      Torbjorn Bjorkman
 #  ORCID:       0000-0002-1154-9846
 #************************************************************************************
+from __future__ import absolute_import
+
 import sys
 import os
 import string
