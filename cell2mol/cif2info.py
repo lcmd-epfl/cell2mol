@@ -36,9 +36,10 @@ from weakref import ref
 
 import CifFile
 
-from cell2mol.cif2cell.ESPInterfaces import *
-from cell2mol.cif2cell.elementdata import ElementData
-from cell2mol.cif2cell.utils import (
+from cell2mol.elementdata import ElementData
+from cell2mol.cif2cell_ESPInterfaces import *
+
+from cell2mol.cif2cell_utils import (
     safe_matheval,
     PositionError,
     SymmetryError,
@@ -53,7 +54,7 @@ from cell2mol.cif2cell.utils import (
     Vector,
     mmmult3,
 )
-from cell2mol.cif2cell.uctools import ReferenceData, CellData, SymmetryOperation
+from cell2mol.cif2cell_uctools import ReferenceData, CellData, SymmetryOperation
 
 from cell2mol.c2m_module import split_infofile
 
