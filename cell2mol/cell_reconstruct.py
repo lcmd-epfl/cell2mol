@@ -1,10 +1,5 @@
-import os
 import numpy as np
-import sys
-import copy
-import scipy
 import itertools
-import pickle
 
 from scipy import sparse
 from scipy.sparse import csr_matrix
