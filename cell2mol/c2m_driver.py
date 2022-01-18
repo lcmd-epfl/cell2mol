@@ -58,8 +58,9 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
             sys.stdout = open(output_fname, "a")
             existing_cell = output_dir + "/" + "Cell_{}.gmol".format(refcode)
 
-            file = open(existing_cell, "rb")
+            
             if os.path.isfile(existing_cell):
+                file = open(existing_cell, "rb")
                 cell = pickle.load(file)
             else:
                 print(f"No cell object in outpud directory: {existing_cell}")
