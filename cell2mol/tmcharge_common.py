@@ -135,7 +135,7 @@ def getconec(labels, pos, factor, radii="default"):
     mconnec = np.zeros((natoms))
 
     with warnings.catch_warnings():
-        warnings.simplefilter(action='ignore', category=FutureWarning)
+        warnings.simplefilter(action="ignore", category=FutureWarning)
         if radii == "default":
             radii = getradii(labels)
 
@@ -681,7 +681,7 @@ class Cell(object):
                 )
 
     def print_Warning(self):
- 
+
         reason_of_Warning = [
             "Warning 1! Errors received from getting reference molecules (disorder)",
             "Warning 2! Missing H atoms from C in reference molecules",
@@ -705,9 +705,10 @@ class Cell(object):
 
         if len(res) == 0:
             print("No Warnings!")
-            
+
         else:
             for i in res:
                 print(reason_of_Warning[i])
-            
+
+
 ########## END OF CLASSES ###########
