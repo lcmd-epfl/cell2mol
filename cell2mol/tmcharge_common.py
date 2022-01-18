@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import warnings
 import sys
 import numpy as np
 from scipy import sparse
@@ -133,8 +134,10 @@ def getconec(labels, pos, factor, radii="default"):
     mconmat = np.zeros((natoms, natoms))
     mconnec = np.zeros((natoms))
 
-    if radii == "default":
-        radii = getradii(labels)
+    with warnings.catch_warnings():
+        warnings.simplefilter(action='ignore', category=FutureWarning)
+        if radii == "default":
+            radii = getradii(labels)
 
     for i in range(0, natoms - 1):
         for j in range(i, natoms):
