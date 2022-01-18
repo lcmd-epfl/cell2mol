@@ -22,7 +22,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     if step in [1, 2, 3]:
         print("Proper step number")
     else:
-        print("Inproper step number")
+        print("Improper step number")
         sys.exit(1)
 
     root, extension = os.path.splitext(infofile)
