@@ -727,7 +727,7 @@ def sequential(
     fragtoallocate = 0
     Htoallocate = 0
     niter = 1
-    maxiter = 300
+    maxiter = 3000
     mixsize = 1
     lastiter = 0
     lastitermargin = maxiter
