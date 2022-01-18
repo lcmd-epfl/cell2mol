@@ -58,6 +58,8 @@ def get_atomic_valences(k):
         return [6, 5, 3]  # [5,4,3]
     if k == 33:  # As
         return [6, 5, 3]  # [5,4,3]
+    if k == 51:  # Sb
+        return [6, 5, 3]  # [5,4,3]
     if k in [16, 34]:  # S, Se
         return [6, 3, 2]  # [6,4,2]
     if block == "s" and period == 1:
@@ -266,6 +268,9 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
         charge = 0
         found = True
     elif atom == 33 and BO_valence == 6 and not found:  # AsX6
+        charge = -1
+        found = True
+    elif atom == 51 and BO_valence == 6 and not found:  # SbX6
         charge = -1
         found = True
 
