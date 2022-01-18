@@ -910,9 +910,10 @@ def sequential(
                 g.type = assigntype(g, refmoleclist)
                 molecsfoundlist.append(g)
             if len(goodlist) >= 1:
-                print("SEQUENTIAL: Molecules found so far:")
-                for i, item in enumerate(molecsfoundlist):
-                    print(i, item.natoms, item.labels)
+                if debug >= 1:
+                    print("SEQUENTIAL: Molecules found so far:")
+                    for i, item in enumerate(molecsfoundlist):
+                        print(i, item.natoms, item.labels)
 
             # Reconstructs list1 and list2
             list1 = []
@@ -1188,12 +1189,7 @@ def identify_frag_molec_H(blocklist, moleclist, refmoleclist, cellvec):
             else:
                 block.type = "Fragment"
                 fraglist.append(block)
-    print("")
-    print("#################")
-    print("Blocks found are:")
-    print("#################")
-    for b in blocklist:
-        print("Block in Info", b.natoms, b.labels, b.type)
+
     print(
         len(blocklist),
         "Blocks sorted for reconstructrion as (Molec, Frag, H):",
