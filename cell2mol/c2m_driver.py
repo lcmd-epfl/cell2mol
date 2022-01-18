@@ -16,13 +16,11 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     pwd = os.getcwd()
 
     infofile, step = parsing_arguments()
-    print(infofile)
-    print(step)
 
     if step in [1, 2, 3]:
-        print("Proper step number")
+        print("Proper step number : {}".format(step))
     else:
-        print("Improper step number")
+        print("Improper step number : {}".format(step))
         sys.exit(1)
 
     root, extension = os.path.splitext(infofile)
@@ -30,6 +28,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
 
     # If infofile is a .cif file
     if extension == ".cif":
+        print("Convert .cif file to .info file")
         new_info_file = "{}.info".format(refcode)
         sys.stdout = open(new_info_file, "w")
         cif_2_info()
@@ -43,11 +42,23 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
         print("Wrong Input File Format")
         sys.exit(1)
 
-    # dir_path = os.path.dirname(os.path.realpath(__file__))
     if infopath:
         output_dir = pwd + "/" + refcode
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
+        
+        # import cell object in case of step 2
+        if step == 2: 
+            existing_cell = output_dir + "/" + "Cell_{}.gmol".format(refcode)
+            if os.path.isfile(existing_cell):
+                file = open(existing_cell, "rb")
+                cell = pickle.load(file)
+            else:
+                print(f"No cell object in outpud directory: {existing_cell}")
+                sys.exit(1)
+        else :
+            pass
+            
 
         # save output and cell object
         output_fname = output_dir + "/output.out"
@@ -56,15 +67,6 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
             sys.stdout = open(output_fname, "w")
         elif step == 2:
             sys.stdout = open(output_fname, "a")
-            existing_cell = output_dir + "/" + "Cell_{}.gmol".format(refcode)
-
-            
-            if os.path.isfile(existing_cell):
-                file = open(existing_cell, "rb")
-                cell = pickle.load(file)
-            else:
-                print(f"No cell object in outpud directory: {existing_cell}")
-                sys.exit(1)
 
         cell = cell2mol(infopath, refcode, output_dir, step)
         print_types = "gmol"
