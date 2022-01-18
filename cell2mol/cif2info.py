@@ -36,8 +36,7 @@ import CifFile
 
 from cell2mol.cif2cell.ESPInterfaces import *
 from cell2mol.cif2cell.elementdata import ElementData
-from cell2mol.cif2cell.utils import safe_matheval, PositionError, SymmetryError, CellError, SurfaceWizard, angtobohr, codename, \
-    uperautogpercm, SetupError, LatticeMatrix, minv3, Vector, mmmult3
+from cell2mol.cif2cell.utils import safe_matheval, PositionError, SymmetryError, CellError, SurfaceWizard, angtobohr, codename, uperautogpercm, SetupError, LatticeMatrix, minv3, Vector, mmmult3
 from cell2mol.cif2cell.uctools import ReferenceData, CellData, SymmetryOperation
 
 from cell2mol.c2m_module import split_infofile
