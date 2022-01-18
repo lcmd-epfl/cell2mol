@@ -179,7 +179,7 @@ def split_infofile(infofile):
     if len(splitname) == 2:
         return splitname[0]
     elif len(splitname) == 3:
-        return splitname[0], splitname[1]
+        return splitname[0]
     else:
         print("can't understand the filename you gave me")
         exit()
