@@ -22,7 +22,6 @@ import networkx as nx
 
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdmolops
-import sys
 
 from cell2mol.elementdata import ElementData
 

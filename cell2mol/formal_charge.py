@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
-import copy
 import itertools
-import pickle
 import sys
 
 from cell2mol.tmcharge_common import atom, molecule, ligand, metal, group

@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 import pickle
-import copy
-import pandas as pd
 
 # Import modules
 from cell2mol.cell_reconstruct import (
@@ -110,7 +108,7 @@ def reconstruct(cell, reflabels, fracs):
 
 def determine_charge(cell):
 
-    # Indentify unique chemical spicies
+    # Indentify unique chemical species
     molec_indices, ligand_indices, unique_indices, unique_species = classify_mols(
         cell.moleclist
     )
@@ -188,8 +186,8 @@ def split_infofile(infofile):
 
 
 def cell2mol(infopath, refcode, output_dir, step=3):
-    
-    if step == 1 or step ==3 :
+
+    if step == 1 or step == 3:
         # Read reference molecules from info file
         labels, pos, reflabels, fracs, cellvec, cellparam = readinfo(infopath)
 
@@ -197,29 +195,28 @@ def cell2mol(infopath, refcode, output_dir, step=3):
         warning_list = []
         cell = Cell(refcode, labels, pos, cellvec, cellparam, warning_list)
         print("[Refcode]", cell.refcode)
-    
-    
+
         # Cell Reconstruction
         cell = reconstruct(cell, reflabels, fracs)
-    
-    elif step == 2 :
+
+    elif step == 2:
         print("Cell loaded using pickle")
-        file = open(f"{output_dir}/Cell_{refcode}.gmol",'rb')
+        file = open(f"{output_dir}/Cell_{refcode}.gmol", "rb")
         cell = pickle.load(file)
         print("[Refcode]", cell.refcode, cell)
-    else :
+    else:
         print("Inproper step number")
-    
+
     if step == 1:
         pass
-    elif step == 2 or step ==3 :
+    elif step == 2 or step == 3:
         # Charge Assignment
         if not any(cell.warning_list):
             print("Cell reconstruction successfully finished.\n")
             cell = determine_charge(cell)
         else:
             print("Cell reconstruction failed.\n")
-    else :
+    else:
         print("Inproper step number")
-    
+
     return cell

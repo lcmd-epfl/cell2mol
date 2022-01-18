@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 
-import numpy as np
 import argparse
 
-def parsing_arguments ():
+
+def parsing_arguments():
     parser = argparse.ArgumentParser(
-        prog="cell2mol",
-        description="Generator cell object from an input file",
+        prog="cell2mol", description="Generates cell object from an input file"
     )
 
     parser.add_argument(
@@ -24,15 +23,13 @@ def parsing_arguments ():
         dest="step",
         type=int,
         required=True,
-        help="Generate cell by the step of cell reconstruction (1), only charge assignment (2), or cell reconstruction + charge assignment (3)",
+        help="Generate cell by the step of cell reconstruction (1), only charge assignment (2), or cell reconstruction and charge assignment (3)",
     )
 
     args = parser.parse_args()
 
     return args.filename, args.step
 
-if __name__ == '__main__':
-    parsing_arguments ()
 
-
-
+if __name__ == "__main__":
+    parsing_arguments()
