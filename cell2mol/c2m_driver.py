@@ -2,10 +2,10 @@
 
 import sys
 import os
-from cell2mol.helper import parsing_arguments
 import pickle
 
 # Import modules
+from cell2mol.helper import parsing_arguments
 from cell2mol.c2m_module import split_infofile, save_cell, cell2mol
 from cell2mol.cif2info import cif_2_info
 
