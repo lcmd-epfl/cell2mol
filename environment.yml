@@ -75,6 +75,7 @@ dependencies:
   - pluggy=1.0.0
   - py=1.10.0
   - pycairo=1.20.1
+  - pycifrw==4.4.3
   - pyparsing=3.0.6
   - pytest=6.2.5
   - python=3.9.9
@@ -97,6 +98,3 @@ dependencies:
   - xz=5.2.5
   - zlib=1.2.11
   - zstd=1.5.1
-  - pip:
-    - cell2mol==1.0
-    - pycifrw==4.4.3
