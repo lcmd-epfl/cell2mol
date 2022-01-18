@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import os
 import sys
 import cell2mol
+import cif2cell
 
 if __package__ == "":
     path = os.path.dirname(os.path.dirname(__file__))

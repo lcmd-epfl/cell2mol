@@ -7,32 +7,35 @@ import pickle
 
 # Import modules
 from cell2mol.c2m_module import split_infofile, save_cell, cell2mol
-
+from cell2mol.cif2info import cif_2_info
 if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     print("Running!")
 
     pwd = os.getcwd()
+    
     infofile, step = parsing_arguments()
     
     root, extension = os.path.splitext(infofile)
-
     refcode = split_infofile(infofile)
-    print(refcode)
     
-    if extension == '.cif':
-        os.system(f"python cif2info.py {infofile} --cartesian --force > {refcode}.info")
-        infofile = "{}.info".format(refcode)
+    # If infofile is a .cif file
+    if extension == '.cif':    
+        new_info_file = "{}.info".format(refcode)
+        sys.stdout = open(new_info_file, "w")
+        cif_2_info (infofile)
+        sys.stdout.close()
+        infopath = pwd + "/" + new_info_file
+        
+    # If infofile is a .info file       
     elif extension == '.info':
-        pass
+        infopath = pwd + "/" + infofile
     
     else :
         print ("Wrong Input File")
 
     # dir_path = os.path.dirname(os.path.realpath(__file__))
 
-    infopath = pwd + "/" + infofile
     output_dir = pwd + "/" + refcode
-
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
