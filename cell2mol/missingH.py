@@ -162,7 +162,7 @@ def check_missingH(refmoleclist):
     #################################
     Missing_H_in_C = False
     Missing_H_in_CoordWater = False
-
+    ismissingH = False
     Warning = False
 
     Exceptions_for_CoordWater = ["Re"]
