@@ -41,6 +41,7 @@ from cell2mol.cif2cell.uctools import ReferenceData, CellData, SymmetryOperation
 
 from cell2mol.c2m_module import split_infofile
 
+print(
 
 # Turn off warnings about deprecated stuff
 warnings.simplefilter("ignore",DeprecationWarning)
@@ -196,7 +197,7 @@ def parsing_input ():
 
     return (options,args)
 
-def cif_2_info (cif_file):
+def cif_2_info (cif_file, angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogpercm):
 
     # Name and version
     programname = "cif2cell"
