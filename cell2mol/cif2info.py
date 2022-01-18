@@ -22,7 +22,6 @@
 #  Author:      Torbjorn Bjorkman
 #  ORCID:       0000-0002-1154-9846
 # ************************************************************************************
-from __future__ import absolute_import
 
 import sys
 import os
@@ -143,6 +142,15 @@ def parsing_input():
     description = "A program for generating input lattice structures to various electronic structure programs from a CIF (Crystallographic Information Framework) file. This code was published in Comput. Phys. Commun. 182, 1183 (2011). Please cite generously."
     usage = "usage: %prog FILE [-p PROGRAM] [other options]"
     parser = OptionParser(usage=usage, description=description)
+
+    parser.add_option(
+        "-s",
+        "--step",
+        dest="step",
+        type=int,
+        help="Generate cell by the step of cell reconstruction (1), only charge assignment (2), or cell reconstruction and charge assignment (3)",
+    )
+
     parser.add_option(
         "--version", dest="version", help="Print version number.", action="store_true"
     )
@@ -163,8 +171,8 @@ def parsing_input():
     # GENERAL OPTIONS
     generalopts = OptionGroup(parser, "General options")
     generalopts.add_option(
-        "-f",
-        "--file",
+        "-i",
+        "--input",
         dest="file",
         help="Input CIF file, unless given as first argument to the program.",
         metavar="FILE",
@@ -660,9 +668,11 @@ def parsing_input():
     return (options, args)
 
 
-def cif_2_info(
-    cif_file, angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogpercm
-):
+def cif_2_info(angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogpercm):
+
+    angtobohr = angtobohr
+    codename = codename
+    uperautogpercm = uperautogpercm
 
     # Name and version
     programname = "cif2cell"
@@ -677,7 +687,6 @@ def cif_2_info(
     # Print version number and exit
     if options.version:
         sys.stdout.write(programname + " version " + version + "\n")
-        sys.exit(0)
 
     #############################################################
     # Check that options given are possible
@@ -832,14 +841,14 @@ def cif_2_info(
 
     #################################################################
     # Open and read CIF file
-    # cif_file = None
-    # if len(args) > 0:
-    #     # input CIF file as argument
-    #     cif_file = args[0]
-    # if options.file:
-    #     # input CIF file as option (overrides argument)
-    #     cif_file = options.file
-    # print(cif_file:)
+    cif_file = None
+    if len(args) > 0:
+        # input CIF file as argument
+        cif_file = args[0]
+    if options.file:
+        # input CIF file as option (overrides argument)
+        cif_file = options.file
+    print(cif_file)
     if cif_file:
         if not os.path.exists(cif_file):
             sys.stderr.write(
@@ -982,7 +991,7 @@ def cif_2_info(
     ref.getFromCIF(cb)
     if bibtexref:
         sys.stdout.write(ref.bibtexref())
-        sys.exit(0)
+
     if options.coordtol:
         # Get cell data
         cd = CellData(compeps=float(options.coordtol))
@@ -1612,7 +1621,7 @@ def cif_2_info(
     ################################################################################################
     # Stop here if no specific output was requested
     if not options.program:
-        sys.exit(0)
+        pass
 
     # Don't generate output for alloys (for most programs)
     if (
@@ -1812,7 +1821,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(sysfile))
         f.close()
-        sys.exit(0)
 
     ################################################################################################
     # Output for CASTEP
@@ -1840,7 +1848,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(sysfile))
         f.close()
-        sys.exit(0)
 
     ################################################################################################
     # Output to coo file
@@ -1852,7 +1859,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(sysfile))
         f.close()
-        sys.exit(0)
 
     ################################################################################################
     # Output for CP2k
@@ -1892,7 +1898,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(crystal09file))
         f.close()
-        sys.exit(0)
 
     ################################################################################################
     # EMTO PROGRAMS
@@ -1999,7 +2004,7 @@ def cif_2_info(
         f.write(str(kstrfile))
         f.close()
         if outputprogram == "kstr":
-            sys.exit(0)
+            pass
     # Output for EMTO Madelung constant program bmdl
     if outputprogram == "bmdl" or outputprogram == "emto":
         # Create directories
@@ -2027,7 +2032,7 @@ def cif_2_info(
         f.write(str(bmdlfile))
         f.close()
         if outputprogram == "bmdl":
-            sys.exit(0)
+            pass
     # Output for EMTO shape function program 'shape'
     if outputprogram == "shape" or outputprogram == "emto":
         # Create directories
@@ -2048,7 +2053,7 @@ def cif_2_info(
         f.write(str(shapefile))
         f.close()
         if outputprogram == "shape":
-            sys.exit(0)
+            pass
     # Output for EMTO main Greens function program 'kgrn'
     if outputprogram == "kgrn" or outputprogram == "emto":
         # Create directories
@@ -2075,7 +2080,7 @@ def cif_2_info(
         f.write(str(kgrnfile))
         f.close()
         if outputprogram == "kgrn":
-            sys.exit(0)
+            pass
     # Output for EMTO charge density program 'kfcd'
     if outputprogram == "kfcd" or outputprogram == "emto":
         # Create directories
@@ -2093,9 +2098,9 @@ def cif_2_info(
         f.write(str(kfcdfile))
         f.close()
         if outputprogram == "kfcd":
-            sys.exit(0)
+            pass
     if outputprogram == "emto":
-        sys.exit(0)
+        pass
 
     ################################################################################################
     # Output for elk
@@ -2107,7 +2112,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(geometryfile))
         f.close()
-        sys.exit(0)
 
     # Output for exciting
     if outputprogram == "exciting":
@@ -2118,7 +2122,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(excitingfile))
         f.close()
-        sys.exit(0)
 
     # Output for spacegroup.in for Elk/Exciting cell utility spacegroup
     if outputprogram == "spacegroup":
@@ -2140,7 +2143,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(spacegroupfile))
         f.close()
-        sys.exit(0)
 
     ################################################################################################
     # Output for Hutsepot
@@ -2275,7 +2277,7 @@ def cif_2_info(
         f.write(str(bstrfile))
         f.close()
         if outputprogram == "bstr":
-            sys.exit(0)
+            pass
 
     if outputprogram == "ncol":
         # Initialize ncolfile
@@ -2287,7 +2289,6 @@ def cif_2_info(
         f = open(jobnam + ".dat", "w")
         f.write(str(ncolfile))
         f.close()
-        sys.exit(0)
 
     ################################################################################################
     # Output for PWSCF (Quantum Espresso)
@@ -2401,7 +2402,6 @@ def cif_2_info(
             f = open("INCAR", "w")
             f.write(str(incarfile))
             f.close()
-        sys.exit(0)
 
     ################################################################################################
     # Output for RSPt
@@ -2438,7 +2438,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(symtfile))
         f.close()
-        sys.exit(0)
 
     # Output for RSPt supercell generator cellgen
     if outputprogram == "cellgen":
@@ -2464,7 +2463,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(cellgenfile))
         f.close()
-        sys.exit(0)
 
     ################################################################################################
     # Output for Siesta
@@ -2485,7 +2483,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(sysfile))
         f.close()
-        sys.exit(0)
 
     ################################################################################################
     # Output for xband
@@ -2517,7 +2514,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(sysfile))
         f.close()
-        sys.exit(0)
 
     ################################################################################################
     # Output for xyz file
@@ -2548,7 +2544,6 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(sysfile))
         f.close()
-        sys.exit(0)
 
     ################################################################################################
     # Output for LAMMPS file
@@ -2577,38 +2572,3 @@ def cif_2_info(
         f = open(outputfile, outmode)
         f.write(str(sysfile))
         f.close()
-        sys.exit(0)
-
-
-if __name__ == "__main__":
-
-    pwd = os.getcwd()
-
-    (options, args) = parsing_input()
-    # Open and read CIF file
-    cif_file = None
-    if len(args) > 0:
-        # input CIF file as argument
-        cif_file = args[0]
-    if options.file:
-        # input CIF file as option (overrides argument)
-        cif_file = options.filels
-
-    if cif_file:
-        if not os.path.exists(cif_file):
-            sys.stderr.write(
-                "***Error: The file " + cif_file + " could not be found.\n"
-            )
-            sys.exit(2)
-        cif_file_name = cif_file.split("/")[-1]
-
-    # python cif2info.py cif_file --cartesian --force
-    options.cartesian = True
-    options.force = True
-    refcode = split_infofile(cif_file)
-    print(refcode)
-
-    info_file = pwd + "/{}.info".format(refcode)
-    sys.stdout = open(info_file, "w")
-    cif_2_info(cif_file)
-    sys.stdout.close()
