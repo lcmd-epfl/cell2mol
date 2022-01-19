@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 import pickle
+import time
+import sys
+import os
 
 # Import modules
 from cell2mol.cell_reconstruct import (
@@ -95,8 +98,14 @@ def reconstruct(cell, reflabels, fracs):
             final_natoms += mol.natoms
         if final_natoms != init_natoms:
             Warning = True
+            print(
+                f"Final and initial atoms do not coincide. Final/Initial {final_natoms}/ {init_natoms}\n"
+            )
         else:
             Warning = False
+            print(
+                f"Final and initial atoms coincide. Final/Initial {final_natoms}/ {init_natoms}\n"
+            )
         cell.warning_list.append(Warning)
 
     # Split Complexes and Reassign Type
@@ -167,7 +176,7 @@ def save_cell(cell, ext, output_dir):
     filename = str(output_dir) + "/" + "Cell_" + str(cell.refcode) + "." + str(ext)
     with open(filename, "wb") as fil:
         if ext == "gmol":
-            print("Cell_" + str(cell.refcode) + "." + str(ext))
+            print("Output file path", filename)
             pickle.dump(cell, fil)
         else:
             print(ext, "not found as a valid print extension in print_molecule")
@@ -188,6 +197,9 @@ def split_infofile(infofile):
 def cell2mol(infopath, refcode, output_dir, step=3):
 
     if step == 1 or step == 3:
+
+        tini = time.time()
+
         # Read reference molecules from info file
         labels, pos, reflabels, fracs, cellvec, cellparam = readinfo(infopath)
 
@@ -197,26 +209,68 @@ def cell2mol(infopath, refcode, output_dir, step=3):
         print("[Refcode]", cell.refcode)
 
         # Cell Reconstruction
+        print(
+            "===================================== step 1 : Cell reconstruction =====================================\n"
+        )
         cell = reconstruct(cell, reflabels, fracs)
+        tend = time.time()
+        print(
+            f"\nTotal execution time for Cell Reconstruction: {tend - tini:.2f} seconds"
+        )
 
     elif step == 2:
-        print("Cell loaded using pickle")
-        file = open(f"{output_dir}/Cell_{refcode}.gmol", "rb")
-        cell = pickle.load(file)
-        print("[Refcode]", cell.refcode, cell)
-    else:
-        print("Inproper step number")
+        print("\n***Imprementing only Charge Assignment***")
+        print("\nCell object loading by pickle")
 
-    if step == 1:
-        pass
-    elif step == 2 or step == 3:
-        # Charge Assignment
-        if not any(cell.warning_list):
-            print("Cell reconstruction successfully finished.\n")
-            cell = determine_charge(cell)
+        cellpath = output_dir + "/Cell_{}.gmol".format(refcode)
+
+        filename = str(output_dir) + "/" + "Cell_" + str(refcode) + ".gmol"
+
+        if os.path.exists(cellpath):
+            file = open(filename, "rb")
+            cell = pickle.load(file)
+            print("[Refcode]", cell.refcode, cell)
+
         else:
-            print("Cell reconstruction failed.\n")
+            print("No such file exists {}".format(filename))
+            sys.exit(1)
     else:
         print("Inproper step number")
+        sys.exit(1)
+
+    if not any(cell.warning_list):
+        if step == 1 or step == 3:
+            print("Cell reconstruction successfully finished.\n")
+        elif step == 2:
+            print("No Warnings in loaded Cell object\n")
+
+        if step == 1:
+            pass
+        elif step == 2 or step == 3:
+            # Charge Assignment
+            tini_2 = time.time()
+            print(
+                "===================================== step 2 : Charge Assignment =======================================\n"
+            )
+            cell = determine_charge(cell)
+            tend_2 = time.time()
+            print(
+                f"\nTotal execution time for Charge Assignment: {tend_2 - tini_2:.2f} seconds"
+            )
+
+            if not any(cell.warning_list):
+                print("Charge Assignment successfully finished.\n")
+                print(cell.print_charge_assignment())
+                print(cell.print_Warning())
+            else:
+                print("Charge Assignment failed.\n")
+                print(cell.print_Warning())
+    else:
+        if step == 1 or step == 3:
+            print("Cell reconstruction failed.\n")
+        elif step == 2:
+            print("Warnings in loaded Cell object\n")
+        print(cell.print_Warning())
+        print("Cannot proceed step 2 Charge Assignment")
 
     return cell
