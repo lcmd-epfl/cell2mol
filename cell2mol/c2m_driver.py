@@ -12,16 +12,17 @@ from cell2mol.cif2info import cif_2_info
 
 if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
 
-    print("Running!")
+    # print("Running!")
 
     pwd = os.getcwd()
 
     infofile, step = parsing_arguments()
 
     if step in [1, 2, 3]:
-        print("Proper step number : {}".format(step))
+        # print("Proper step number : {}".format(step))
+        pass
     else:
-        print("Improper step number : {}".format(step))
+        # print("Improper step number : {}".format(step))
         sys.exit(1)
 
     root, extension = os.path.splitext(infofile)
@@ -33,7 +34,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     elif step == 1 or step == 3:
         # If infofile is a .cif file
         if extension == ".cif":
-            print("Convert .cif file to .info file")
+            # print("Convert .cif file to .info file")
             new_info_file = "{}.info".format(refcode)
             sys.stdout = open(new_info_file, "w")
             cif_2_info()
@@ -43,10 +44,10 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
         elif extension == ".info":
             infopath = pwd + "/" + infofile
             if not os.path.exists(infopath):
-                print(f"Error: The file {infofile} could not be found.\n")
+                # print(f"Error: The file {infofile} could not be found.\n")
                 sys.exit(1)
         else:
-            print("Wrong Input File Format")
+            # print("Wrong Input File Format")
             sys.exit(1)
 
     output_dir = pwd + "/" + refcode
@@ -55,9 +56,10 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
         cellpath = output_dir + "/Cell_{}.gmol".format(refcode)
         filename = str(output_dir) + "/" + "Cell_" + str(refcode) + ".gmol"
         if os.path.exists(cellpath):
-            print("Cell object exist in output directory")
+            # print("Cell object exist in output directory")
+            pass
         else:
-            print("No such file exists {}".format(filename))
+            # print("No such file exists {}".format(filename))
             sys.exit(1)
 
     if not os.path.exists(output_dir):
@@ -89,5 +91,4 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     print(cell.print_Warning())
     sys.stdout.close()
 else:
-    print("Error!")
     sys.exit(1)

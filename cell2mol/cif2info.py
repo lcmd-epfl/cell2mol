@@ -688,6 +688,8 @@ def cif_2_info(angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogp
     if options.version:
         sys.stdout.write(programname + " version " + version + "\n")
 
+    pwd = os.getcwd()
+    sys.stderr = open(pwd + "/error_cif2cell.txt", "w")
     #############################################################
     # Check that options given are possible
     if options.append and not options.outputfile:
@@ -1670,6 +1672,7 @@ def cif_2_info(angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogp
             sys.stderr.write(
                 "Warning: You are setting up a VCA calculation but not all alloy sites are occupied by species\n         from neighbouring groups in the periodic table. Make sure that you know what you are doing!\n"
             )
+    sys.stderr.close()
 
     # Function for printing a standard docstring
     def StandardDocstring():

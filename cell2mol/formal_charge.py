@@ -38,7 +38,7 @@ if "ipykernel" in sys.modules:
         from rdkit.Chem.Draw import IPythonConsole
     except ModuleNotFoundError:
         pass
-print("RDKIT Version:", rdBase.rdkitVersion)
+# print("RDKIT Version:", rdBase.rdkitVersion)
 rdBase.DisableLog("rdApp.*")
 
 
