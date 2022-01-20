@@ -168,7 +168,8 @@ def getcharge(labels, pos, initcharge, conmat, cov_factor=1.3, debug=0):
     #:return atom_charge: atomic charge for each atom of the molecule
     #:return mols: rdkit molecule object
     #:return smiles: smiles representation of the molecule
-
+    
+    pt = Chem.GetPeriodicTable()    #needed to retrieve the default valences in the 2nd and 3rd checks
     natoms = len(labels)
     atnums = [int_atom(label) for label in labels]  # from xyz2mol
 
