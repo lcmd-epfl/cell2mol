@@ -12,17 +12,16 @@ from cell2mol.cif2info import cif_2_info
 
 if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
 
-    # print("Running!")
-
+    #print("Running!")
     pwd = os.getcwd()
 
     infofile, step = parsing_arguments()
 
     if step in [1, 2, 3]:
-        # print("Proper step number : {}".format(step))
         pass
+        #print("Proper step number : {}".format(step))
     else:
-        # print("Improper step number : {}".format(step))
+        #print("Improper step number : {}".format(step))
         sys.exit(1)
 
     root, extension = os.path.splitext(infofile)
@@ -50,7 +49,8 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
             # print("Wrong Input File Format")
             sys.exit(1)
 
-    output_dir = pwd + "/" + refcode
+    output_dir = pwd + "/" 
+    #output_dir = pwd + "/" + refcode
 
     if step == 2:
         cellpath = output_dir + "/Cell_{}.gmol".format(refcode)
