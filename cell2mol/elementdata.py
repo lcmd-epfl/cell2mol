@@ -977,7 +977,8 @@ class ElementData:
             "Na": 0.680,  # Modded Sergi, Was 0.97
             "Mg": 0.880,  # Modded Sergi, Was 1.11
             "Al": 1.350,
-            "Si": 1.200,
+            "Si": 1.100,
+            #"Si": 1.200,
             "P": 0.750,
             "S": 1.020,
             "Cl": 0.990,
