@@ -76,6 +76,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     cell = cell2mol(infopath, refcode, output_dir, step)
     print_types = "gmol"
     save_cell(cell, print_types, output_dir)
+
     sys.stdout.close()
 
     # save error
