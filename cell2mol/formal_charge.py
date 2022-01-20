@@ -1120,7 +1120,7 @@ def define_sites(ligand, metalist, molecule, debug=1):
                 a = ligand.atoms[idx]
                 if debug >= 1:
                     print(
-                        f"        DEFINE_SITES: evaluating non-haptic group with {idx}, {a.label}"
+                        f"        DEFINE_SITES: evaluating non-haptic group with index {idx} and label {a.label}"
                     )
                 # Simple Ionic Case
                 if a.label in ions:
@@ -1165,6 +1165,7 @@ def define_sites(ligand, metalist, molecule, debug=1):
                             elemlist[idx] = "H"
                             addedlist[idx] = 1
                     else:
+                        # nitrogen with at least 3 adjacencies doesnt need H
                         if a.connec >= 3:
                             block[idx] = 1
                         else:
@@ -1279,7 +1280,6 @@ def define_sites(ligand, metalist, molecule, debug=1):
         # Generate the new adjacency matrix to be sent to xyz2mol
         tmpradii = getradii(newlab)
         dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, pos, ligand.factor, tmpradii)
-        print("Lengths to xyz2mol", len(newlab), len(pos), len(tmpconmat))
 
         # Generation of the tentative neutral connectivity for the ligand. Here we use allow_charged_fragments = False
         try:
