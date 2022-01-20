@@ -43,7 +43,7 @@ rdBase.DisableLog("rdApp.*")
 
 
 #######################################################
-def classify_mols(moleclist, debug=1):
+def classify_mols(moleclist, debug=0):
 
     # This subroutine reads all molecules and
     # identifies those that are identical based on a sort of ID number, which is
