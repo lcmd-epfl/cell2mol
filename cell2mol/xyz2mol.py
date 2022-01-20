@@ -645,135 +645,135 @@ def read_xyz_file(filename, look_for_charge=True):
     return atoms, charge, xyz_coordinates
 
 
-def xyz2AC(atoms, xyz, charge, covalent_factor, use_huckel=False):
-    """
-
-    atoms and coordinates to atom connectivity (AC)
-
-    args:
-        atoms - int atom types
-        xyz - coordinates
-        charge - molecule charge
-
-    optional:
-        use_huckel - Use Huckel method for atom connecitivty
-
-    returns
-        ac - atom connectivity matrix
-        mol - rdkit molecule
-
-    """
-
-    if use_huckel:
-        return xyz2AC_huckel(atoms, xyz, charge)
-    else:
-        return xyz2AC_vdW(atoms, xyz, covalent_factor)
-
-
-def xyz2AC_vdW(atoms, xyz, covalent_factor):
-
-    # Get mol template
-    mol = get_proto_mol(atoms)
-
-    # Set coordinates
-    conf = Chem.Conformer(mol.GetNumAtoms())
-    for i in range(mol.GetNumAtoms()):
-        conf.SetAtomPosition(i, (xyz[i][0], xyz[i][1], xyz[i][2]))
-    mol.AddConformer(conf)
-
-    AC = get_AC(mol, covalent_factor)
-
-    return AC, mol
-
-
-def get_AC(mol, covalent_factor=1.3):
-    """
-
-    Generate adjacent matrix from atoms and coordinates.
-
-    AC is a (num_atoms, num_atoms) matrix with 1 being covalent bond and 0 is not
-
-
-    covalent_factor - 1.3 is an arbitrary factor
-
-    args:
-        mol - rdkit molobj with 3D conformer
-
-    optional
-        covalent_factor - increase covalent bond length threshold with facto
-
-    returns:
-        AC - adjacent matrix
-
-    """
-
-    # Calculate distance matrix
-    dMat = Chem.Get3DDistanceMatrix(mol)
-
-    pt = Chem.GetPeriodicTable()
-    num_atoms = mol.GetNumAtoms()
-    AC = np.zeros((num_atoms, num_atoms), dtype=int)
-
-    for i in range(num_atoms):
-        a_i = mol.GetAtomWithIdx(i)
-        Rcov_i = pt.GetRcovalent(a_i.GetAtomicNum()) * covalent_factor
-        for j in range(i + 1, num_atoms):
-            a_j = mol.GetAtomWithIdx(j)
-            Rcov_j = pt.GetRcovalent(a_j.GetAtomicNum()) * covalent_factor
-            if dMat[i, j] <= Rcov_i + Rcov_j:
-                AC[i, j] = 1
-                AC[j, i] = 1
-
-    return AC
-
-
-# http://rdkit.blogspot.com/2019/06/doing-extended-hueckel-calculations.html
-
-
-def xyz2AC_huckel(atomicNumList, xyz, charge):
-    """
-
-    args
-        atomicNumList - atom type list
-        xyz - coordinates
-        charge - molecule charge
-
-    returns
-        ac - atom connectivity
-        mol - rdkit molecule
-
-    """
-    mol = get_proto_mol(atomicNumList)
-
-    conf = Chem.Conformer(mol.GetNumAtoms())
-    for i in range(mol.GetNumAtoms()):
-        conf.SetAtomPosition(i, (xyz[i][0], xyz[i][1], xyz[i][2]))
-    mol.AddConformer(conf)
-
-    num_atoms = len(atomicNumList)
-    AC = np.zeros((num_atoms, num_atoms)).astype(int)
-
-    mol_huckel = Chem.Mol(mol)
-    mol_huckel.GetAtomWithIdx(0).SetFormalCharge(
-        charge
-    )  # mol charge arbitrarily added to 1st atom
-
-    passed, result = rdEHTTools.RunMol(mol_huckel)
-    opop = (
-        result.GetReducedOverlapPopulationMatrix()
-    )  # The reduced overlap population matrix provides the Mulliken overlap population between atoms in the molecule. It's returned as a vector representing a symmetric matrix
-    tri = np.zeros((num_atoms, num_atoms))
-    tri[
-        np.tril(np.ones((num_atoms, num_atoms), dtype=bool))
-    ] = opop  # lower triangular to square matrix
-    for i in range(num_atoms):
-        for j in range(i + 1, num_atoms):
-            pair_pop = abs(tri[j, i])
-            if pair_pop >= 0.15:  # arbitry cutoff for bond. May need adjustment
-                AC[i, j] = 1
-                AC[j, i] = 1
-
-    return AC, mol
+#def xyz2AC(atoms, xyz, charge, covalent_factor, use_huckel=False):
+#    """
+#
+#    atoms and coordinates to atom connectivity (AC)
+#
+#    args:
+#        atoms - int atom types
+#        xyz - coordinates
+#        charge - molecule charge
+#
+#    optional:
+#        use_huckel - Use Huckel method for atom connecitivty
+#
+#    returns
+#        ac - atom connectivity matrix
+#        mol - rdkit molecule
+#
+#    """
+#
+#    if use_huckel:
+#        return xyz2AC_huckel(atoms, xyz, charge)
+#    else:
+#        return xyz2AC_vdW(atoms, xyz, covalent_factor)
+#
+#
+#def xyz2AC_vdW(atoms, xyz, covalent_factor):
+#
+#    # Get mol template
+#    mol = get_proto_mol(atoms)
+#
+#    # Set coordinates
+#    conf = Chem.Conformer(mol.GetNumAtoms())
+#    for i in range(mol.GetNumAtoms()):
+#        conf.SetAtomPosition(i, (xyz[i][0], xyz[i][1], xyz[i][2]))
+#    mol.AddConformer(conf)
+#
+#    AC = get_AC(mol, covalent_factor)
+#
+#    return AC, mol
+#
+#
+#def get_AC(mol, covalent_factor=1.3):
+#    """
+#
+#    Generate adjacent matrix from atoms and coordinates.
+#
+#    AC is a (num_atoms, num_atoms) matrix with 1 being covalent bond and 0 is not
+#
+#
+#    covalent_factor - 1.3 is an arbitrary factor
+#
+#    args:
+#        mol - rdkit molobj with 3D conformer
+#
+#    optional
+#        covalent_factor - increase covalent bond length threshold with facto
+#
+#    returns:
+#        AC - adjacent matrix
+#
+#    """
+#
+#    # Calculate distance matrix
+#    dMat = Chem.Get3DDistanceMatrix(mol)
+#
+#    pt = Chem.GetPeriodicTable()
+#    num_atoms = mol.GetNumAtoms()
+#    AC = np.zeros((num_atoms, num_atoms), dtype=int)
+#
+#    for i in range(num_atoms):
+#        a_i = mol.GetAtomWithIdx(i)
+#        Rcov_i = pt.GetRcovalent(a_i.GetAtomicNum()) * covalent_factor
+#        for j in range(i + 1, num_atoms):
+#            a_j = mol.GetAtomWithIdx(j)
+#            Rcov_j = pt.GetRcovalent(a_j.GetAtomicNum()) * covalent_factor
+#            if dMat[i, j] <= Rcov_i + Rcov_j:
+#                AC[i, j] = 1
+#                AC[j, i] = 1
+#
+#    return AC
+#
+#
+## http://rdkit.blogspot.com/2019/06/doing-extended-hueckel-calculations.html
+#
+#
+#def xyz2AC_huckel(atomicNumList, xyz, charge):
+#    """
+#
+#    args
+#        atomicNumList - atom type list
+#        xyz - coordinates
+#        charge - molecule charge
+#
+#    returns
+#        ac - atom connectivity
+#        mol - rdkit molecule
+#
+#    """
+#    mol = get_proto_mol(atomicNumList)
+#
+#    conf = Chem.Conformer(mol.GetNumAtoms())
+#    for i in range(mol.GetNumAtoms()):
+#        conf.SetAtomPosition(i, (xyz[i][0], xyz[i][1], xyz[i][2]))
+#    mol.AddConformer(conf)
+#
+#    num_atoms = len(atomicNumList)
+#    AC = np.zeros((num_atoms, num_atoms)).astype(int)
+#
+#    mol_huckel = Chem.Mol(mol)
+#    mol_huckel.GetAtomWithIdx(0).SetFormalCharge(
+#        charge
+#    )  # mol charge arbitrarily added to 1st atom
+#
+#    passed, result = rdEHTTools.RunMol(mol_huckel)
+#    opop = (
+#        result.GetReducedOverlapPopulationMatrix()
+#    )  # The reduced overlap population matrix provides the Mulliken overlap population between atoms in the molecule. It's returned as a vector representing a symmetric matrix
+#    tri = np.zeros((num_atoms, num_atoms))
+#    tri[
+#        np.tril(np.ones((num_atoms, num_atoms), dtype=bool))
+#    ] = opop  # lower triangular to square matrix
+#    for i in range(num_atoms):
+#        for j in range(i + 1, num_atoms):
+#            pair_pop = abs(tri[j, i])
+#            if pair_pop >= 0.15:  # arbitry cutoff for bond. May need adjustment
+#                AC[i, j] = 1
+#                AC[j, i] = 1
+#
+#    return AC, mol
 
 
 def chiral_stereo_check(mol):
@@ -795,6 +795,7 @@ def chiral_stereo_check(mol):
 def xyz2mol(
     atoms,
     coordinates,
+    AC,
     covalent_factor,
     charge=0,
     allow_charged_fragments=True,
@@ -821,10 +822,11 @@ def xyz2mol(
 
     """
 
+    AC = np.array(AC)
+    mol = get_proto_mol(atoms)
     # Get atom connectivity (AC) matrix, list of atomic numbers, molecular charge,
     # and mol object with no connectivity information
-    AC, mol = xyz2AC(atoms, coordinates, charge, covalent_factor, use_huckel=use_huckel)
-
+    #AC, mol = xyz2AC(atoms, coordinates, charge, covalent_factor, use_huckel=use_huckel)
     # Convert AC to bond order matrix and add connectivity and charge info to
     # mol object
     new_mols = AC2mol(

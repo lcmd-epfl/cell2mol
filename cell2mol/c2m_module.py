@@ -122,7 +122,7 @@ def determine_charge(cell):
         cell.moleclist
     )
     print(f"{len(unique_species)} Species (Ligand or Molecules) to Characterize")
-    print("unique_indices", unique_indices)
+    #print("unique_indices", unique_indices)
 
     unique_species, Warning = get_poscharges_unique_species(unique_species)
     cell.warning_list.append(Warning)
