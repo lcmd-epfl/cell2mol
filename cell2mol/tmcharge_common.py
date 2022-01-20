@@ -687,7 +687,7 @@ class Cell(object):
             "Warning 2! Missing H atoms from C in reference molecules",
             "Warning 3! Missing H atoms from coordinated water in reference molecules",
             "Warning 4! Steric clashes while blocking molecules",
-            "Warning 5! Errors in cell reconstruction.",
+            "Warning 5! Errors in cell reconstruction",
             "Warning 6! Empty list of possible charges received for molecule or ligand",
             "Warning 7! More than one valid possible charge distribution found",
             "Warning 8! No valid possible charge distribution found",
