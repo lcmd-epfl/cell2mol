@@ -938,8 +938,7 @@ def define_sites(ligand, metalist, molecule, debug=1):
                 print("        DEFINE_SITES: addressing group with hapticity:", g.hapttype)
 
             if "h5-Cp" in g.hapttype and not Selected_Hapticity:
-                if debug >= 1:
-                    print("        DEFINE_SITES: It is an h5-Cp with atlist:", g.atlist)
+                if debug >= 1: print("        DEFINE_SITES: It is an h5-Cp with atlist:", g.atlist)
                 Selected_Hapticity = True
                 tobeadded = 1
                 tmp_added_atoms = 0
@@ -955,8 +954,7 @@ def define_sites(ligand, metalist, molecule, debug=1):
                             block[idx]
 
             elif "h7-Cicloheptatrienyl" in g.hapttype and not Selected_Hapticity:
-                if debug >= 1:
-                    print("        DEFINE_SITES: It is an h7-Cicloheptatrienyl")
+                if debug >= 1: print("        DEFINE_SITES: It is an h7-Cicloheptatrienyl")
                 Selected_Hapticity = True
                 tobeadded = 1
                 tmp_added_atoms = 0
@@ -970,8 +968,7 @@ def define_sites(ligand, metalist, molecule, debug=1):
                             block[idx]
 
             elif "h5-AsCp" in g.hapttype and not Selected_Hapticity:
-                if debug >= 1:
-                    print("        DEFINE_SITES: It is an h5-AsCp")
+                if debug >= 1: print("        DEFINE_SITES: It is an h5-AsCp")
                 Selected_Hapticity = True
                 tobeadded = 1
                 tmp_added_atoms = 0
@@ -986,8 +983,7 @@ def define_sites(ligand, metalist, molecule, debug=1):
 
             elif ("h3-Allyl" in g.hapttype or "h3-Cp" in g.hapttype) and not Selected_Hapticity:
                 # if "h3-Allyl" or "h3-Cp" in g.hapttype:
-                if debug >= 1:
-                    print("        DEFINE_SITES: It is either an h3-Allyl or an h3-Cp")
+                if debug >= 1: print("        DEFINE_SITES: It is either an h3-Allyl or an h3-Cp")
                 Selected_Hapticity = True
                 tobeadded = 1
                 tmp_added_atoms = 0
@@ -1001,10 +997,8 @@ def define_sites(ligand, metalist, molecule, debug=1):
                             block[idx]
 
             elif ("h4-Benzene" in g.hapttype or "h4-Butadiene" in g.hapttype) and not Selected_Hapticity:
-                if debug >= 1:
-                    print("        DEFINE_SITES: It is either an h4-Benzene or an h4-Butadiene")
-                if debug >= 1:
-                    print("        DEFINE_SITES: No action is required")
+                if debug >= 1: print("        DEFINE_SITES: It is either an h4-Benzene or an h4-Butadiene")
+                if debug >= 1: print("        DEFINE_SITES: No action is required")
                 Selected_Hapticity = True
                 tobeadded = 0
                 for idx, a in enumerate(ligand.atoms):
@@ -1012,10 +1006,8 @@ def define_sites(ligand, metalist, molecule, debug=1):
                         block[idx]
 
             elif ("h2-Benzene" in g.hapttype or "h2-Butadiene" in g.hapttype) and not Selected_Hapticity:
-                if debug >= 1:
-                    print("        DEFINE_SITES: It is either an h2-Benzene or an h2-Butadiene")
-                if debug >= 1:
-                    print("        DEFINE_SITES: No action is required")
+                if debug >= 1: print("        DEFINE_SITES: It is either an h2-Benzene or an h2-Butadiene")
+                if debug >= 1: print("        DEFINE_SITES: No action is required")
                 Selected_Hapticity = True
                 tobeadded = 0
                 for idx, a in enumerate(ligand.atoms):
@@ -1023,10 +1015,8 @@ def define_sites(ligand, metalist, molecule, debug=1):
                         block[idx]
 
             elif "h4-Enone" in g.hapttype and not Selected_Hapticity:
-                if debug >= 1:
-                    print("        DEFINE_SITES: It is an h4-Enone")
-                if debug >= 1:
-                    print("        DEFINE_SITES: No action is required")
+                if debug >= 1: print("        DEFINE_SITES: It is an h4-Enone")
+                if debug >= 1: print("        DEFINE_SITES: No action is required")
                 Selected_Hapticity = True
                 tobeadded = 0
                 for idx, a in enumerate(ligand.atoms):
@@ -1035,25 +1025,17 @@ def define_sites(ligand, metalist, molecule, debug=1):
 
             # If the group hapticity type is not recognized -or instructions are not defined-, nothing is done
             if not Selected_Hapticity:
-                if debug >= 1:
-                    print(f"        DEFINE_SITES: {g.hapttype} not recognized or new rules are necessary")
+                if debug >= 1: print(f"        DEFINE_SITES: {g.hapttype} not recognized or new rules are necessary")
 
         else:  # cases without hapticity
-            ions = [
-                "F",
-                "Cl",
-                "Br",
-                "I",
-                "As",
-            ]  # Atoms for which an H atom is always added
+            ions = ["F", "Cl","Br","I","As"]  # Atoms for which an H atom is always added
             ###########################
             # Cases with No Hapticity #
             ###########################
             # An initial attempt to add elements based on the adjacency of the connected atom
             for idx in g.atlist:
                 a = ligand.atoms[idx]
-                if debug >= 1:
-                    print(f"        DEFINE_SITES: evaluating non-haptic group with index {idx} and label {a.label}")
+                if debug >= 1: print(f"        DEFINE_SITES: evaluating non-haptic group with index {idx} and label {a.label}")
                 # Simple Ionic Case
                 if a.label in ions:
                     elemlist[idx] = "H"
@@ -1062,11 +1044,10 @@ def define_sites(ligand, metalist, molecule, debug=1):
                 elif a.label == "O" or a.label == "S" or a.label == "Se":
                     if a.connec == 1:
                         needs_nonlocal = True
-                        if debug >= 1:
-                            print(f"        DEFINE_SITES: will be sent to nonlocal due to {a.label} atom")
+                        if debug >= 1: print(f"        DEFINE_SITES: will be sent to nonlocal due to {a.label} atom")
                     else:
                         block[idx] = 1
-                # I'm considering a different one with S and Se
+                # SERGI: I'm considering a different one with S and Se
                 #                 elif a.label == "S" or a.label == "Se":
                 #                     if a.connec == 1:
                 #                         elemlist[idx] = "H"
@@ -1084,14 +1065,12 @@ def define_sites(ligand, metalist, molecule, debug=1):
                     if ligand.natoms == 2 and "O" in ligand.labels:
                         NO_type = get_nitrosyl_geom(ligand)
                         if NO_type == "Linear":
-                            if debug >= 0:
-                                print("        DEFINE_SITES: Found Linear Nitrosyl")
+                            if debug >= 0: print("        DEFINE_SITES: Found Linear Nitrosyl")
                             elemlist[idx] = "O"
                             addedlist[idx] = 2
                             metal_electrons[idx] = 1
                         elif NO_type == "Bent":
-                            if debug >= 0:
-                                print("        DEFINE_SITES: Found Bent Nitrosyl")
+                            if debug >= 0: print("        DEFINE_SITES: Found Bent Nitrosyl")
                             elemlist[idx] = "H"
                             addedlist[idx] = 1
                     else:
@@ -1123,20 +1102,12 @@ def define_sites(ligand, metalist, molecule, debug=1):
                         if "O" in ligand.labels:
                             block[idx] = 1
                     # Added in V15e for amides
-                    elif (
-                        any(ligand.labels[i] == "O" for i in a.adjacency)
-                        and any(ligand.labels[i] == "N" for i in a.adjacency)
-                        and a.connec == 2
-                    ):
+                    elif (any(ligand.labels[i] == "O" for i in a.adjacency) and any(ligand.labels[i] == "N" for i in a.adjacency) and a.connec == 2 ):
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
                     else:
                         iscarbene, tmp_element, tmp_added, tmp_metal = check_carbenes(a, ligand, molecule)
-                        if debug >= 1:
-                            print(
-                                "        DEFINE_SITES: Evaluating as carbene and",
-                                iscarbene,
-                            )
+                        if debug >= 1: print(f"        DEFINE_SITES: Evaluating as carbene and {iscarbene}")
                         if iscarbene:
                             # Carbene identified
                             elemlist[idx] = tmp_element
@@ -1145,8 +1116,7 @@ def define_sites(ligand, metalist, molecule, debug=1):
                         else:
                             if not needs_nonlocal:
                                 needs_nonlocal = True
-                                if debug >= 1:
-                                    print("        DEFINE_SITES: will be sent to nonlocal due to C atom")
+                                if debug >= 1: print(f"        DEFINE_SITES: will be sent to nonlocal due to C atom")
                 # Silicon
                 elif a.label == "Si":
                     if a.connec < 4:
@@ -1165,8 +1135,7 @@ def define_sites(ligand, metalist, molecule, debug=1):
                 else:
                     if not needs_nonlocal:
                         needs_nonlocal = True
-                        if debug >= 1:
-                            print("        DEFINE_SITES: will be sent to nonlocal due to connected atom with no rules")
+                        if debug >= 1: print("        DEFINE_SITES: will be sent to nonlocal due to connected atom with no rules")
 
         # If, at this stage, we have found that any atom must be added, this is done before entering the non_local part.
         # The block variable makes that more atoms cannot be added to these connected atoms
@@ -1179,7 +1148,7 @@ def define_sites(ligand, metalist, molecule, debug=1):
                     if debug >= 1: print(f"        DEFINE_SITES: Added {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
                 else:
                     addedlist[idx] = 0
-                    if debug >= 1: print(f"        DEFINE_SITES: False isadded")
+                    if debug >= 1: print(f"        DEFINE_SITES: isadded=False for {idx}")
 
     ############################
     ###### NON-LOCAL PART ######
@@ -1188,10 +1157,8 @@ def define_sites(ligand, metalist, molecule, debug=1):
     # Then, a preliminary bond-order connectivity is generated with rdkit using charge=0.
     # this connectivity can contain errors, but is tipically enough to determine the bonds of the connected atom with the rest of the ligand
     if needs_nonlocal:
-        if debug >= 1:
-            print(f"        DEFINE_SITES: Enters non-local")
-        if debug >= 1:
-            print(f"        DEFINE_SITES: block:", block)
+        if debug >= 1: print(f"        DEFINE_SITES: Enters non-local")
+        if debug >= 1: print(f"        DEFINE_SITES: block: {block}")
 
         avoid = ["Si", "P"]
         metal_electrons = np.zeros((len(newlab))).astype(int)  ## Electrons Contributed to the Metal
@@ -1207,28 +1174,20 @@ def define_sites(ligand, metalist, molecule, debug=1):
 
         # Generation of the tentative neutral connectivity for the ligand. Here we use allow_charged_fragments = False
         try:
-            tmpmol = xyz2mol(
-                atnums,
-                pos,
-                tmpconmat,
-                ligand.factor,
-                charge=0,
-                use_graph=True,
-                allow_charged_fragments=False,
-                embed_chiral=False,
-                use_huckel=False,
-            )
+            tmpmol = xyz2mol(atnums,pos,tmpconmat,ligand.factor,charge=0,use_graph=True,allow_charged_fragments=False,embed_chiral=False,use_huckel=False)
         except Exception as m:
             tmpmol = []
-            for idx, a in enumerate(newlab):
-                print("%s  %.6f  %.6f  %.6f" % (a, pos[idx][0], pos[idx][1], pos[idx][2]))
+            #for idx, a in enumerate(newlab):
+            #    print("%s  %.6f  %.6f  %.6f" % (a, pos[idx][0], pos[idx][1], pos[idx][2]))
 
         if len(tmpmol) > 0:
+            # xyz mol could give a meaningful temp molecule object
             for mol in tmpmol:
                 smi = Chem.MolToSmiles(mol)
                 print("        DEFINE_SITES: TMP smiles:", smi)
             for idx, a in enumerate(ligand.atoms):
                 addH = False
+                # Conditions for adding an element 
                 if a.mconnec == 1 and a.label not in avoid:
                     rdkitatom = tmpmol[0].GetAtomWithIdx(idx)
                     conjugated = False
@@ -1246,11 +1205,12 @@ def define_sites(ligand, metalist, molecule, debug=1):
                         addH = True
                     if debug >= 1: print(f"        DEFINE_SITES: Non-Local reports: {total_bond_order} for atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
 
+                # Element details
                 if addH and block[idx] == 0:
                     elemlist[idx] = "H"
                     addedlist[idx] = 1
 
-        # Adds the elements to the non_local atoms
+        # Adds the elements to the atoms identified by non_local part of the subroutine
         for idx, a in enumerate(ligand.atoms):
             if addedlist[idx] != 0 and block[idx] == 0:
                 isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, metalist, elemlist[idx])
@@ -1451,32 +1411,22 @@ def build_bonds(moleclist, debug=1):
     ## Bond entries are defined in the mol and lig objects
 
     # First Creates Bonds for Non-Complex Molecules
-    if debug >= 1:
-        print("")
-    if debug >= 1:
-        print("BUILD_BONDS: Doing 1st Part")
+    if debug >= 1: print("")
+    if debug >= 1: print("BUILD_BONDS: Doing 1st Part")
     for mol in moleclist:
         if mol.type != "Complex":
-            if debug >= 1:
-                print("")
-            if debug >= 1:
-                print("BUILD BONDS: doing mol", mol.labels, "with Natoms", mol.natoms)
+            if debug >= 1: print("")
+            if debug >= 1: print("BUILD BONDS: doing mol", mol.labels, "with Natoms", mol.natoms)
             # Checks that the gmol and rdkit-mol objects have same order
             for idx, a in enumerate(mol.atoms):
 
                 # Security Check. Confirms that the labels are the same
-                if debug >= 1:
-                    print("BUILD BONDS: atom", idx, a.label)
+                if debug >= 1: print("BUILD BONDS: atom", idx, a.label)
                 rdkitatom = mol.object.GetAtomWithIdx(idx)
                 tmp = rdkitatom.GetSymbol()
-                if a.label != tmp:
-                    print(
-                        "Error in Build_Bonds. Atom labels do not coincide. GMOL vs. MOL:",
-                        a.label,
-                        tmp,
-                    )
+                if a.label != tmp: 
+                    print("Error in Build_Bonds. Atom labels do not coincide. GMOL vs. MOL:",a.label,tmp)
                 else:
-
                     # First part. Creates bond information
                     starts = []
                     ends = []
@@ -1503,30 +1453,18 @@ def build_bonds(moleclist, debug=1):
                                 orders.append(bond_order)
                             else:
                                 print("Warning BUILD_BONDS: Index atom is neither start nor end bond")
-
                     a.bonds(starts, ends, orders)
 
-    if debug >= 1:
-        print("")
-    if debug >= 1:
-        print("BUILD_BONDS: Doing 2nd Part")
+    if debug >= 1: print("")
+    if debug >= 1: print("BUILD_BONDS: Doing 2nd Part")
     # 2nd Part. Creates Ligand Information
     for mol in moleclist:
-        if debug >= 1:
-            print("")
-        if debug >= 1:
-            print("BUILD BONDS: doing mol", mol.labels, "with Natoms", mol.natoms)
+        if debug >= 1: print("")
+        if debug >= 1: print("BUILD BONDS: doing mol", mol.labels, "with Natoms", mol.natoms)
         if mol.type == "Complex":
             for lig in mol.ligandlist:
-                if debug >= 1:
-                    print("")
-                if debug >= 1:
-                    print(
-                        "BUILD BONDS: doing ligand",
-                        lig.labels,
-                        "with Natoms",
-                        lig.natoms,
-                    )
+                if debug >= 1: print("")
+                if debug >= 1: print(f"BUILD BONDS: doing ligand {lig.labels} with Natoms {lig.natoms}")
 
                 for idx, a in enumerate(lig.atoms):
                     # if debug >= 1: print(len(lig.atoms), lig.natoms)
@@ -1534,13 +1472,9 @@ def build_bonds(moleclist, debug=1):
                     rdkitatom = lig.object.GetAtomWithIdx(idx)
                     tmp = rdkitatom.GetSymbol()
                     if a.label != tmp:
-                        print(
-                            "Error in Build_Bonds. Atom labels do not coincide. GMOL vs. MOL:",
-                            a.label,
-                            tmp,
-                        )
-                        print("DEBUG:")
-                        print("Ligand;", lig.labels)
+                        print(f"Error in Build_Bonds. Atom labels do not coincide. GMOL vs. MOL: {a.label} {tmp}")
+                        print("BUILD BONDS DEBUG:")
+                        print(f"Ligand; {lig.labels}")
                         print("Atoms of RDKIT-Object")
                         for kdx, a in enumerate(lig.object.GetAtoms()):
                             print(kdx, a.GetSymbol())
@@ -1565,11 +1499,7 @@ def build_bonds(moleclist, debug=1):
                             else:
                                 # if debug >= 1: print(lig.atoms[bond_endatom].label, lig.object.GetAtomWithIdx(bond_endatom).GetSymbol())
                                 if lig.atoms[bond_endatom].label != lig.object.GetAtomWithIdx(bond_endatom).GetSymbol():
-                                    print(
-                                        "Error with Bond EndAtom",
-                                        lig.atoms[bond_endatom].label,
-                                        lig.object.GetAtomWithIdx(bond_endatom).GetSymbol(),
-                                    )
+                                    print( "Error with Bond EndAtom",lig.atoms[bond_endatom].label,lig.object.GetAtomWithIdx(bond_endatom).GetSymbol())
                                 else:
                                     if bond_endatom == idx:
                                         starts.append(bond_endatom)
@@ -1579,14 +1509,9 @@ def build_bonds(moleclist, debug=1):
                                         starts.append(bond_startatom)
                                         ends.append(bond_endatom)
                                         orders.append(bond_order)
-                        #                                     starts.append(bond_startatom)
-                        #                                     ends.append(bond_endatom)
-                        #                                     orders.append(bond_order)
-
                         a.bonds(starts, ends, orders)
 
-    if debug >= 1:
-        print("BUILD_BONDS: Doing 3rd Part")
+    if debug >= 1: print("BUILD_BONDS: Doing 3rd Part")
     # 3rd Part. Merges Ligand Information into Molecule Object using the atlists
     for mol in moleclist:
         if mol.type == "Complex":
@@ -1612,7 +1537,6 @@ def build_bonds(moleclist, debug=1):
                         allorders.append(0.5)
 
             # I sould work to add Metal-Metal Bonds. Would need to work on the Metal class:
-
             # Finally, puts everything together, and creates bonds for MOLECULE atom objects
             for idx, a in enumerate(mol.atoms):
                 starts = []
