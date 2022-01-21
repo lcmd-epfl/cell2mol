@@ -8,22 +8,18 @@ from cell2mol.module1 import addone, subtwo
 from cell2mol.c2m_module import cell2mol, split_infofile
 
 
-def test_modules1():
-    assert addone(10) == 11
-    assert subtwo(8) == 6
-
-
 def test_cell2mol():
     dir_path = os.path.dirname(os.path.realpath(__file__))
     infofile = "YOXKUS.info"
+    outfile = "YOXKUS.out"
     infopath = dir_path + "/infodata/" + infofile
+    outpath = dir_path + "/infodata/" + outfile
     refcode = split_infofile(infofile)
-    cell = cell2mol(infopath, refcode)
-
+    cell = cell2mol(infopath, refcode, outpath)
     return cell
 
 
-def test_check_cell():
+def test_check_cell_vs_data():
 
     cell = test_cell2mol()
 
@@ -464,16 +460,17 @@ def test_check_cell():
         ),
     )
     assert cell.warning_list == [
+        False, 
+        False,
+        False,
+
         False,
         False,
         False,
+
         False,
         False,
-        False,
-        False,
-        False,
-        False,
-        False,
+        True,
     ]
 
 
@@ -20483,3 +20480,7 @@ def test_check_cellrefmoleclist():
                 ]
             ),
         )
+
+
+if __name__ == "__main__":
+    test_check_cell_vs_data()

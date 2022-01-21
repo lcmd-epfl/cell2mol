@@ -687,19 +687,17 @@ class Cell(object):
             "Warning 2! Missing H atoms from C in reference molecules",
             "Warning 3! Missing H atoms from coordinated water in reference molecules",
             "Warning 4! Steric clashes while blocking molecules",
-            "Warning 5! Remaining fragments after reconstruction",
-            "Warning 6! No coincidence in the number of atoms between final and initial state",
-            "Warning 7! Empty list of possible charges received for molecule or ligand",
-            "Warning 8! More than one valid possible charge distribution found",
-            "Warning 9! No valid possible charge distribution found",
-            "Warning 10! Total net charge does not exist among possible charges",
+            "Warning 5! Errors in cell reconstruction",
+            "Warning 6! Empty list of possible charges received for molecule or ligand",
+            "Warning 7! More than one valid possible charge distribution found",
+            "Warning 8! No valid possible charge distribution found",
+            "Warning 9! Total net charge does not exist among possible charges",
         ]
 
         # printing original list
         print("The Warning type list is : " + str(self.warning_list))
 
         res = [i for i, val in enumerate(self.warning_list) if val]
-
         # printing result
         #         print ("The list indices having True values are : " + str(res))
 
