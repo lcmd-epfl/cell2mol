@@ -9,7 +9,7 @@ from cell2mol.tmcharge_common import Cell
 from cell2mol.c2m_module import cell2mol, split_infofile
 
 
-def test_cell2mol(infofile):
+def run_cell2mol(infofile):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     infopath = dir_path + "/infodata/" + infofile
     refcode = split_infofile(infofile)
@@ -21,7 +21,7 @@ def test_cell2mol(infofile):
 
 def test_check_cell_vs_pickle():
     infofile = "YOXKUS.info"
-    cell = test_cell2mol(infofile)
+    cell = run_cell2mol(infofile)
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     cellpath = dir_path + "/infodata/"
