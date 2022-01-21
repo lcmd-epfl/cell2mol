@@ -460,17 +460,15 @@ def test_check_cell_vs_data():
         ),
     )
     assert cell.warning_list == [
-        False, 
-        False,
-        False,
-
         False,
         False,
         False,
-
         False,
         False,
-        True,
+        False,
+        False,
+        False,
+        False,
     ]
 
 
