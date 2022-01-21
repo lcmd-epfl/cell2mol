@@ -9,24 +9,23 @@ from cell2mol.tmcharge_common import Cell
 from cell2mol.c2m_module import cell2mol, split_infofile
 
 
-def test_cell2mol():
+def run_cell2mol(infofile):
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    infofile = "YOXKUS.info"
-    outfile = "YOXKUS.out"
     infopath = dir_path + "/infodata/" + infofile
-    outpath = dir_path + "/infodata/" + outfile
     refcode = split_infofile(infofile)
+    outfile = f"Cell_{refcode}.gmol"
+    outpath = dir_path + "/infodata/" + outfile
     cell = cell2mol(infopath, refcode, outpath)
     return cell
 
 
 def test_check_cell_vs_pickle():
-
-    cell = test_cell2mol()
+    infofile = "YOXKUS.info"
+    cell = run_cell2mol(infofile)
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    cellpath = dir_path + "/infodata"
-    file = open(f"{cellpath}/Cell_{cell.refcode}.gmol", "rb")
+    cellpath = dir_path + "/infodata/"
+    file = open(f"{cellpath}Cell_{cell.refcode}.gmol", "rb")
     result = pickle.load(file)
     print("=======Result======")
     print(result.version)
@@ -35,6 +34,7 @@ def test_check_cell_vs_pickle():
     print(result.cellparam)
     print(result.labels)
     print(result.pos)
+    print(result.warning_list)
 
     assert cell.version == result.version
     assert cell.refcode == result.refcode
