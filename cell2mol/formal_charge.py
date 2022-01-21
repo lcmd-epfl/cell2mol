@@ -819,7 +819,7 @@ def get_metal_poscharge(label):
 
 
 #######################################################
-def balance_charge(moleclist,molec_indices,ligand_indices,unique_indicesunique_species,typ_charge="Primary",debug=1):
+def balance_charge(moleclist,molec_indices,ligand_indices,unique_indices,unique_species,typ_charge="Primary",debug=1):
 
     # Function to Select the Best Charge Distribution for the unique species.
     # It accepts multiple charge options for each molecule/ligand/metal (poscharge, etc...).
