@@ -1317,13 +1317,9 @@ def add_atom(labels, coords, site, ligand, metalist, element="H", debug=1):
 
 
 #######################################################
-def prepare_mols(moleclist, unique_indices, unique_species, final_charge_distribution, debug=1):
-
+def prepare_mols(moleclist,unique_indices,unique_species,final_charge_distribution,debug=1):
     #############
-    # SELECT: unique_indices [0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 2, 2, 2, 2]
-    # final_charge_distribution [0, 0, 0, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, -1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, 0]
     #############
-
     Warning = False
     idxtoallocate = 0
 
@@ -1377,48 +1373,36 @@ def prepare_mols(moleclist, unique_indices, unique_species, final_charge_distrib
                         #### Evaluates possible charges except if the ligand is a nitrosyl
                         if isnitrosyl:
                             NO_type = get_nitrosyl_geom(lig)
-                            if NO_type == "Linear":
-                                NOcharge = 1
-                            if NO_type == "Bent":
-                                NOcharge = 0
-                            dummy, dummy, uncorr_ch, mol_object, smiles = getcharge(
-                                tmplab, tmpcoord, NOcharge, tmpconmat, lig.factor
-                            )
-                            if debug >= 1: print("PREPARE: Found Nitrosyl of type=", NO_type)
-                            if debug >= 1: print("addedlist", addedlist)
-                            if debug >= 1: print("metal_electrons", metal_electrons)
-                            if debug >= 1: print("addedH", addedH)
-                            if debug >= 1: print("Sent:", NOcharge, "Obtained:", uncorr_ch)
+                            if NO_type == "Linear": NOcharge = 1
+                            if NO_type == "Bent": NOcharge = 0
+                            dummy, dummy, uncorr_ch, mol_object, smiles = getcharge(tmplab, tmpcoord, NOcharge, tmpconmat, lig.factor)
+                            if debug >= 1: print(f"PREPARE: Found Nitrosyl of type= {NO_type}")
+                            if debug >= 1: print(f"addedlist {addedlist}")
+                            if debug >= 1: print(f"metal_electrons {metal_electrons}")
+                            if debug >= 1: print(f"addedH {addedH}")
+                            if debug >= 1: print(f"Sent: {NOcharge} Obtained: {uncorr_ch}")
                         else:
-                            if debug >= 1: print("ch", ch)
-                            if debug >= 1: print("addedH", addedH)
-                            if debug >= 1: print("addedlist", addedlist)
-                            if debug >= 1: print("PREPARE: Sending getcharge with charge",ch+addedH)
+                            #if debug >= 1: print(f"ch {ch}")
+                            #if debug >= 1: print(f"addedH {addedH}")
+                            if debug >= 1: print(f"addedlist {addedlist}")
+                            if debug >= 1: print(f"PREPARE: Sending getcharge with charge {ch+addedH}")
                             dummy, dummy, uncorr_ch, mol_object, smiles = getcharge(tmplab, tmpcoord,ch + addedH, tmpconmat, lig.factor)
 
-                        print(
-                            "PREPARE: total charge obtained without correction",
-                            np.sum(uncorr_ch),
-                            "while it should be",
-                            ch + addedH,
-                        )
-                        print("PREPARE: smiles:", smiles)
+                        if np.sum(uncorr_ch) != (ch+addedH):
+                            print(f"PREPARE: WARNING: total charge obtained without correction {np.sum(uncorr_ch)} while it should be {ch + addedH}")
+                            print(f"PREPARE: WARNIGN: smiles: {smiles}")
                         #### Corrects the Charge of atoms with addedH
                         atom_charge = []
                         count = 0
-                        for i, a in enumerate(
-                            lig.atoms
-                        ):  # Iterates over the original number of ligand atoms, thus without the added H
+                        for i, a in enumerate(lig.atoms):  # Iterates over the original number of ligand atoms, thus without the added H
                             if addedlist[i] != 0:
                                 count += 1
-                                atom_charge.append(
-                                    uncorr_ch[i] - addedlist[i] + metal_electrons[i] - uncorr_ch[lig.natoms - 1 + count]
-                                )  # the last term corrects cases in which a charge is assigned to the added atom
-                                # atom_charge.append(uncorr_ch[i]-addedlist[i]+metal_electrons[i])
+                                # the last term corrects cases in which a charge is assigned to the added atom
+                                atom_charge.append(uncorr_ch[i] - addedlist[i] + metal_electrons[i] - uncorr_ch[lig.natoms-1+count])  
                             else:
                                 atom_charge.append(uncorr_ch[i])
                         total_charge = np.sum(atom_charge)
-                        print("PREPARE: total charge obtained", total_charge, "while it should be", ch)
+                        print(f"PREPARE: total charge obtained {total_charge} while it should be {ch}")
                         if total_charge == ch:
                             lig.charge(atom_charge, total_charge, mol_object, smiles)
                         else:
@@ -1428,28 +1412,14 @@ def prepare_mols(moleclist, unique_indices, unique_species, final_charge_distrib
                     idxtoallocate += 1
 
             for kdx, met in enumerate(mol.metalist):
-                if debug >= 1:
-                    print("")
                 specie = unique_indices[idxtoallocate]
                 spec_object = unique_species[specie][1]
-                if debug >= 1:
-                    print("PREPARE: Metal", kdx, met.label, "is specie", specie)
-                if debug >= 1:
-                    print("PREPARE: Metal poscharges:", spec_object.poscharge)
                 allocated = False
-                if debug >= 1:
-                    print(
-                        "PREPARE: Doing Metal",
-                        kdx,
-                        "with idxtoallocate:",
-                        idxtoallocate,
-                    )
-
+                if debug >= 1: print("")
+                if debug >= 1: print(f"PREPARE: Metal {kdx}, label {met.label} is specie {specie}")
+                if debug >= 1: print(f"PREPARE: Metal poscharges: {spec_object.poscharge}")
                 for jdx, ch in enumerate(spec_object.poscharge):
-                    # if (debug >= 1): print("PREPARE: Checking", spec_object.poscharge, jdx, ch,"=",final_charge_distribution[idxtoallocate])
                     if final_charge_distribution[idxtoallocate] == ch and not allocated:
-                        if debug >= 1:
-                            print("Allocated")
                         allocated = True
                         met.charge(ch)
                 if allocated:
@@ -1459,16 +1429,10 @@ def prepare_mols(moleclist, unique_indices, unique_species, final_charge_distrib
                 ###################################################
                 # Now builds the Charge Data for the final molecule
                 ###################################################
-                if debug >= 1:
-                    print(
-                        "PREPARE: Building Molecule",
-                        kdx,
-                        "From Ligand&Metal Information",
-                    )
+                if debug >= 1: print("PREPARE: Building Molecule {kdx} From Ligand&Metal Information")
                 tmp_atcharge = np.zeros((mol.natoms))
                 tmp_smiles = []
                 for lig in mol.ligandlist:
-                    # print("Lig.atlist:", lig.atlist, lig.atcharge, lig.labels)
                     tmp_smiles.append(lig.smiles)
                     for kdx, a in enumerate(lig.atlist):
                         tmp_atcharge[a] = lig.atcharge[kdx]
