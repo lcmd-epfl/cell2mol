@@ -88,25 +88,24 @@ def reconstruct(cell, reflabels, fracs):
             covalent_factor,
             metal_factor,
         )
-        cell.warning_list.append(Warning)
 
-    # Check final number of atoms
-    if not any(cell.warning_list):
         moleclist.extend(finalmols)
         final_natoms = 0
         for mol in moleclist:
             final_natoms += mol.natoms
+
+        # Check final number of atoms after reconstruction
         if final_natoms != init_natoms:
-            Warning = True
+            warning_num = True
             print(
                 f"Final and initial atoms do not coincide. Final/Initial {final_natoms}/ {init_natoms}\n"
             )
         else:
-            Warning = False
+            warning_num = False
             print(
                 f"Final and initial atoms coincide. Final/Initial {final_natoms}/ {init_natoms}\n"
             )
-        cell.warning_list.append(Warning)
+        cell.warning_list.append(any([Warning, warning_num]))
 
     # Split Complexes and Reassign Type
     if not any(cell.warning_list):
@@ -231,6 +230,10 @@ def cell2mol(infopath, refcode, output_dir, step=3):
             cell = pickle.load(file)
             print("[Refcode]", cell.refcode, cell)
 
+            cell.warning_list = cell.warning_list[
+                :5
+            ]  # Warnings before charge assignment
+            print("Warnings before charge assignment", cell.warning_list)
         else:
             print("No such file exists {}".format(filename))
             sys.exit(1)
@@ -242,7 +245,7 @@ def cell2mol(infopath, refcode, output_dir, step=3):
         if step == 1 or step == 3:
             print("Cell reconstruction successfully finished.\n")
         elif step == 2:
-            print("No Warnings in loaded Cell object\n")
+            print("No Warnings in loaded Cell object in cell reconstruction \n")
 
         if step == 1:
             pass
