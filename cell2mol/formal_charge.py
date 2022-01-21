@@ -153,7 +153,7 @@ def classify_mols(moleclist, debug=0):
     nspecs = len(unique_species)
     for idx in range(0, nspecs):
         count = unique_indices.count(idx)
-        print(f"CLASSIFY: specie {idx} appears {count}")
+        print(f"CLASSIFY: specie {idx} appears {count} times")
 
     return molec_indices, ligand_indices, unique_indices, unique_species
 
@@ -819,23 +819,14 @@ def get_metal_poscharge(label):
 
 
 #######################################################
-def balance_charge(
-    moleclist,
-    molec_indices,
-    ligand_indices,
-    unique_indices,
-    unique_species,
-    typ_charge="Primary",
-):
+def balance_charge(moleclist,molec_indices,ligand_indices,unique_indicesunique_species,typ_charge="Primary",debug=1):
 
     # Function to Select the Best Charge Distribution for the unique species.
     # It accepts multiple charge options for each molecule/ligand/metal (poscharge, etc...).
     # NO: It should select the best one depending on whether the final metal charge makes sense or not.
     # In some cases, can accept metal oxidation state = 0, if no other makes sense
 
-    debug = 0
-    Error = False
-
+    iserror = False
     iterlist = []
     for idx, spec_tuple in enumerate(unique_species):
         spec = spec_tuple[1]
@@ -846,7 +837,7 @@ def balance_charge(
             for tch in spec.poscharge:
                 toadd.append(tch)
         elif len(spec.poscharge) == 0:
-            Error = True
+            iserror = True
             toadd.append("-")
         if typ_charge == "Secondary":
             toadd.append(int(0))
@@ -857,7 +848,7 @@ def balance_charge(
     if debug >= 1:
         print("BALANCE: unique_indices", unique_indices)
 
-    if not Error:
+    if not iserror:
         tmpdistr = list(itertools.product(*iterlist))
         if debug >= 1:
             print("BALANCE: tmpdistr", tmpdistr)
@@ -877,8 +868,8 @@ def balance_charge(
                 final_charge = np.sum(d)
                 if final_charge == 0:
                     gooddistr.append(d)
-    elif Error:
-        print("Error found in balance_charge: one species has no possible charges")
+    elif iserror:
+        print("Error found in BALANCE: one species has no possible charges")
         gooddistr = []
 
     return gooddistr
