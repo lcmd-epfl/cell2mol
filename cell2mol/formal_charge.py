@@ -7,7 +7,7 @@ import sys
 from cell2mol.tmcharge_common import atom, molecule, ligand, metal, group, getradii, getconec, find_closest_metal
 from cell2mol.xyz2mol import int_atom, xyz2mol
 
-from cell2mol.hungarian import reorder
+#from cell2mol.hungarian import reorder
 from cell2mol.elementdata import ElementData
 
 elemdatabase = ElementData()
