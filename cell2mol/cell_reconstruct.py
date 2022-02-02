@@ -12,6 +12,7 @@ from cell2mol.tmcharge_common import (
     getradii,
     getcentroid,
     find_groups_within_ligand,
+    find_closest_metal,
     checkchemistry,
     getconec,
     getblocks,
@@ -26,7 +27,39 @@ from cell2mol.elementdata import ElementData
 
 elemdatabase = ElementData()
 
+#######################################################
+def verify_connectivity(ligand, molecule, debug=1):
 
+    metalist = molecule.metalist.copy()
+    # Original labels and coordinates are copied
+    newlab = ligand.labels.copy()
+    newlab.append(str("H"))  # One H atom will be added
+    newcoord = ligand.coord.copy()
+    isadded = False
+    # position (index) of the added atom 
+    posadded = len(ligand.labels)
+
+    if debug >= 1: print(f"VERIFY: checking connectivity of ligand {ligand.labels}")
+    for idx, a in enumerate(ligand.atoms):
+        if a.mconnec == 1: 
+            tgt, apos, dist = find_closest_metal(a, metalist)
+            idealdist = a.radii + elemdatabase.CovalentRadius2["H"]
+            addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
+            newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])  # adds H at the position of the closest Metal Atom
+
+            # Evaluates the new adjacency matrix.
+            tmpradii = getradii(newlab)
+            dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, newcoord, ligand.factor, tmpradii)
+            # If no undesired adjacencies have been created, the coordinates are kept. Otherwise, data is corrected
+            if tmpconnec[posadded] == 1:
+                if debug >= 1: print(f"VERIFY: connectivity verified for atom {idx} with label {a.label}") 
+            else:
+               # Corrects data of atom object
+               a.mconnec = 0
+               if debug >= 1: print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label} of ligand {ligand.labels}")
+               # Now it should correct data of metal, ligand and molecule objects. Not yet implemented
+
+#######################################################
 def get_reference_molecules(labels, pos, debug=0):
     ## Retrieves the reference molecules from the information in the .cif file
     # Molecules are extracted from the adjacency matrix, and the results are evaluated. How? Well, the adjacency matrix is constructed using a covalent factor.
@@ -70,42 +103,27 @@ def get_reference_molecules(labels, pos, debug=0):
 
         # Tries to find the reference molecules
         print("")
-        if debug >= 1:
-            print(
-                "GETREFS: sending listofreferences with", covalent_factor, metal_factor
-            )
-
-        Warning, listofreferences = getmolecs(
-            labels, pos, covalent_factor, metal_factor
-        )
+        if debug >= 1: print(f"GETREFS: sending listofreferences with {covalent_factor} {metal_factor}")
+        Warning, listofreferences = getmolecs(labels, pos, covalent_factor, metal_factor)
 
         # Condition to accept the covalent_factor:
         valid_list_of_references = True
 
         for ref in listofreferences:
             if ref.natoms == 1:
-                if (
-                    (
-                        elemdatabase.elementgroup[ref.atoms[0].label]
-                        and ref.atoms[0].label != "H"
-                    )
+                if ((elemdatabase.elementgroup[ref.atoms[0].label] and ref.atoms[0].label != "H" )
                     or elemdatabase.elementgroup[ref.atoms[0].label] == 2
-                    or elemdatabase.elementgroup[ref.atoms[0].label] == 17
-                ):
+                    or elemdatabase.elementgroup[ref.atoms[0].label] == 17):
                     pass
                 else:
-                    if debug >= 1:
-                        print(
-                            "GETREFS: found ref molecule with only one atom", ref.labels
-                        )
+                    if debug >= 1: print(f"GETREFS: found ref molecule with only one atom {ref.labels}")
                     valid_list_of_references = False
 
         if not valid_list_of_references:
             if covalent_factor < max_covalent_factor:
                 found_covalent_factor = False
                 covalent_factor += increase_covalent_factor
-                if debug >= 1:
-                    print("GETREFS: Increasing covalent_factor to:", covalent_factor)
+                if debug >= 1: print("GETREFS: Increasing covalent_factor to:", covalent_factor)
             else:
                 print("GETREFS: Reached Maximum Covalent_factor:", max_covalent_factor)
                 Warning = True
@@ -118,18 +136,16 @@ def get_reference_molecules(labels, pos, debug=0):
         dlist = []
         for ref in listofreferences:
             if ref.type == "Complex":
-                ref.ligandlist, ref.metalist = splitcomplex(
-                    ref, covalent_factor, metal_factor
-                )
-
-                for lig in ref.ligandlist:
-                    print(
-                        "Lig in Ref molec", lig.natoms, lig.labels, lig.totmconnec
-                    )  # , len(lig.metalatoms))
+                ref.ligandlist, ref.metalist = splitcomplex(ref, covalent_factor, metal_factor)
 
                 # Checks Hapticity
                 potential_hapticity = get_hapticity(ref)
-                print("Potential hapticity=", potential_hapticity)
+                print(f"Potential hapticity={potential_hapticity} for molecule {ref.labels}")
+
+                for lig in ref.ligandlist:
+                    verify_connectivity(lig, ref)
+                    print(f"Verifying Connectivity for Lig in Ref molec {lig.natoms}, {lig.labels}, {lig.totmconnec}")  # , len(lig.metalatoms))
+                    print(f"Metalatoms for this ligand: {len(lig.metalatoms)}")  # , len(lig.metalatoms))
 
                 # Checks Shared Ligands in Polymetallic complexes
                 if any(len(lig.metalatoms) >= 2 for lig in ref.ligandlist):
@@ -138,32 +154,15 @@ def get_reference_molecules(labels, pos, debug=0):
                 else:
                     ispolymetallic_and_shared = False
 
-                if (
-                    not potential_hapticity and not ispolymetallic_and_shared
-                ):  # then tries to adjust the metal_factor
+                if (not potential_hapticity and not ispolymetallic_and_shared):  # then tries to adjust the metal_factor
                     for a in ref.atoms:
                         if a.block == "d" or a.block == "f":
-                            if debug >= 1:
-                                print(
-                                    "GETREFS: sending",
-                                    a.label,
-                                    a.mconnec,
-                                    "to coordcheck",
-                                )
-                            good, increase, decrease = metalcoordcheck(
-                                a.label, a.mconnec
-                            )
+                            if debug >= 1: print(f"GETREFS: sending {a.label} {a.mconnec} to coordcheck")
+                            good, increase, decrease = metalcoordcheck(a.label, a.mconnec)
                             glist.append(good)
                             ilist.append(increase)
                             dlist.append(decrease)
-                            if debug >= 1:
-                                print(
-                                    "GETREFS: received",
-                                    good,
-                                    increase,
-                                    decrease,
-                                    "from coordcheck",
-                                )
+                            if debug >= 1: print(f"GETREFS: received {good}, {increase}, {decrease} from coordcheck")
                 else:
                     glist.append(True)
                     ilist.append(False)
@@ -527,21 +526,15 @@ def splitcomplex(molecule, factor=1.3, metal_factor=1.0):
             tmp_mconnec = tmp_mconnec.astype(int)
 
             # Creates the Ligands
-            lig = ligand(
-                b, atlist, labelist, poslist, radiilist
-            )  # Creates Object Molecule
-            lig.information(
-                factor, metal_factor
-            )  # Creates Information about the construction
-            lig.adjacencies(
-                tmp_conmat, tmp_mconnec
-            )  # Creates the Adjacency Information
+            lig = ligand(b, atlist, labelist, poslist, radiilist)  # Creates Object Molecule
+            lig.information(factor, metal_factor)  # Creates Information about the construction
+            lig.adjacencies(tmp_conmat, tmp_mconnec)  # Creates the Adjacency Information
             for a in matoms:  # only adds metal atoms that are connected to the ligand
+                found = False 
                 for idx, ligat in enumerate(lig.atoms):
-                    if lig.atlist[idx] in a.adjacency:
-                        lig.metalatoms.append(
-                            a
-                        )  # Saves Metal-Atom Information to the Ligand Object
+                    if lig.atlist[idx] in a.adjacency and not found:
+                        lig.metalatoms.append(a)  # Saves Metal-Atom Information to the Ligand Object
+                        found = True
             ligandlist.append(lig)  # Appends it to the final list of ligand
 
     return ligandlist, metalist

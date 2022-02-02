@@ -172,22 +172,22 @@ def check_missingH(refmoleclist):
     print("##################")
     for idx, ref in enumerate(refmoleclist):
         if ref.type != "Complex":
-            for kdx, a in enumerate(ref.atoms):
-                if a.label == "C":
-                    bonded_atom_coord = []
-                    for adj in a.adjacency:
-                        bonded_atom_coord.append(ref.coord[adj])
-                    ismissingH, report = get_missingH_from_adjacency(
-                        a.atnum, a.coord, bonded_atom_coord
-                    )
-                    if ismissingH:
-                        print("")
-                        print(
-                            f"WARNING in Missing H function for: {ref.type}, {idx}, {ref.labels}"
-                        )
-                        print(f"C Atom {kdx} has missing H atoms")
-                        print(report)
-                        Missing_H_in_C = True
+            if ref.natoms == 1 and "O" in ref.labels: 
+                Missing_H_in_CoordWater = True
+                print(f"WARNING found isolated O atom in the cell. This tends to be a water with missing H, so stopping")
+            else:
+                for kdx, a in enumerate(ref.atoms):
+                    if a.label == "C":
+                        bonded_atom_coord = []
+                        for adj in a.adjacency:
+                            bonded_atom_coord.append(ref.coord[adj])
+                        ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord)
+                        if ismissingH:
+                            print("")
+                            print(f"WARNING in Missing H function for: {ref.type}, {idx}, {ref.labels}")
+                            print(f"C Atom {kdx} has missing H atoms")
+                            print(report)
+                            Missing_H_in_C = True
         elif ref.type == "Complex":
             for jdx, lig in enumerate(ref.ligandlist):
                 if lig.natoms == 1 and "O" in lig.labels and lig.totmconnec <= 1:
