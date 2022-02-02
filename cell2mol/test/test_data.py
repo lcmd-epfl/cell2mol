@@ -23,7 +23,7 @@ def test_check_cell_vs_data():
 
     cell = test_cell2mol()
 
-    assert cell.version == "V16"
+    assert cell.version == "V17"
     assert cell.refcode == "YOXKUS"
     assert np.allclose(
         cell.cellvec,
@@ -476,7 +476,6 @@ def test_check_cellrefmoleclist():
 
     cell = test_cell2mol()
     for mol in cell.refmoleclist:
-        assert mol.version == "V16"
         assert mol.refcode == "YOXKUS"
         assert mol.name == "YOXKUS_Reference_0"
         assert mol.atlist == [

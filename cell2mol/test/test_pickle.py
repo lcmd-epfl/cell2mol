@@ -28,7 +28,6 @@ def test_check_cell_vs_pickle():
     file = open(f"{cellpath}Cell_{cell.refcode}.gmol", "rb")
     result = pickle.load(file)
     print("=======Result======")
-    print(result.version)
     print(result.refcode)
     print(result.cellvec)
     print(result.cellparam)
@@ -36,7 +35,6 @@ def test_check_cell_vs_pickle():
     print(result.pos)
     print(result.warning_list)
 
-    assert cell.version == result.version
     assert cell.refcode == result.refcode
     assert cell.cellvec == result.cellvec
     assert cell.cellparam == result.cellparam

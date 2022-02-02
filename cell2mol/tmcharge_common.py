@@ -339,6 +339,18 @@ def find_groups_within_ligand(ligand):
 
     return groups
 
+#######################################################
+def find_closest_metal(atom, metalist, debug=0):
+
+    apos = np.array(atom.coord)
+    dist = []
+    for tm in metalist:
+        bpos = np.array(tm.coord)
+        dist.append(np.linalg.norm(apos - bpos))
+
+    # finds the closest Metal Atom (tgt)
+    tgt = np.argmin(dist)
+    return tgt, apos, dist[tgt]
 
 ############################ CLASSES #########################
 
@@ -413,13 +425,13 @@ class atom(object):
 ###############
 class molecule(object):
     def __init__(self, name, atlist, label, coord, radii):
-        self.version = "V16"
-        self.refcode = ""  # V14
+        self.refcode = ""  
         self.name = name
         self.atlist = atlist
         self.labels = label
         self.coord = coord
         self.radii = radii
+        self.occurrence = 0   # How many times the molecule appears in a unit cell
 
         self.natoms = len(atlist)
         self.elemcountvec = getelementcount(label)
@@ -513,13 +525,13 @@ class molecule(object):
 ###############
 class ligand(object):
     def __init__(self, name, atlist, labels, coord, radii):
-        self.version = "V16"
-        self.refcode = ""  # V14
-        self.name = name  # creates as ligand index, later modified
+        self.refcode = ""  
+        self.name = name      # creates as ligand index, later modified
         self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
         self.labels = labels  # elements
-        self.coord = coord  # coordinates
+        self.coord = coord    # coordinates
         self.radii = radii
+        self.occurrence = 0   # How many times the ligand appears in a molecule
 
         self.natoms = len(atlist)  # number of atoms
         self.type = "Ligand"
@@ -586,15 +598,12 @@ class ligand(object):
         self.adjtypes = get_adjacency_types(self.labels, self.conmat)  # V14
 
         for idx, a in enumerate(self.atoms):
-            a.adjacencies(
-                np.array(self.conmat[idx].astype(int)), int(mconnec[idx]), type="Ligand"
-            )
+            a.adjacencies(np.array(self.conmat[idx].astype(int)), int(mconnec[idx]), type="Ligand")
 
 
 ###############
 class group(object):
     def __init__(self, atlist, hapticity, hapttype):
-        self.version = "V16"
         self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
         self.hapticity = hapticity
         self.hapttype = hapttype
@@ -605,7 +614,6 @@ class group(object):
 ###############
 class metal(object):
     def __init__(self, name, atlist, label, coord, radii):
-        self.version = "V16"
         self.name = name  # creates as metal index, later modified
         self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
         self.label = label
@@ -616,6 +624,7 @@ class metal(object):
         self.poscharge = []
         self.coord_sphere = []
         self.coord_sphere_ID = []
+        self.occurrence = 0   # How many times the metal appears in a unit cell
 
         self.atom = atom(name, label, self.coord, self.radii)
 
@@ -642,7 +651,7 @@ class metal(object):
 class Cell(object):
     def __init__(self, refcode, labels, pos, cellvec, cellparam, warning_list):
 
-        self.version = "V16"
+        self.version = "V17"
         self.refcode = refcode
 
         self.cellvec = cellvec
@@ -651,9 +660,12 @@ class Cell(object):
         self.labels = labels  # original_cell_labels
         self.pos = pos  # original_cell_pos
 
+        self.speclist = []
         self.refmoleclist = []
         self.moleclist = []
         self.warning_list = warning_list
+  
+        self.charge_distribution_list = []
 
     def bvs(self, warning_BVS):
         self.warning_BVS = warning_BVS
