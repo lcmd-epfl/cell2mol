@@ -163,7 +163,7 @@ def getcharge(labels, pos, conmat, ich, cov_factor=1.3, debug=0):
     # use_huckel false means that the xyz2mol adjacency will be generated based on atom distances and vdw radii.
     # Ideally, the adjacency matrix could be provided
     mols = xyz2mol(atnums,pos,conmat,cov_factor,charge=ich,use_graph=True,allow_charged_fragments=True,embed_chiral=True,use_huckel=False)
-    if len(mols) > 1: print("WARNING: More than 1 mol received from xyz2mol for initcharge:", initcharge)
+    if len(mols) > 1: print("WARNING: More than 1 mol received from xyz2mol for initcharge:", ich)
 
     # smiles is generated with rdkit
     smiles = Chem.MolToSmiles(mols[0])
@@ -229,8 +229,8 @@ def getcharge(labels, pos, conmat, ich, cov_factor=1.3, debug=0):
                 iscorrect = False
 
         if debug >= 1 and i == 0:
-            print("initcharge, atom idx, label, charge, pt.GetDefaultValence(a.GetAtomicNum()), valence, num bonds, num lonepairs, iscorrect")
-        if debug >= 1: print(initcharge,i,a.GetSymbol(),a.GetFormalCharge(),pt.GetDefaultValence(a.GetAtomicNum()),valence,int(bonds),int(lonepairs),iscorrect)
+            print("ich, atom idx, label, charge, pt.GetDefaultValence(a.GetAtomicNum()), valence, num bonds, num lonepairs, iscorrect")
+        if debug >= 1: print(ich,i,a.GetSymbol(),a.GetFormalCharge(),pt.GetDefaultValence(a.GetAtomicNum()),valence,int(bonds),int(lonepairs),iscorrect)
 
     # Creates the charge_state
     #print("Creating state with",iscorrect, total_charge, atom_charge, smiles, ich)
@@ -561,10 +561,10 @@ def get_poscharges(spec, debug=1):
 
             NO_type = get_nitrosyl_geom(spec[1])
             if NO_type == "Linear":
-                best_charge_distr = 2
+                best_charge_distr_idx = 2
                 #best_charge_distr = [prot_charge_states[2]]
             elif NO_type == "Bent":
-                best_charge_distr = 0
+                best_charge_distr_idx = 0
                 #best_charge_distr = [prot_charge_states[0]]
 
         #############################
