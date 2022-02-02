@@ -1018,7 +1018,7 @@ class ElementData:
             "In": 1.630,
             "Sn": 1.460,
             "Sb": 1.200,  # Modded Sergi, Was 1.460
-            "Te": 1.470,
+            "Te": 1.250,  # Modded Sergi, Was 1.470
             "I": 1.400,
             "Xe": 1.980,
             "Cs": 1.670,

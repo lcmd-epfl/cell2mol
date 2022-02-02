@@ -28,7 +28,7 @@ from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
 #######################################################
-def verify_connectivity(ligand, molecule, debug=1):
+def verify_connectivity(ligand, molecule, debug=0):
 
     metalist = molecule.metalist.copy()
     # Original labels and coordinates are copied
@@ -60,7 +60,7 @@ def verify_connectivity(ligand, molecule, debug=1):
                     else:
                        # Corrects data of atom object
                        a.mconnec = 0
-                       if debug >= 1: print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label} of ligand {ligand.labels}")
+                       if debug >= 0: print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label} of ligand {ligand.labels}")
                        # Now it should correct data of metal, ligand and molecule objects. Not yet implemented
 
 #######################################################

@@ -149,9 +149,7 @@ def getconec(labels, pos, factor, radii="default"):
                 thres = (radii[i] + radii[j]) * factor
                 if dist <= clash:
                     status = 0  # invalid molecule
-                    print(
-                        "GETCONEC: Distance", dist, "smaller than clash for atoms", i, j
-                    )
+                    print("GETCONEC: Distance", dist, "smaller than clash for atoms", i, j)
                 elif dist <= thres:
                     conmat[i, j] = 1
                     conmat[j, i] = 1

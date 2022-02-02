@@ -7,6 +7,7 @@ import sys
 from cell2mol.tmcharge_common import atom, molecule, ligand, metal, group, getradii, getconec, find_closest_metal
 from cell2mol.xyz2mol import int_atom, xyz2mol
 
+from cell2mol.hungarian import reorder
 from cell2mol.elementdata import ElementData
 
 elemdatabase = ElementData()
@@ -139,7 +140,7 @@ def classify_mols(moleclist, debug=0):
 
 
 #######################################################
-def getcharge(labels, pos, conmat, ich, cov_factor=1.3, allowchargefragments=True, debug=0):
+def getcharge(labels, pos, conmat, ich, cov_factor=1.3, debug=0):
     ## Generates the connectivity of a molecule given a charge.
     # The molecule is described by the labels, and the atomic cartesian coordinates "pos"
     # The adjacency matrix is also provided (conmat)
@@ -161,7 +162,7 @@ def getcharge(labels, pos, conmat, ich, cov_factor=1.3, allowchargefragments=Tru
     # embed_chiral shouldn't ideally be necessary, but it runs a sanity check that improves the proposed connectivity
     # use_huckel false means that the xyz2mol adjacency will be generated based on atom distances and vdw radii.
     # Ideally, the adjacency matrix could be provided
-    mols = xyz2mol(atnums,pos,conmat,cov_factor,charge=ich,use_graph=True,allow_charged_fragments=allowchargefragments,embed_chiral=True,use_huckel=False)
+    mols = xyz2mol(atnums,pos,conmat,cov_factor,charge=ich,use_graph=True,allow_charged_fragments=True,embed_chiral=True,use_huckel=False)
     if len(mols) > 1: print("WARNING: More than 1 mol received from xyz2mol for initcharge:", initcharge)
 
     # smiles is generated with rdkit
@@ -272,85 +273,141 @@ def select_charge_distr(charge_states, debug=1):
     listofminabs = [i for i, x in enumerate(uncorr_abs_atcharge) if x == minofabs]
     if debug >= 1: print(f"    NEW SELECT FUNCTION: listofmintot: {listofmintot}")
     if debug >= 1: print(f"    NEW SELECT FUNCTION: listofminabs: {listofminabs}")
-
     # Searches for entries that have the smallest total charge(appear in listofmintot),
-    #     and smallest number of charges(appear in listofminabs)
+    # and smallest number of charges(appear in listofminabs)
+
+    ####################
+    # building tmplist #
+    ####################
     tmplist = []
     for idx in range(0, nlists):
         if (idx in listofminabs) and (idx in listofmintot) and coincide[idx]:
             tmplist.append(idx)
-    if debug >= 1: print(f"    NEW SELECT FUNCTION: tmplist: {tmplist}")
 
-    # CASE 1, IF only one distribution meets the requirement. Then it is chosen
-    if len(tmplist) == 1:
-        goodlist = tmplist.copy()
-        if debug >= 1: print(f"    NEW SELECT FUNCTION: Case 1, only one entry in tmplist, so goodlist is: {goodlist}")
-
-    # CASE 2, IF listofminabs and listofmintot do not have any value in common. Then we select from minima, coincide, and zwitt
-    elif len(tmplist) == 0:
-        goodlist = []
+    # IF listofminabs and listofmintot do not have any value in common. Then we select from minima, coincide, and zwitt
+    if len(tmplist) == 0:
+        if debug >= 1: print("    NEW SELECT FUNCTION: No entry in initial tmplist. We now select from minima, coincide and zwitt:")
         for idx in range(0, nlists):
-            if (idx in listofminabs) or (idx in listofmintot) and coincide[idx] and not uncorr_zwitt[idx]:
-                goodlist.append(idx)
-        if debug >= 1: print("    NEW SELECT FUNCTION: Case 2, no entry in initial tmplist. We select from minima, coincide and zwitt:",goodlist)
+            if ((idx in listofminabs) or (idx in listofmintot)) and coincide[idx] and not uncorr_zwitt[idx]:
+                tmplist.append(idx)
 
-    # CASE 3, IF more than one in list is correct. Then, I choose the one that delivered the expected charge and that delivers the minimum charge after H removal
-    elif len(tmplist) > 1:
-        corr_total = []
-        corr_abs_total = []
-        corr_abs_atcharge = []
-        for chs in charge_states:
-            corr_total.append(chs.corr_total_charge)
-            corr_abs_total.append(chs.corr_abstotal)
-            corr_abs_atcharge.append(chs.corr_abs_atcharge)
-
-        if debug >= 1: print(f"    NEW SELECT FUNCTION: Initial corr_total: {corr_total}")
-        if debug >= 1: print(f"    NEW SELECT FUNCTION: Initial corr_abs_total: {corr_abs_total}")
-        if debug >= 1: print(f"    NEW SELECT FUNCTION: Initial corr_abs_atcharge: {corr_abs_atcharge}")
-
-        selected_corr_abs_total = []
-        selected_corr_abs_atcharge = []
-        indices_transfer = []
+    # IF no values yet, we relax the criterion 
+    if len(tmplist) == 0: 
         for idx in range(0, nlists):
-            if idx in tmplist and coincide[idx]:
-                selected_corr_abs_total.append(corr_abs_total[idx])
-                selected_corr_abs_atcharge.append(corr_abs_atcharge[idx])
-                indices_transfer.append(idx)
+            if ((idx in listofminabs) or (idx in listofmintot)) and coincide[idx]: 
+                tmplist.append(idx)
+ 
+    ####################
+    # tmplist is built #
+    ####################
+    if debug >= 1: print(f"    NEW SELECT FUNCTION: tmplist: {tmplist}, including:")
+    for idx in range(0, nlists):
+        if idx in tmplist: 
+            if debug >= 1: print(f"    NEW SELECT FUNCTION: Corr_charge={charge_states[idx].corr_total_charge}")
+            if debug >= 1: print(f"    NEW SELECT FUNCTION: Smiles={charge_states[idx].smiles}")
 
-        if debug >= 1: print("    NEW SELECT FUNCTION: Initial selected_corr_total:",selected_corr_abs_total)
-        if debug >= 1: print("    NEW SELECT FUNCTION: Initial selected_corr_abs_total:",selected_corr_abs_atcharge)
+    corr_charges = []
+    for idx in range(0, nlists):
+        if idx in tmplist: 
+            if charge_states[idx].corr_total_charge not in corr_charges: 
+                corr_charges.append(charge_states[idx].corr_total_charge)
+    if debug >= 1: print(f"    NEW SELECT FUNCTION: found corr_charges={corr_charges}")
+            
+    good_idx = []
+    for jdx, tgt_charge in enumerate(corr_charges): 
+        if debug >= 1: print(f"    NEW SELECT FUNCTION: doing tgt_charge={tgt_charge}")
+        list_for_tgt_charge = []
+        for idx in tmplist: 
+            if charge_states[idx].corr_total_charge == tgt_charge: 
+                list_for_tgt_charge.append(idx)
+                if debug >= 1: print(f"    NEW SELECT FUNCTION: charge_state added")
+             
+        # CASE 1, IF only one distribution meets the requirement. Then it is chosen
+        if len(list_for_tgt_charge) == 1:
+            good_idx.append(list_for_tgt_charge[0])
+            if debug >= 1: print(f"    NEW SELECT FUNCTION: Case 1, only one entry for {tgt_charge} in tmplist")
+ 
+        # CASE 2, IF more than one charge_state is found for a given final charge
+        elif len(list_for_tgt_charge) > 1:
+            good_idx.append(list_for_tgt_charge[0])
+            if debug >= 1: print(f"    NEW SELECT FUNCTION: Case 2, more than one entry for {tgt_charge} in tmplist. Taking first")
 
-        ncorr_list = len(selected_corr_abs_total)
+    return good_idx
 
-        ####### Option 1, go for minimum charge of the corrected one
-        minoftot = np.min(selected_corr_abs_total)
-        minofabs = np.min(selected_corr_abs_atcharge)
-        listofmintot = [i for i, x in enumerate(selected_corr_abs_total) if x == minoftot]
-        listofminabs = [i for i, x in enumerate(selected_corr_abs_atcharge) if x == minofabs]
-
-        if debug >= 1: print("    NEW SELECT FUNCTION: sel_listofmaxtot:", listofmintot)
-        if debug >= 1: print("    NEW SELECT FUNCTION: sel_listofmaxabs:", listofminabs)
-
-        goodlist = []
-        for idx in range(0, ncorr_list):
-            if (idx in listofmintot) and (idx in listofminabs):
-                goodlist.append(indices_transfer[idx])
-
-        if debug >= 1: print("    NEW SELECT FUNCTION: Case 3, multiple entries in tmplist, so goodlist is:",goodlist)
-
-    ###### CASE 4. IF, at this stage, a clear option is not found. Then, resort to coincide. Even if the charge works, the connectivity is probably wrong
-    if len(goodlist) == 0:
-        if debug >= 1: print("    SELECT FUNCTION: Case 4, empty goodlist so going for coincide as our last resort")
-        for idx, g in enumerate(coincide):
-            if g:
-                goodlist.append(idx)
-
-    # goodlist are the indices of the states, here we move the actual states to good_states
-    good_states = []
-    for idx in goodlist:
-        good_states.append(charge_states[idx]) 
-
-    return good_states
+#    # CASE 1, IF only one distribution meets the requirement. Then it is chosen
+#    if len(tmplist) == 1:
+#        goodlist = tmplist.copy()
+#        if debug >= 1: print(f"    NEW SELECT FUNCTION: Case 1, only one entry in tmplist, so goodlist is: {goodlist}")
+#
+#    # CASE 2, IF listofminabs and listofmintot do not have any value in common. Then we select from minima, coincide, and zwitt
+#    elif len(tmplist) == 0:
+#        goodlist = []
+#        for idx in range(0, nlists):
+#            if ((idx in listofminabs) or (idx in listofmintot)) and coincide[idx] and not uncorr_zwitt[idx]:
+#                goodlist.append(idx)
+#        if len(goodlist) == 0: 
+#            for idx in range(0, nlists):
+#                if ((idx in listofminabs) or (idx in listofmintot)) and coincide[idx]: 
+#                    goodlist.append(idx)
+#        if debug >= 1: print("    NEW SELECT FUNCTION: Case 2, no entry in initial tmplist. We select from minima, coincide and zwitt:",goodlist)
+#
+#    # CASE 3, IF more than one in list is correct. Then, I choose the one that delivered the expected charge and that delivers the minimum charge after H removal
+#    elif len(tmplist) > 1:
+#        corr_total = []
+#        corr_abs_total = []
+#        corr_abs_atcharge = []
+#        for chs in charge_states:
+#            corr_total.append(chs.corr_total_charge)
+#            corr_abs_total.append(chs.corr_abstotal)
+#            corr_abs_atcharge.append(chs.corr_abs_atcharge)
+#
+#        if debug >= 1: print(f"    NEW SELECT FUNCTION: Initial corr_total: {corr_total}")
+#        if debug >= 1: print(f"    NEW SELECT FUNCTION: Initial corr_abs_total: {corr_abs_total}")
+#        if debug >= 1: print(f"    NEW SELECT FUNCTION: Initial corr_abs_atcharge: {corr_abs_atcharge}")
+#
+#        selected_corr_abs_total = []
+#        selected_corr_abs_atcharge = []
+#        indices_transfer = []
+#        for idx in range(0, nlists):
+#            if idx in tmplist and coincide[idx]:
+#                selected_corr_abs_total.append(corr_abs_total[idx])
+#                selected_corr_abs_atcharge.append(corr_abs_atcharge[idx])
+#                indices_transfer.append(idx)
+#
+#        if debug >= 1: print("    NEW SELECT FUNCTION: Initial selected_corr_total:",selected_corr_abs_total)
+#        if debug >= 1: print("    NEW SELECT FUNCTION: Initial selected_corr_abs_total:",selected_corr_abs_atcharge)
+#
+#        ncorr_list = len(selected_corr_abs_total)
+#
+#        ####### Option 1, go for minimum charge of the corrected one
+#        minoftot = np.min(selected_corr_abs_total)
+#        minofabs = np.min(selected_corr_abs_atcharge)
+#        listofmintot = [i for i, x in enumerate(selected_corr_abs_total) if x == minoftot]
+#        listofminabs = [i for i, x in enumerate(selected_corr_abs_atcharge) if x == minofabs]
+#
+#        if debug >= 1: print("    NEW SELECT FUNCTION: sel_listofmaxtot:", listofmintot)
+#        if debug >= 1: print("    NEW SELECT FUNCTION: sel_listofmaxabs:", listofminabs)
+#
+#        goodlist = []
+#        for idx in range(0, ncorr_list):
+#            if (idx in listofmintot) and (idx in listofminabs):
+#                goodlist.append(indices_transfer[idx])
+#
+#        if debug >= 1: print("    NEW SELECT FUNCTION: Case 3, multiple entries in tmplist, so goodlist is:",goodlist)
+#
+#    ###### CASE 4. IF, at this stage, a clear option is not found. Then, resort to coincide. Even if the charge works, the connectivity is probably wrong
+#    if len(goodlist) == 0:
+#        if debug >= 1: print("    SELECT FUNCTION: Case 4, empty goodlist so going for coincide as our last resort")
+#        for idx, g in enumerate(coincide):
+#            if g:
+#                goodlist.append(idx)
+#
+#    # goodlist are the indices of the states, here we move the actual states to good_states
+#    good_states = []
+#    for idx in goodlist:
+#        good_states.append(charge_states[idx]) 
+#
+#    return good_states
 
 #######################################################
 def drive_get_poscharges(unique_species):
@@ -396,17 +453,27 @@ def drive_get_poscharges(unique_species):
     return selected_charge_states, Warning
 
 #######################################################
-def get_list_of_charges_to_try(spec, debug=0):
+def get_list_of_charges_to_try(spec, prot, debug=0):
 
     chargestried = []
+
     #### Educated Guess on the Maximum Charge one can expect from the spec[1]
     if spec[0] == "Other": 
         maxcharge = 3
+
     elif spec[0] == "Ligand":
+  
+        count_non_connected_O = 0
+        for a in spec[1].atoms:
+            if a.label == "O" and a.mconnec == 0 and a.connec == 1:
+                count_non_connected_O += 1
+
         if not spec[1].hapticity:
-            maxcharge = spec[1].totmconnec + 2
+            maxcharge = spec[1].totmconnec + count_non_connected_O - prot.added_atoms
+            if debug >= 1: print(f"MAXCHARGE: maxcharge set at {maxcharge} with {spec[1].totmconnec}+{count_non_connected_O}-{prot.added_atoms}")
         else:
             maxcharge = 2
+            if debug >= 1: print(f"MAXCHARGE: maxcharge set at {maxcharge}")
     
         # Cases of same atom being connected to more than one metal
         if any(a.mconnec >= 2 for a in spec[1].atoms):
@@ -414,8 +481,10 @@ def get_list_of_charges_to_try(spec, debug=0):
         else:
             if maxcharge > spec[1].natoms:
                 maxcharge = spec[1].natoms
-        if maxcharge > 4:
-            maxcharge = 4
+        if maxcharge > 3:
+            maxcharge = 3
+        if maxcharge < 1:
+            maxcharge = 1
     
     # Defines list of charges that will try
     for magn in range(0, int(maxcharge + 1)):
@@ -428,48 +497,6 @@ def get_list_of_charges_to_try(spec, debug=0):
             chargestried.append(ich)
 
     return chargestried
-
-#######################################################
-
-class charge_state(object):
-    def __init__(self, status, uncorr_total_charge, uncorr_atom_charges, mol_object, smiles, charge_tried):
-        self.status = status
-        self.uncorr_total_charge = uncorr_total_charge
-        self.uncorr_atom_charges = uncorr_atom_charges
-        self.mol_object = mol_object
-        self.smiles = smiles
-        self.charge_tried = charge_tried
-
-        self.uncorr_abstotal, self.uncorr_abs_atcharge, self.uncorr_zwitt = eval_chargelist(uncorr_atom_charges)
-        
-        if uncorr_total_charge == charge_tried:  
-            self.coincide = True
-        else:
-            self.coincide = False
-
-    def correction(self, addedlist, metal_electrons, elemlist):
-        self.addedlist = addedlist
-        self.metal_electrons = metal_electrons
-        self.elemlist = elemlist
-        self.corr_total_charge = int(0)
-        self.corr_atom_charges = []
-        # Corrects the Charge of atoms with addedH
-        count = 0 
-        if len(addedlist) > 0:
-            for idx, add in enumerate(addedlist):  # Iterates over the original number of ligand atoms, thus without the added H
-                if add != 0:
-                    count += 1 
-                    corrected = self.uncorr_atom_charges[idx] - addedlist[idx] + metal_electrons[idx] - self.uncorr_atom_charges[len(addedlist)-1+count]
-                    self.corr_atom_charges.append(corrected)
-                    # last term corrects for cases in which a charge has been assigned to the added atom
-                else:
-                    self.corr_atom_charges.append(self.uncorr_atom_charges[idx])
-            self.corr_total_charge = int(np.sum(self.corr_atom_charges))
-        else:
-            self.corr_total_charge = self.uncorr_total_charge
-            self.corr_atom_charges = self.uncorr_atom_charges.copy()
-
-        self.corr_abstotal, self.corr_abs_atcharge, self.corr_zwitt = eval_chargelist(self.corr_atom_charges)
 
 #######################################################
 def eval_chargelist(atom_charges):
@@ -501,8 +528,6 @@ def get_poscharges(spec, debug=1):
     Warning = False
     selected_charge_states = []
     # Finds maximum plausible charge for the specie
-    chargestried = get_list_of_charges_to_try(spec)
-    if debug >= 2: print(f"    POSCHARGE will try charges {chargestried}") 
 
     ##############################
     #### Creates protonation states. That is, geometries in which atoms have been added to the original molecule
@@ -510,99 +535,103 @@ def get_poscharges(spec, debug=1):
     if spec[0] == "Ligand":
         list_of_protonations = define_sites(spec[1], spec[2], debug)
     elif spec[0] == "Other":
-        empty_protonation = protonation(spec[1].labels, spec[1].coord, spec[1].factor, True, int(0), [], [], [], [], typ="Empty")
+        #empty_protonation = protonation(spec[1].labels, spec[1].coord, spec[1].factor, True, int(0), [], [], [], [], typ="Empty")
+        empty_protonation = protonation(spec[1].labels, spec[1].coord, spec[1].factor, int(0), [], [], [], [], typ="Empty")
         list_of_protonations = [] 
         list_of_protonations.append(empty_protonation)
         if debug >= 1: print(f"    POSCHARGE: doing empty PROTONATION for this specie")
-
-
     if debug >= 1: print(f"    POSCHARGE: received {len(list_of_protonations)} protonations for this specie")
+
     ##############################
     #### Evaluates possible charges except if the ligand is a nitrosyl
     ##############################
     if spec[0] == "Ligand" and spec[1].natoms == 2 and "N" in spec[1].labels and "O" in spec[1].labels:
         for prot in list_of_protonations: 
-            prot_charge_states = []
+            list_of_charge_states = []
+            list_of_protonations_for_each_state = [] 
+            chargestried = get_list_of_charges_to_try(spec, prot)
+            if debug >= 2: print(f"    POSCHARGE will try charges {chargestried}") 
 
-            if prot.allowchargedfragments == False:   # only charge=0 is evaluated
-                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, int(0), prot.factor, prot.allowchargedfragments)
+            for ich in chargestried:
+                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor)
                 ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
-                prot_charge_states.append(ch_state)
-                if debug >= 0: print(f"    POSCHARGE: charge {ich} with smiles {ch_state.smiles}")
-            else:
-                for ich in chargestried:
-                    ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor, prot.allowchargedfragments)
-                    ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
-                    prot_charge_states.append(ch_state)
-                    if debug >= 0: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}")
+                list_of_charge_states.append(ch_state)
+                list_of_protonations_for_each_state.append(prot)
+                if debug >= 0: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}")
 
             NO_type = get_nitrosyl_geom(spec[1])
             if NO_type == "Linear":
-                best_charge_distr = [prot_charge_states[2]]
+                best_charge_distr = 2
+                #best_charge_distr = [prot_charge_states[2]]
             elif NO_type == "Bent":
-                best_charge_distr = [prot_charge_states[0]]
+                best_charge_distr = 0
+                #best_charge_distr = [prot_charge_states[0]]
 
-            #############################
-            # For all protonations, it adds the resulting states to selected_charge_states
-            #############################
-            #if debug >= 1: print("    TM-POSCHARGE. Choosing  ") 
-            for idx, g in enumerate(best_charge_distr):
-                if g.corr_total_charge not in spec[1].poscharge:
-                    spec[1].poscharge.append(g.corr_total_charge)
-                    spec[1].posatcharge.append(g.corr_atom_charges)
-                    spec[1].posobjlist.append(g.mol_object)
-                    spec[1].possmiles.append(g.smiles)
-                    # Selected_charge_states is a tuple with the actual charge state, and the protonation it belongs to
-                    selected_charge_states.append([g,prot])
-                    if debug >= 0: print(f"    POSCHARGE. poscharge added with corrected charge: {g.corr_total_charge} and uncorrected: {g.uncorr_total_charge}")
+        #############################
+        # For all protonations, it adds the resulting states to selected_charge_states
+        #############################
+        #if debug >= 1: print("    TM-POSCHARGE. Choosing  ") 
+        for idx in best_charge_distr_idx:
+            c = list_of_charge_states[idx]
+            p = list_of_protonations_for_each_state[idx] 
+            if c.corr_total_charge not in spec[1].poscharge:
+                spec[1].poscharge.append(c.corr_total_charge)
+                spec[1].posatcharge.append(c.corr_atom_charges)
+                spec[1].posobjlist.append(c.mol_object)
+                spec[1].possmiles.append(c.smiles)
+                # Selected_charge_states is a tuple with the actual charge state, and the protonation it belongs to
+                selected_charge_states.append([c,p])
+                if debug >= 0: print(f"    POSCHARGE. poscharge added with corrected charge: {c.corr_total_charge} and uncorrected: {c.uncorr_total_charge}")
+                if debug >= 0: print(f"    POSCHARGE. poscharge added with smiles: {c.smiles}") 
 
+    ##############################
+    # If not a Nitrosyl ligand, choose among the charge_states for this protonation
+    ##############################
     else:
-        ##############################
-        # If not a Nitrosyl ligand, choose among the charge_states for this protonation
-        ##############################
+        list_of_charge_states = []
+        list_of_protonations_for_each_state = []
         for prot in list_of_protonations: 
-            prot_charge_states = []
             if debug >= 0: print(" ")
             if debug >= 0: print(f"    POSCHARGE: doing PROTONATION with added atoms: {prot.added_atoms}")
+            chargestried = get_list_of_charges_to_try(spec, prot)
+            if debug >= 2: print(f"    POSCHARGE will try charges {chargestried}") 
 
-            if prot.allowchargedfragments == False:   # only charge=0 is evaluated
-                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, int(0), prot.factor, prot.allowchargedfragments)
-                ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
-                prot_charge_states.append(ch_state)
-                if debug >= 0: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}")
-            else:
-                for ich in chargestried:
-                    # Launches getcharge for each initial charge. Creates prot_charge_states
-                    try:
-                        ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor, prot.allowchargedfragments)
-                        ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
-                        prot_charge_states.append(ch_state)
-                        if debug >= 0: print(f"    POSCHARGE: charge {ich} with smiles {ch_state.smiles}")
-                    except Exception as exc:
-                        if debug >= 0: print(f"    POSCHARGE: EXCEPTION in get_poscharges: {exc}")
+            for ich in chargestried:
+                # Launches getcharge for each initial charge. Creates prot_charge_states
+                try:
+                    ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor)
+                    ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
+                    list_of_charge_states.append(ch_state)
+                    list_of_protonations_for_each_state.append(prot)
+                    if debug >= 0: print(f"    POSCHARGE: charge {ich} with smiles {ch_state.smiles}")
+                except Exception as exc:
+                    if debug >= 0: print(f"    POSCHARGE: EXCEPTION in get_poscharges: {exc}")
 
-            #############################
-            # Selects the best distribution(s) for a given protonation
-            #############################
-            if len(prot_charge_states) > 0:
-                best_charge_distr = select_charge_distr(prot_charge_states)
-            else:
-                if debug >= 1: print(f"    POSCHARGE. EMPTY prot_gooddistr for PROTONATION with added atoms: {prot.added_atoms}")
-                best_charge_distr = []
+        #############################
+        # Selects the best distribution(s) for all protonations. We retrieve the indices first, and then move the objects to the list
+        #############################
+        if len(list_of_charge_states) > 0:
+            best_charge_distr_idx = select_charge_distr(list_of_charge_states)
+        else:
+            if debug >= 1: print(f"    POSCHARGE. EMPTY prot_gooddistr for PROTONATION with added atoms: {prot.added_atoms}")
+            best_charge_distr_idx = []
 
-            #############################
-            # For all protonations, it adds the resulting states to selected_charge_states
-            #############################
-            #if debug >= 1: print("    TM-POSCHARGE. Choosing  ") 
-            for idx, g in enumerate(best_charge_distr):
-                if g.corr_total_charge not in spec[1].poscharge:
-                    spec[1].poscharge.append(g.corr_total_charge)
-                    spec[1].posatcharge.append(g.corr_atom_charges)
-                    spec[1].posobjlist.append(g.mol_object)
-                    spec[1].possmiles.append(g.smiles)
-                    # Selected_charge_states is a tuple with the actual charge state, and the protonation it belongs to
-                    selected_charge_states.append([g,prot])
-                    if debug >= 0: print(f"    POSCHARGE. poscharge added with corrected charge: {g.corr_total_charge} and uncorrected: {g.uncorr_total_charge}")
+        #############################
+        # For all protonations, it adds the resulting states to selected_charge_states
+        #############################
+        #if debug >= 1: print("    TM-POSCHARGE. Choosing  ") 
+        for idx in best_charge_distr_idx:
+            c = list_of_charge_states[idx]
+            p = list_of_protonations_for_each_state[idx] 
+            if c.corr_total_charge not in spec[1].poscharge:
+                spec[1].poscharge.append(c.corr_total_charge)
+                spec[1].posatcharge.append(c.corr_atom_charges)
+                spec[1].posobjlist.append(c.mol_object)
+                spec[1].possmiles.append(c.smiles)
+                # Selected_charge_states is a tuple with the actual charge state, and the protonation it belongs to
+                selected_charge_states.append([c,p])
+                if debug >= 0: print(f"    POSCHARGE. poscharge added with corrected charge: {c.corr_total_charge} and uncorrected: {c.uncorr_total_charge}")
+                if debug >= 0: print(f"    POSCHARGE. poscharge added with smiles: {c.smiles}") 
 
     ### HERE IS HAS FINISHED WITH ALL PROTONATIONS
     if len(selected_charge_states) == 0:  # Means that no good option has been found
@@ -965,8 +994,11 @@ def define_sites(ligand, molecule, debug=1):
                 if debug >= 1: print(f"        DEFINE_SITES: evaluating non-haptic group with index {idx} and label {a.label}")
                 # Simple Ionic Case
                 if a.label in ions:
-                    elemlist[idx] = "H"
-                    addedlist[idx] = 1
+                    if a.connec == 0:
+                        elemlist[idx] = "H"
+                        addedlist[idx] = 1
+                    elif a.connec >= 1:
+                        block[idx] = 1
                 # Oxigen
                 elif a.label == "O" or a.label == "S" or a.label == "Se":
                     if a.connec == 1:
@@ -1044,10 +1076,9 @@ def define_sites(ligand, molecule, debug=1):
                             addedlist[idx] = tmp_added
                             metal_electrons[idx] = tmp_metal
                         else:
-                            if not needs_nonlocal:
-                                needs_nonlocal = True
-                                non_local_groups += 1
-                                if debug >= 1: print(f"        DEFINE_SITES: will be sent to nonlocal due to {a.label} atom")
+                            needs_nonlocal = True
+                            non_local_groups += 1
+                            if debug >= 1: print(f"        DEFINE_SITES: will be sent to nonlocal due to {a.label} atom")
                 # Silicon
                 elif a.label == "Si":
                     if a.connec < 4:
@@ -1086,10 +1117,11 @@ def define_sites(ligand, molecule, debug=1):
     # this connectivity can contain errors, but is tipically enough to determine the bonds of the connected atom with the rest of the ligand
     
     limit_to_exact = False
-    create_all = False
+    create_all = True
 
     if not needs_nonlocal:
-        new_prot = protonation(newlab, newcoord, ligand.factor, True, added_atoms, addedlist, block, metal_electrons, elemlist) 
+        new_prot = protonation(newlab, newcoord, ligand.factor, added_atoms, addedlist, block, metal_electrons, elemlist) 
+        #new_prot = protonation(newlab, newcoord, ligand.factor, True, added_atoms, addedlist, block, metal_electrons, elemlist) 
         list_of_protonations.append(new_prot)
     else:
         # Generate the new adjacency matrix after local elements have been added to be sent to xyz2mol
@@ -1131,9 +1163,8 @@ def define_sites(ligand, molecule, debug=1):
             tmpmols = []
             oslist = []
             BOlist = []
-            allowtype = []
             for os in tmposlist:
-                if debug >= 1: print(f"        DEFINE_SITES: Trying to generate tmpmol with OS={os}") 
+                if debug >= 1: print(f"        DEFINE_SITES: Trying to generate tmpmol with OS={os}")
                 if os == 0 :  
 
                     #First generates with allow_charged_fragments=False
@@ -1141,20 +1172,17 @@ def define_sites(ligand, molecule, debug=1):
                     tmpmols.append(mol[0])
                     oslist.append(os)
                     BOlist.append(np.sum(tmpBO,axis=0))
-                    allowtype.append(False)
 
                     #Then with allow_charged_fragments=True
                     mol, tmpBO = xyz2mol(local_atnums,local_coords,local_conmat,ligand.factor,charge=os,use_graph=True,allow_charged_fragments=True,embed_chiral=True,use_huckel=False,exportBO=True)
                     tmpmols.append(mol[0])
                     oslist.append(os)
                     BOlist.append(np.sum(tmpBO,axis=0))
-                    allowtype.append(True)
                 else:
                     mol,tmpBO = xyz2mol(local_atnums,local_coords,local_conmat,ligand.factor,charge=os,use_graph=True,allow_charged_fragments=True,embed_chiral=True,use_huckel=False,exportBO=True)
                     tmpmols.append(mol[0])
                     oslist.append(os)
                     BOlist.append(np.sum(tmpBO,axis=0))
-                    allowtype.append(True)
 
             # Decides for each tmpmol. Generates metal_electrons and elemlist, and creates protonation object
             if len(tmpmols) > 0:
@@ -1215,22 +1243,37 @@ def define_sites(ligand, molecule, debug=1):
                                 if debug >= 1:  print(f"        DEFINE_SITES: Protonation DISCARDED because it generated a repeated addedlist")
     
                     if saveprot:
-                        new_prot = protonation(newlab, newcoord, ligand.factor, allowtype[idx], added_atoms, addedlist, block, metal_electrons, elemlist, smi, os=oslist[idx], typ="Non-local") 
-                        list_of_protonations.append(new_prot)
-                        if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand")
-                    
-        else:
+                        new_prot = protonation(newlab, newcoord, ligand.factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, os=oslist[idx], typ="Non-local") 
+                        if new_prot.status == 1:
+                            list_of_protonations.append(new_prot)
+                            if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand")
+                        else:
+                            if debug >= 1:  print(f"        DEFINE_SITES: Protonation DISCARDED. Steric Clashes found when adding atoms")
 
+                    
+        #################
+        # IF CREATE ALL # 
+        #################
+        else:
             if debug >= 1:  print(f"        DEFINE_SITES: chosen create_all={create_all}") 
             # Creates [0,1] tuples for each non_local
             tmp = []
-            for kdx in range(0,len(nonlocal_indices)):
+            #if non_local_groups == 1:
+            #    tmp.append([0,1])
+            #elif non_local_groups > 1:
+            for kdx in range(0,non_local_groups):
                 tmp.append([0,1])
-                #tmp.append([0,nonlocal_indices[kdx]]) 
             
-            combinations = list(itertools.product(*tmp))
+            if len(tmp) > 1:
+                combinations = list(itertools.product(*tmp))
+                combinations.sort(key=sum)
+            else:
+                combinations = [0,1]
+
             for com in combinations:
 
+                newlab = local_labels.copy()
+                newcoord = local_coords.copy()
                 if debug >= 1:  print(f"        DEFINE_SITES: doing combination {com}") 
                 metal_electrons = np.zeros((local_natoms)).astype(int)  ## Electrons Contributed to the Metal
                 elemlist = np.empty((local_natoms)).astype(str)
@@ -1240,22 +1283,35 @@ def define_sites(ligand, molecule, debug=1):
                 added_atoms = local_added_atoms
                 non_local_added_atoms = 0
 
-                os.append(-np.sum(com))
+                os = -np.sum(com)
                 toallocate = int(0)
                 for jdx, a in enumerate(ligand.atoms):
-                    if a.mconnec == 1 and a.label not in avoid and block[jdx] == 0 and com[toallocate] == 1:
-                        newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, molecule.metalist, elemlist[jdx])
+                    if a.mconnec == 1 and a.label not in avoid and block[jdx] == 0:
+                        if non_local_groups > 1:
+                            if com[toallocate] == 1:
+                                elemlist[jdx] = "H"
+                                addedlist[jdx] = 1
+                                added_atoms += addedlist[jdx] 
+                                newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, molecule.metalist, elemlist[jdx])
+                                if debug >= 1:  print(f"        DEFINE_SITES: added atom to index {jdx} with label {a.label}") 
+                        elif non_local_groups == 1:
+                            if com == 1:
+                                elemlist[jdx] = "H"
+                                addedlist[jdx] = 1
+                                added_atoms += addedlist[jdx] 
+                                newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, molecule.metalist, elemlist[jdx])
+                                if debug >= 1:  print(f"        DEFINE_SITES: added atom to index {jdx} with label {a.label}") 
+                        #in any case, moves index
                         toallocate += 1
-                        elemlist[jdx] = "H"
-                        addedlist[jdx] = 1
-                        added_atoms += addedlist[jdx] 
-                        if debug >= 1:  print(f"        DEFINE_SITES: added atom to index {jdx}") 
 
                 smi = " "
             
-                new_prot = protonation(newlab, newcoord, ligand.factor, allowtype[idx], added_atoms, addedlist, block, metal_electrons, elemlist, smi, os=oslist[idx], typ="Non-local") 
-                list_of_protonations.append(new_prot)
-                if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand")
+                new_prot = protonation(newlab, newcoord, ligand.factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, os, typ="Non-local") 
+                if new_prot.status == 1:
+                    list_of_protonations.append(new_prot)
+                    if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand")
+                else:
+                    if debug >= 1:  print(f"        DEFINE_SITES: Protonation DISCARDED. Steric Clashes found when adding atoms")
                 
     return list_of_protonations 
 
@@ -1324,7 +1380,7 @@ def prepare_mols(moleclist, unique_indices, unique_species, selected_charge_stat
                     tgt_charge_state = selected_charge_states[specie][jdx][0]
                     tgt_protonation = selected_charge_states[specie][jdx][1]
                     allocated = True
-                    ch_state = getcharge(mol.labels, mol.coord, mol.conmat, ch, mol.factor, tgt_protonation.allowchargedfragments)
+                    ch_state = getcharge(mol.labels, mol.coord, mol.conmat, ch, mol.factor)
                     ch_state.correction(tgt_protonation.addedlist, tgt_protonation.metal_electrons, tgt_protonation.elemlist)
 
                     if ch_state.corr_total_charge == tgt_charge_state.corr_total_charge:
@@ -1382,7 +1438,7 @@ def prepare_mols(moleclist, unique_indices, unique_species, selected_charge_stat
                                 if NO_type == "Linear": NOcharge = 1   #NOcharge is the charge with which I need to run getcharge to make it work
                                 if NO_type == "Bent": NOcharge = 0
     
-                                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, NOcharge, prot.factor, prot.allowchargedfragments)
+                                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, NOcharge, prot.factor)
                                 ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
     
                                 if debug >= 1: print(f"PREPARE: Found Nitrosyl of type= {NO_type}")
@@ -1390,8 +1446,7 @@ def prepare_mols(moleclist, unique_indices, unique_species, selected_charge_stat
                                 if debug >= 1: print(f"PREPARE: smiles: {ch_state.smiles}")
                             else:
                                 if debug >= 1: print(f"PREPARE: Sending getcharge with prot.added_atoms={prot.added_atoms} to obtain charge {ch}")
-                                if debug >= 1: print(f"PREPARE: prot.allowchargedfragments={prot.allowchargedfragments}")
-                                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ch+prot.added_atoms, prot.factor, prot.allowchargedfragments)
+                                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ch+prot.added_atoms, prot.factor)
                                 ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
     
                                 if debug >= 1: print(f"PREPARE: Wanted charge {ch}, obtained: {ch_state.corr_total_charge}")
@@ -1621,10 +1676,12 @@ def check_carbenes(atom, ligand, molecule):
 
     return iscarbene, element, addedlist, metal_electrons
 
-#######################################################
+###################
+### NEW OBJECTS ###
+###################
 
 class protonation(object):
-    def __init__(self, labels, coordinates, factor, allowchargedfragments, added_atoms, addedlist, block, metal_electrons, elemlist, tmpsmiles=" ", os=int(0), typ="Local"):
+    def __init__(self, labels, coordinates, factor, added_atoms, addedlist, block, metal_electrons, elemlist, tmpsmiles=" ", os=int(0), typ="Local"):
         self.labels = labels
         self.coordinates = coordinates
         self.added_atoms = added_atoms
@@ -1636,14 +1693,53 @@ class protonation(object):
         self.factor = factor
         self.os = os
         self.tmpsmiles = tmpsmiles
-        self.allowchargedfragments = allowchargedfragments
 
         self.radii = getradii(labels)
-        dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(self.labels, self.coordinates, self.factor, self.radii)
+        status, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(self.labels, self.coordinates, self.factor, self.radii)
 
+        self.status = status     # 1 when correct, 0 when steric clashes
         self.conmat = tmpconmat
         self.connec = tmpconnec
 #######################################################
 
+class charge_state(object):
+    def __init__(self, status, uncorr_total_charge, uncorr_atom_charges, mol_object, smiles, charge_tried):
+        self.status = status
+        self.uncorr_total_charge = uncorr_total_charge
+        self.uncorr_atom_charges = uncorr_atom_charges
+        self.mol_object = mol_object
+        self.smiles = smiles
+        self.charge_tried = charge_tried
+
+        self.uncorr_abstotal, self.uncorr_abs_atcharge, self.uncorr_zwitt = eval_chargelist(uncorr_atom_charges)
+        
+        if uncorr_total_charge == charge_tried:  
+            self.coincide = True
+        else:
+            self.coincide = False
+
+    def correction(self, addedlist, metal_electrons, elemlist):
+        self.addedlist = addedlist
+        self.metal_electrons = metal_electrons
+        self.elemlist = elemlist
+        self.corr_total_charge = int(0)
+        self.corr_atom_charges = []
+        # Corrects the Charge of atoms with addedH
+        count = 0 
+        if len(addedlist) > 0:
+            for idx, add in enumerate(addedlist):  # Iterates over the original number of ligand atoms, thus without the added H
+                if add != 0:
+                    count += 1 
+                    corrected = self.uncorr_atom_charges[idx] - addedlist[idx] + metal_electrons[idx] - self.uncorr_atom_charges[len(addedlist)-1+count]
+                    self.corr_atom_charges.append(corrected)
+                    # last term corrects for cases in which a charge has been assigned to the added atom
+                else:
+                    self.corr_atom_charges.append(self.uncorr_atom_charges[idx])
+            self.corr_total_charge = int(np.sum(self.corr_atom_charges))
+        else:
+            self.corr_total_charge = self.uncorr_total_charge
+            self.corr_atom_charges = self.uncorr_atom_charges.copy()
+
+        self.corr_abstotal, self.corr_abs_atcharge, self.corr_zwitt = eval_chargelist(self.corr_atom_charges)
 
 
