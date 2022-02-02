@@ -979,7 +979,7 @@ class ElementData:
             "Al": 1.350,
             "Si": 1.100,
             #"Si": 1.200,
-            "P": 0.750,
+            "P": 0.820,   # Modded Sergi, Was 0.75
             "S": 1.020,
             "Cl": 0.990,
             "Ar": 1.570,
