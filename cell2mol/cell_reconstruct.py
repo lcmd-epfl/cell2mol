@@ -40,24 +40,28 @@ def verify_connectivity(ligand, molecule, debug=1):
     posadded = len(ligand.labels)
 
     if debug >= 1: print(f"VERIFY: checking connectivity of ligand {ligand.labels}")
-    for idx, a in enumerate(ligand.atoms):
-        if a.mconnec == 1: 
-            tgt, apos, dist = find_closest_metal(a, metalist)
-            idealdist = a.radii + elemdatabase.CovalentRadius2["H"]
-            addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
-            newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])  # adds H at the position of the closest Metal Atom
-
-            # Evaluates the new adjacency matrix.
-            tmpradii = getradii(newlab)
-            dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, newcoord, ligand.factor, tmpradii)
-            # If no undesired adjacencies have been created, the coordinates are kept. Otherwise, data is corrected
-            if tmpconnec[posadded] == 1:
-                if debug >= 1: print(f"VERIFY: connectivity verified for atom {idx} with label {a.label}") 
-            else:
-               # Corrects data of atom object
-               a.mconnec = 0
-               if debug >= 1: print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label} of ligand {ligand.labels}")
-               # Now it should correct data of metal, ligand and molecule objects. Not yet implemented
+    for g in ligand.grouplist:
+        if g.hapticity == True:
+            if debug >= 1: print(f"VERIFY: group has hapticity, skipping check") 
+        else:
+            for idx, a in enumerate(ligand.atoms):
+                if a.mconnec == 1 and a.index in g.atlist: 
+                    tgt, apos, dist = find_closest_metal(a, metalist)
+                    idealdist = a.radii + elemdatabase.CovalentRadius2["H"]
+                    addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
+                    newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])  # adds H at the position of the closest Metal Atom
+        
+                    # Evaluates the new adjacency matrix.
+                    tmpradii = getradii(newlab)
+                    dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, newcoord, ligand.factor, tmpradii)
+                    # If no undesired adjacencies have been created, the coordinates are kept. Otherwise, data is corrected
+                    if tmpconnec[posadded] == 1:
+                        if debug >= 1: print(f"VERIFY: connectivity verified for atom {idx} with label {a.label}") 
+                    else:
+                       # Corrects data of atom object
+                       a.mconnec = 0
+                       if debug >= 1: print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label} of ligand {ligand.labels}")
+                       # Now it should correct data of metal, ligand and molecule objects. Not yet implemented
 
 #######################################################
 def get_reference_molecules(labels, pos, debug=0):
@@ -1361,12 +1365,9 @@ def get_hapticity(molecule, debug=0):
                     if idx in g and a.mconnec > 0:
                         list_of_coord_atoms.append(a.label)
 
-                numC = list_of_coord_atoms.count(
-                    "C"
-                )  # Carbon is the most common connected atom in ligands with hapticity
-                numAs = list_of_coord_atoms.count(
-                    "As"
-                )  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
+                numC = list_of_coord_atoms.count("C")  # Carbon is the most common connected atom in ligands with hapticity
+                numAs = list_of_coord_atoms.count("As")  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
+                numP = list_of_coord_atoms.count("P")  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
                 numO = list_of_coord_atoms.count("O")  # For h4-Enone
                 ## Carbon-based Haptic Ligands
                 if numC == 2:
@@ -1397,6 +1398,9 @@ def get_hapticity(molecule, debug=0):
                 # Other less common types of haptic ligands
                 elif numC == 0 and numAs == 5:
                     group_hapttype = ["h5-AsCp"]
+                    has_hapticity = True
+                elif numC == 0 and numP == 5:
+                    group_hapttype = ["h5-Pentaphosphole"]
                     has_hapticity = True
 
                 # Creates Group

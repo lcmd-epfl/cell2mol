@@ -139,7 +139,7 @@ def classify_mols(moleclist, debug=0):
 
 
 #######################################################
-def getcharge(labels, pos, conmat, ich, cov_factor=1.3, debug=0):
+def getcharge(labels, pos, conmat, ich, cov_factor=1.3, allowchargefragments=True, debug=0):
     ## Generates the connectivity of a molecule given a charge.
     # The molecule is described by the labels, and the atomic cartesian coordinates "pos"
     # The adjacency matrix is also provided (conmat)
@@ -161,7 +161,7 @@ def getcharge(labels, pos, conmat, ich, cov_factor=1.3, debug=0):
     # embed_chiral shouldn't ideally be necessary, but it runs a sanity check that improves the proposed connectivity
     # use_huckel false means that the xyz2mol adjacency will be generated based on atom distances and vdw radii.
     # Ideally, the adjacency matrix could be provided
-    mols = xyz2mol(atnums,pos,conmat,cov_factor,charge=ich,use_graph=True,allow_charged_fragments=True,embed_chiral=True,use_huckel=False)
+    mols = xyz2mol(atnums,pos,conmat,cov_factor,charge=ich,use_graph=True,allow_charged_fragments=allowchargefragments,embed_chiral=True,use_huckel=False)
     if len(mols) > 1: print("WARNING: More than 1 mol received from xyz2mol for initcharge:", initcharge)
 
     # smiles is generated with rdkit
@@ -510,7 +510,7 @@ def get_poscharges(spec, debug=1):
     if spec[0] == "Ligand":
         list_of_protonations = define_sites(spec[1], spec[2], debug)
     elif spec[0] == "Other":
-        empty_protonation = protonation(spec[1].labels, spec[1].coord, spec[1].factor, int(0), [], [], [], [], typ="Empty")
+        empty_protonation = protonation(spec[1].labels, spec[1].coord, spec[1].factor, True, int(0), [], [], [], [], typ="Empty")
         list_of_protonations = [] 
         list_of_protonations.append(empty_protonation)
         if debug >= 1: print(f"    POSCHARGE: doing empty PROTONATION for this specie")
@@ -523,11 +523,18 @@ def get_poscharges(spec, debug=1):
     if spec[0] == "Ligand" and spec[1].natoms == 2 and "N" in spec[1].labels and "O" in spec[1].labels:
         for prot in list_of_protonations: 
             prot_charge_states = []
-            for ich in chargestried:
-                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor)
+
+            if prot.allowchargedfragments == False:   # only charge=0 is evaluated
+                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, int(0), prot.factor, prot.allowchargedfragments)
                 ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
                 prot_charge_states.append(ch_state)
                 if debug >= 0: print(f"    POSCHARGE: charge {ich} with smiles {ch_state.smiles}")
+            else:
+                for ich in chargestried:
+                    ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor, prot.allowchargedfragments)
+                    ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
+                    prot_charge_states.append(ch_state)
+                    if debug >= 0: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}")
 
             NO_type = get_nitrosyl_geom(spec[1])
             if NO_type == "Linear":
@@ -557,15 +564,22 @@ def get_poscharges(spec, debug=1):
             prot_charge_states = []
             if debug >= 0: print(" ")
             if debug >= 0: print(f"    POSCHARGE: doing PROTONATION with added atoms: {prot.added_atoms}")
-            for ich in chargestried:
-                # Launches getcharge for each initial charge. Creates prot_charge_states
-                try:
-                    ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor)
-                    ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
-                    prot_charge_states.append(ch_state)
-                    if debug >= 0: print(f"    POSCHARGE: charge {ich} with smiles {ch_state.smiles}")
-                except Exception as exc:
-                    if debug >= 0: print(f"    POSCHARGE: EXCEPTION in get_poscharges: {exc}")
+
+            if prot.allowchargedfragments == False:   # only charge=0 is evaluated
+                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, int(0), prot.factor, prot.allowchargedfragments)
+                ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
+                prot_charge_states.append(ch_state)
+                if debug >= 0: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}")
+            else:
+                for ich in chargestried:
+                    # Launches getcharge for each initial charge. Creates prot_charge_states
+                    try:
+                        ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor, prot.allowchargedfragments)
+                        ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
+                        prot_charge_states.append(ch_state)
+                        if debug >= 0: print(f"    POSCHARGE: charge {ich} with smiles {ch_state.smiles}")
+                    except Exception as exc:
+                        if debug >= 0: print(f"    POSCHARGE: EXCEPTION in get_poscharges: {exc}")
 
             #############################
             # Selects the best distribution(s) for a given protonation
@@ -845,7 +859,45 @@ def define_sites(ligand, molecule, debug=1):
             elif "h5-AsCp" in g.hapttype and not Selected_Hapticity:
                 if debug >= 1: print("        DEFINE_SITES: It is an h5-AsCp")
                 Selected_Hapticity = True
-                tobeadded = 1
+
+                # Rules change depending on whether the ring is substituted or not 
+                issubstituted = False
+                for idx, a in enumerate(ligand.atoms):
+                    if idx in g.atlist and a.mconnec == 1:
+                        for jdx in a.adjacency:
+                            if ligand.labels[jdx] != "As":
+                                issubstituted = True
+                if issubstituted: 
+                    tobeadded = 0
+                else: 
+                    tobeadded = 1
+
+                tmp_added_atoms = 0
+                for idx, a in enumerate(ligand.atoms):
+                    if idx in g.atlist and a.mconnec == 1:
+                        if tmp_added_atoms < tobeadded:
+                            elemlist[idx] = "H"
+                            addedlist[idx] = 1
+                            tmp_added_atoms += 1
+                        else:
+                            block[idx] = 1
+
+            elif "h5-Pentaphosphole" in g.hapttype and not Selected_Hapticity: ## Case of IMUCAX
+                if debug >= 1: print("        DEFINE_SITES: It is an h5-Pentaphosphole")
+                Selected_Hapticity = True
+
+                # Rules change depending on whether the ring is substituted or not 
+                issubstituted = False
+                for idx, a in enumerate(ligand.atoms):
+                    if idx in g.atlist and a.mconnec == 1:
+                        for jdx in a.adjacency:
+                            if ligand.labels[jdx] != "P":
+                                issubstituted = True
+                if issubstituted: 
+                    tobeadded = 0
+                else: 
+                    tobeadded = 1
+
                 tmp_added_atoms = 0
                 for idx, a in enumerate(ligand.atoms):
                     if idx in g.atlist and a.mconnec == 1:
@@ -1037,7 +1089,7 @@ def define_sites(ligand, molecule, debug=1):
     create_all = False
 
     if not needs_nonlocal:
-        new_prot = protonation(newlab, newcoord, ligand.factor, added_atoms, addedlist, block, metal_electrons, elemlist) 
+        new_prot = protonation(newlab, newcoord, ligand.factor, True, added_atoms, addedlist, block, metal_electrons, elemlist) 
         list_of_protonations.append(new_prot)
     else:
         # Generate the new adjacency matrix after local elements have been added to be sent to xyz2mol
@@ -1079,22 +1131,30 @@ def define_sites(ligand, molecule, debug=1):
             tmpmols = []
             oslist = []
             BOlist = []
+            allowtype = []
             for os in tmposlist:
                 if debug >= 1: print(f"        DEFINE_SITES: Trying to generate tmpmol with OS={os}") 
                 if os == 0 :  
+
+                    #First generates with allow_charged_fragments=False
                     mol, tmpBO = xyz2mol(local_atnums,local_coords,local_conmat,ligand.factor,charge=os,use_graph=True,allow_charged_fragments=False,embed_chiral=False,use_huckel=False,exportBO=True)
                     tmpmols.append(mol[0])
                     oslist.append(os)
                     BOlist.append(np.sum(tmpBO,axis=0))
+                    allowtype.append(False)
+
+                    #Then with allow_charged_fragments=True
                     mol, tmpBO = xyz2mol(local_atnums,local_coords,local_conmat,ligand.factor,charge=os,use_graph=True,allow_charged_fragments=True,embed_chiral=True,use_huckel=False,exportBO=True)
                     tmpmols.append(mol[0])
                     oslist.append(os)
                     BOlist.append(np.sum(tmpBO,axis=0))
+                    allowtype.append(True)
                 else:
                     mol,tmpBO = xyz2mol(local_atnums,local_coords,local_conmat,ligand.factor,charge=os,use_graph=True,allow_charged_fragments=True,embed_chiral=True,use_huckel=False,exportBO=True)
                     tmpmols.append(mol[0])
                     oslist.append(os)
                     BOlist.append(np.sum(tmpBO,axis=0))
+                    allowtype.append(True)
 
             # Decides for each tmpmol. Generates metal_electrons and elemlist, and creates protonation object
             if len(tmpmols) > 0:
@@ -1155,7 +1215,7 @@ def define_sites(ligand, molecule, debug=1):
                                 if debug >= 1:  print(f"        DEFINE_SITES: Protonation DISCARDED because it generated a repeated addedlist")
     
                     if saveprot:
-                        new_prot = protonation(newlab, newcoord, ligand.factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, os=oslist[idx], typ="Non-local") 
+                        new_prot = protonation(newlab, newcoord, ligand.factor, allowtype[idx], added_atoms, addedlist, block, metal_electrons, elemlist, smi, os=oslist[idx], typ="Non-local") 
                         list_of_protonations.append(new_prot)
                         if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand")
                     
@@ -1193,7 +1253,7 @@ def define_sites(ligand, molecule, debug=1):
 
                 smi = " "
             
-                new_prot = protonation(newlab, newcoord, ligand.factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, os=oslist[idx], typ="Non-local") 
+                new_prot = protonation(newlab, newcoord, ligand.factor, allowtype[idx], added_atoms, addedlist, block, metal_electrons, elemlist, smi, os=oslist[idx], typ="Non-local") 
                 list_of_protonations.append(new_prot)
                 if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand")
                 
@@ -1264,7 +1324,7 @@ def prepare_mols(moleclist, unique_indices, unique_species, selected_charge_stat
                     tgt_charge_state = selected_charge_states[specie][jdx][0]
                     tgt_protonation = selected_charge_states[specie][jdx][1]
                     allocated = True
-                    ch_state = getcharge(mol.labels, mol.coord, mol.conmat, ch, mol.factor)
+                    ch_state = getcharge(mol.labels, mol.coord, mol.conmat, ch, mol.factor, tgt_protonation.allowchargedfragments)
                     ch_state.correction(tgt_protonation.addedlist, tgt_protonation.metal_electrons, tgt_protonation.elemlist)
 
                     if ch_state.corr_total_charge == tgt_charge_state.corr_total_charge:
@@ -1322,15 +1382,16 @@ def prepare_mols(moleclist, unique_indices, unique_species, selected_charge_stat
                                 if NO_type == "Linear": NOcharge = 1   #NOcharge is the charge with which I need to run getcharge to make it work
                                 if NO_type == "Bent": NOcharge = 0
     
-                                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, NOcharge, prot.factor)
+                                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, NOcharge, prot.factor, prot.allowchargedfragments)
                                 ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
     
                                 if debug >= 1: print(f"PREPARE: Found Nitrosyl of type= {NO_type}")
                                 if debug >= 1: print(f"PREPARE: Wanted charge {ch}, obtained: {ch_state.corr_total_charge}")
                                 if debug >= 1: print(f"PREPARE: smiles: {ch_state.smiles}")
                             else:
-                                if debug >= 1: print(f"PREPARE: Sending getcharge with charge {ch}")
-                                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ch+prot.added_atoms, prot.factor)
+                                if debug >= 1: print(f"PREPARE: Sending getcharge with prot.added_atoms={prot.added_atoms} to obtain charge {ch}")
+                                if debug >= 1: print(f"PREPARE: prot.allowchargedfragments={prot.allowchargedfragments}")
+                                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ch+prot.added_atoms, prot.factor, prot.allowchargedfragments)
                                 ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
     
                                 if debug >= 1: print(f"PREPARE: Wanted charge {ch}, obtained: {ch_state.corr_total_charge}")
@@ -1563,7 +1624,7 @@ def check_carbenes(atom, ligand, molecule):
 #######################################################
 
 class protonation(object):
-    def __init__(self, labels, coordinates, factor, added_atoms, addedlist, block, metal_electrons, elemlist, tmpsmiles=" ", os=int(0), typ="Local"):
+    def __init__(self, labels, coordinates, factor, allowchargedfragments, added_atoms, addedlist, block, metal_electrons, elemlist, tmpsmiles=" ", os=int(0), typ="Local"):
         self.labels = labels
         self.coordinates = coordinates
         self.added_atoms = added_atoms
@@ -1575,6 +1636,7 @@ class protonation(object):
         self.factor = factor
         self.os = os
         self.tmpsmiles = tmpsmiles
+        self.allowchargedfragments = allowchargedfragments
 
         self.radii = getradii(labels)
         dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(self.labels, self.coordinates, self.factor, self.radii)
