@@ -12,38 +12,33 @@ from cell2mol.formal_charge import classify_mols
 from cell2mol.tmcharge_common import Cell
 
 
-def determine_charge_BVS (get_dict, thre_max, thre_diff):
-    
+def determine_charge_BVS (get_dict, thre_max):
+
     sort = sorted(get_dict, key=get_dict.get)
-    
+
     mean_values = sum(get_dict[key] for key in get_dict.keys())/len(get_dict)
-    
+
     min_delta = get_dict[sort[0]]
     second_min_delta =  get_dict[sort[1]]
-    
-    if np.isclose(mean_values, 9999):        
+
+    if np.isclose(mean_values, 9999):
         charge_BVS = 9999
         print(f"No valid charge by BVS")
-        
+
     elif min_delta > thre_max :
         charge_BVS = 8888
         print(f"Minimum delta exceeds threshold value {thre_max}")
-        
+
     elif min_delta <= thre_max and second_min_delta <= thre_max :
         print("charge of 1st minimum delta {} : {}".format(sort[0], min_delta))
         print("charge of 2nd minimum delta {} : {}".format(sort[1], second_min_delta))
         charge_BVS = 7777
         print(f"Multiple deltas are less than the threshold value")
-    #elif min_delta <= thre_max and second_min_delta <= thre_max and (second_min_delta - min_delta < thre_diff) :
-        #print("charge of 1st minimum delta {} : {}".format(sort[0], min_delta))
-        #print("charge of 2nd minimum delta {} : {}".format(sort[1], second_min_delta))
-        #charge_BVS = 6666
-        #print(f"Too small difference {second_min_delta - min_delta < thre_diff} between two minimum deltas (less than {thre_diff})")
     else:
         charge_BVS = sort[0]
-    
+
     print(f"{charge_BVS=}")
-    
+
     return charge_BVS
                     
 def parsing_arguments_BVS():
@@ -167,7 +162,7 @@ def bond_valence_sum(cell, bv_para, result, thre_max, thre_diff):
                     get_dict.update((key, round(val, 6)) for key, val in get_dict.items()) 
                     print("Charge and Delta pairs", get_dict)
                     
-                    charge_BVS = determine_charge_BVS (get_dict, thre_max, thre_diff)
+                    charge_BVS = determine_charge_BVS (get_dict, thre_max)
                     
                     data.write("%s\t%s\t%d\t%d\t%s\t%d\n" % (cell.refcode, metal.label, metal.totcharge, charge_BVS, get_dict, idx))
                     print(
@@ -192,9 +187,8 @@ if __name__ == "__main__" :
     output_fname = output_dir + "/bvs_output.out"
     
     thre_max = 0.5
-    thre_diff =  0.2 # mean value of difference between 1st and 2nd minimum delta for Mn 
     
     sys.stdout = open(output_fname, "w")
     print("[Refcode]", cell.refcode)
-    bond_valence_sum(cell, df, result, thre_max, thre_diff)
+    bond_valence_sum(cell, df, result, thre_max)
     sys.stdout.close()
