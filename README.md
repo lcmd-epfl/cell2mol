@@ -16,4 +16,5 @@ The program generates a so-called "cell" object, with hierarchical information o
 
 cell2mol characterizes the crystal structure of "YOXKUS" as follows. YOXKUS has 4 Re complexes and no counterion or solvent molecules. Each complex has 3 types of ligands. The first ligand bears a -1 charge, and is connected to the Rh ion through two groups of atoms. The first group consists of a substituted Cp ring with η5 hapticity, and the other is the P atom of a diphenylphosphine, with κ1 denticity. The second ligand is an iodine atom with -1 charge, and appears twice. The third is a neutral CO ligand, with a -1 and a +1 formal charge in the C and O atoms, respectively, and a triple bond between them.
 
-The cell object contains all the information following the class specifications, and can be loaded via pickle.
+The cell object contains all the information following the class specifications, and can be loaded using the pickle library.
+

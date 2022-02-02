@@ -61,7 +61,7 @@ def get_atomic_valences(k):
     if k == 51:  # Sb
         return [6, 5, 3]  # [5,4,3]
     if k in [16, 34]:  # S, Se
-        return [6, 3, 2]  # [6,4,2]
+        return [6, 3, 2, 1]  # [6,4,2]
     if block == "s" and period == 1:
         av = 2 - ave
     elif block == "s" and period != 1:
@@ -272,6 +272,9 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
         found = True
     elif atom == 51 and BO_valence == 6 and not found:  # SbX6
         charge = -1
+        found = True
+    elif atom == 50 and BO_valence == 4 and not found:  # SnX4
+        charge = 0 
         found = True
 
     else:
@@ -494,6 +497,9 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
                 "Has no possible valences assigned in database",
             )
         possible_valence = [x for x in atomic_valence[atomicNum] if x >= valence]
+        if atomicNum == 7:
+            #print("Possible valences for:", atomicNum,"are",possible_valence, valence)
+            possible_valence.append(valence)
         # if atomicNum == 15:
         #    print("Possible valences for:", atomicNum,"are",possible_valence, valence)
         if not possible_valence:
@@ -603,7 +609,7 @@ def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True)
     # mols = rdchem.ResonanceMolSupplier(mol, Chem.UNCONSTRAINED_CATIONS, Chem.UNCONSTRAINED_ANIONS)
     # mols = [mol for mol in mols]
 
-    return [mol]
+    return [mol], BO
 
 
 def get_proto_mol(atoms):
@@ -802,6 +808,7 @@ def xyz2mol(
     use_graph=True,
     use_huckel=False,
     embed_chiral=True,
+    exportBO=False,
 ):
     """
     Generate a rdkit molobj from atoms, coordinates and a total_charge.
@@ -829,7 +836,7 @@ def xyz2mol(
     #AC, mol = xyz2AC(atoms, coordinates, charge, covalent_factor, use_huckel=use_huckel)
     # Convert AC to bond order matrix and add connectivity and charge info to
     # mol object
-    new_mols = AC2mol(
+    new_mols, BO = AC2mol(
         mol,
         AC,
         atoms,
@@ -843,7 +850,10 @@ def xyz2mol(
         for new_mol in new_mols:
             chiral_stereo_check(new_mol)
 
-    return new_mols
+    if exportBO:
+        return new_mols, BO
+    else:
+        return new_mols
 
 
 ########################

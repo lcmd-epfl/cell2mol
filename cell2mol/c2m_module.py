@@ -14,7 +14,7 @@ from cell2mol.cell_reconstruct import (
     get_reference_molecules,
 )
 from cell2mol.formal_charge import (
-    get_poscharges_unique_species,
+    drive_get_poscharges,
     classify_mols,
     balance_charge,
     build_bonds,
@@ -117,30 +117,27 @@ def reconstruct(cell, reflabels, fracs):
 def determine_charge(cell):
 
     # Indentify unique chemical species
-    molec_indices, ligand_indices, unique_indices, unique_species = classify_mols(
-        cell.moleclist
-    )
+    molec_indices, ligand_indices, unique_indices, unique_species = classify_mols(cell.moleclist)
+ 
+    # Group all unique species in a cell variable
+    for spec in unique_species:            # spec is a list in which item 1 is the actual unique specie
+        cell.speclist.append(spec[1])    
+
     print(f"{len(unique_species)} Species (Ligand or Molecules) to Characterize")
     #print("unique_indices", unique_indices)
 
-    unique_species, Warning = get_poscharges_unique_species(unique_species)
+    # drive_get_poscharges adds posible charges to the metal, ligand, and molecule objects of all species in the unit cell
+    # also, it retrieves "Selected_charge_states", which is a tuple with [the actual charge state, and the protonation it belongs to] for all objects except metals
+    selected_charge_states, Warning = drive_get_poscharges(unique_species)
     cell.warning_list.append(Warning)
 
     # Find possible charge distribution
     if not any(cell.warning_list):
-        final_charge_distribution = balance_charge(
-            cell.moleclist,
-            molec_indices,
-            ligand_indices,
-            unique_indices,
-            unique_species,
-        )
+        final_charge_distribution = balance_charge(cell.moleclist,molec_indices,ligand_indices,unique_indices,unique_species)
         print("final_charge_distribution", final_charge_distribution)
         if len(final_charge_distribution) > 1:
             Warning = True
-            print(
-                "More than one Possible Distribution Found:", final_charge_distribution
-            )
+            print("More than one Possible Distribution Found:", final_charge_distribution)
         else:
             Warning = False
         cell.warning_list.append(Warning)
@@ -155,10 +152,11 @@ def determine_charge(cell):
     # Only one possible charge distribution -> getcharge for the repeated species
     if not any(cell.warning_list):
         print("\nFINAL Charge Distribution:", final_charge_distribution)
+        print(" ")
+        print("#########################################")
         print("Assigning Charges and Preparing Molecules")
-        cell.moleclist, Warning = prepare_mols(
-            cell.moleclist, unique_indices, unique_species, final_charge_distribution[0]
-        )
+        print("#########################################")
+        cell.moleclist, Warning = prepare_mols(cell.moleclist, unique_indices, unique_species, selected_charge_states, final_charge_distribution[0])
         cell.warning_list.append(Warning)
 
     # Build Bond objects for molecules
