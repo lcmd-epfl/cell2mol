@@ -2,6 +2,7 @@
 
 from array import array
 import os
+import pytest
 import numpy as np
 import pickle
 
@@ -19,10 +20,12 @@ def run_cell2mol(infofile):
     return cell
 
 
-def test_check_cell_vs_pickle():
-    infofile = "YOXKUS.info"
+@pytest.mark.parametrize(
+    "refcode", ["DAPGAF", "EGITOF", "HACXOY", "ISIPIJ", "YOXKUS", "ROKQAM", "LOKXUG"]
+)
+def test_check_info_vs_pickle(refcode):
+    infofile = refcode + ".info"
     cell = run_cell2mol(infofile)
-
     dir_path = os.path.dirname(os.path.realpath(__file__))
     cellpath = dir_path + "/infodata/"
     file = open(f"{cellpath}Cell_{cell.refcode}.gmol", "rb")
@@ -41,7 +44,3 @@ def test_check_cell_vs_pickle():
     assert cell.labels == result.labels
     assert np.allclose(cell.pos, result.pos)
     assert cell.warning_list == result.warning_list
-
-
-if __name__ == "__main__":
-    test_check_cell_vs_pickle()

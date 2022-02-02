@@ -55,11 +55,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     if step == 2:
         cellpath = output_dir + "/Cell_{}.gmol".format(refcode)
         filename = str(output_dir) + "/" + "Cell_" + str(refcode) + ".gmol"
-        if os.path.exists(cellpath):
-            # print("Cell object exist in output directory")
-            pass
-        else:
-            # print("No such file exists {}".format(filename))
+        if not os.path.exists(cellpath):
             sys.exit(1)
 
     if not os.path.exists(output_dir):
