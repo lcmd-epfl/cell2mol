@@ -440,6 +440,7 @@ def drive_get_poscharges(unique_species):
             if Warning: 
                 print("Empty possible charges received for molecule", spec[1].labels)
             else: 
+                print("Charge state and protonation received for molecule", len(tmp)) 
                 selected_charge_states.append(tmp)
 
         # Gets possible Charges for Metals
@@ -448,7 +449,7 @@ def drive_get_poscharges(unique_species):
             mol = spec[2]
             met.poscharge = get_metal_poscharge(met, mol)
             print("Possible charges received for metal:", met.poscharge)
-            selected_charge_states.append([])
+            #selected_charge_states.append([])
 
     return selected_charge_states, Warning
 
@@ -561,16 +562,17 @@ def get_poscharges(spec, debug=1):
 
             NO_type = get_nitrosyl_geom(spec[1])
             if NO_type == "Linear":
-                best_charge_distr_idx = 2
+                best_charge_distr_idx = [2]
                 #best_charge_distr = [prot_charge_states[2]]
             elif NO_type == "Bent":
-                best_charge_distr_idx = 0
+                best_charge_distr_idx = [0]
                 #best_charge_distr = [prot_charge_states[0]]
 
         #############################
         # For all protonations, it adds the resulting states to selected_charge_states
         #############################
         #if debug >= 1: print("    TM-POSCHARGE. Choosing  ") 
+        #tmplist = []
         for idx in best_charge_distr_idx:
             c = list_of_charge_states[idx]
             p = list_of_protonations_for_each_state[idx] 
@@ -580,7 +582,9 @@ def get_poscharges(spec, debug=1):
                 spec[1].posobjlist.append(c.mol_object)
                 spec[1].possmiles.append(c.smiles)
                 # Selected_charge_states is a tuple with the actual charge state, and the protonation it belongs to
+                #tmplist.append([c,p])
                 selected_charge_states.append([c,p])
+                print("tmplist", tmplist)
                 if debug >= 0: print(f"    POSCHARGE. poscharge added with corrected charge: {c.corr_total_charge} and uncorrected: {c.uncorr_total_charge}")
                 if debug >= 0: print(f"    POSCHARGE. poscharge added with smiles: {c.smiles}") 
 
@@ -620,6 +624,7 @@ def get_poscharges(spec, debug=1):
         # For all protonations, it adds the resulting states to selected_charge_states
         #############################
         #if debug >= 1: print("    TM-POSCHARGE. Choosing  ") 
+        #tmplist = []
         for idx in best_charge_distr_idx:
             c = list_of_charge_states[idx]
             p = list_of_protonations_for_each_state[idx] 
@@ -629,6 +634,7 @@ def get_poscharges(spec, debug=1):
                 spec[1].posobjlist.append(c.mol_object)
                 spec[1].possmiles.append(c.smiles)
                 # Selected_charge_states is a tuple with the actual charge state, and the protonation it belongs to
+                #tmplist.append([c,p])
                 selected_charge_states.append([c,p])
                 if debug >= 0: print(f"    POSCHARGE. poscharge added with corrected charge: {c.corr_total_charge} and uncorrected: {c.uncorr_total_charge}")
                 if debug >= 0: print(f"    POSCHARGE. poscharge added with smiles: {c.smiles}") 
@@ -1104,10 +1110,15 @@ def define_sites(ligand, molecule, debug=1):
         # The block variable makes that more atoms cannot be added to these connected atoms
         for idx, a in enumerate(ligand.atoms):
             if addedlist[idx] != 0 and block[idx] == 0:
-                newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, molecule.metalist, elemlist[idx])
-                added_atoms += addedlist[idx]
-                block[idx] = 1  # No more elements will be added to those atoms
-                if debug >= 1: print(f"        DEFINE_SITES: Added {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
+                isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, molecule.metalist, elemlist[idx])
+                if isadded:
+                    added_atoms += addedlist[idx]
+                    block[idx] = 1  # No more elements will be added to those atoms
+                    if debug >= 1: print(f"        DEFINE_SITES: Added {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
+                else:
+                    addedlist[idx] = 0 
+                    block[idx] = 1  # No more elements will be added to those atoms
+                   
 
     ############################
     ###### NON-LOCAL PART ######
@@ -1225,9 +1236,13 @@ def define_sites(ligand, molecule, debug=1):
                     newcoord = local_coords.copy()
                     for jdx, a in enumerate(ligand.atoms):
                         if addedlist[jdx] != 0 and block[jdx] == 0:
-                            newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, molecule.metalist, elemlist[jdx])
-                            added_atoms += addedlist[jdx]
-                            if debug >= 1: print(f"        DEFINE_SITES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
+                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, molecule.metalist, elemlist[jdx])
+                            if isadded:
+                                added_atoms += addedlist[jdx]
+                                if debug >= 1: print(f"        DEFINE_SITES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
+                            else:
+                                addedlist[idx] = 0 
+                                block[idx] = 1  # No more elements will be added to those atoms
     
                     saveprot = True
                     if limit_to_exact and non_local_added_atoms != np.abs(oslist[idx]):
@@ -1274,6 +1289,7 @@ def define_sites(ligand, molecule, debug=1):
 
                 newlab = local_labels.copy()
                 newcoord = local_coords.copy()
+                if debug >= 1:  print(f" ") 
                 if debug >= 1:  print(f"        DEFINE_SITES: doing combination {com}") 
                 metal_electrons = np.zeros((local_natoms)).astype(int)  ## Electrons Contributed to the Metal
                 elemlist = np.empty((local_natoms)).astype(str)
@@ -1291,23 +1307,31 @@ def define_sites(ligand, molecule, debug=1):
                             if com[toallocate] == 1:
                                 elemlist[jdx] = "H"
                                 addedlist[jdx] = 1
-                                added_atoms += addedlist[jdx] 
-                                newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, molecule.metalist, elemlist[jdx])
-                                if debug >= 1:  print(f"        DEFINE_SITES: added atom to index {jdx} with label {a.label}") 
+                                isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, molecule.metalist, elemlist[jdx])
+                                if isadded:
+                                    added_atoms += addedlist[jdx]
+                                    if debug >= 1: print(f"        DEFINE_SITES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
+                                else:
+                                    addedlist[idx] = 0 
+                                    block[idx] = 1  # No more elements will be added to those atoms
                         elif non_local_groups == 1:
                             if com == 1:
                                 elemlist[jdx] = "H"
                                 addedlist[jdx] = 1
-                                added_atoms += addedlist[jdx] 
-                                newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, molecule.metalist, elemlist[jdx])
-                                if debug >= 1:  print(f"        DEFINE_SITES: added atom to index {jdx} with label {a.label}") 
+                                isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, molecule.metalist, elemlist[jdx])
+                                if isadded:
+                                    added_atoms += addedlist[jdx]
+                                    if debug >= 1: print(f"        DEFINE_SITES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
+                                else:
+                                    addedlist[idx] = 0 
+                                    block[idx] = 1  # No more elements will be added to those atoms
                         #in any case, moves index
                         toallocate += 1
 
                 smi = " "
             
                 new_prot = protonation(newlab, newcoord, ligand.factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, os, typ="Non-local") 
-                if new_prot.status == 1:
+                if new_prot.status == 1 and new_prot.added_atoms == -os:
                     list_of_protonations.append(new_prot)
                     if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand")
                 else:
@@ -1316,20 +1340,20 @@ def define_sites(ligand, molecule, debug=1):
     return list_of_protonations 
 
 #######################################################
-def add_atom(labels, coords, site, ligand, metalist, element="H", debug=1):
+def add_atom(labels, coords, site, ligand, metalist, element="H", debug=0):
     # This function adds one atom of a given "element" to a given "site=atom index" of a "ligand".
     # It does so at the position of the closest "metal" atom to the "site"
     #:return newlab: labels of the original ligand, plus the label of the new element
     #:return newcoord: same as above but for coordinates
 
     # Original labels and coordinates are copied
+    isadded = False
     posadded = len(labels)
     newlab = labels.copy()
     newcoord = coords.copy()
     newlab.append(str(element))  # One H atom will be added
 
-    if debug >= 2:
-        print("        ADD_ATOM: Metalist length", len(metalist))
+    if debug >= 1: print("        ADD_ATOM: Metalist length", len(metalist))
     # It is adding the element (H, O, or whatever) at the vector formed by the closest TM atom and the "site"
     for idx, a in enumerate(ligand.atoms):
         if idx == site:
@@ -1338,22 +1362,21 @@ def add_atom(labels, coords, site, ligand, metalist, element="H", debug=1):
             addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
             newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])  # adds H at the position of the closest Metal Atom
 
-            #### MOVED TO SUBROUTINE verify_connectivity IN CELL_RECONSTRUCT 
-            ## Evaluates the new adjacency matrix.
-            #tmpradii = getradii(newlab)
-            #dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, newcoord, ligand.factor, tmpradii)
-            ## If no undesired adjacencies have been created, the coordinates are kept
-            #if tmpconnec[posadded] == 1:
-            #    isadded = True
-            #    if debug >= 1: print(f"        ADD_ATOM: Chosen {tgt} Metal atom. {element} is added at site {site}")
-            ## Otherwise, coordinates are reset
-            #else:
-            #    if debug >= 1: print(f"        ADD_ATOM: Chosen {tgt} Metal atom. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
-            #    isadded = False
-            #    newlab = labels.copy()
-            #    newcoord = coords.copy()
+            # Evaluates the new adjacency matrix.
+            tmpradii = getradii(newlab)
+            dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, newcoord, ligand.factor, tmpradii)
+            # If no undesired adjacencies have been created, the coordinates are kept
+            if tmpconnec[posadded] == 1:
+                isadded = True
+                if debug >= 1: print(f"        ADD_ATOM: Chosen {tgt} Metal atom. {element} is added at site {site}")
+            # Otherwise, coordinates are reset
+            else:
+                if debug >= 0: print(f"        ADD_ATOM: Chosen {tgt} Metal atom. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
+                isadded = False
+                newlab = labels.copy()
+                newcoord = coords.copy()
     
-    return newlab, newcoord
+    return isadded, newlab, newcoord
 
 
 #######################################################
@@ -1363,37 +1386,65 @@ def prepare_mols(moleclist, unique_indices, unique_species, selected_charge_stat
     Warning = False
     idxtoallocate = 0
 
+    #################
+    # SANITY CHECKS #
+    #################
+    print(selected_charge_states)
+    if debug >= 1: print(f"PREPARE: {len(moleclist)} molecules to prepare, of types")
+    if debug >= 1: print(f"PREPARE: {len(selected_charge_states)} selected_charge_states received")
+    for idx, sel in enumerate(selected_charge_states):
+        for jdx, opt in enumerate(sel):
+            chstate = opt[0]
+            prot = opt[1]
+            if debug >= 0: print(f"PREPARE: State {idx} and option {jdx}. Target state and protonation received with {chstate.corr_total_charge} and {prot.added_atoms}")
+        
+ 
     for idx, mol in enumerate(moleclist):
+        #while not Warning:
         if debug >= 1: print("")
         if debug >= 1: print(f"PREPARE: Molecule {idx} is a {mol.type} with labels {mol.labels}"),
-
+        #if debug >= 1: print(f"PREPARE: Molecule {idx} is a {mol.type} with labels {mol.labels}"),
+    
         if mol.type == "Other":
             specie = unique_indices[idxtoallocate]
             spec_object = unique_species[specie][1]
             if debug >= 1: print(f"PREPARE: Specie number={specie} with molecule poscharges: {spec_object.poscharge}")
             if debug >= 1: print(f"PREPARE: Doing molecule {idx} with idxtoallocate: {idxtoallocate}")
-
+    
             allocated = False
             for jdx, ch in enumerate(spec_object.poscharge):
                 if final_charge_distribution[idxtoallocate] == ch and not allocated:   # If the charge in poscharges coincides with the one for this entry in final_distribution
-
+    
+                    #try: 
                     tgt_charge_state = selected_charge_states[specie][jdx][0]
                     tgt_protonation = selected_charge_states[specie][jdx][1]
+                    if debug >= 0: print(f"PREPARE: target state and protonation loaded, with {tgt_charge_state.corr_total_charge} and {tgt_protonation.added_atoms}")
                     allocated = True
                     ch_state = getcharge(mol.labels, mol.coord, mol.conmat, ch, mol.factor)
                     ch_state.correction(tgt_protonation.addedlist, tgt_protonation.metal_electrons, tgt_protonation.elemlist)
-
+    
                     if ch_state.corr_total_charge == tgt_charge_state.corr_total_charge:
                         mol.charge(ch_state.corr_atom_charges, ch_state.corr_total_charge, ch_state.mol_object, ch_state.smiles)
+                        if debug >= 0: print(f"PREPARE: Success doing molecule {idx}. Created Charge State with total_charge={ch_state.corr_total_charge}") 
                     else:
                         if debug >= 0: print(f"PREPARE: Error doing molecule {idx}. Created Charge State is different than Target")
                         Warning = True
-            if allocated: idxtoallocate += 1
-
+                    #except Exception as exc:
+                    #    if debug >= 0: print(f"    PREPARE: EXCEPTION {exc} for molecule {idx}")
+                    #    Warning = True
+            if allocated: 
+                idxtoallocate += 1
+            else:
+                idxtoallocate += 1
+                if debug >= 0: print(f"PREPARE: Warning allocating molecule {idx} with {final_charge_distribution[idxtoallocate]} as target charge") 
+                Warning = True
+    
         elif mol.type == "Complex":
             if debug >= 1: print(f"PREPARE: Molecule {moleclist.index(mol)} has {len(mol.ligandlist)} ligands")
-
+    
             for kdx, lig in enumerate(mol.ligandlist):
+                #while not Warning:
+                #try:
                 allocated = False
                 specie = unique_indices[idxtoallocate]
                 spec_object = unique_species[specie][1]
@@ -1401,25 +1452,25 @@ def prepare_mols(moleclist, unique_indices, unique_species, selected_charge_stat
                 if debug >= 1: print(f"PREPARE: Ligand {kdx}, labels: {lig.labels} is specie {specie}")
                 if debug >= 1: print(f"PREPARE: Ligand poscharges: {spec_object.poscharge}")
                 if debug >= 1: print(f"PREPARE: Doing ligand {kdx} with idxtoallocate {idxtoallocate}")
-
+        
                 if lig.natoms == 2 and "N" in lig.labels and "O" in lig.labels:
                     isnitrosyl = True
                 else:
                     isnitrosyl = False
-
+        
                 for jdx, ch in enumerate(spec_object.poscharge):
                     if debug >= 1: print(f"PREPARE: Doing {ch} of options {spec_object.poscharge}. jdx={jdx}")
                     tgt_charge_state = selected_charge_states[specie][jdx][0]
                     tgt_protonation = selected_charge_states[specie][jdx][1]
                     if debug >= 1: print(f"PREPARE: Found Target Prot State with {tgt_protonation.added_atoms} added atoms and {tgt_protonation.os} OS") 
-
+        
                     if final_charge_distribution[idxtoallocate] == ch and not allocated:
                         allocated = True
-
+        
                         ############ RE-RUNS the Charge assignation for same-type molecules in the cell
                         #### Adds Hydrogens
                         #tmplab, tmpcoord, addedH, addedlist, metal_electrons = define_sites(lig, mol, debug)
-                        list_of_protonations = define_sites(lig, mol, debug=0)
+                        list_of_protonations = define_sites(lig, mol, debug=1)
                         found_prot = False
                         for p in list_of_protonations:
                             if p.os == tgt_protonation.os and p.added_atoms == tgt_protonation.added_atoms and not found_prot:
@@ -1430,17 +1481,17 @@ def prepare_mols(moleclist, unique_indices, unique_species, selected_charge_stat
                             print(f"PREPARE: WARNING, I Could not identify the protonation state")
                             for p in list_of_protonations:
                                 if debug >= 1: print(f"PREPARE: WARNING, I got prot with {p.added_atoms} added atoms and {p.os} OS") 
-
+        
                         #### Evaluates possible charges except if the ligand is a nitrosyl
                         if not Warning:
                             if isnitrosyl:
                                 NO_type = get_nitrosyl_geom(lig)
                                 if NO_type == "Linear": NOcharge = 1   #NOcharge is the charge with which I need to run getcharge to make it work
                                 if NO_type == "Bent": NOcharge = 0
-    
+        
                                 ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, NOcharge, prot.factor)
                                 ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
-    
+        
                                 if debug >= 1: print(f"PREPARE: Found Nitrosyl of type= {NO_type}")
                                 if debug >= 1: print(f"PREPARE: Wanted charge {ch}, obtained: {ch_state.corr_total_charge}")
                                 if debug >= 1: print(f"PREPARE: smiles: {ch_state.smiles}")
@@ -1448,33 +1499,41 @@ def prepare_mols(moleclist, unique_indices, unique_species, selected_charge_stat
                                 if debug >= 1: print(f"PREPARE: Sending getcharge with prot.added_atoms={prot.added_atoms} to obtain charge {ch}")
                                 ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ch+prot.added_atoms, prot.factor)
                                 ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
-    
+        
                                 if debug >= 1: print(f"PREPARE: Wanted charge {ch}, obtained: {ch_state.corr_total_charge}")
                                 if debug >= 1: print(f"PREPARE: smiles: {ch_state.smiles}")
-
+        
                             if ch_state.corr_total_charge != ch:
                                 print(f"PREPARE: WARNING: total charge obtained without correction {ch_state.corr_total_charge} while it should be {ch}")
                                 Warning = True
                             else:
                                 lig.charge(ch_state.corr_atom_charges, ch_state.corr_total_charge, ch_state.mol_object, ch_state.smiles)
+                                if debug >= 0: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={ch_state.corr_total_charge}") 
+                #except Exception as exc:
+                #   if debug >= 0: print(f"    PREPARE: EXCEPTION {exc} for ligand {kdx} of molecule {idx}")
+                #   Warning = True
+                if allocated: 
+                    idxtoallocate += 1
+                else:
+                    idxtoallocate += 1
+                    if debug >= 0: print(f"PREPARE: Warning allocating molecule {idx} with {final_charge_distribution[idxtoallocate]} as target charge") 
+                    Warning = True
+    
+            #if not Warning:
+            for kdx, met in enumerate(mol.metalist):
+                specie = unique_indices[idxtoallocate]
+                spec_object = unique_species[specie][1]
+                allocated = False
+                if debug >= 1: print("")
+                if debug >= 1: print(f"PREPARE: Metal {kdx}, label {met.label} is specie {specie}")
+                if debug >= 1: print(f"PREPARE: Metal poscharges: {spec_object.poscharge}")
+                for jdx, ch in enumerate(spec_object.poscharge):
+                    if final_charge_distribution[idxtoallocate] == ch and not allocated:
+                        allocated = True
+                        met.charge(ch)
                 if allocated:
                     idxtoallocate += 1
-
-            if not Warning:
-                for kdx, met in enumerate(mol.metalist):
-                    specie = unique_indices[idxtoallocate]
-                    spec_object = unique_species[specie][1]
-                    allocated = False
-                    if debug >= 1: print("")
-                    if debug >= 1: print(f"PREPARE: Metal {kdx}, label {met.label} is specie {specie}")
-                    if debug >= 1: print(f"PREPARE: Metal poscharges: {spec_object.poscharge}")
-                    for jdx, ch in enumerate(spec_object.poscharge):
-                        if final_charge_distribution[idxtoallocate] == ch and not allocated:
-                            allocated = True
-                            met.charge(ch)
-                    if allocated:
-                        idxtoallocate += 1
-
+    
             if not Warning:
                 ###################################################
                 # Now builds the Charge Data for the final molecule
@@ -1488,7 +1547,7 @@ def prepare_mols(moleclist, unique_indices, unique_species, selected_charge_stat
                         tmp_atcharge[a] = lig.atcharge[kdx]
                 for met in mol.metalist:
                     tmp_atcharge[met.atlist] = met.totcharge
-
+    
                 mol.charge(tmp_atcharge, int(sum(tmp_atcharge)), [], tmp_smiles)
 
     return moleclist, Warning
