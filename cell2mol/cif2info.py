@@ -55,8 +55,6 @@ from cell2mol.cif2cell_utils import (
 )
 from cell2mol.cif2cell_uctools import ReferenceData, CellData, SymmetryOperation
 
-from cell2mol.c2m_module import split_infofile
-
 # Turn off warnings about deprecated stuff
 warnings.simplefilter("ignore", DeprecationWarning)
 
@@ -142,7 +140,14 @@ def parsing_input():
     description = "A program for generating input lattice structures to various electronic structure programs from a CIF (Crystallographic Information Framework) file. This code was published in Comput. Phys. Commun. 182, 1183 (2011). Please cite generously."
     usage = "usage: %prog FILE [-p PROGRAM] [other options]"
     parser = OptionParser(usage=usage, description=description)
-
+    
+    parser.add_option(
+        "-i",
+        "--input",
+        dest="filename",
+        type=str,
+        help="Filename of Input (.info or .cif file)",   
+    )
     parser.add_option(
         "-s",
         "--step",
@@ -171,8 +176,8 @@ def parsing_input():
     # GENERAL OPTIONS
     generalopts = OptionGroup(parser, "General options")
     generalopts.add_option(
-        "-i",
-        "--input",
+        "-f",
+        "--file",
         dest="file",
         help="Input CIF file, unless given as first argument to the program.",
         metavar="FILE",
@@ -668,7 +673,7 @@ def parsing_input():
     return (options, args)
 
 
-def cif_2_info(angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogpercm):
+def cif_2_info(infopath, refcode, angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogpercm):
 
     angtobohr = angtobohr
     codename = codename
@@ -680,16 +685,20 @@ def cif_2_info(angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogp
 
     (options, args) = parsing_input()
 
-    # python cif2info.py cif_file --cartesian --force
+    # python cif2info.py infopath --cartesian --force
+    options.file = infopath
     options.cartesian = True
     options.force = True
+    
+    pwd = os.getcwd()
+
+    errorpath = os.path.join(pwd, "error_cif2cell.txt")
+    sys.stderr = open(errorpath, "w")
 
     # Print version number and exit
     if options.version:
         sys.stdout.write(programname + " version " + version + "\n")
 
-    pwd = os.getcwd()
-    sys.stderr = open(pwd + "/error_cif2cell.txt", "w")
     #############################################################
     # Check that options given are possible
     if options.append and not options.outputfile:
@@ -850,7 +859,6 @@ def cif_2_info(angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogp
     if options.file:
         # input CIF file as option (overrides argument)
         cif_file = options.file
-    print(cif_file)
     if cif_file:
         if not os.path.exists(cif_file):
             sys.stderr.write(
@@ -858,7 +866,6 @@ def cif_2_info(angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogp
             )
             sys.exit(2)
         cif_file_name = cif_file.split("/")[-1]
-        # print(cif_file_name)
         # Set CIF grammar
         if options.grammar:
             cif_grammar = options.grammar
@@ -1672,7 +1679,9 @@ def cif_2_info(angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogp
             sys.stderr.write(
                 "Warning: You are setting up a VCA calculation but not all alloy sites are occupied by species\n         from neighbouring groups in the periodic table. Make sure that you know what you are doing!\n"
             )
+    sys.stdout.close()
     sys.stderr.close()
+
 
     # Function for printing a standard docstring
     def StandardDocstring():
@@ -2575,3 +2584,5 @@ def cif_2_info(angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogp
         f = open(outputfile, outmode)
         f.write(str(sysfile))
         f.close()
+    
+    return
