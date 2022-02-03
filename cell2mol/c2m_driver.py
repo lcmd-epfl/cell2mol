@@ -15,7 +15,6 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     pwd = os.getcwd()
 
     input, step = parsing_arguments()
-    print(input, step)
     input_path = os.path.normpath(input)
     dir, file = os.path.split(input_path)
     root, extension = os.path.splitext(file)
@@ -31,7 +30,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
         pass
     else:
         sys.exit(1)
-    print(input, step)
+
     if step == 2:
         infopath = None
 
