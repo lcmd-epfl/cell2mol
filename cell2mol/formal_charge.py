@@ -584,7 +584,6 @@ def get_poscharges(spec, debug=1):
                 # Selected_charge_states is a tuple with the actual charge state, and the protonation it belongs to
                 #tmplist.append([c,p])
                 selected_charge_states.append([c,p])
-                print("tmplist", tmplist)
                 if debug >= 0: print(f"    POSCHARGE. poscharge added with corrected charge: {c.corr_total_charge} and uncorrected: {c.uncorr_total_charge}")
                 if debug >= 0: print(f"    POSCHARGE. poscharge added with smiles: {c.smiles}") 
 
