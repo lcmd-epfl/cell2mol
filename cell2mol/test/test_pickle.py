@@ -21,7 +21,7 @@ def run_cell2mol(infofile):
 
 
 @pytest.mark.parametrize(
-    "refcode", ["DAPGAF", "EGITOF", "HACXOY", "ISIPIJ", "YOXKUS", "ROKQAM", "LOKXUG"]
+    "refcode", ["DAPGAF", "EGITOF", "HACXOY", "ISIPIJ", "KANYUT", "YOXKUS", "ROKQAM", "LOKXUG"]
 )
 def test_check_info_vs_pickle(refcode):
     infofile = refcode + ".info"

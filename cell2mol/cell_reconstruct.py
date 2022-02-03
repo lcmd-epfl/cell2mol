@@ -149,7 +149,7 @@ def get_reference_molecules(labels, pos, debug=0):
                 for lig in ref.ligandlist:
                     verify_connectivity(lig, ref)
                     print(f"Verifying Connectivity for Lig in Ref molec {lig.natoms}, {lig.labels}, {lig.totmconnec}")  # , len(lig.metalatoms))
-                    print(f"Metalatoms for this ligand: {len(lig.metalatoms)}")  # , len(lig.metalatoms))
+                    #print(f"Metalatoms for this ligand: {len(lig.metalatoms)}")  # , len(lig.metalatoms))
 
                 # Checks Shared Ligands in Polymetallic complexes
                 if any(len(lig.metalatoms) >= 2 for lig in ref.ligandlist):

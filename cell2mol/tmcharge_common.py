@@ -701,7 +701,7 @@ class Cell(object):
             "Warning 6! Empty list of possible charges received for molecule or ligand",
             "Warning 7! More than one valid possible charge distribution found",
             "Warning 8! No valid possible charge distribution found",
-            "Warning 9! Total net charge does not exist among possible charges",
+            "Warning 9! Error while preparing molecules.",
         ]
 
         # printing original list
