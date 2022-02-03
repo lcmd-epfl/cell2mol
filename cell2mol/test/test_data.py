@@ -4,17 +4,20 @@ from array import array
 import os
 import numpy as np
 
-from cell2mol.module1 import addone, subtwo
-from cell2mol.c2m_module import cell2mol, split_infofile
+from cell2mol.c2m_module import cell2mol
 
 
 def test_cell2mol():
     dir_path = os.path.dirname(os.path.realpath(__file__))
     infofile = "YOXKUS.info"
     outfile = "YOXKUS.out"
-    infopath = dir_path + "/infodata/" + infofile
-    outpath = dir_path + "/infodata/" + outfile
-    refcode = split_infofile(infofile)
+
+    root = infofile.split(".")
+    refcode = root[0]
+
+    infopath = os.path.join(dir_path, "infodata", infofile)
+    outpath = os.path.join(dir_path, "infodata", outfile)
+
     cell = cell2mol(infopath, refcode, outpath)
     return cell
 

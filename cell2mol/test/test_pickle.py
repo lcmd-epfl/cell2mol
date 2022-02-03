@@ -7,28 +7,35 @@ import numpy as np
 import pickle
 
 from cell2mol.tmcharge_common import Cell
-from cell2mol.c2m_module import cell2mol, split_infofile
+from cell2mol.c2m_module import cell2mol
 
 
 def run_cell2mol(infofile):
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    infopath = dir_path + "/infodata/" + infofile
-    refcode = split_infofile(infofile)
+
+    root = infofile.split(".")
+    refcode = root[0]
     outfile = f"Cell_{refcode}.gmol"
-    outpath = dir_path + "/infodata/" + outfile
+
+    infopath = os.path.join(dir_path, "infodata", infofile)
+    outpath = os.path.join(dir_path, "infodata", outfile)
+
     cell = cell2mol(infopath, refcode, outpath)
+
     return cell
 
 
 @pytest.mark.parametrize(
-    "refcode", ["DAPGAF", "EGITOF", "HACXOY", "ISIPIJ", "KANYUT", "YOXKUS", "ROKQAM", "LOKXUG"]
+    "refcode",
+    ["DAPGAF", "EGITOF", "HACXOY", "ISIPIJ", "KANYUT", "YOXKUS", "ROKQAM", "LOKXUG"],
 )
 def test_check_info_vs_pickle(refcode):
-    infofile = refcode + ".info"
+    infofile = f"{refcode}.info"
     cell = run_cell2mol(infofile)
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    cellpath = dir_path + "/infodata/"
-    file = open(f"{cellpath}Cell_{cell.refcode}.gmol", "rb")
+    cellpath = os.path.join(dir_path, "infodata", f"Cell_{refcode}.gmol")
+
+    file = open(cellpath, "rb")
     result = pickle.load(file)
     print("=======Result======")
     print(result.refcode)
