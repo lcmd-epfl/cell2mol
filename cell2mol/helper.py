@@ -22,7 +22,6 @@ def parsing_arguments():
         "--step",
         dest="step",
         type=int,
-        required=True,
         help="Generate cell by the step of cell reconstruction (1), only charge assignment (2), or cell reconstruction and charge assignment (3)",
     )
 
