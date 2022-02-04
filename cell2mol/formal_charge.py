@@ -623,7 +623,7 @@ def get_poscharges(spec, debug=1):
         if len(list_of_charge_states) > 0:
             best_charge_distr_idx = select_charge_distr(list_of_charge_states)
         else:
-            if debug >= 1: print(f"    POSCHARGE. EMPTY prot_gooddistr for PROTONATION with added atoms: {prot.added_atoms}")
+            if debug >= 1: print(f"    POSCHARGE. found EMPTY best_charge_distr_idx for PROTONATION state")
             best_charge_distr_idx = []
 
         #############################
