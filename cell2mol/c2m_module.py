@@ -21,10 +21,10 @@ from cell2mol.formal_charge import (
     prepare_mols,
 )
 from cell2mol.missingH import check_missingH
-from cell2mol.tmcharge_common import Cell, getcentroid
-from cell2mol.cellconversions import cart2frac, frac2cart_fromparam
-from cell2mol.readwrite import readinfo, print_unit_cell
-from cell2mol.BVS import bond_valence_sum, choose_final_dist_using_BVS
+from cell2mol.tmcharge_common import Cell
+from cell2mol.cellconversions import frac2cart_fromparam
+from cell2mol.readwrite import readinfo
+
 
 
 def get_refmoleclist_and_check_missingH(cell, reflabels, fracs):
@@ -168,27 +168,15 @@ def determine_charge(cell):
 
 def save_cell(cell, ext, output_dir):
     print("\n[Output files]")
-    # print_unit_cell (cell, output_dir)
 
-    filename = str(output_dir) + "/" + "Cell_" + str(cell.refcode) + "." + str(ext)
-    with open(filename, "wb") as fil:
+    cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(cell.refcode))
+    with open(cellpath, "wb") as fil:
         if ext == "gmol":
-            print("Output file path", filename)
+            print("Output file path", cellpath)
             pickle.dump(cell, fil)
         else:
             print(ext, "not found as a valid print extension in print_molecule")
 
-
-def split_infofile(infofile):
-
-    splitname = infofile.split(".")
-    if len(splitname) == 2:
-        return splitname[0]
-    elif len(splitname) == 3:
-        return splitname[0]
-    else:
-        print("can't understand the filename you gave me")
-        exit()
 
 
 def cell2mol(infopath, refcode, output_dir, step=3):
