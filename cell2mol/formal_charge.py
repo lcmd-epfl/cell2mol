@@ -456,7 +456,7 @@ def drive_get_poscharges(unique_species):
             mol = spec[2]
             met.poscharge = get_metal_poscharge(met, mol)
             print("Possible charges received for metal:", met.poscharge)
-            #selected_charge_states.append([])
+            selected_charge_states.append([])
 
     return selected_charge_states, Warning
 
