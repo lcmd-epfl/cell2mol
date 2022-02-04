@@ -416,6 +416,13 @@ def drive_get_poscharges(unique_species):
     # For each specie, a plausible_charge_state is generated. These include the actual charge state, and the protonation it belongs to
     selected_charge_states = []
     for idx, spec in enumerate(unique_species):
+
+        spec[1].poscharge = []
+        spec[1].posatcharge = []
+        spec[1].posobjlist = []
+        spec[1].posspin = []
+        spec[1].possmiles = []
+
         # Obtains charge for Organic Molecules
         print("")
         if spec[0] == "Other":
@@ -482,10 +489,10 @@ def get_list_of_charges_to_try(spec, prot, debug=0):
         else:
             if maxcharge > spec[1].natoms:
                 maxcharge = spec[1].natoms
-        if maxcharge > 3:
-            maxcharge = 3
-        if maxcharge < 1:
-            maxcharge = 1
+        if maxcharge > 4:
+            maxcharge = 4
+        if maxcharge < 2:
+            maxcharge = 2
     
     # Defines list of charges that will try
     for magn in range(0, int(maxcharge + 1)):
@@ -584,7 +591,6 @@ def get_poscharges(spec, debug=1):
                 # Selected_charge_states is a tuple with the actual charge state, and the protonation it belongs to
                 #tmplist.append([c,p])
                 selected_charge_states.append([c,p])
-                print("tmplist", tmplist)
                 if debug >= 0: print(f"    POSCHARGE. poscharge added with corrected charge: {c.corr_total_charge} and uncorrected: {c.uncorr_total_charge}")
                 if debug >= 0: print(f"    POSCHARGE. poscharge added with smiles: {c.smiles}") 
 
