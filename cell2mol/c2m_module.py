@@ -4,7 +4,7 @@ import pickle
 import time
 import sys
 import os
-
+import copy
 # Import modules
 from cell2mol.cell_reconstruct import (
     getmolecs,
@@ -106,7 +106,9 @@ def reconstruct(cell, reflabels, fracs):
                 f"Final and initial atoms coincide. Final/Initial {final_natoms}/ {init_natoms}\n"
             )
         cell.warning_list.append(any([Warning, warning_num]))
-
+    
+    cell.warning_after_reconstruction = copy.deepcopy(cell.warning_list)
+    
     # Split Complexes and Reassign Type
     if not any(cell.warning_list):
         cell = split_complexes_reassign_type(cell, moleclist)
@@ -178,6 +180,49 @@ def save_cell(cell, ext, output_dir):
             print(ext, "not found as a valid print extension in print_molecule")
 
 
+def load_cell_reset_charges (cellpath):
+    
+    file = open(cellpath, "rb")
+    cell = pickle.load(file)
+    print("[Refcode]", cell.refcode, cell)
+    # print(f"{cell.moleclist=}")  
+    print(f"{cell.warning_list=}")
+    cell.warning_list = copy.deepcopy(cell.warning_after_reconstruction)
+    print(f"{cell.warning_after_reconstruction=}")
+
+    for mol in cell.moleclist:
+        mol.poscharge = []
+        mol.posatcharge = []
+        mol.posobjlist = []
+        mol.posspin = []
+        mol.possmiles = []            
+        mol.atcharge = None
+        mol.totcharge = None
+        mol.smiles = None
+        mol.object = None
+        for atom in mol.atoms:
+            atom.atom_charge(None)
+
+        if mol.type == "Complex":
+            for lig in mol.ligandlist:
+                lig.poscharge = []
+                lig.posatcharge = []
+                lig.posobjlist = []
+                lig.posspin = []
+                lig.possmiles = []
+                lig.atcharge = None
+                lig.totcharge = None
+                lig.smiles = None
+                lig.object = None
+                for atom in lig.atoms:
+                    atom.atom_charge(None)
+
+            for met in mol.metalist :
+                met.poscharge = []
+                met.totcharge = None
+
+    return cell
+
 
 def cell2mol(infopath, refcode, output_dir, step=3):
 
@@ -206,28 +251,13 @@ def cell2mol(infopath, refcode, output_dir, step=3):
     elif step == 2:
         print("\n***Imprementing only Charge Assignment***")
         print("\nCell object loading by pickle")
-
-        cellpath = output_dir + "/Cell_{}.gmol".format(refcode)
-
-        filename = str(output_dir) + "/" + "Cell_" + str(refcode) + ".gmol"
-
-        if os.path.exists(cellpath):
-            file = open(filename, "rb")
-            cell = pickle.load(file)
-            print("[Refcode]", cell.refcode, cell)
-
-            cell.warning_list = cell.warning_list[
-                :5
-            ]  # Warnings before charge assignment
-            print("Warnings before charge assignment", cell.warning_list)
-        else:
-            print("No such file exists {}".format(filename))
-            sys.exit(1)
+        cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(refcode))
+        cell = load_cell_reset_charges (cellpath)
     else:
         print("Inproper step number")
         sys.exit(1)
 
-    if not any(cell.warning_list):
+    if not any(cell.warning_after_reconstruction):
         if step == 1 or step == 3:
             print("Cell reconstruction successfully finished.\n")
         elif step == 2:
@@ -249,17 +279,17 @@ def cell2mol(infopath, refcode, output_dir, step=3):
 
             if not any(cell.warning_list):
                 print("Charge Assignment successfully finished.\n")
-                print(cell.print_charge_assignment())
-                print(cell.print_Warning())
+                cell.print_charge_assignment()
+                cell.print_Warning()
             else:
                 print("Charge Assignment failed.\n")
-                print(cell.print_Warning())
+                cell.print_Warning()
     else:
         if step == 1 or step == 3:
             print("Cell reconstruction failed.\n")
         elif step == 2:
             print("Warnings in loaded Cell object\n")
-        print(cell.print_Warning())
+        cell.print_Warning()
         print("Cannot proceed step 2 Charge Assignment")
 
     return cell

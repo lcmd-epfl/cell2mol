@@ -2,8 +2,6 @@
 
 import sys
 import os
-import pickle
-import time
 
 # Import modules
 from cell2mol.helper import parsing_arguments
@@ -52,15 +50,16 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
                 # print("Wrong Input File Format")
                 sys.exit(1)
         else:
-            # print(f"Error: The file {file} could not be found.\n")
+            # print(f"Error: The file {input_path} could not be found.\n")
             sys.exit(1)
 
-    output_dir = pwd
+    # output_dir = pwd
 
-    # output_dir = os.path.join(output_dir, refcode)
-    # if not os.path.exists(output_dir):
-    #     os.makedirs(output_dir)
-    # print(f"{output_dir=}")
+    output_dir = os.path.join(pwd, refcode)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    print(f"{output_dir=}")
 
     if step == 2:
         cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(refcode))
@@ -95,7 +94,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     error_fname = os.path.join(output_dir, f"error_{error_code}.out")
     error = open(error_fname, "w")
     sys.stdout = error
-    print(cell.print_Warning())
+    cell.print_Warning()
     error.close()
 
     sys.stdout = stdout
