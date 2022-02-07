@@ -414,7 +414,7 @@ class atom(object):
         self.nbonds = len(self.bond)
         self.totbondorder = np.sum(self.bond_order)
 
-    def charge(self, charge):
+    def atom_charge(self, charge):
         self.charge = charge
 
 
@@ -484,7 +484,7 @@ class molecule(object):
 
         if self.type != "Complex":
             for idx, a in enumerate(self.atoms):
-                a.charge(self.atcharge[idx])
+                a.atom_charge(self.atcharge[idx])
 
     # Spin State Variables
     def magnetism(self, spin):
@@ -577,7 +577,7 @@ class ligand(object):
         self.object = object
 
         for idx, a in enumerate(self.atoms):
-            a.charge(self.atcharge[idx])
+            a.atom_charge(self.atcharge[idx])
 
     # Spin State Variables
     def magnetism(self, spin):
@@ -631,8 +631,8 @@ class metal(object):
         self.factor = factor
         self.metal_factor = metal_factor
 
-    def charge(self, charge):
-        self.totcharge = charge
+    def charge(self, metal_charge):
+        self.totcharge = metal_charge
 
     def magnetism(self, spin):
         self.spin = spin
@@ -662,17 +662,17 @@ class Cell(object):
         self.refmoleclist = []
         self.moleclist = []
         self.warning_list = warning_list
-  
+
         self.charge_distribution_list = []
 
-    def bvs(self, warning_BVS):
-        self.warning_BVS = warning_BVS
+        # After cell reconstruction
+        self.warning_after_reconstruction = []
 
     def print_charge_assignment(self):
         print(
             "=====================================Charges for all species in the unit cell====================================="
         )
-        print("[Ref.code] : {}\n".format(self.refcode))
+        print("[Ref.code] : {}".format(self.refcode))
         for unit in self.moleclist:
             if unit.type == "Complex":
                 print("\n{}, totcharge {}".format(unit.type, unit.totcharge))
@@ -687,9 +687,11 @@ class Cell(object):
 
             elif unit.type == "Other":
                 print(
-                    "{} totcharge {}, {}".format(unit.type, unit.totcharge, unit.smiles)
+                    "\n{} totcharge {}, {}".format(unit.type, unit.totcharge, unit.smiles)
                 )
+        print("\n")
 
+        
     def print_Warning(self):
 
         reason_of_Warning = [
