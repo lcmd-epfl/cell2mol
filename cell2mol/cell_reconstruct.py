@@ -4,9 +4,10 @@ import itertools
 from scipy import sparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
+from typing import Tuple
+from collections import defaultdict
 
 from cell2mol.cellconversions import frac2cart_fromparam, cart2frac, translate
-
 from cell2mol.tmcharge_common import (
     getelementcount,
     getradii,
@@ -22,13 +23,12 @@ from cell2mol.tmcharge_common import (
 
 # Imports Classes
 from cell2mol.tmcharge_common import atom, molecule, ligand, metal, group
-
 from cell2mol.elementdata import ElementData
 
 elemdatabase = ElementData()
 
 #######################################################
-def verify_connectivity(ligand, molecule, debug=0):
+def verify_connectivity(ligand: object, molecule: object, debug: int=0):
 
     metalist = molecule.metalist.copy()
     # Original labels and coordinates are copied
@@ -64,7 +64,7 @@ def verify_connectivity(ligand, molecule, debug=0):
                        # Now it should correct data of metal, ligand and molecule objects. Not yet implemented
 
 #######################################################
-def get_reference_molecules(labels, pos, debug=0):
+def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list, float, float, bool]:
     ## Retrieves the reference molecules from the information in the .cif file
     # Molecules are extracted from the adjacency matrix, and the results are evaluated. How? Well, the adjacency matrix is constructed using a covalent factor.
     # This factor is taken as 1.3, but it can occasionally be too small or too large. If it is too small, it results on some atoms being detached from their molecule.
@@ -216,12 +216,10 @@ def get_reference_molecules(labels, pos, debug=0):
 
 
 #######################################################
-def metalcoordcheck(label, coordination, debug=0):
+def metalcoordcheck(label: str, coordination: int, debug: int=0) -> Tuple[bool, bool, bool]:
     ## Function that receives the label of a metal atom, and a proposed coordination number, and tells whether this coordination is too high, low, or correct.
     # It uses a database of common coordination numbers from paper below
     #:return good, increase, decrease: booleans for what to do with this metal
-
-    from collections import defaultdict
 
     # Data Obtained from:
     # Venkataraman, D.; Du, Y.; Wilson, S. R.; Hirsch, K. A.; Zhang, P.; Moore, J. S. A
@@ -242,12 +240,7 @@ def metalcoordcheck(label, coordination, debug=0):
     coordnum[22] = [3, 4, 6]  # Ti
     coordnum[23] = [3, 4, 5, 6]  # V
     coordnum[24] = [4, 5, 6]  # Cr
-    coordnum[25] = [
-        3,
-        4,
-        5,
-        6,
-    ]  # Mn #some strange cases of heptacoordination in Mn exist. Not sure is a good idea to have it
+    coordnum[25] = [3, 4, 5, 6]  # Mn #some strange cases of heptacoordination in Mn exist. Not sure is a good idea to have it
     coordnum[26] = [3, 4, 5, 6]  # Fe
     coordnum[27] = [3, 4, 6]  # Co
     coordnum[28] = [3, 4, 5, 6]  # Ni
@@ -316,7 +309,7 @@ def metalcoordcheck(label, coordination, debug=0):
 
 
 #######################################################
-def getmolecs(labels, pos, factor=1.3, metal_factor=1.0, debug=0):
+def getmolecs(labels: list, pos: list, factor: float=1.3, metal_factor: float=1.0, debug: int=0) -> Tuple[bool, list]:
     ##Simplified Version of the getmolecs
     ## Function that identifies connected groups of atoms from their positions and labels.
     #:return mlist. List of molecules saved as objects
@@ -427,7 +420,7 @@ def getmolecs(labels, pos, factor=1.3, metal_factor=1.0, debug=0):
 
 
 #######################################################
-def splitcomplex(molecule, factor=1.3, metal_factor=1.0):
+def splitcomplex(molecule: object, factor: float=1.3, metal_factor: float=1.0) -> Tuple[list, list]:
     ## Similar function to getmolecs, but with a prelude in which the molecule (it must be a molecule of type "Complex"), is split into ligands and metals.
     #:return ligandlist, metalist. List of ligands and metals, respectively, saved as objects
 
@@ -694,8 +687,8 @@ def tmatgenerator(centroid, thres=0.40, full=False):
 
 #######################################################
 def sequential(
-    fragmentlist, refmoleclist, cellvec, debug, factor, metal_factor, typ="All"
-):
+    fragmentlist: list, refmoleclist: list, cellvec: list, debug: int, factor: float, metal_factor: float, typ: str="All"
+) -> Tuple[list, list]:
     # Crappy function that controls the reconstruction process. It is called sequential because pairs of fragments are sent one by one. Ideally, a parallel version would be desirable.
     # Given a list of fragments(fragmentlist), a list of reference molecules(refmoleclist), and some other minor parameters, the function sends pairs of fragments and evaluates if they...
     # ...form a bigger fragment. If so, the bigger fragment is evaluated. If it coincides with one of the molecules in refmoleclist, than it means that it is a full molecule that requires no further work.
@@ -1012,8 +1005,8 @@ def sequential(
 
 #######################################################
 def combine(
-    tobeallocated, references, cellvec, threshold_tmat, factor, metal_factor, debug=0
-):
+    tobeallocated: list, references: list, cellvec: list, threshold_tmat: float, factor: float, metal_factor: float, debug: int=0
+) -> Tuple[list, list, list]:
 
     goodlist = []
     avglist = []
@@ -1104,7 +1097,7 @@ def combine(
 
 
 #######################################################
-def merge_fragments(fraglist, listofids, reflist, cellvec, factor, metal_factor):
+def merge_fragments(fraglist: list, listofids: list, reflist: list, cellvec: list, factor: float, metal_factor: float) -> Tuple[int, list]:
     # function also used fraglist
 
     tmatlist = []
@@ -1159,7 +1152,7 @@ def merge_fragments(fraglist, listofids, reflist, cellvec, factor, metal_factor)
 
 
 #######################################################
-def identify_frag_molec_H(blocklist, moleclist, refmoleclist, cellvec):
+def identify_frag_molec_H(blocklist: list, moleclist: list, refmoleclist: list, cellvec: list) -> Tuple[list, list, list, int]:
 
     init_natoms = 0
 
@@ -1201,8 +1194,8 @@ def identify_frag_molec_H(blocklist, moleclist, refmoleclist, cellvec):
 
 #######################################################
 def fragments_reconstruct(
-    moleclist, fraglist, Hlist, refmoleclist, cellvec, debug, factor, metal_factor
-):
+    moleclist: list, fraglist: list, Hlist: list, refmoleclist: list, cellvec: list, debug: int, factor: float, metal_factor: float
+) -> Tuple[list, list, bool]:
 
     Warning = False
 
@@ -1272,7 +1265,7 @@ def fragments_reconstruct(
 
 
 #######################################################
-def assigntype(molecule, references):
+def assigntype(molecule: object, references: list) -> str:
     Found = False
     for ref in references:
         if (
@@ -1291,7 +1284,7 @@ def assigntype(molecule, references):
 
 
 #######################################################
-def split_complexes_reassign_type(cell, moleclist):
+def split_complexes_reassign_type(cell: object, moleclist: list) -> object:
 
     if not all(cell.warning_list):
         # Split Complexes
@@ -1343,7 +1336,7 @@ def split_complexes_reassign_type(cell, moleclist):
 
 
 #######################################################
-def get_hapticity(molecule, debug=0):
+def get_hapticity(molecule: object, debug: int=0) -> bool:
     # This function evaluates whether a molecule has any ligand with hapticity and, if so, detects which type of hapticity
     # The information is stored in both the molecule and ligand objects.
     # This function also defines the number of groups in a ligand. A "group" is a group of adjacent atoms that is connected to the metal atom.
