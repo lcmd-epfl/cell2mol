@@ -5,6 +5,7 @@ import time
 import sys
 import os
 import copy
+from typing import Tuple
 # Import modules
 from cell2mol.cell_reconstruct import (
     getmolecs,
@@ -24,10 +25,10 @@ from cell2mol.missingH import check_missingH
 from cell2mol.tmcharge_common import Cell
 from cell2mol.cellconversions import frac2cart_fromparam
 from cell2mol.readwrite import readinfo
+from typing import Tuple
 
 
-
-def get_refmoleclist_and_check_missingH(cell, reflabels, fracs):
+def get_refmoleclist_and_check_missingH(cell: object, reflabels: list, fracs: list) -> Tuple[object, float, float]:
 
     refpos = frac2cart_fromparam(fracs, cell.cellparam)
 
@@ -55,7 +56,7 @@ def get_refmoleclist_and_check_missingH(cell, reflabels, fracs):
     return cell, covalent_factor, metal_factor
 
 
-def reconstruct(cell, reflabels, fracs):
+def reconstruct(cell: object, reflabels: list, fracs: list) -> object:
 
     debug = 0
     moleclist = []
@@ -116,7 +117,7 @@ def reconstruct(cell, reflabels, fracs):
     return cell
 
 
-def determine_charge(cell):
+def determine_charge(cell: object) -> object:
 
     # Indentify unique chemical species
     molec_indices, ligand_indices, unique_indices, unique_species = classify_mols(cell.moleclist)
@@ -168,7 +169,7 @@ def determine_charge(cell):
     return cell
 
 
-def save_cell(cell, ext, output_dir):
+def save_cell(cell: object, ext: str, output_dir: str):
     print("\n[Output files]")
 
     cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(cell.refcode))
@@ -180,7 +181,7 @@ def save_cell(cell, ext, output_dir):
             print(ext, "not found as a valid print extension in print_molecule")
 
 
-def load_cell_reset_charges (cellpath):
+def load_cell_reset_charges (cellpath: str) -> object:
     
     file = open(cellpath, "rb")
     cell = pickle.load(file)
@@ -224,7 +225,7 @@ def load_cell_reset_charges (cellpath):
     return cell
 
 
-def cell2mol(infopath, refcode, output_dir, step=3):
+def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3) -> object:
 
     if step == 1 or step == 3:
 
