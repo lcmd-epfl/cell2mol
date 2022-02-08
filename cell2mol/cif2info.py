@@ -673,7 +673,7 @@ def parsing_input():
     return (options, args)
 
 
-def cif_2_info(infopath, refcode, angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogpercm):
+def cif_2_info(infopath, angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogpercm):
 
     angtobohr = angtobohr
     codename = codename
