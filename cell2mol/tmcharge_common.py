@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 
 import warnings
-import sys
 import numpy as np
 from scipy import sparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
 from cell2mol.elementdata import ElementData
+from typing import Tuple
 
 elemdatabase = ElementData()
 
 ################################
-def getelementcount(labels):
+def getelementcount(labels: list) -> np.ndarray:
     elems = elemdatabase.elementnr.keys()
     times = np.zeros((len(elems)))
     for l in labels:
@@ -22,7 +22,7 @@ def getelementcount(labels):
 
 
 ################################
-def getHvcount(labels):
+def getHvcount(labels: list) -> np.ndarray:
     elems = elemdatabase.elementnr.keys()
     times = np.zeros((len(elems)))
     for l in labels:
@@ -34,7 +34,7 @@ def getHvcount(labels):
 
 
 ################################
-def get_adjacency_types(label, conmat):
+def get_adjacency_types(label: list, conmat: np.ndarray) -> np.ndarray:
     elems = elemdatabase.elementnr.keys()
     bondtypes = np.zeros((len(elems), len(elems))).astype(int)
     natoms = len(label)
@@ -59,7 +59,7 @@ def get_adjacency_types(label, conmat):
 
 
 ################################
-def checkchemistry(molecule, references, typ="Max"):
+def checkchemistry(molecule: object, references: list, typ: str="Max") -> int:
 
     elems = elemdatabase.elementnr.keys()
     maxval = np.zeros((len(references[0].adjtypes), len(references[0].adjtypes)))
@@ -84,7 +84,7 @@ def checkchemistry(molecule, references, typ="Max"):
 
 
 ################################
-def getradii(labels):
+def getradii(labels: list) -> np.ndarray:
     radii = []
     for l in labels:
         radii.append(elemdatabase.CovalentRadius2[l])
@@ -92,7 +92,7 @@ def getradii(labels):
 
 
 ################################
-def getcentroid(frac):
+def getcentroid(frac: list) -> list:
     natoms = len(frac)
     x = 0
     y = 0
@@ -106,7 +106,7 @@ def getcentroid(frac):
 
 
 ################################
-def extract_from_matrix(entrylist, old_array, dimension=2):
+def extract_from_matrix(entrylist: list, old_array: np.ndarray, dimension: int=2) -> np.ndarray:
 
     length = len(entrylist)
 
@@ -125,7 +125,7 @@ def extract_from_matrix(entrylist, old_array, dimension=2):
 
 
 ####################################
-def getconec(labels, pos, factor, radii="default"):
+def getconec(labels: list, pos: list, factor: float, radii: str="default") -> Tuple[int, list, list, list, list]:
     status = 1  # good molecule, no clashes yet
     clash = 0.3
     natoms = len(labels)
@@ -174,61 +174,14 @@ def getconec(labels, pos, factor, radii="default"):
     return status, conmat, connec, mconmat, mconnec
 
 
-def inv(perm):
+def inv(perm: list) -> list:
     inverse = [0] * len(perm)
     for i, p in enumerate(perm):
         inverse[p] = i
     return inverse
 
 
-#######################################################
-def get_blocks_V2(matrix):
-    # retrieves the blocks from a diagonal block matrix
-    startlist = []
-    endlist = []
-
-    row = 0
-    rowold = 0
-    maxcol = 0
-    blockcount = 0
-    col = 1
-    while col < len(matrix):  # moving within a row
-        # print("Evaluating", row, col, maxcol)
-        if matrix[row, col] != 0:
-            # print("Searching maxcol between", row, col+1, "and", row, len(matrix)-1)
-            for idx in range(col + 1, len(matrix)):
-                if matrix[row, idx] == 1:
-                    if idx > maxcol:
-                        maxcol = idx
-                    # print("maxcol found at", maxcol)
-            row = row + 1
-            if col > maxcol:
-                maxcol = col
-                # print("maxcol updated at", maxcol)
-        if col == len(matrix) - 1:  # and (row >= maxcol):
-            blockcount = blockcount + 1
-            startlist.append(rowold)
-            endlist.append(np.max([row - 1, maxcol]))
-            # print("adds block with", startlist, endlist, maxcol)
-            rowold = row
-            row = np.max([row - 1, maxcol]) + 1
-            col = np.max([row - 1, maxcol]) + 1
-            # print("restarting at", row, col)
-            continue
-        #         elif (col == len(matrix)-1) and (row < maxcol):
-        #             row += 1
-        col += 1
-
-    if (blockcount == 0) and (
-        len(matrix) == 1
-    ):  # if a 1x1 matrix is provided, it then finds 1 block
-        startlist.append(0)
-        endlist.append(0)
-
-    return startlist, endlist
-
-
-def getblocks(matrix):
+def getblocks(matrix: np.ndarray) -> Tuple[list, list]:
     # retrieves the blocks from a diagonal block matrix
     startlist = []
     endlist = []
@@ -260,7 +213,7 @@ def getblocks(matrix):
     return startlist, endlist
 
 
-def find_groups_within_ligand(ligand):
+def find_groups_within_ligand(ligand: object) -> list:
 
     debug = 0
     if debug >= 1:
@@ -338,7 +291,7 @@ def find_groups_within_ligand(ligand):
     return groups
 
 #######################################################
-def find_closest_metal(atom, metalist, debug=0):
+def find_closest_metal(atom: object, metalist: list, debug: int=0) -> Tuple[np.ndarray, np.ndarray, list]:
 
     apos = np.array(atom.coord)
     dist = []
