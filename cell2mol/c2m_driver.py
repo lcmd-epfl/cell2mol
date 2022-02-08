@@ -39,7 +39,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
                 f = open(infopath, "w")
                 sys.stdout = f
                 # Create .info file
-                cif_2_info(input_path, refcode)
+                cif_2_info(input_path)
                 f.close()
                 sys.stdout = stdout
 
