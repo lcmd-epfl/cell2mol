@@ -687,7 +687,7 @@ def tmatgenerator(centroid, thres=0.40, full=False):
 
 #######################################################
 def sequential(
-    fragmentlist: list, refmoleclist: list, cellvec: list, debug: int, factor: float, metal_factor: float, typ: str="All"
+    fragmentlist: list, refmoleclist: list, cellvec: list, factor: float, metal_factor: float, typ: str="All", debug: int=0
 ) -> Tuple[list, list]:
     # Crappy function that controls the reconstruction process. It is called sequential because pairs of fragments are sent one by one. Ideally, a parallel version would be desirable.
     # Given a list of fragments(fragmentlist), a list of reference molecules(refmoleclist), and some other minor parameters, the function sends pairs of fragments and evaluates if they...
@@ -1194,7 +1194,7 @@ def identify_frag_molec_H(blocklist: list, moleclist: list, refmoleclist: list, 
 
 #######################################################
 def fragments_reconstruct(
-    moleclist: list, fraglist: list, Hlist: list, refmoleclist: list, cellvec: list, debug: int, factor: float, metal_factor: float
+    moleclist: list, fraglist: list, Hlist: list, refmoleclist: list, cellvec: list, factor: float, metal_factor: float, debug: int=0
 ) -> Tuple[list, list, bool]:
 
     Warning = False
@@ -1206,7 +1206,7 @@ def fragments_reconstruct(
         print(len(fraglist), "molecules submitted to SEQUENTIAL with Heavy")
         print("##############################################")
         newmols, remfrag = sequential(
-            fraglist, refmoleclist, cellvec, debug, factor, metal_factor, "Heavy"
+            fraglist, refmoleclist, cellvec, factor, metal_factor, "Heavy", debug
         )
         print(len(newmols), len(remfrag), "molecules out of SEQUENTIAL with Heavy")
         moleclist.extend(newmols)
@@ -1242,7 +1242,7 @@ def fragments_reconstruct(
         print(len(fraglist), "molecules submitted to sequential with All")
         print("##############################################")
         finalmols, remfrag = sequential(
-            fraglist, refmoleclist, cellvec, debug, factor, metal_factor, "All"
+            fraglist, refmoleclist, cellvec, factor, metal_factor, "All", debug
         )
         if len(remfrag) > 0:
             Warning = True

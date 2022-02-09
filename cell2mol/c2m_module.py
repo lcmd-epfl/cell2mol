@@ -85,9 +85,9 @@ def reconstruct(cell: object, reflabels: list, fracs: list) -> object:
             Hlist,
             cell.refmoleclist,
             cell.cellvec,
-            debug,
             covalent_factor,
             metal_factor,
+            debug,
         )
 
         moleclist.extend(finalmols)
