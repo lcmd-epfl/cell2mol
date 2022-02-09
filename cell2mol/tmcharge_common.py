@@ -125,7 +125,7 @@ def extract_from_matrix(entrylist: list, old_array: np.ndarray, dimension: int=2
 
 
 ####################################
-def getconec(labels: list, pos: list, factor: float, radii: str="default") -> Tuple[int, list, list, list, list]:
+def getconec(labels: list, pos: list, factor: float, radii="default") -> Tuple[int, list, list, list, list]:
     status = 1  # good molecule, no clashes yet
     clash = 0.3
     natoms = len(labels)
@@ -133,7 +133,7 @@ def getconec(labels: list, pos: list, factor: float, radii: str="default") -> Tu
     connec = np.zeros((natoms))
     mconmat = np.zeros((natoms, natoms))
     mconnec = np.zeros((natoms))
-
+    # Sometimes argument radii np.ndarry, or list
     with warnings.catch_warnings():
         warnings.simplefilter(action="ignore", category=FutureWarning)
         if radii == "default":
@@ -309,7 +309,7 @@ def find_closest_metal(atom: object, metalist: list, debug: int=0) -> Tuple[np.n
 ### ATOM ######
 ###############
 class atom(object):
-    def __init__(self, index, label, coord, radii):
+    def __init__(self, index: int, label: str, coord: list, radii: float) -> None:
         self.version = "V16"
         self.index = index
         self.label = label
@@ -323,7 +323,7 @@ class atom(object):
 
     # Adjacency part is simultaneously to creating the ligand or molecule object
     ### Changed in V14
-    def adjacencies(self, conmat, mconmat, type="Molecule"):
+    def adjacencies(self, conmat: np.ndarray, mconmat: np.ndarray, type: str="Molecule") -> None:
         self.adjacency = []
         self.metal_adjacency = []
 
@@ -348,7 +348,7 @@ class atom(object):
             self.mconnec = mconmat  # this has to be improved, now it only receives a number, should receive a vector as above for "molecule"
 
     # Bonds part is created after the formal charge for each molecule/ligand/metal is decided
-    def bonds(self, start, end, order):
+    def bonds(self, start: list, end: list, order: list) -> None:
         self.bond = []
         self.bond_start_idx = []
         self.bond_end_idx = []
@@ -367,15 +367,14 @@ class atom(object):
         self.nbonds = len(self.bond)
         self.totbondorder = np.sum(self.bond_order)
 
-    def atom_charge(self, charge):
+    def atom_charge(self, charge: int) -> None:
         self.charge = charge
-
-
+        
 ###############
 ### MOLECULE ##
 ###############
 class molecule(object):
-    def __init__(self, name, atlist, label, coord, radii):
+    def __init__(self, name: str, atlist: list, label: list, coord: list, radii:list) -> None:
         self.refcode = ""  
         self.name = name
         self.atlist = atlist
@@ -424,12 +423,12 @@ class molecule(object):
         self.possmiles = []
 
     # Stores the covalentradii factor and metal factor that were used to generate the molecule
-    def information(self, factor, metal_factor):
+    def information(self, factor: float, metal_factor: float) -> None:
         self.factor = factor
         self.metal_factor = metal_factor
 
     # Actual variables for the molecule in the crystal where it comes from:
-    def charge(self, atcharge, totcharge, object, smiles):
+    def charge(self, atcharge: np.ndarray, totcharge: int, object: list, smiles: list) -> None:
         self.atcharge = atcharge
         self.totcharge = totcharge
         self.smiles = smiles
@@ -444,7 +443,7 @@ class molecule(object):
         self.spin = spin
 
     # Connectivity = Adjacency Matrix. Potentially expandable to Include Bond Types
-    def adjacencies(self, conmat, mconmat):
+    def adjacencies(self, conmat: np.ndarray, mconmat: np.ndarray) -> None:
         self.conmat = conmat
         self.mconmat = mconmat
         self.connec = np.zeros((self.natoms))
@@ -475,7 +474,7 @@ class molecule(object):
 ### LIGAND ####
 ###############
 class ligand(object):
-    def __init__(self, name, atlist, labels, coord, radii):
+    def __init__(self, name: str, atlist: list, labels: list, coord: list, radii: list) -> None:
         self.refcode = ""  
         self.name = name      # creates as ligand index, later modified
         self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
@@ -519,11 +518,11 @@ class ligand(object):
             self.eleccount += a.atnum
 
     # Stores the covalentradii factor and metal factor that were used to generate the molecule
-    def information(self, factor, metal_factor):
+    def information(self, factor: float, metal_factor: float) -> None:
         self.factor = factor
         self.metal_factor = metal_factor
 
-    def charge(self, atcharge, totcharge, object, smiles):
+    def charge(self, atcharge: list, totcharge: int, object: object, smiles: str) -> None:
         self.atcharge = atcharge
         self.totcharge = totcharge
         self.smiles = smiles
@@ -536,7 +535,7 @@ class ligand(object):
     def magnetism(self, spin):
         self.spin = spin
 
-    def adjacencies(self, conmat, mconnec):
+    def adjacencies(self, conmat: np.ndarray, mconnec: np.ndarray) -> None:
         self.conmat = conmat
         self.connec = np.zeros((self.natoms))
         for i in range(0, self.natoms):
@@ -554,7 +553,7 @@ class ligand(object):
 
 ###############
 class group(object):
-    def __init__(self, atlist, hapticity, hapttype):
+    def __init__(self, atlist: list, hapticity: bool, hapttype: list) -> None:
         self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
         self.hapticity = hapticity
         self.hapttype = hapttype
@@ -564,7 +563,7 @@ class group(object):
 #### METAL ####
 ###############
 class metal(object):
-    def __init__(self, name, atlist, label, coord, radii):
+    def __init__(self, name: int, atlist: int, label: str, coord: list, radii: float) -> None:
         self.name = name  # creates as metal index, later modified
         self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
         self.label = label
@@ -580,27 +579,26 @@ class metal(object):
         self.atom = atom(name, label, self.coord, self.radii)
 
     # Stores the covalentradii factor and metal factor that were used to generate the molecule
-    def information(self, factor, metal_factor):
+    def information(self, factor: float, metal_factor: float) -> None:
         self.factor = factor
         self.metal_factor = metal_factor
 
-    def charge(self, metal_charge):
+    def charge(self, metal_charge: int) -> None:
         self.totcharge = metal_charge
 
     def magnetism(self, spin):
         self.spin = spin
 
-    def adjacencies(self, mconnec):
+    def adjacencies(self, mconnec: np.ndarray) -> None:
         self.mconnec = mconnec  # adjacencies matrix with only metal bonds
         self.totmconnec = int(np.sum(mconnec))
         self.atom.adjacencies(np.array(int(0)), int(mconnec), type="Metal")
-
 
 ##############
 #### CELL ####
 ##############
 class Cell(object):
-    def __init__(self, refcode, labels, pos, cellvec, cellparam, warning_list):
+    def __init__(self, refcode: str, labels: list, pos: list, cellvec: list, cellparam: list, warning_list: list) -> None:
 
         self.version = "V17"
         self.refcode = refcode
