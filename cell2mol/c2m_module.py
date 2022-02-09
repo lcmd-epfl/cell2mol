@@ -136,7 +136,7 @@ def determine_charge(cell: object) -> object:
 
     # Find possible charge distribution
     if not any(cell.warning_list):
-        final_charge_distribution = balance_charge(cell.moleclist,molec_indices,ligand_indices,unique_indices,unique_species)
+        final_charge_distribution = balance_charge(unique_indices,unique_species)
         print("final_charge_distribution", final_charge_distribution)
         if len(final_charge_distribution) > 1:
             Warning = True
