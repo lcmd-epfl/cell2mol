@@ -28,40 +28,56 @@ from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
 #######################################################
-def verify_connectivity(ligand: object, molecule: object, debug: int=0):
+def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> None:
 
     metalist = molecule.metalist.copy()
+
     # Original labels and coordinates are copied
     newlab = ligand.labels.copy()
     newlab.append(str("H"))  # One H atom will be added
     newcoord = ligand.coord.copy()
-    isadded = False
-    # position (index) of the added atom 
+
+    # position (index) of the added atom
     posadded = len(ligand.labels)
 
     if debug >= 1: print(f"VERIFY: checking connectivity of ligand {ligand.labels}")
+    if debug >= 0: print(f"VERIFY: initial connectivity is {ligand.totmconnec}")
     for g in ligand.grouplist:
-        if g.hapticity == True:
-            if debug >= 1: print(f"VERIFY: group has hapticity, skipping check") 
+        if g.hapticity is True:
+            if debug >= 1:
+                print("VERIFY: group has hapticity, skipping check")
         else:
             for idx, a in enumerate(ligand.atoms):
-                if a.mconnec == 1 and a.index in g.atlist: 
+                if a.mconnec == 1 and a.index in g.atlist:
                     tgt, apos, dist = find_closest_metal(a, metalist)
                     idealdist = a.radii + elemdatabase.CovalentRadius2["H"]
-                    addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
-                    newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])  # adds H at the position of the closest Metal Atom
-        
+                    addedHcoords = apos + (metalist[tgt].coord - apos) * (
+                        idealdist / dist
+                    )  # the factor idealdist/dist[tgt] controls the distance
+                    newcoord.append(
+                        [addedHcoords[0], addedHcoords[1], addedHcoords[2]]
+                    )  # adds H at the position of the closest Metal Atom
+
                     # Evaluates the new adjacency matrix.
                     tmpradii = getradii(newlab)
-                    dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, newcoord, ligand.factor, tmpradii)
+                    dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(
+                        newlab, newcoord, ligand.factor, tmpradii
+                    )
                     # If no undesired adjacencies have been created, the coordinates are kept. Otherwise, data is corrected
                     if tmpconnec[posadded] == 1:
-                        if debug >= 1: print(f"VERIFY: connectivity verified for atom {idx} with label {a.label}") 
+                        if debug >= 1:
+                            print(f"VERIFY: connectivity verified for atom {idx} with label {a.label}")
                     else:
-                       # Corrects data of atom object
-                       a.mconnec = 0
-                       if debug >= 0: print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label} of ligand {ligand.labels}")
-                       # Now it should correct data of metal, ligand and molecule objects. Not yet implemented
+                        # Corrects data of atom object
+                        a.mconnec = 0
+                        if debug >= 0:
+                            print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label}")
+                        # Now it should correct data of metal, ligand and molecule objects. Not yet implemented
+
+    ligand.totmconnec = 0
+    for a in ligand.atoms:
+        ligand.totmconnec += a.mconnec
+    if debug >= 0: print(f"VERIFY: final connectivity is {ligand.totmconnec}")
 
 #######################################################
 def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list, float, float, bool]:
