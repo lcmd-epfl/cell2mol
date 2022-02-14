@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# fmt: off
+
 import numpy as np
 import itertools
 import sys
@@ -1470,7 +1472,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                         ###############
                         issorted = False
                         if tgt_protonation.typ == "Non-local":
-                            tini_hun = time.time()
+                            #tini_hun = time.time()
 
                             # Adding connectivity data to labels to improve the hungarian sort
                             ligand_data = []
@@ -1487,7 +1489,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                             bla = list(np.array(lig.labels)[map12])
 
                             issorted = True
-                            tend_hun = time.time()
+                            #tend_hun = time.time()
                             print(f"Hungarian took {tend_hun - tini_hun:.2f} seconds")
                             print(f"Hungarian gave map12:{map12}")
                             #print(*dummy1)
@@ -1833,4 +1835,4 @@ class charge_state(object):
 
         self.corr_abstotal, self.corr_abs_atcharge, self.corr_zwitt = eval_chargelist(self.corr_atom_charges)
 
-
+# fmt: on
