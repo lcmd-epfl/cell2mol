@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from array import array
 import os
 import numpy as np
 
@@ -30,13 +29,8 @@ def test_check_cell_vs_data():
     assert cell.refcode == "YOXKUS"
     assert np.allclose(
         cell.cellvec,
-        np.array(
-            [[15.136, 0.0, 0.0], [0.0, 8.798, 0.0], [-4.1830788, 0.0, 17.4721325]]
-        ),
-    )
-    assert np.allclose(
-        cell.cellparam, np.array([15.136, 8.798, 17.9659, 90.0, 103.464, 90.0])
-    )
+        np.array([[15.136, 0.0, 0.0], [0.0, 8.798, 0.0], [-4.1830788, 0.0, 17.4721325]]))
+    assert np.allclose(cell.cellparam, np.array([15.136, 8.798, 17.9659, 90.0, 103.464, 90.0]))
     assert cell.labels == [
         "Re",
         "Re",
@@ -956,7 +950,7 @@ def test_check_cellrefmoleclist():
         assert mol.eleccount == 366
         assert mol.numH == 24
 
-        assert mol.hapticity == True
+        assert mol.hapticity is True
         assert mol.hapttype == ["h5-Cp"]
 
         # Lists of potentially good variables for this molecule
