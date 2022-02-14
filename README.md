@@ -1,4 +1,4 @@
-# cell2mol
+cell2mol: Unit Cell to Molecule Interpretation
 ==============================================
 
 ![cell2mol logo](./images/cell2mol_logo.png)
