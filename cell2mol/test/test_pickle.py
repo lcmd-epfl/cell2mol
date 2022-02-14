@@ -5,9 +5,9 @@ import pytest
 import numpy as np
 import pickle
 
-from cell2mol.tmcharge_common import Cell
 from cell2mol.c2m_module import cell2mol
 from cell2mol.c2m_module import load_cell_reset_charges
+
 
 def run_cell2mol(infofile):
     dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -24,10 +24,7 @@ def run_cell2mol(infofile):
     return cell
 
 
-@pytest.mark.parametrize(
-    "refcode",
-    ["DAPGAF", "EGITOF", "HACXOY", "ISIPIJ", "KANYUT", "YOXKUS", "ROKQAM", "LOKXUG"],
-)
+@pytest.mark.parametrize("refcode",["DAPGAF", "EGITOF", "HACXOY", "ISIPIJ", "KANYUT", "YOXKUS", "ROKQAM", "LOKXUG"])
 def test_check_info_vs_pickle(refcode):
     infofile = f"{refcode}.info"
     cell = run_cell2mol(infofile)
@@ -52,10 +49,8 @@ def test_check_info_vs_pickle(refcode):
     assert cell.warning_list == result.warning_list
     assert cell.warning_after_reconstruction == result.warning_after_reconstruction
 
-@pytest.mark.parametrize(
-    "refcode",
-    ["DAPGAF", "EGITOF", "HACXOY", "ISIPIJ", "KANYUT", "YOXKUS", "ROKQAM", "LOKXUG"],
-)
+
+@pytest.mark.parametrize("refcode",["DAPGAF", "EGITOF", "HACXOY", "ISIPIJ", "KANYUT", "YOXKUS", "ROKQAM", "LOKXUG"])
 def test_load_cell_reset_charges (refcode):
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -64,7 +59,7 @@ def test_load_cell_reset_charges (refcode):
     file = open(cellpath, "rb")
     cell = pickle.load(file)
 
-    temp = load_cell_reset_charges (cellpath)
+    temp = load_cell_reset_charges(cellpath)
 
     assert temp.warning_list == cell.warning_after_reconstruction
     assert temp.warning_after_reconstruction == cell.warning_after_reconstruction
