@@ -9,7 +9,7 @@ from collections import defaultdict
 from cell2mol.tmcharge_common import getradii, getconec, find_closest_metal
 from cell2mol.xyz2mol import int_atom, xyz2mol
 from cell2mol.missingH import getangle
-#from cell2mol.hungarian import reorder
+from cell2mol.hungarian import reorder
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
@@ -1463,15 +1463,55 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                         #tmplab, tmpcoord, addedH, addedlist, metal_electrons = define_sites(lig, mol, debug)
                         list_of_protonations = define_sites(lig, mol, debug=1)
                         found_prot = False
+                        
+                        ###############
+                        # HUNGARIAN SORT
+                        ###############
+                        issorted = False
+                        if tgt_protonation.typ == "Non-local":
+                            tini_hun = time.time()
+
+                            # Adding connectivity data to labels to improve the hungarian sort
+                            ligand_data = []
+                            ref_data = []
+                            for a in lig.atoms:
+                                if a.mconnec > 0: ligand_data.append(a.label+str(1))
+                                if a.mconnec == 0: ligand_data.append(a.label+str(0))
+                            for a in spec_object.atoms:
+                                if a.mconnec > 0: ref_data.append(a.label+str(1))
+                                if a.mconnec == 0: ref_data.append(a.label+str(0))
+                                    
+                            #lig.labels, lig.coord, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
+                            dummy1, dummy2, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
+                            bla = list(np.array(lig.labels)[map12])
+
+                            issorted = True
+                            tend_hun = time.time()
+                            print(f"Hungarian took {tend_hun - tini_hun:.2f} seconds")
+                            print(f"Hungarian gave map12:{map12}")
+                            #print(*dummy1)
+                            #print(*bla)
+                            #print(*spec_object.labels)
+                        ###############                      
+                        
                         for p in list_of_protonations:
+                            if debug >= 1: print(f"PREPARE: evaluating prot state with {p.os}, {p.added_atoms}, {p.addedlist}")
                             if p.os == tgt_protonation.os and p.added_atoms == tgt_protonation.added_atoms and not found_prot:
-                                prot = p
-                                found_prot = True
-                        if not found_prot and debug >= 0: 
+                                if issorted:
+                                    tmp_addedlist = list(np.array(p.addedlist)[map12])
+                                else:
+                                    tmp_addedlist = p.addedlist
+                                if debug >= 1: print(f"PREPARE: tmp_addedlist={tmp_addedlist}")
+                                if all(tmp_addedlist[idx] == tgt_protonation.addedlist[idx] for idx in range(len(p.addedlist))):
+                                    if debug >= 1: print(f"PREPARE: found match in protonation with tmpsmiles:{p.tmpsmiles}")
+                                    prot = p
+                                    found_prot = True
+                        if not found_prot and debug >= 0:
                             Warning = True
                             print(f"PREPARE: WARNING, I Could not identify the protonation state")
                             for p in list_of_protonations:
-                                if debug >= 1: print(f"PREPARE: WARNING, I got prot with {p.added_atoms} added atoms and {p.os} OS") 
+                                if debug >= 1: print(f"PREPARE: WARNING, I got prot with {p.added_atoms} added atoms and {p.os} OS")
+                        ####
         
                         #### Evaluates possible charges except if the ligand is a nitrosyl
                         if not Warning:
