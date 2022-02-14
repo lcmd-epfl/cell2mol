@@ -33,16 +33,12 @@ def get_refmoleclist_and_check_missingH(cell: object, reflabels: list, fracs: li
     refpos = frac2cart_fromparam(fracs, cell.cellparam)
 
     # Get ref.molecules --> output: a valid list of ref.molecules
-    (refmoleclist, covalent_factor, metal_factor, Warning) = get_reference_molecules(
-        reflabels, refpos
-    )
+    refmoleclist, covalent_factor, metal_factor, Warning = get_reference_molecules(reflabels, refpos)
     cell.warning_list.append(Warning)
 
     # Check missing hydrogens in ref.molecules
     if not any(cell.warning_list):
-        (Warning, ismissingH, Missing_H_in_C, Missing_H_in_CoordWater) = check_missingH(
-            refmoleclist
-        )
+        Warning, ismissingH, Missing_H_in_C, Missing_H_in_CoordWater = check_missingH(refmoleclist)
         cell.warning_list.append(Missing_H_in_C)
         cell.warning_list.append(Missing_H_in_CoordWater)
 
@@ -62,22 +58,16 @@ def reconstruct(cell: object, reflabels: list, fracs: list) -> object:
     moleclist = []
 
     # Get a list of ref.molecules and Check missing H in ref.molecules
-    cell, covalent_factor, metal_factor = get_refmoleclist_and_check_missingH(
-        cell, reflabels, fracs
-    )
+    cell, covalent_factor, metal_factor = get_refmoleclist_and_check_missingH(cell, reflabels, fracs)
 
     # Get blocks in the unit cells constructing the adjacency matrix (A)
     if not any(cell.warning_list):
-        Warning, blocklist = getmolecs(
-            cell.labels, cell.pos, covalent_factor, metal_factor
-        )
+        Warning, blocklist = getmolecs(cell.labels, cell.pos, covalent_factor, metal_factor)
         cell.warning_list.append(Warning)
 
     # Indentify blocks and Reconstruct Fragments
     if not any(cell.warning_list):
-        (moleclist, fraglist, Hlist, init_natoms) = identify_frag_molec_H(
-            blocklist, moleclist, cell.refmoleclist, cell.cellvec
-        )
+        moleclist, fraglist, Hlist, init_natoms = identify_frag_molec_H(blocklist, moleclist, cell.refmoleclist, cell.cellvec)
 
         moleclist, finalmols, Warning = fragments_reconstruct(
             moleclist,
@@ -98,14 +88,10 @@ def reconstruct(cell: object, reflabels: list, fracs: list) -> object:
         # Check final number of atoms after reconstruction
         if final_natoms != init_natoms:
             warning_num = True
-            print(
-                f"Final and initial atoms do not coincide. Final/Initial {final_natoms}/ {init_natoms}\n"
-            )
+            print(f"Final and initial atoms do not coincide. Final/Initial {final_natoms}/ {init_natoms}\n")
         else:
             warning_num = False
-            print(
-                f"Final and initial atoms coincide. Final/Initial {final_natoms}/ {init_natoms}\n"
-            )
+            print(f"Final and initial atoms coincide. Final/Initial {final_natoms}/ {init_natoms}\n")
         cell.warning_list.append(any([Warning, warning_num]))
     
     cell.warning_after_reconstruction = copy.deepcopy(cell.warning_list)
