@@ -53,13 +53,13 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
             # print(f"Error: The file {input_path} could not be found.\n")
             sys.exit(1)
 
-    # output_dir = pwd
+    output_dir = pwd
 
-    output_dir = os.path.join(pwd, refcode)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    # output_dir = os.path.join(pwd, refcode)
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
     
-    print(f"{output_dir=}")
+    # print(f"{output_dir=}")
 
     if step == 2:
         cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(refcode))
