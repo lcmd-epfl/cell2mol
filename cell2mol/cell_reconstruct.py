@@ -40,7 +40,7 @@ def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> Non
     # position (index) of the added atom
     posadded = len(ligand.labels)
 
-    if debug >= 1: print(f"VERIFY: checking connectivity of ligand {ligand.labels}")
+    if debug >= 1: print(f"VERIFY: checking connectivity of ligand {ligand.formula}")
     if debug >= 0: print(f"VERIFY: initial connectivity is {ligand.totmconnec}")
     for g in ligand.grouplist:
         if g.hapticity is True:
@@ -164,7 +164,7 @@ def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list
 
                 for lig in ref.ligandlist:
                     verify_connectivity(lig, ref)
-                    print(f"Verifying Connectivity for Lig in Ref molec {lig.natoms}, {lig.labels}, {lig.totmconnec}")  # , len(lig.metalatoms))
+                    print(f"Verifying Connectivity for Lig in Ref molec {lig.natoms}, {lig.formula}, {lig.totmconnec}")  # , len(lig.metalatoms))
                     #print(f"Metalatoms for this ligand: {len(lig.metalatoms)}")  # , len(lig.metalatoms))
 
                 # Checks Shared Ligands in Polymetallic complexes

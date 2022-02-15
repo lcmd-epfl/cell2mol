@@ -11,6 +11,19 @@ from typing import Tuple
 elemdatabase = ElementData()
 
 ################################
+def labels2formula(labels):
+    elems = elemdatabase.elementnr.keys()
+    formula=[]
+    for z in elems:
+        nz = labels.count(z)
+        if nz > 1:
+            formula.append(f"{z}{nz}-")
+        if nz == 1:
+            formula.append(f"{z}-")
+    formula = ''.join(formula)[:-1] 
+    return formula 
+
+################################
 def getelementcount(labels: list) -> np.ndarray:
     elems = elemdatabase.elementnr.keys()
     times = np.zeros((len(elems)))
@@ -374,18 +387,19 @@ class atom(object):
 ### MOLECULE ##
 ###############
 class molecule(object):
-    def __init__(self, name: str, atlist: list, label: list, coord: list, radii:list) -> None:
+    def __init__(self, name: str, atlist: list, labels: list, coord: list, radii:list) -> None:
         self.refcode = ""  
         self.name = name
         self.atlist = atlist
-        self.labels = label
+        self.labels = labels
         self.coord = coord
         self.radii = radii
+        self.formula = labels2formula(labels)
         self.occurrence = 0   # How many times the molecule appears in a unit cell
 
         self.natoms = len(atlist)
-        self.elemcountvec = getelementcount(label)
-        self.Hvcountvec = getHvcount(label)
+        self.elemcountvec = getelementcount(labels)
+        self.Hvcountvec = getHvcount(labels)
 
         self.frac = []
         self.centroid = []
@@ -481,6 +495,7 @@ class ligand(object):
         self.labels = labels  # elements
         self.coord = coord    # coordinates
         self.radii = radii
+        self.formula = labels2formula(labels)
         self.occurrence = 0   # How many times the ligand appears in a molecule
 
         self.natoms = len(atlist)  # number of atoms
