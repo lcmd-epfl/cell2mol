@@ -60,10 +60,14 @@ def parsing_arguments_BVS():
     return args.filename
                     
                     
-def bond_valence_sum(cell, bv_para, result, thre_max, thre_diff):
+def bond_valence_sum(cell, bv_para, result, thre_max):
     
+    if not any(cell.warning_list[:5]):
+        print("Cell reconstruction successfully finished.\n")
+
     print("====================================== BVS ======================================")
     print("Classify unique species\n")
+    
     
     molec_indices, ligand_indices, unique_indices, unique_species = classify_mols(cell.moleclist)
     
@@ -174,21 +178,27 @@ if __name__ == "__main__" :
     pwd = os.getcwd()
     filename = parsing_arguments_BVS()
     print(filename)
-    df = pd.read_csv("bvparm2020.txt",delimiter="\t")
-    
+    df = pd.read_csv("bvparm2020.txt",delimiter="\t")  
     file = open(filename,'rb')
     cell = pickle.load(file)
     
-    result = "BVS_result.txt"
+    result = "BVS_result.txt"  
+    fail_reconstruct = "fail_in_reconstruct.txt"
     
-    output_dir = pwd + "/" + cell.refcode
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    output_fname = output_dir + "/bvs_output.out"
-    
-    thre_max = 0.5
-    
-    sys.stdout = open(output_fname, "w")
-    print("[Refcode]", cell.refcode)
-    bond_valence_sum(cell, df, result, thre_max)
-    sys.stdout.close()
+    # Several Cell objects do not contain cell.warning_after_reconstruction 
+    # so check the errors in cell reconstruction via cell.warning_list[:5]
+    if any(cell.warning_list[:5]):
+        with open(fail_reconstruct,'a') as fail: 
+            fail.write("%s\n" % (cell.refcode))
+    else:
+        output_dir = pwd + "/" + cell.refcode
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        output_fname = output_dir + "/bvs_output.out"
+        
+        thre_max = 0.5
+        
+        sys.stdout = open(output_fname, "w")
+        print("[Refcode]", cell.refcode)
+        bond_valence_sum(cell, df, result, thre_max)
+        sys.stdout.close()
