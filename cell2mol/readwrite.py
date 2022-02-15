@@ -171,8 +171,6 @@ def readcif(filepath):
 
 ###########
 def print_molecule(mol, name, ext, folder):
-    print(f"\t\t\t{name}.{ext}")
-    #     print(f"Print Molecule Received {name}, {folder}, {ext}")
     filename = str(folder) + "/" + str(name) + "." + str(ext)
 
     if ext == "xyz" or ext == "txt":
@@ -190,12 +188,7 @@ def print_molecule(mol, name, ext, folder):
                     print("", file=fil)
 
                 for a in mol.atoms:
-                    # print(a.label, a.coord[0], a.coord[1], a.coord[2], file=fil)
-                    print(
-                        "%s   %.6f   %.6f   %.6f"
-                        % (a.label, a.coord[0], a.coord[1], a.coord[2]),
-                        file=fil,
-                    )
+                    print("%s   %.6f   %.6f   %.6f" % (a.label, a.coord[0], a.coord[1], a.coord[2]),file=fil)
 
             # TXT
             elif ext == "txt":
