@@ -7,20 +7,8 @@ import os
 import copy
 from typing import Tuple
 # Import modules
-from cell2mol.cell_reconstruct import (
-    getmolecs,
-    identify_frag_molec_H,
-    split_complexes_reassign_type,
-    fragments_reconstruct,
-    get_reference_molecules,
-)
-from cell2mol.formal_charge import (
-    drive_get_poscharges,
-    classify_mols,
-    balance_charge,
-    build_bonds,
-    prepare_mols,
-)
+from cell2mol.cell_reconstruct import (getmolecs,identify_frag_molec_H,split_complexes_reassign_type,fragments_reconstruct,get_reference_molecules)
+from cell2mol.formal_charge import (drive_get_poscharges,classify_mols,balance_charge,build_bonds,prepare_mols)
 from cell2mol.missingH import check_missingH
 from cell2mol.tmcharge_common import Cell
 from cell2mol.cellconversions import frac2cart_fromparam
@@ -68,17 +56,7 @@ def reconstruct(cell: object, reflabels: list, fracs: list) -> object:
     # Indentify blocks and Reconstruct Fragments
     if not any(cell.warning_list):
         moleclist, fraglist, Hlist, init_natoms = identify_frag_molec_H(blocklist, moleclist, cell.refmoleclist, cell.cellvec)
-
-        moleclist, finalmols, Warning = fragments_reconstruct(
-            moleclist,
-            fraglist,
-            Hlist,
-            cell.refmoleclist,
-            cell.cellvec,
-            covalent_factor,
-            metal_factor,
-            debug,
-        )
+        moleclist, finalmols, Warning = fragments_reconstruct(moleclist,fraglist,Hlist,cell.refmoleclist,cell.cellvec,covalent_factor,metal_factor,debug)
 
         moleclist.extend(finalmols)
         final_natoms = 0
@@ -226,14 +204,10 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3) -> objec
         print("[Refcode]", cell.refcode)
 
         # Cell Reconstruction
-        print(
-            "===================================== step 1 : Cell reconstruction =====================================\n"
-        )
+        print("===================================== step 1 : Cell reconstruction =====================================\n")
         cell = reconstruct(cell, reflabels, fracs)
         tend = time.time()
-        print(
-            f"\nTotal execution time for Cell Reconstruction: {tend - tini:.2f} seconds"
-        )
+        print(f"\nTotal execution time for Cell Reconstruction: {tend - tini:.2f} seconds")
 
     elif step == 2:
         print("\n***Imprementing only Charge Assignment***")
@@ -255,14 +229,10 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3) -> objec
         elif step == 2 or step == 3:
             # Charge Assignment
             tini_2 = time.time()
-            print(
-                "===================================== step 2 : Charge Assignment =======================================\n"
-            )
+            print("===================================== step 2 : Charge Assignment =======================================\n")
             cell = determine_charge(cell)
             tend_2 = time.time()
-            print(
-                f"\nTotal execution time for Charge Assignment: {tend_2 - tini_2:.2f} seconds"
-            )
+            print(f"\nTotal execution time for Charge Assignment: {tend_2 - tini_2:.2f} seconds")
 
             if not any(cell.warning_list):
                 print("Charge Assignment successfully finished.\n")
