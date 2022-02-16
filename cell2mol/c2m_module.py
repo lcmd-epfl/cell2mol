@@ -7,7 +7,7 @@ import os
 import copy
 from typing import Tuple
 # Import modules
-from cell2mol.cell_reconstruct import (getmolecs,identify_frag_molec_H,split_complexes_reassign_type,fragments_reconstruct,get_reference_molecules)
+from cell2mol.cell_reconstruct import (getmolecs,identify_frag_molec_H,split_complexes_reassign_type,fragments_reconstruct,get_reference_molecules, compare_moleclist_refmoleclist)
 from cell2mol.formal_charge import (drive_get_poscharges,classify_mols,balance_charge,build_bonds,prepare_mols)
 from cell2mol.missingH import check_missingH
 from cell2mol.tmcharge_common import Cell
@@ -53,24 +53,29 @@ def reconstruct(cell: object, reflabels: list, fracs: list) -> object:
         Warning, blocklist = getmolecs(cell.labels, cell.pos, covalent_factor, metal_factor)
         cell.warning_list.append(Warning)
 
-    # Indentify blocks and Reconstruct Fragments
+
     if not any(cell.warning_list):
+        # Indentify blocks and Reconstruct Fragments
         moleclist, fraglist, Hlist, init_natoms = identify_frag_molec_H(blocklist, moleclist, cell.refmoleclist, cell.cellvec)
         moleclist, finalmols, Warning = fragments_reconstruct(moleclist,fraglist,Hlist,cell.refmoleclist,cell.cellvec,covalent_factor,metal_factor,debug)
 
         moleclist.extend(finalmols)
+        
+        # Compare moleclist with refmoleclist
+        warning_kinds = compare_moleclist_refmoleclist(moleclist, cell.refmoleclist)
+           
+        # Check final number of atoms after reconstruction   
         final_natoms = 0
         for mol in moleclist:
             final_natoms += mol.natoms
 
-        # Check final number of atoms after reconstruction
         if final_natoms != init_natoms:
             warning_num = True
             print(f"Final and initial atoms do not coincide. Final/Initial {final_natoms}/ {init_natoms}\n")
         else:
             warning_num = False
             print(f"Final and initial atoms coincide. Final/Initial {final_natoms}/ {init_natoms}\n")
-        cell.warning_list.append(any([Warning, warning_num]))
+        cell.warning_list.append(any([Warning, warning_kinds, warning_num]))
     
     cell.warning_after_reconstruction = copy.deepcopy(cell.warning_list)
     
