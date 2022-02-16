@@ -19,8 +19,11 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     root = root.split(".")
     refcode = root[0]
 
-    stdout = sys.stdout
+    output_dir = pwd
 
+    stdout = sys.stdout
+    stderr = sys.stderr
+    
     if step == None:
         step = 3
         pass
@@ -30,18 +33,21 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
         sys.exit(1)
 
     if step == 2:
-        infopath = None
-
+        infopath = None  
     elif step == 1 or step == 3:
         if os.path.exists(input_path):
             if extension == ".cif":
-                infopath = os.path.join(pwd, f"{refcode}.info")
-                f = open(infopath, "w")
-                sys.stdout = f
-                # Create .info file
-                cif_2_info(input_path)
-                f.close()
-                sys.stdout = stdout
+
+                infopath = os.path.join(output_dir, f"{refcode}.info")
+                errorpath = os.path.join(output_dir, "error_cif2cell.txt")
+                
+                # Create .info file 
+                cif_2_info(input_path, infopath, errorpath)
+  
+                with open(errorpath, 'r') as err:
+                    for line in err.readlines():
+                        if "Error" in line:
+                            sys.exit(1)
 
             elif extension == ".info":
                 infopath = input_path
@@ -52,14 +58,6 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
         else:
             # print(f"Error: The file {input_path} could not be found.\n")
             sys.exit(1)
-
-    output_dir = pwd
-
-    # output_dir = os.path.join(pwd, refcode)
-    # if not os.path.exists(output_dir):
-    #     os.makedirs(output_dir)
-    
-    # print(f"{output_dir=}")
 
     if step == 2:
         cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(refcode))
