@@ -1281,6 +1281,43 @@ def fragments_reconstruct(
 
 
 #######################################################
+def compare_moleclist_refmoleclist(moleclist: list, refmoleclist: list, debug: int=0) -> bool:
+    
+    found = []
+    not_found = []
+
+    for mol in moleclist:
+        for ref in refmoleclist:
+            if (ref.elemcountvec == mol.elemcountvec).all() and (ref.adjtypes == mol.adjtypes).all():
+                found.append(mol)
+            else:
+                pass
+
+    for mol in moleclist:
+        if mol not in found:
+            not_found.append(mol)
+
+    print(f"Compare molecules in moleclist with molecules in refmoleclist: Right/Wrong {len(found)}/ {len(not_found)}")
+
+    if len(not_found) == 0 :
+        Warning = False
+        print("All molecules in moleclist are found in refmoleclist\n")
+    else : 
+        Warning = True
+        print("Wrong molecules in moleclist")
+        for wrong in not_found: 
+            print("Wrong: the number of atoms", len(wrong.labels), wrong.labels)
+        if debug >= 1 : 
+            print("\nRefmoleclist")
+            for j, ref in enumerate(refmoleclist):
+                print("Ref {}".format(j), "the number of atoms:", len(ref.labels), ref.labels)
+
+    print("")
+
+    return Warning
+
+
+#######################################################
 def assigntype(molecule: object, references: list) -> str:
     Found = False
     for ref in references:
