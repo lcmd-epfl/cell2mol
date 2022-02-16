@@ -30,6 +30,7 @@
 import sys
 import string
 import copy
+
 from math import sin, cos, pow, gcd
 from random import random, gauss
 from functools import reduce
@@ -45,6 +46,7 @@ from cell2mol.cif2cell_spacegroupdata import (
     SymOpsHall,
 )
 from cell2mol.elementdata import ElementData
+
 
 ################################################################################################
 
@@ -1654,10 +1656,10 @@ class CellData(GeometryObject):
         except KeyError:
             raise PositionError("Error reading site occupancies.")
         if siteoccer == None or "?" in siteoccer or "." in siteoccer:
-            if not self.quiet:
-                sys.stderr.write(
-                    "***Warning : Site occupancies not found, assuming all occupancies = 1.\n"
-                )
+            # if not self.quiet:
+            #     sys.stderr.write(
+            #         "***Warning : Site occupancies not found, assuming all occupancies = 1.\n"
+            #     )
             siteoccer = []
             for site in self.elements:
                 siteoccer.append("1.0")

@@ -1,4 +1,5 @@
-#!/opt/anaconda3/envs/test/bin/python
+#!/usr/bin/env python
+
 # Copyright 2010 Torbjorn Bjorkman
 # This file is part of cif2cell
 #
@@ -27,12 +28,11 @@ import sys
 import os
 import string
 import copy
+
 from datetime import datetime
 from optparse import OptionParser, OptionGroup
-import warnings
 from math import acos, pi
 from weakref import ref
-
 import CifFile
 
 from cell2mol.elementdata import ElementData
@@ -55,8 +55,6 @@ from cell2mol.cif2cell_utils import (
 )
 from cell2mol.cif2cell_uctools import ReferenceData, CellData, SymmetryOperation
 
-# Turn off warnings about deprecated stuff
-warnings.simplefilter("ignore", DeprecationWarning)
 
 # All supported output formats
 outputprograms = set(
@@ -673,8 +671,8 @@ def parsing_input():
     return (options, args)
 
 
-def cif_2_info(infopath, angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogpercm):
-
+def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogpercm):
+    
     angtobohr = angtobohr
     codename = codename
     uperautogpercm = uperautogpercm
@@ -684,21 +682,19 @@ def cif_2_info(infopath, angtobohr=angtobohr, codename=codename, uperautogpercm=
     version = "2.0.0"
 
     (options, args) = parsing_input()
+    sys.stdout = open(infopath, "w")
+    sys.stderr = open(errorpath, "w")   
 
-    # python cif2info.py infopath --cartesian --force
-    options.file = infopath
+    # python cif2info.py input_path --cartesian --force 
+    options.file = input_path
     options.cartesian = True
     options.force = True
-    
-    pwd = os.getcwd()
-
-    errorpath = os.path.join(pwd, "error_cif2cell.txt")
-    sys.stderr = open(errorpath, "w")
+    force_warning_print = False # suppress warning if force is True
 
     # Print version number and exit
     if options.version:
         sys.stdout.write(programname + " version " + version + "\n")
-
+    
     #############################################################
     # Check that options given are possible
     if options.append and not options.outputfile:
@@ -1064,10 +1060,11 @@ def cif_2_info(infopath, angtobohr=angtobohr, codename=codename, uperautogpercm=
     if len(ref.ChemicalComposition) > 0 and not cd.alloy:
         if ref.ChemicalComposition != cd.ChemicalComposition:
             if force:
-                sys.stderr.write(
-                    "***Warning: Chemical composition of the generated cell differs from that given\n"
-                    + "            by _chemical_formula_sum.\n"
-                )
+                if force_warning_print :
+                    sys.stderr.write(
+                        "***Warning: Chemical composition of the generated cell differs from that given\n"
+                        + "            by _chemical_formula_sum.\n"
+                    )
             else:
                 sys.stderr.write(
                     "***Error: Chemical composition of the generated cell differs from that given\n"
@@ -1503,12 +1500,13 @@ def cif_2_info(infopath, angtobohr=angtobohr, codename=codename, uperautogpercm=
 
     # Remind that the result may be junk when using --force
     if force:
-        sys.stderr.write(
-            "\n***Warning: You invoked the --force flag, presumably to bypass some error message.\n"
-        )
-        sys.stderr.write(
-            "            Carefully check the results, which may be rubbish, nonsense or both!\n"
-        )
+        if force_warning_print:
+            sys.stderr.write(
+                "\n***Warning: You invoked the --force flag, presumably to bypass some error message.\n"
+            )
+            sys.stderr.write(
+                "            Carefully check the results, which may be rubbish, nonsense or both!\n"
+            )
 
     ##############################################
     # Sort sites so that the ones occupied by the heaviest elements come first,
@@ -2585,4 +2583,5 @@ def cif_2_info(infopath, angtobohr=angtobohr, codename=codename, uperautogpercm=
         f.write(str(sysfile))
         f.close()
     
+
     return
