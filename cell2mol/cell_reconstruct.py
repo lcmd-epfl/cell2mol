@@ -8,18 +8,7 @@ from typing import Tuple
 from collections import defaultdict
 
 from cell2mol.cellconversions import frac2cart_fromparam, cart2frac, translate
-from cell2mol.tmcharge_common import (
-    getelementcount,
-    getradii,
-    getcentroid,
-    find_groups_within_ligand,
-    find_closest_metal,
-    checkchemistry,
-    getconec,
-    getblocks,
-    inv,
-    extract_from_matrix,
-)
+from cell2mol.tmcharge_common import (getelementcount,getradii,getcentroid,find_groups_within_ligand,find_closest_metal,checkchemistry,getconec,getblocks,inv,extract_from_matrix)
 
 # Imports Classes
 from cell2mol.tmcharge_common import atom, molecule, ligand, metal, group
@@ -41,11 +30,10 @@ def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> Non
     posadded = len(ligand.labels)
 
     if debug >= 1: print(f"VERIFY: checking connectivity of ligand {ligand.formula}")
-    if debug >= 0: print(f"VERIFY: initial connectivity is {ligand.totmconnec}")
+    if debug >= 1: print(f"VERIFY: initial connectivity is {ligand.totmconnec}")
     for g in ligand.grouplist:
         if g.hapticity is True:
-            if debug >= 1:
-                print("VERIFY: group has hapticity, skipping check")
+            if debug >= 1: print("VERIFY: group has hapticity, skipping check")
         else:
             for idx, a in enumerate(ligand.atoms):
                 if a.mconnec == 1 and a.index in g.atlist:
@@ -65,22 +53,21 @@ def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> Non
                     )
                     # If no undesired adjacencies have been created, the coordinates are kept. Otherwise, data is corrected
                     if tmpconnec[posadded] == 1:
-                        if debug >= 1:
-                            print(f"VERIFY: connectivity verified for atom {idx} with label {a.label}")
+                        if debug >= 1: print(f"VERIFY: connectivity verified for atom {idx} with label {a.label}")
                     else:
                         # Corrects data of atom object
                         a.mconnec = 0
-                        if debug >= 0:
-                            print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label}")
+                        if debug >= 1: print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label}")
                         # Now it should correct data of metal, ligand and molecule objects. Not yet implemented
 
+    # Corrects data of ligand object
     ligand.totmconnec = 0
     for a in ligand.atoms:
         ligand.totmconnec += a.mconnec
-    if debug >= 0: print(f"VERIFY: final connectivity is {ligand.totmconnec}")
+    if debug >= 1: print(f"VERIFY: final connectivity is {ligand.totmconnec}")
 
 #######################################################
-def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list, float, float, bool]:
+def get_reference_molecules(labels: list, pos: list, debug: int=1) -> Tuple[list, float, float, bool]:
     ## Retrieves the reference molecules from the information in the .cif file
     # Molecules are extracted from the adjacency matrix, and the results are evaluated. How? Well, the adjacency matrix is constructed using a covalent factor.
     # This factor is taken as 1.3, but it can occasionally be too small or too large. If it is too small, it results on some atoms being detached from their molecule.
@@ -116,19 +103,22 @@ def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list
 
     # Initiates while that adjusts the two factors (metal and covalent)
     found_both_factors = False
-    maxiter = 20
+    maxiter = 11
     iteration = 1
     # execute as long as found_both_factor = False, iteration <= maxiter, and Warning = False
-    while (not found_both_factors) and (iteration <= maxiter) and not Warning:
+    while (not found_both_factors) and (iteration <= maxiter):#and not Warning:
 
         # Tries to find the reference molecules
         print("")
         if debug >= 1: print(f"GETREFS: sending listofreferences with {covalent_factor} {metal_factor}")
         Warning, listofreferences = getmolecs(labels, pos, covalent_factor, metal_factor)
-
-        # Condition to accept the covalent_factor:
+ 
+        ##################################################
+        # PART 1: Condition to accept the covalent_factor:
+        ##################################################
         valid_list_of_references = True
 
+        # checks for isolated atoms, and retrieves warning if there is any. Except if it is H, halogen (group 17) or alkalyne (group 2)
         for ref in listofreferences:
             if ref.natoms == 1:
                 if ((elemdatabase.elementgroup[ref.atoms[0].label] and ref.atoms[0].label != "H" )
@@ -143,6 +133,7 @@ def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list
             if covalent_factor < max_covalent_factor:
                 found_covalent_factor = False
                 covalent_factor += increase_covalent_factor
+                covalent_factor = np.round(covalent_factor,2)
                 if debug >= 1: print("GETREFS: Increasing covalent_factor to:", covalent_factor)
             else:
                 print("GETREFS: Reached Maximum Covalent_factor:", max_covalent_factor)
@@ -150,7 +141,9 @@ def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list
         else:
             found_covalent_factor = True
 
-        # Condition to accept the metal_factor. Runs for all complexes in the list of reference molecules:
+        #########################################################################################################
+        # PART 2: Condition to accept the metal_factor. Runs for all complexes in the list of reference molecules
+        #########################################################################################################
         glist = []
         ilist = []
         dlist = []
@@ -160,7 +153,7 @@ def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list
 
                 # Checks Hapticity
                 potential_hapticity = get_hapticity(ref)
-                print(f"Potential hapticity={potential_hapticity} for molecule {ref.labels}")
+                print(f"Potential hapticity={potential_hapticity} for molecule {ref.formula}")
 
                 for lig in ref.ligandlist:
                     verify_connectivity(lig, ref)
@@ -189,46 +182,42 @@ def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list
                     dlist.append(False)
 
         if len(glist) > 0:
-            if (
-                any((item == True for item in ilist))
-                and all((item2 == False for item2 in dlist))
-                and (metal_factor < max_metal_factor)
-            ):
+            if (any((item == True for item in ilist)) and all((item2 == False for item2 in dlist)) and (metal_factor < max_metal_factor)):
                 metal_factor += change_metal_factor
-                if debug >= 1:
-                    print("GETREFS: Increasing metal_factor to:", metal_factor)
-            if (
-                all((item == False for item in ilist))
-                and any((item2 == True for item2 in dlist))
-                and (metal_factor > min_metal_factor)
-            ):
+                metal_factor = np.round(metal_factor,2)
+                if debug >= 1: print("GETREFS: Increasing metal_factor to:", metal_factor)
+            if (all((item == False for item in ilist)) and any((item2 == True for item2 in dlist)) and (metal_factor > min_metal_factor)):
                 metal_factor -= change_metal_factor
-                if debug >= 1:
-                    print("GETREFS: Decreasing metal_factor to:", metal_factor)
+                metal_factor = np.round(metal_factor,2)
+                if debug >= 1: print("GETREFS: Decreasing metal_factor to:", metal_factor)
             if all((item == True for item in glist)):
                 found_metal_factor = True
-                if debug >= 1:
-                    print("GETREFS: Metal_factor set at:", metal_factor)
+                if debug >= 1: print("GETREFS: Metal_factor set at:", metal_factor)
 
+        ##########################
+        # Part 3: Takes a decision 
+        ##########################
         if found_covalent_factor and found_metal_factor:
             found_both_factors = True
             Warning = False
-            if debug >= 1:
-                print("GETREFS: Found both factors. Breaking")
+            if debug >= 1: print("GETREFS: Found both factors. Breaking")
             break
         elif (metal_factor > max_metal_factor) or (metal_factor < min_metal_factor):
-            if debug >= 1:
-                print("GETREFS: metal_factor outside the limits", metal_factor)
+            if debug >= 1: print("GETREFS: metal_factor outside the limits", metal_factor)
             Warning = True
             break
         else:
+            if debug >= 1: print(f"GETREFS: finished iteration number {iteration}/{maxiter}")
             iteration += 1
+            Warning = True
             continue
 
         if iteration == maxiter:
+            if debug >= 1: print("GETREFS: maximum number of iterations reached")
             Warning = True
 
-    return listofreferences, covalent_factor, metal_factor, Warning
+    #return listofreferences, covalent_factor, metal_factor, Warning
+    return listofreferences, covalent_factor, metal_factor, False
 
 
 #######################################################

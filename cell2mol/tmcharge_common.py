@@ -661,7 +661,7 @@ class Cell(object):
     def print_Warning(self):
 
         reason_of_Warning = [
-            "Warning 1! Errors received from getting reference molecules (disorder)",
+            "Warning 1! Errors received from getting reference molecules (disorder or strange coordination)",
             "Warning 2! Missing H atoms from C in reference molecules",
             "Warning 3! Missing H atoms from coordinated water in reference molecules",
             "Warning 4! Steric clashes while blocking molecules",

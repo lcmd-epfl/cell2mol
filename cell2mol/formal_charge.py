@@ -69,7 +69,7 @@ def classify_mols(moleclist: list, debug: int=0) -> Tuple[list, list, list, list
             if not found:
                 specs_found += 1
                 kdx = specs_found
-                if debug >= 1: print(f"New molecule found with: {mol.labels} and added in position {kdx}")
+                if debug >= 1: print(f"New molecule found with: {mol.formula} and added in position {kdx}")
                 typelist_mols.append(list([mol.elemcountvec, kdx]))
                 unique_species.append(list([mol.type, mol]))
 
@@ -91,7 +91,7 @@ def classify_mols(moleclist: list, debug: int=0) -> Tuple[list, list, list, list
                 if not found:
                     specs_found += 1
                     kdx = specs_found
-                    if debug >= 1: print(f"New ligand found with: labels {lig.labels} and added in position {kdx}")
+                    if debug >= 1: print(f"New ligand found with: formula {lig.formula} and added in position {kdx}")
                     typelist_ligs.append(list([lig.elemcountvec, kdx]))
                     unique_species.append(list([lig.type, lig, mol]))
 
@@ -110,7 +110,7 @@ def classify_mols(moleclist: list, debug: int=0) -> Tuple[list, list, list, list
                 if not found:
                     specs_found += 1
                     kdx = specs_found
-                    if debug >= 1: print(f"New Metal Center found with: labels {met.labels} and added in position {kdx}")
+                    if debug >= 1: print(f"New Metal Center found with: labels {met.label} and added in position {kdx}")
                     typelist_mets.append(list([met.coord_sphere_ID, kdx]))
                     unique_species.append(list([met.type, met, mol]))
 
@@ -421,12 +421,12 @@ def drive_get_poscharges(unique_species: list) -> Tuple[list, bool]:
             print("    ---------------")
             print("    #### NON-Complex ####")
             print("    ---------------")
-            print("          ", spec[1].natoms, spec[1].labels)
+            print("          ", spec[1].natoms, spec[1].formula)
         elif spec[0] == "Ligand":
             print("    ---------------")
             print("    #### Ligand ####")
             print("    ---------------")
-            print("          ", spec[1].natoms, spec[1].labels, spec[1].totmconnec)
+            print("          ", spec[1].natoms, spec[1].formula, spec[1].totmconnec)
         elif spec[0] == "Metal":
             print("    ---------------")
             print("    #### Metal ####")
@@ -437,7 +437,7 @@ def drive_get_poscharges(unique_species: list) -> Tuple[list, bool]:
         if spec[0] == "Other" or spec[0] == "Ligand":
             tmp, Warning = get_poscharges(spec)
             if Warning: 
-                print("Empty possible charges received for molecule", spec[1].labels)
+                print(f"Empty possible charges received for molecule {spec[1].formula}")
             else: 
                 print("Charge state and protonation received for molecule", len(tmp)) 
                 selected_charge_states.append(tmp)
@@ -1396,7 +1396,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
     for idx, mol in enumerate(moleclist):
         #while not Warning:
         if debug >= 1: print("")
-        if debug >= 1: print(f"PREPARE: Molecule {idx} is a {mol.type} with labels {mol.labels}"),
+        if debug >= 1: print(f"PREPARE: Molecule {idx} is a {mol.type} with formulat {mol.formula}"),
         #if debug >= 1: print(f"PREPARE: Molecule {idx} is a {mol.type} with labels {mol.labels}"),
     
         if mol.type == "Other":
@@ -1443,7 +1443,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                 specie = unique_indices[idxtoallocate]
                 spec_object = unique_species[specie][1]
                 if debug >= 1: print("")
-                if debug >= 1: print(f"PREPARE: Ligand {kdx}, labels: {lig.labels} is specie {specie}")
+                if debug >= 1: print(f"PREPARE: Ligand {kdx}, formula: {lig.formula} is specie {specie}")
                 if debug >= 1: print(f"PREPARE: Ligand poscharges: {spec_object.poscharge}")
                 if debug >= 1: print(f"PREPARE: Doing ligand {kdx} with idxtoallocate {idxtoallocate}")
         
@@ -1457,6 +1457,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                     tgt_charge_state = selected_charge_states[specie][jdx][0]
                     tgt_protonation = selected_charge_states[specie][jdx][1]
                     if debug >= 1: print(f"PREPARE: Found Target Prot State with {tgt_protonation.added_atoms} added atoms and {tgt_protonation.os} OS") 
+                    if debug >= 1: print(f"PREPARE: addedlist of Target Prot State: {tgt_protonation.addedlist}")
         
                     if final_charge_distribution[idxtoallocate] == ch and not allocated:
                         allocated = True
@@ -1471,30 +1472,30 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                         # HUNGARIAN SORT
                         ###############
                         issorted = False
-                        if tgt_protonation.typ == "Non-local":
-                            tini_hun = time.time()
+                        #if tgt_protonation.typ == "Non-local":
+                        tini_hun = time.time()
 
-                            # Adding connectivity data to labels to improve the hungarian sort
-                            ligand_data = []
-                            ref_data = []
-                            for a in lig.atoms:
-                                if a.mconnec > 0: ligand_data.append(a.label+str(1))
-                                if a.mconnec == 0: ligand_data.append(a.label+str(0))
-                            for a in spec_object.atoms:
-                                if a.mconnec > 0: ref_data.append(a.label+str(1))
-                                if a.mconnec == 0: ref_data.append(a.label+str(0))
-                                    
-                            #lig.labels, lig.coord, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
-                            dummy1, dummy2, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
-                            bla = list(np.array(lig.labels)[map12])
+                        # Adding connectivity data to labels to improve the hungarian sort
+                        ligand_data = []
+                        ref_data = []
+                        for a in lig.atoms:
+                            if a.mconnec > 0: ligand_data.append(a.label+str(1))
+                            if a.mconnec == 0: ligand_data.append(a.label+str(0))
+                        for a in spec_object.atoms:
+                            if a.mconnec > 0: ref_data.append(a.label+str(1))
+                            if a.mconnec == 0: ref_data.append(a.label+str(0))
+                                
+                        #lig.labels, lig.coord, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
+                        dummy1, dummy2, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
+                        bla = list(np.array(lig.labels)[map12])
 
-                            issorted = True
-                            tend_hun = time.time()
-                            print(f"Hungarian took {tend_hun - tini_hun:.2f} seconds")
-                            print(f"Hungarian gave map12:{map12}")
-                            #print(*dummy1)
-                            #print(*bla)
-                            #print(*spec_object.labels)
+                        issorted = True
+                        tend_hun = time.time()
+                        print(f"Hungarian took {tend_hun - tini_hun:.2f} seconds")
+                        print(f"Hungarian gave map12:{map12}")
+                        #print(*dummy1)
+                        #print(*bla)
+                        #print(*spec_object.labels)
                         ###############                      
                         
                         for p in list_of_protonations:
@@ -1639,10 +1640,10 @@ def build_bonds(moleclist: list, debug: int=1) -> list:
     if debug >= 1: print("###########################")
     # 2nd Part. Creates Ligand Information
     for mol in moleclist:
-        if debug >= 1: print(f"BUILD BONDS: doing mol with Natoms {mol.natoms}")
+        if debug >= 1: print(f"BUILD BONDS: doing mol {mol.formula} with Natoms {mol.natoms}")
         if mol.type == "Complex":
             for lig in mol.ligandlist:
-                if debug >= 1: print(f"BUILD BONDS: doing ligand with Natoms {lig.natoms}")
+                if debug >= 1: print(f"BUILD BONDS: doing ligand {lig.formula}")
 
                 for idx, a in enumerate(lig.atoms):
                     # if debug >= 1: print(len(lig.atoms), lig.natoms)
@@ -1694,7 +1695,7 @@ def build_bonds(moleclist: list, debug: int=1) -> list:
     if debug >= 1: print("###########################")
     # 3rd Part. Merges Ligand Information into Molecule Object using the atlists
     for mol in moleclist:
-        if debug >= 1: print("BUILD BONDS: doing mol", mol.labels, "with Natoms", mol.natoms)
+        if debug >= 1: print("BUILD BONDS: doing mol", mol.formula, "with Natoms", mol.natoms)
         if mol.type == "Complex":
             allstarts = []
             allends = []
