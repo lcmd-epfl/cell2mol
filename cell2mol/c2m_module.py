@@ -7,7 +7,7 @@ import os
 import copy
 from typing import Tuple
 # Import modules
-from cell2mol.cell_reconstruct import (getmolecs,identify_frag_molec_H,split_complexes_reassign_type,fragments_reconstruct,get_reference_molecules, compare_moleclist_refmoleclist)
+from cell2mol.cell_reconstruct import (getmolecs,identify_frag_molec_H,split_complexes_reassign_type,fragments_reconstruct,get_reference_molecules)#, compare_moleclist_refmoleclist)
 from cell2mol.formal_charge import (drive_get_poscharges,classify_mols,balance_charge,build_bonds,prepare_mols)
 from cell2mol.missingH import check_missingH
 from cell2mol.tmcharge_common import Cell
@@ -40,9 +40,9 @@ def get_refmoleclist_and_check_missingH(cell: object, reflabels: list, fracs: li
     return cell, covalent_factor, metal_factor
 
 
-def reconstruct(cell: object, reflabels: list, fracs: list) -> object:
+def reconstruct(cell: object, reflabels: list, fracs: list, debug: int=0) -> object:
 
-    debug = 0
+    # We start with an empty list of molecules
     moleclist = []
 
     # Get a list of ref.molecules and Check missing H in ref.molecules
@@ -53,38 +53,38 @@ def reconstruct(cell: object, reflabels: list, fracs: list) -> object:
         Warning, blocklist = getmolecs(cell.labels, cell.pos, covalent_factor, metal_factor)
         cell.warning_list.append(Warning)
 
-
+    # Indentify blocks and Reconstruct Fragments
     if not any(cell.warning_list):
-        # Indentify blocks and Reconstruct Fragments
         moleclist, fraglist, Hlist, init_natoms = identify_frag_molec_H(blocklist, moleclist, cell.refmoleclist, cell.cellvec)
         moleclist, finalmols, Warning = fragments_reconstruct(moleclist,fraglist,Hlist,cell.refmoleclist,cell.cellvec,covalent_factor,metal_factor,debug)
-
         moleclist.extend(finalmols)
         
-        # Compare moleclist with refmoleclist
-        warning_kinds = compare_moleclist_refmoleclist(moleclist, cell.refmoleclist)
-           
-        # Check final number of atoms after reconstruction   
+    # Split Complexes and Reassign Type
+    if not any(cell.warning_list):
+        cell = split_complexes_reassign_type(cell, moleclist)
+
+        #print("Molecule Types assigned. These are:")
+        #for mol in moleclist:
+        #    print(mol.formula, mol.type)
+         
+        if any(mol.type != "Complex" and mol.type != "Other" for mol in moleclist):
+            Warning = True
+            print(f"Fragment hasn't been fully reconstructed. Stopping")
+               
+    # Check final number of atoms after reconstruction   
+    if not any(cell.warning_list):
         final_natoms = 0
         for mol in moleclist:
             final_natoms += mol.natoms
 
         if final_natoms != init_natoms:
-            warning_num = True
-            print(f"Final and initial atoms do not coincide. Final/Initial {final_natoms}/ {init_natoms}\n")
-        else:
-            warning_num = False
-            print(f"Final and initial atoms coincide. Final/Initial {final_natoms}/ {init_natoms}\n")
-        cell.warning_list.append(any([Warning, warning_kinds, warning_num]))
-    
+            Warning = True
+            print(f"Final and initial atoms do not coincide. Final/Initial {final_natoms}/{init_natoms}\n")
+
+    cell.warning_list.append(Warning)
     cell.warning_after_reconstruction = copy.deepcopy(cell.warning_list)
-    
-    # Split Complexes and Reassign Type
-    if not any(cell.warning_list):
-        cell = split_complexes_reassign_type(cell, moleclist)
 
     return cell
-
 
 def determine_charge(cell: object) -> object:
 
@@ -194,6 +194,9 @@ def load_cell_reset_charges (cellpath: str) -> object:
     return cell
 
 
+##################################################################################
+################################## MAIN ##########################################
+##################################################################################
 def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3) -> object:
 
     if step == 1 or step == 3:
@@ -201,7 +204,7 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3) -> objec
         tini = time.time()
 
         # Read reference molecules from info file
-        labels, pos, reflabels, fracs, cellvec, cellparam = readinfo(infopath)
+        labels, pos, ref_labels, ref_fracs, cellvec, cellparam = readinfo(infopath)
 
         # Initialize cell object
         warning_list = []
@@ -210,15 +213,15 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3) -> objec
 
         # Cell Reconstruction
         print("===================================== step 1 : Cell reconstruction =====================================\n")
-        cell = reconstruct(cell, reflabels, fracs)
+        cell = reconstruct(cell, ref_labels, ref_fracs)
         tend = time.time()
         print(f"\nTotal execution time for Cell Reconstruction: {tend - tini:.2f} seconds")
 
     elif step == 2:
-        print("\n***Imprementing only Charge Assignment***")
-        print("\nCell object loading by pickle")
+        print("\n***Runing only Charge Assignment***")
+        print("\nCell object loaded with pickle")
         cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(refcode))
-        cell = load_cell_reset_charges (cellpath)
+        cell = load_cell_reset_charges(cellpath)
     else:
         print("Inproper step number")
         sys.exit(1)

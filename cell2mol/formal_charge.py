@@ -125,7 +125,7 @@ def classify_mols(moleclist: list, debug: int=0) -> Tuple[list, list, list, list
     nspecs = len(unique_species)
     for idx in range(0, nspecs):
         count = unique_indices.count(idx)
-        print(f"CLASSIFY: specie {idx} appears {count} times")
+        print(f"CLASSIFY: specie {idx} appears {count} times, with type: {unique_species[idx][0]}")
         #unique_species[idx][1].occurrence = count
 
     return molec_indices, ligand_indices, unique_indices, unique_species
@@ -1396,7 +1396,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
     for idx, mol in enumerate(moleclist):
         #while not Warning:
         if debug >= 1: print("")
-        if debug >= 1: print(f"PREPARE: Molecule {idx} is a {mol.type} with formulat {mol.formula}"),
+        if debug >= 1: print(f"PREPARE: Molecule {idx} is a {mol.type} with formula {mol.formula}"),
         #if debug >= 1: print(f"PREPARE: Molecule {idx} is a {mol.type} with labels {mol.labels}"),
     
         if mol.type == "Other":
@@ -1472,34 +1472,34 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                         # HUNGARIAN SORT
                         ###############
                         issorted = False
-                        #if tgt_protonation.typ == "Non-local":
-                        tini_hun = time.time()
+                        if not lig.hapticity:
+                            tini_hun = time.time()
 
-                        # Adding connectivity data to labels to improve the hungarian sort
-                        ligand_data = []
-                        ref_data = []
-                        for a in lig.atoms:
-                            if a.mconnec > 0: ligand_data.append(a.label+str(1))
-                            if a.mconnec == 0: ligand_data.append(a.label+str(0))
-                        for a in spec_object.atoms:
-                            if a.mconnec > 0: ref_data.append(a.label+str(1))
-                            if a.mconnec == 0: ref_data.append(a.label+str(0))
-                                
-                        #lig.labels, lig.coord, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
-                        dummy1, dummy2, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
-                        bla = list(np.array(lig.labels)[map12])
+                            # Adding connectivity data to labels to improve the hungarian sort
+                            ligand_data = []
+                            ref_data = []
+                            for a in lig.atoms:
+                                if a.mconnec > 0: ligand_data.append(a.label+str(1))
+                                if a.mconnec == 0: ligand_data.append(a.label+str(0))
+                            for a in spec_object.atoms:
+                                if a.mconnec > 0: ref_data.append(a.label+str(1))
+                                if a.mconnec == 0: ref_data.append(a.label+str(0))
+                                    
+                            #lig.labels, lig.coord, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
+                            dummy1, dummy2, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
+                            bla = list(np.array(lig.labels)[map12])
 
-                        issorted = True
-                        tend_hun = time.time()
-                        print(f"Hungarian took {tend_hun - tini_hun:.2f} seconds")
-                        print(f"Hungarian gave map12:{map12}")
-                        #print(*dummy1)
-                        #print(*bla)
-                        #print(*spec_object.labels)
-                        ###############                      
+                            issorted = True
+                            tend_hun = time.time()
+                            print(f"Hungarian took {tend_hun - tini_hun:.2f} seconds")
+                            print(f"Hungarian gave map12:{map12}")
+                            #print(*dummy1)
+                            #print(*bla)
+                            #print(*spec_object.labels)
+                            ###############                      
                         
                         for p in list_of_protonations:
-                            if debug >= 1: print(f"PREPARE: evaluating prot state with {p.os}, {p.added_atoms}, {p.addedlist}")
+                            if debug >= 1: print(f"PREPARE: evaluating prot state with added_atoms={p.added_atoms}, addedlist={p.addedlist}")
                             if p.os == tgt_protonation.os and p.added_atoms == tgt_protonation.added_atoms and not found_prot:
                                 if issorted:
                                     tmp_addedlist = list(np.array(p.addedlist)[map12])

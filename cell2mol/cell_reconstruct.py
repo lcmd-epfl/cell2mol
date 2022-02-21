@@ -1210,32 +1210,28 @@ def fragments_reconstruct(
         print("##############################################")
         print(len(fraglist), "molecules submitted to SEQUENTIAL with Heavy")
         print("##############################################")
-        newmols, remfrag = sequential(
-            fraglist, refmoleclist, cellvec, factor, metal_factor, "Heavy", debug
-        )
+        newmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "Heavy", debug)
         print(len(newmols), len(remfrag), "molecules out of SEQUENTIAL with Heavy")
         moleclist.extend(newmols)
         fraglist = []
         fraglist.extend(remfrag)
         fraglist.extend(Hlist)
 
-        print(" ")
-        # Prints molecules after Heavy Fragment Reconstruction
-        if len(newmols) > 0:
-            for mol in newmols:
-                print(
-                    "Molec reconstructed after Heavy", mol.natoms, mol.labels, mol.type
-                )
-        else:
-            print("NO Molecules reconstructed after Heavy")
-        if len(remfrag) > 0:
-            for rem in remfrag:
-                print("Remaining after Heavy", rem.natoms, rem.labels, rem.type)
-        else:
-            print("NO remaining Molecules after Heavy")
-
-        print(" ")
-
+        # For debugging
+        if debug >= 1:
+            print(" ")
+            # Prints molecules after Heavy Fragment Reconstruction
+            if len(newmols) > 0:
+                for mol in newmols:
+                    print("Molec reconstructed after Heavy", mol.natoms, mol.formula, mol.type)
+            else:
+                print("NO Molecules reconstructed after Heavy")
+            if len(remfrag) > 0:
+                for rem in remfrag:
+                    print("Remaining after Heavy", rem.natoms, rem.formula, rem.type)
+            else:
+                print("NO remaining Molecules after Heavy")
+            print(" ")
     else:
         print("Only 0 or 1 heavy fragments. Skipping Heavy")
         remfrag = fraglist.copy()
@@ -1246,66 +1242,59 @@ def fragments_reconstruct(
         print("##############################################")
         print(len(fraglist), "molecules submitted to sequential with All")
         print("##############################################")
-        finalmols, remfrag = sequential(
-            fraglist, refmoleclist, cellvec, factor, metal_factor, "All", debug
-        )
+        finalmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "All", debug)
         if len(remfrag) > 0:
             Warning = True
             for rem in remfrag:
-                print(
-                    "Remaining after Hydrogen reconstruction",
-                    rem.natoms,
-                    rem.labels,
-                    rem.type,
-                )
+                print("Remaining after Hydrogen reconstruction",rem.natoms,rem.formula,rem.type)
         else:
             print("NO remaining Molecules after Hydrogen reconstruction")
             Warning = False
         print(" ")
     else:
+        print("Not necessary to reconstruct Hydrogens")
         finalmols = fraglist.copy()  # IF not Hidrogen fragments, then is done
         remfrag = []
 
     return moleclist, finalmols, Warning
 
-
 #######################################################
-def compare_moleclist_refmoleclist(moleclist: list, refmoleclist: list, debug: int=0) -> bool:
-    
-    found = []
-    not_found = []
-
-    for mol in moleclist:
-        for ref in refmoleclist:
-            if (ref.elemcountvec == mol.elemcountvec).all() and (ref.adjtypes == mol.adjtypes).all():
-                found.append(mol)
-            else:
-                pass
-
-    for mol in moleclist:
-        if mol not in found:
-            not_found.append(mol)
-
-    print(f"Compare molecules in moleclist with molecules in refmoleclist: Right/Wrong {len(found)}/ {len(not_found)}")
-
-    if len(not_found) == 0 :
-        Warning = False
-        print("All molecules in moleclist are found in refmoleclist\n")
-    else : 
-        Warning = True
-        print("Wrong molecules in moleclist")
-        for wrong in not_found: 
-            print("Wrong: the number of atoms", len(wrong.labels), wrong.labels)
-        if debug >= 1 : 
-            print("\nRefmoleclist")
-            for j, ref in enumerate(refmoleclist):
-                print("Ref {}".format(j), "the number of atoms:", len(ref.labels), ref.labels)
-
-    print("")
-
-    return Warning
-
-
+#def compare_moleclist_refmoleclist(moleclist: list, refmoleclist: list, debug: int=0) -> bool:
+#    
+#    found = []
+#    not_found = []
+#
+#    for mol in moleclist:
+#        for ref in refmoleclist:
+#            if (ref.elemcountvec == mol.elemcountvec).all() and (ref.adjtypes == mol.adjtypes).all():
+#                found.append(mol)
+#            else:
+#                pass
+#
+#    for mol in moleclist:
+#        if mol not in found:
+#            not_found.append(mol)
+#
+#    print(f"Compare molecules in moleclist with molecules in refmoleclist: Right/Wrong {len(found)}/ {len(not_found)}")
+#
+#    if len(not_found) == 0 :
+#        Warning = False
+#        print("All molecules in moleclist are found in refmoleclist\n")
+#    else : 
+#        Warning = True
+#        print("Wrong molecules in moleclist")
+#        for wrong in not_found: 
+#            print("Wrong: the number of atoms", len(wrong.labels), wrong.labels)
+#        if debug >= 1 : 
+#            print("\nRefmoleclist")
+#            for j, ref in enumerate(refmoleclist):
+#                print("Ref {}".format(j), "the number of atoms:", len(ref.labels), ref.labels)
+#
+#    print("")
+#
+#    return Warning
+#
+#
 #######################################################
 def assigntype(molecule: object, references: list) -> str:
     Found = False
