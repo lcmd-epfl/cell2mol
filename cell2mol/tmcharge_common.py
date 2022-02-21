@@ -26,7 +26,7 @@ def labels2formula(labels):
 ################################
 def getelementcount(labels: list) -> np.ndarray:
     elems = elemdatabase.elementnr.keys()
-    times = np.zeros((len(elems)))
+    times = np.zeros((len(elems)),dtype=int)
     for l in labels:
         for jdx, elem in enumerate(elems):
             if l == elem:
@@ -37,7 +37,7 @@ def getelementcount(labels: list) -> np.ndarray:
 ################################
 def getHvcount(labels: list) -> np.ndarray:
     elems = elemdatabase.elementnr.keys()
-    times = np.zeros((len(elems)))
+    times = np.zeros((len(elems)),dtype=int)
     for l in labels:
         if l != "H":
             for jdx, elem in enumerate(elems):
@@ -49,7 +49,8 @@ def getHvcount(labels: list) -> np.ndarray:
 ################################
 def get_adjacency_types(label: list, conmat: np.ndarray) -> np.ndarray:
     elems = elemdatabase.elementnr.keys()
-    bondtypes = np.zeros((len(elems), len(elems))).astype(int)
+    bondtypes = np.zeros((len(elems), len(elems)),dtype=int)
+    #bondtypes = np.zeros((len(elems), len(elems))).astype(int)
     natoms = len(label)
     found = np.zeros((natoms, natoms))
 
@@ -473,11 +474,7 @@ class molecule(object):
 
         for idx, a in enumerate(self.atoms):
             # print("adjacencies sent with", np.array(self.conmat[idx].astype(int)), np.array(self.mconmat[idx].astype(int)))
-            a.adjacencies(
-                np.array(self.conmat[idx].astype(int)),
-                np.array(self.mconmat[idx].astype(int)),
-                type="Molecule",
-            )
+            a.adjacencies(np.array(self.conmat[idx].astype(int)),np.array(self.mconmat[idx].astype(int)),type="Molecule")
 
     # def repr_CM(self, ):
     # self.CM = coulomb_matrix(self.atnums, self.coord)

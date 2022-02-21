@@ -33,10 +33,7 @@ def writexyz(fdir, fname, labels, pos):
         print(natoms, file=fil)
         print(" ", file=fil)
         for idx, l in enumerate(labels):
-            print(
-                "%s  %.6f  %.6f  %.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]),
-                file=fil,
-            )
+            print("%s  %.6f  %.6f  %.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]),file=fil)
 
 
 ##############
