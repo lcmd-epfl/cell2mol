@@ -17,7 +17,7 @@ from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
 #######################################################
-def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> None:
+def verify_connectivity(ligand: object, molecule: object, debug: int = 1) -> None:
 
     metalist = molecule.metalist.copy()
 
@@ -29,6 +29,7 @@ def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> Non
     # position (index) of the added atom
     posadded = len(ligand.labels)
 
+    if debug >= 1: print("")
     if debug >= 1: print(f"VERIFY: checking connectivity of ligand {ligand.formula}")
     if debug >= 1: print(f"VERIFY: initial connectivity is {ligand.totmconnec}")
     for g in ligand.grouplist:
@@ -36,21 +37,16 @@ def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> Non
             if debug >= 1: print("VERIFY: group has hapticity, skipping check")
         else:
             for idx, a in enumerate(ligand.atoms):
-                if a.mconnec == 1 and a.index in g.atlist:
+                if a.mconnec >= 1 and a.index in g.atlist:
+                    if debug >= 1: print(f"VERIFY: connectivity={a.mconnec} in atom idx={idx}, label={a.label}")
                     tgt, apos, dist = find_closest_metal(a, metalist)
                     idealdist = a.radii + elemdatabase.CovalentRadius2["H"]
-                    addedHcoords = apos + (metalist[tgt].coord - apos) * (
-                        idealdist / dist
-                    )  # the factor idealdist/dist[tgt] controls the distance
-                    newcoord.append(
-                        [addedHcoords[0], addedHcoords[1], addedHcoords[2]]
-                    )  # adds H at the position of the closest Metal Atom
+                    addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
+                    newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])  # adds H at the position of the closest Metal Atom
 
                     # Evaluates the new adjacency matrix.
                     tmpradii = getradii(newlab)
-                    dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(
-                        newlab, newcoord, ligand.factor, tmpradii
-                    )
+                    dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, newcoord, ligand.factor, tmpradii)
                     # If no undesired adjacencies have been created, the coordinates are kept. Otherwise, data is corrected
                     if tmpconnec[posadded] == 1:
                         if debug >= 1: print(f"VERIFY: connectivity verified for atom {idx} with label {a.label}")
@@ -416,9 +412,7 @@ def getmolecs(labels: list, pos: list, factor: float=1.3, metal_factor: float=1.
         mlist = []
         print("GETMOLECS: steric clashes found. Printing Coordinates")
         for idx, lab in enumerate(labels):
-            print(
-                "%s   %.6f   %.6f   %.6f" % (lab, pos[idx][0], pos[idx][1], pos[idx][2])
-            )
+            print("%s   %.6f   %.6f   %.6f" % (lab, pos[idx][0], pos[idx][1], pos[idx][2]))
         print("")
 
     return Warning, mlist
@@ -451,9 +445,7 @@ def splitcomplex(molecule: object, factor: float=1.3, metal_factor: float=1.0) -
     number_of_metal_atoms = 0
     for idx, a in enumerate(molecule.atoms):
         if a.block == "d" or a.block == "f":
-            matoms.append(
-                a
-            )  # This information is for the ligands. To generate lig.metalatoms
+            matoms.append(a)  # This information is for the ligands. To generate lig.metalatoms
             number_of_metal_atoms += 1
             met = metal(number_of_metal_atoms, idx, a.label, a.coord, a.radii)
             met.information(factor, metal_factor)
@@ -464,10 +456,7 @@ def splitcomplex(molecule: object, factor: float=1.3, metal_factor: float=1.0) -
             met.adjacencies(tmp_mconnec)
             metalist.append(met)
 
-            connec_atoms_label = (
-                []
-            )  # collects the labels of all atoms connected to this metal
-            # print(molecule.mconmat)
+            connec_atoms_label = ([])  # collects the labels of all atoms connected to this metal
             for jdx, at2 in enumerate(molecule.atoms):
                 if molecule.mconmat[idx, jdx] == 1:
                     connec_atoms_label.append(str(at2.label))
@@ -481,14 +470,10 @@ def splitcomplex(molecule: object, factor: float=1.3, metal_factor: float=1.0) -
             mfreeatlist.append(idx)
 
     # Uses the Metal-free coordinates to find the ligands. Notice that, when creating their metal connectivity, it uses that of the original molecule
-    status, conmat, connec, dummy, dummy = getconec(
-        mfreelabels, mfreepos, factor, mfreeradii
-    )
+    status, conmat, connec, dummy, dummy = getconec(mfreelabels, mfreepos, factor, mfreeradii)
 
     if status == 1:
-        degree = np.diag(
-            connec
-        )  # creates a matrix with connec as diagonal values. Needed for the laplacian
+        degree = np.diag(connec)  # creates a matrix with connec as diagonal values. Needed for the laplacian
         lap = conmat - degree  # computes laplacian
 
         graph = csr_matrix(lap)

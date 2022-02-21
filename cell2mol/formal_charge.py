@@ -36,7 +36,7 @@ rdBase.DisableLog("rdApp.*")
 
 
 #######################################################
-def classify_mols(moleclist: list, debug: int=0) -> Tuple[list, list, list, list]:
+def classify_mols(moleclist: list, debug: int=1) -> Tuple[list, list, list, list]:
 
     # This subroutine reads all molecules and
     # identifies those that are identical based on a sort of ID number, which is
@@ -62,15 +62,28 @@ def classify_mols(moleclist: list, debug: int=0) -> Tuple[list, list, list, list
         if mol.type != "Complex":
             found = False
             for ldx, typ in enumerate(typelist_mols):
+                #print("typ0")
+                #print(typ[0])
+                #print("mol")
+                #print(mol.elemcountvec)
                 if (mol.elemcountvec == typ[0]).all() and not found:
-                    found = True
-                    kdx = typelist_mols[ldx][1]
-                    if debug >= 1: print(f"Molecule {idx} is the same than {ldx} in typelist")
+                    #print("A")
+                    #print(*mol.adjtypes)
+                    #print("B")
+                    #print(*typ[1])
+                    if (mol.adjtypes == typ[1]).all():
+                        if mol.totmconnec == typ[2]:
+                            found = True
+                            kdx = typ[3]
+                            if debug >= 1: print(f"Molecule {idx} is the same than {ldx} in typelist")
             if not found:
                 specs_found += 1
                 kdx = specs_found
-                if debug >= 1: print(f"New molecule found with: {mol.formula} and added in position {kdx}")
-                typelist_mols.append(list([mol.elemcountvec, kdx]))
+                if debug >= 1: print(f"New molecule found with: formula={mol.formula}, totmconnec={mol.totmconnec}, and added in position {kdx}")
+                typ_comparison = [mol.elemcountvec, mol.adjtypes, mol.totmconnec, kdx]
+                #print(typ_comparison)
+                typelist_mols.append(typ_comparison)
+                #typelist_mols.append(list([mol.elemcountvec, kdx]))
                 unique_species.append(list([mol.type, mol]))
 
             jdx = "-"
@@ -84,16 +97,29 @@ def classify_mols(moleclist: list, debug: int=0) -> Tuple[list, list, list, list
                 found = False
     # Ligands
                 for ldx, typ in enumerate(typelist_ligs):
+                    #print("typ0")
+                    #print(typ[0])
+                    #print("lig")
+                    #print(lig.elemcountvec)
                     if (lig.elemcountvec == typ[0]).all() and not found:
-                        found = True
-                        kdx = typelist_ligs[ldx][1]
-                        if debug >= 1: print(f"Ligand {jdx} is the same than {ldx} in typelist")
+                        #print("A")
+                        #print(*lig.adjtypes)
+                        #print("B")
+                        #print(*typ[1])
+                        if (lig.adjtypes == typ[1]).all():
+                            if lig.totmconnec == typ[2]:
+                                found = True
+                                kdx = typ[3]
+                                if debug >= 1: print(f"Ligand {jdx} is the same than {ldx} in typelist")
                 if not found:
                     specs_found += 1
                     kdx = specs_found
-                    if debug >= 1: print(f"New ligand found with: formula {lig.formula} and added in position {kdx}")
-                    typelist_ligs.append(list([lig.elemcountvec, kdx]))
+                    if debug >= 1: print(f"New ligand found with: formula {lig.formula} and totmconnec={lig.totmconnec}, and added in position {kdx}")
+                    typ_comparison = [lig.elemcountvec, lig.adjtypes, lig.totmconnec, kdx]
+                    #print(typ_comparison)
+                    typelist_ligs.append(typ_comparison)
                     unique_species.append(list([lig.type, lig, mol]))
+                    #typelist_ligs.append(list([lig.elemcountvec, kdx]))
 
                 molec_indices.append(idx)
                 ligand_indices.append(jdx)
@@ -111,7 +137,9 @@ def classify_mols(moleclist: list, debug: int=0) -> Tuple[list, list, list, list
                     specs_found += 1
                     kdx = specs_found
                     if debug >= 1: print(f"New Metal Center found with: labels {met.label} and added in position {kdx}")
-                    typelist_mets.append(list([met.coord_sphere_ID, kdx]))
+                    typ_comparison = list([met.coord_sphere_ID, kdx])
+                    typelist_mets.append(typ_comparison)
+                    #typelist_mets.append(list([met.coord_sphere_ID, kdx]))
                     unique_species.append(list([met.type, met, mol]))
 
                 molec_indices.append(idx)
@@ -199,21 +227,11 @@ def getcharge(labels: list, pos: list, conmat: np.ndarray, ich: int, cov_factor:
             # I know it should be the same, but in bad SMILES they often do not coincide
             if bonds != valence:
                 if debug >= 1:
-                    print(
-                        "GETCHARGE: 1st Check-bonds/valence:",
-                        i,
-                        a.GetSymbol(),
-                        bonds,
-                        valence,
-                    )
+                    print("GETCHARGE: 1st Check-bonds/valence:",i,a.GetSymbol(),bonds,valence)
                 iscorrect = False
                 if debug >= 1:
                     for b in a.GetBonds():
-                        print(
-                            b.GetBondTypeAsDouble(),
-                            b.GetBeginAtomIdx(),
-                            b.GetEndAtomIdx(),
-                        )
+                        print(b.GetBondTypeAsDouble(),b.GetBeginAtomIdx(),b.GetEndAtomIdx())
 
             # Third check, using the totalvalenceelectrons
             if totalvalenceelectrons != elemdatabase.valenceelectrons[a.GetSymbol()]:
@@ -515,7 +533,7 @@ def eval_chargelist(atom_charges: list) -> Tuple[np.ndarray, np.ndarray, bool]:
     return abstotal, abs_atcharge, zwitt
 
 #######################################################
-def get_poscharges(spec: list, debug: int=1) -> Tuple[list, bool]:
+def get_poscharges(spec: list, debug: int=0) -> Tuple[list, bool]:
     # This function drives the detrmination of the charge for a "ligand=lig" of a given "molecule=mol"
     # The whole process is done by the functions:
     # 1) define_sites, which determines which atoms must have added elements (see above)
@@ -557,7 +575,7 @@ def get_poscharges(spec: list, debug: int=1) -> Tuple[list, bool]:
                 ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
                 list_of_charge_states.append(ch_state)
                 list_of_protonations_for_each_state.append(prot)
-                if debug >= 0: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}")
+                if debug >= 1: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}")
 
             NO_type = get_nitrosyl_geom(spec[1])
             if NO_type == "Linear":
@@ -605,7 +623,7 @@ def get_poscharges(spec: list, debug: int=1) -> Tuple[list, bool]:
                     ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
                     list_of_charge_states.append(ch_state)
                     list_of_protonations_for_each_state.append(prot)
-                    if debug >= 0: print(f"    POSCHARGE: charge {ich} with smiles {ch_state.smiles}")
+                    if debug >= 1: print(f"    POSCHARGE: charge {ich} with smiles {ch_state.smiles}")
                 except Exception as exc:
                     if debug >= 0: print(f"    POSCHARGE: EXCEPTION in get_poscharges: {exc}")
 
@@ -1207,7 +1225,7 @@ def define_sites(ligand: object, molecule: object, debug: int=1) -> list:
                     for jdx, a in enumerate(ligand.atoms):
                         addH = False
                         # Conditions for adding an element 
-                        if a.mconnec == 1 and a.label not in avoid:
+                        if a.mconnec >= 1 and a.label not in avoid:
                             total_bond_order = BOlist[idx][jdx]
                             if (a.label == "O" or a.label == "S" or a.label == "Se") and total_bond_order < 2:
                                 addH = True
@@ -1255,9 +1273,9 @@ def define_sites(ligand: object, molecule: object, debug: int=1) -> list:
                         new_prot = protonation(newlab, newcoord, ligand.factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, os=oslist[idx], typ="Non-local") 
                         if new_prot.status == 1:
                             list_of_protonations.append(new_prot)
-                            if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand")
+                            if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand. status={new_prot.status}")
                         else:
-                            if debug >= 1:  print(f"        DEFINE_SITES: Protonation DISCARDED. Steric Clashes found when adding atoms")
+                            if debug >= 1:  print(f"        DEFINE_SITES: Protonation DISCARDED. Steric Clashes found when adding atoms. status={new_prot.status}")
 
                     
         #################
@@ -1296,7 +1314,7 @@ def define_sites(ligand: object, molecule: object, debug: int=1) -> list:
                 os = -np.sum(com)
                 toallocate = int(0)
                 for jdx, a in enumerate(ligand.atoms):
-                    if a.mconnec == 1 and a.label not in avoid and block[jdx] == 0:
+                    if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
                         if non_local_groups > 1:
                             if com[toallocate] == 1:
                                 elemlist[jdx] = "H"
@@ -1327,9 +1345,9 @@ def define_sites(ligand: object, molecule: object, debug: int=1) -> list:
                 new_prot = protonation(newlab, newcoord, ligand.factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, os, typ="Non-local") 
                 if new_prot.status == 1 and new_prot.added_atoms == -os:
                     list_of_protonations.append(new_prot)
-                    if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand")
+                    if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand. status={new_prot.status}")
                 else:
-                    if debug >= 1:  print(f"        DEFINE_SITES: Protonation DISCARDED. Steric Clashes found when adding atoms")
+                    if debug >= 1:  print(f"        DEFINE_SITES: Protonation DISCARDED. Steric Clashes found when adding atoms. status={new_prot.status}")
                 
     return list_of_protonations 
 
@@ -1360,7 +1378,8 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
             tmpradii = getradii(newlab)
             dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, newcoord, ligand.factor, tmpradii)
             # If no undesired adjacencies have been created, the coordinates are kept
-            if tmpconnec[posadded] == 1:
+            #if tmpconnec[posadded] == 1:
+            if tmpconnec[posadded] <= 1:
                 isadded = True
                 if debug >= 1: print(f"        ADD_ATOM: Chosen {tgt} Metal atom. {element} is added at site {site}")
             # Otherwise, coordinates are reset
@@ -1375,30 +1394,33 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
 
 #######################################################
 def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, selected_charge_states: list, final_charge_distribution: list, debug: int=1) -> Tuple[list, bool]:
-    #############
+    
     #############
     Warning = False
     idxtoallocate = 0
 
-    #################
-    # SANITY CHECKS #
-    #################
-    print(selected_charge_states)
-    if debug >= 1: print(f"PREPARE: {len(moleclist)} molecules to prepare, of types")
-    if debug >= 1: print(f"PREPARE: {len(selected_charge_states)} selected_charge_states received")
+    # prints SUMMARY at start
+    if debug >= 1: 
+        print(f"PREPARE: {len(selected_charge_states)} selected_charge_states received")
+        print("")
+        print(f"PREPARE: {len(moleclist)} molecules to prepare, of types")
+        for idx, mol in enumerate(moleclist):
+            print(f"PREPARE: Molecule {idx} is a {mol.type} with formula {mol.formula}"),
+        print("")
+
     for idx, sel in enumerate(selected_charge_states):
         for jdx, opt in enumerate(sel):
             chstate = opt[0]
             prot = opt[1]
             if debug >= 0: print(f"PREPARE: State {idx} and option {jdx}. Target state and protonation received with {chstate.corr_total_charge} and {prot.added_atoms}")
-        
  
     for idx, mol in enumerate(moleclist):
-        #while not Warning:
         if debug >= 1: print("")
         if debug >= 1: print(f"PREPARE: Molecule {idx} is a {mol.type} with formula {mol.formula}"),
-        #if debug >= 1: print(f"PREPARE: Molecule {idx} is a {mol.type} with labels {mol.labels}"),
     
+        ###################################
+        ### FOR SOLVENT AND COUNTERIONS ###
+        ###################################
         if mol.type == "Other":
             specie = unique_indices[idxtoallocate]
             spec_object = unique_species[specie][1]
@@ -1409,7 +1431,6 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
             for jdx, ch in enumerate(spec_object.poscharge):
                 if final_charge_distribution[idxtoallocate] == ch and not allocated:   # If the charge in poscharges coincides with the one for this entry in final_distribution
     
-                    #try: 
                     tgt_charge_state = selected_charge_states[specie][jdx][0]
                     tgt_protonation = selected_charge_states[specie][jdx][1]
                     if debug >= 0: print(f"PREPARE: target state and protonation loaded, with {tgt_charge_state.corr_total_charge} and {tgt_protonation.added_atoms}")
@@ -1423,9 +1444,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                     else:
                         if debug >= 0: print(f"PREPARE: Error doing molecule {idx}. Created Charge State is different than Target")
                         Warning = True
-                    #except Exception as exc:
-                    #    if debug >= 0: print(f"    PREPARE: EXCEPTION {exc} for molecule {idx}")
-                    #    Warning = True
+                    
             if allocated: 
                 idxtoallocate += 1
             else:
@@ -1433,6 +1452,9 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                 if debug >= 0: print(f"PREPARE: Warning allocating molecule {idx} with {final_charge_distribution[idxtoallocate]} as target charge") 
                 Warning = True
     
+        ###########################
+        ######  FOR LIGANDS  ######
+        ###########################
         elif mol.type == "Complex":
             if debug >= 1: print(f"PREPARE: Molecule {moleclist.index(mol)} has {len(mol.ligandlist)} ligands")
     
@@ -1462,15 +1484,11 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                     if final_charge_distribution[idxtoallocate] == ch and not allocated:
                         allocated = True
         
-                        ############ RE-RUNS the Charge assignation for same-type molecules in the cell
-                        #### Adds Hydrogens
-                        #tmplab, tmpcoord, addedH, addedlist, metal_electrons = define_sites(lig, mol, debug)
+                        # RE-RUNS the Charge assignation for same-type molecules in the cell
                         list_of_protonations = define_sites(lig, mol, debug=1)
                         found_prot = False
                         
-                        ###############
-                        # HUNGARIAN SORT
-                        ###############
+                        # Hungarian sort
                         issorted = False
                         if not lig.hapticity:
                             tini_hun = time.time()
@@ -1479,27 +1497,25 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                             ligand_data = []
                             ref_data = []
                             for a in lig.atoms:
-                                if a.mconnec > 0: ligand_data.append(a.label+str(1))
-                                if a.mconnec == 0: ligand_data.append(a.label+str(0))
+                                ligand_data.append(a.label+str(a.mconnec))
                             for a in spec_object.atoms:
-                                if a.mconnec > 0: ref_data.append(a.label+str(1))
-                                if a.mconnec == 0: ref_data.append(a.label+str(0))
+                                ref_data.append(a.label+str(a.mconnec))
                                     
                             #lig.labels, lig.coord, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
                             dummy1, dummy2, map12 = reorder(ref_data, ligand_data, spec_object.coord, lig.coord)
-                            bla = list(np.array(lig.labels)[map12])
 
                             issorted = True
                             tend_hun = time.time()
                             print(f"Hungarian took {tend_hun - tini_hun:.2f} seconds")
                             print(f"Hungarian gave map12:{map12}")
-                            #print(*dummy1)
-                            #print(*bla)
-                            #print(*spec_object.labels)
+                            bla = list(np.array(lig.labels)[map12])
+                            print(*dummy1)
+                            print(*bla)
+                            print(*spec_object.labels)
                             ###############                      
                         
                         for p in list_of_protonations:
-                            if debug >= 1: print(f"PREPARE: evaluating prot state with added_atoms={p.added_atoms}, addedlist={p.addedlist}")
+                            if debug >= 1: print(f"PREPARE: evaluating prot state with added_atoms={p.added_atoms}")#, addedlist={p.addedlist}")
                             if p.os == tgt_protonation.os and p.added_atoms == tgt_protonation.added_atoms and not found_prot:
                                 if issorted:
                                     tmp_addedlist = list(np.array(p.addedlist)[map12])
@@ -1510,15 +1526,9 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                                     if debug >= 1: print(f"PREPARE: found match in protonation with tmpsmiles:{p.tmpsmiles}")
                                     prot = p
                                     found_prot = True
-                        if not found_prot and debug >= 0:
-                            Warning = True
-                            print(f"PREPARE: WARNING, I Could not identify the protonation state")
-                            for p in list_of_protonations:
-                                if debug >= 1: print(f"PREPARE: WARNING, I got prot with {p.added_atoms} added atoms and {p.os} OS")
-                        ####
-        
+
                         #### Evaluates possible charges except if the ligand is a nitrosyl
-                        if not Warning:
+                        if found_prot:
                             if isnitrosyl:
                                 NO_type = get_nitrosyl_geom(lig)
                                 if NO_type == "Linear": NOcharge = 1   #NOcharge is the charge with which I need to run getcharge to make it work
@@ -1544,6 +1554,50 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                             else:
                                 lig.charge(ch_state.corr_atom_charges, ch_state.corr_total_charge, ch_state.mol_object, ch_state.smiles)
                                 if debug >= 0: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={ch_state.corr_total_charge}") 
+
+                        else:
+                            print(f"PREPARE: WARNING, I Could not identify the protonation state. I'll try to obtain the desired result")
+                            # Tries to obtain the target result
+                            ## It only adds protonations that match the target one
+                            #list_of_potential_prots = []
+                            #for p in list_of_protonations:
+                            #    if p.os == tgt_protonation.os and p.added_atoms == tgt_protonation.added_atoms:
+                            #        list_of_potential_prots.append(p)
+
+                            found_charge_state = False
+                            for prot in list_of_protonations:
+                            #for prot in list_of_potential_prots:
+                                list_of_charge_states = []
+                                list_of_protonations_for_each_state = []
+                                 
+                                tmpobject = ["Ligand", lig, mol]
+                                chargestried = get_list_of_charges_to_try(tmpobject, prot)
+                                for ich in chargestried:
+                                    ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor)
+                                    ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
+                                    list_of_charge_states.append(ch_state)
+                                    list_of_protonations_for_each_state.append(prot)
+                                    if debug >= 1: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}") 
+
+                            if len(list_of_charge_states) > 0:
+                                best_charge_distr_idx = select_charge_distr(list_of_charge_states)
+                            else:
+                                if debug >= 1: print(f"    POSCHARGE. found EMPTY best_charge_distr_idx for PROTONATION state")
+                                best_charge_distr_idx = []
+
+                            if debug >= 1: print(f"    POSCHARGE. best_charge_distr_idx={best_charge_distr_idx}")
+                            for idx in best_charge_distr_idx:
+                            #for idx in range(len(list_of_charge_states)):
+                                c = list_of_charge_states[idx]
+                                p = list_of_protonations_for_each_state[idx]
+                                if debug >= 1: print(f"    POSCHARGE. {c.corr_total_charge}={ch}, {p.added_atoms}={tgt_protonation.added_atoms}")
+                                if c.corr_total_charge == ch and p.added_atoms == tgt_protonation.added_atoms:
+                                    lig.charge(ch_state.corr_atom_charges, ch_state.corr_total_charge, ch_state.mol_object, ch_state.smiles)
+                                    if debug >= 1: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={ch_state.corr_total_charge}") 
+                                    found_charge_state = True
+ 
+                            if not found_charge_state: Warning = True
+
                 #except Exception as exc:
                 #   if debug >= 0: print(f"    PREPARE: EXCEPTION {exc} for ligand {kdx} of molecule {idx}")
                 #   Warning = True
@@ -1789,7 +1843,12 @@ class protonation(object):
         self.tmpsmiles = tmpsmiles
 
         self.radii = getradii(labels)
+        print("Evaluating status with:", len(self.labels), len(self.radii))
         status, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(self.labels, self.coordinates, self.factor, self.radii)
+
+        if status == 0:
+            for idx in range(len(self.labels)):
+                print("%s  %.6f  %.6f  %.6f" % (self.labels[idx], self.coordinates[idx][0], self.coordinates[idx][1], self.coordinates[idx][2]))
 
         self.status = status     # 1 when correct, 0 when steric clashes
         self.conmat = tmpconmat
