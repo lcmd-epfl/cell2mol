@@ -243,11 +243,10 @@ def getcharge(labels: list, pos: list, conmat: np.ndarray, ich: int, cov_factor:
         if debug >= 1: print(ich,i,a.GetSymbol(),a.GetFormalCharge(),pt.GetDefaultValence(a.GetAtomicNum()),valence,int(bonds),int(lonepairs),iscorrect)
 
     # Creates the charge_state
-    #print("Creating state with",iscorrect, total_charge, atom_charge, smiles, ich)
     try: 
         ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, ich)
     except Exception as exc:
-        if debug >= 0: print(f"    TM-POSCHARGE: EXCEPTION in charge_state creation: {exc}")
+        if debug >= 0: print(f"    GETCHARGE: EXCEPTION in charge_state creation: {exc}")
 
     return ch_state
 
@@ -303,8 +302,16 @@ def select_charge_distr(charge_states: list, debug: int=1) -> list:
 
     # IF no values yet, we relax the criterion 
     if len(tmplist) == 0: 
+        if debug >= 1: print("    NEW SELECT FUNCTION: No entry in initial tmplist yet. We now select from minima and coincide:")
         for idx in range(0, nlists):
             if ((idx in listofminabs) or (idx in listofmintot)) and coincide[idx]: 
+                tmplist.append(idx)
+
+    # IF no values yet, we relax the criterion even more 
+    if len(tmplist) == 0: 
+        if debug >= 1: print("    NEW SELECT FUNCTION: No entry in initial tmplist yet. We now select from minima:")
+        for idx in range(0, nlists):
+            if ((idx in listofminabs) or (idx in listofmintot)): 
                 tmplist.append(idx)
  
     ####################
@@ -611,8 +618,8 @@ def get_poscharges(spec: list, debug: int=0) -> Tuple[list, bool]:
         list_of_charge_states = []
         list_of_protonations_for_each_state = []
         for prot in list_of_protonations: 
-            if debug >= 0: print(" ")
-            if debug >= 0: print(f"    POSCHARGE: doing PROTONATION with added atoms: {prot.added_atoms}")
+            if debug >= 1: print(" ")
+            if debug >= 1: print(f"    POSCHARGE: doing PROTONATION with added atoms: {prot.added_atoms}")
             chargestried = get_list_of_charges_to_try(spec, prot)
             if debug >= 2: print(f"    POSCHARGE will try charges {chargestried}") 
 
@@ -739,7 +746,7 @@ def get_metal_poscharge(metal: object, molecule: object) -> list:
     at_charge[72] = [4]  # Hf
     at_charge[73] = [2, 3, 4]  # Ta
     at_charge[74] = [0, 2, 3, 4, 5, 6]  # W
-    at_charge[75] = [1, 2, 3, 4, 5]  # Re
+    at_charge[75] = [1, 2, 3, 4, 5, 7]  # Re
     at_charge[76] = [0, 2, 3, 4, 5]  # Os
     at_charge[77] = [1, 3]  # Ir
     at_charge[78] = [2, 4]  # Pt
@@ -1843,12 +1850,11 @@ class protonation(object):
         self.tmpsmiles = tmpsmiles
 
         self.radii = getradii(labels)
-        print("Evaluating status with:", len(self.labels), len(self.radii))
         status, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(self.labels, self.coordinates, self.factor, self.radii)
 
-        if status == 0:
-            for idx in range(len(self.labels)):
-                print("%s  %.6f  %.6f  %.6f" % (self.labels[idx], self.coordinates[idx][0], self.coordinates[idx][1], self.coordinates[idx][2]))
+        #if status == 0:
+        #    for idx in range(len(self.labels)):
+        #        print("%s  %.6f  %.6f  %.6f" % (self.labels[idx], self.coordinates[idx][0], self.coordinates[idx][1], self.coordinates[idx][2]))
 
         self.status = status     # 1 when correct, 0 when steric clashes
         self.conmat = tmpconmat
