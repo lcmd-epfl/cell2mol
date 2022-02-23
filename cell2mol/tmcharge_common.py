@@ -275,8 +275,6 @@ def find_groups_within_ligand(ligand: object) -> list:
     startlist, endlist = getblocks(dense)
     ngroups = len(startlist)
 
-    #     np.save("C:/Users/sergi/Documents/PostDoc/Marvel_TM_Database/Get_TMCharge-Tests/BADWOT/Output/matrix", dense)
-
     atomlist = np.zeros((len(dense)))
     for b in range(0, ngroups):
         for i in range(0, len(dense)):
@@ -287,9 +285,6 @@ def find_groups_within_ligand(ligand: object) -> list:
 
     if debug >= 1:
         print(f"FIND GROUPS: the {ngroups} groups start at: {startlist}")
-
-    #     CUTMOLEC [['C', 5], ['C', 6], ['C', 8], ['C', 22], ['C', 24], ['C', 30], ['C', 31], ['C', 33], ['C', 34], ['C', 35]]
-    #     ATOMLISTPERM: [2, 2, 2, 2, 2, 1, 1, 1, 1, 1]
 
     groups = []
     for b in range(0, ngroups):
@@ -625,16 +620,17 @@ class Cell(object):
         self.refmoleclist = []
         self.moleclist = []
         self.warning_list = warning_list
-
-        self.charge_distribution_list = []
-
-        # After cell reconstruction
         self.warning_after_reconstruction = []
 
+        self.charge_distribution_list = []
+   
+    def data_for_postproc(self, molecules, indices, options):
+        self.pp_molecules = molecules
+        self.pp_indices = indices
+        self.pp_options = options
+
     def print_charge_assignment(self):
-        print(
-            "=====================================Charges for all species in the unit cell====================================="
-        )
+        print("=====================================Charges for all species in the unit cell=====================================")
         print("[Ref.code] : {}".format(self.refcode))
         for unit in self.moleclist:
             if unit.type == "Complex":
@@ -642,21 +638,12 @@ class Cell(object):
                 for metal in unit.metalist:
                     print("\t Metal: {} charge {}".format(metal.label, metal.totcharge))
                 for ligand in unit.ligandlist:
-                    print(
-                        "\t Ligand charge {}, {}".format(
-                            ligand.totcharge, ligand.smiles
-                        )
-                    )
-
+                    print("\t Ligand charge {}, {}".format(ligand.totcharge, ligand.smiles))
             elif unit.type == "Other":
-                print(
-                    "\n{} totcharge {}, {}".format(unit.type, unit.totcharge, unit.smiles)
-                )
+                print("\n{} totcharge {}, {}".format(unit.type, unit.totcharge, unit.smiles))
         print("\n")
 
-        
     def print_Warning(self):
-
         reason_of_Warning = [
             "Warning 1! Errors received from getting reference molecules (disorder or strange coordination)",
             "Warning 2! Missing H atoms from C in reference molecules",
@@ -678,10 +665,7 @@ class Cell(object):
 
         if len(res) == 0:
             print("No Warnings!")
-
         else:
             for i in res:
                 print(reason_of_Warning[i])
-
-
 ########## END OF CLASSES ###########
