@@ -8,7 +8,7 @@ import copy
 from typing import Tuple
 # Import modules
 from cell2mol.cell_reconstruct import (getmolecs,identify_frag_molec_H,split_complexes_reassign_type,fragments_reconstruct,get_reference_molecules)#, compare_moleclist_refmoleclist)
-from cell2mol.formal_charge import (drive_get_poscharges,classify_mols,balance_charge,build_bonds,prepare_mols)
+from cell2mol.formal_charge import (drive_get_poscharges,classify_mols,balance_charge,build_bonds,prepare_mols,prepare_unresolved)
 from cell2mol.missingH import check_missingH
 from cell2mol.tmcharge_common import Cell
 from cell2mol.cellconversions import frac2cart_fromparam
@@ -16,6 +16,7 @@ from cell2mol.readwrite import readinfo
 from typing import Tuple
 
 
+##################################################################################
 def get_refmoleclist_and_check_missingH(cell: object, reflabels: list, fracs: list) -> Tuple[object, float, float]:
 
     refpos = frac2cart_fromparam(fracs, cell.cellparam)
@@ -40,10 +41,12 @@ def get_refmoleclist_and_check_missingH(cell: object, reflabels: list, fracs: li
     return cell, covalent_factor, metal_factor
 
 
+##################################################################################
 def reconstruct(cell: object, reflabels: list, fracs: list, debug: int=0) -> object:
 
     # We start with an empty list of molecules
     moleclist = []
+    Warning = False
 
     # Get a list of ref.molecules and Check missing H in ref.molecules
     cell, covalent_factor, metal_factor = get_refmoleclist_and_check_missingH(cell, reflabels, fracs)
@@ -86,6 +89,8 @@ def reconstruct(cell: object, reflabels: list, fracs: list, debug: int=0) -> obj
 
     return cell
 
+
+##################################################################################
 def determine_charge(cell: object) -> object:
 
     # Indentify unique chemical species
@@ -95,17 +100,22 @@ def determine_charge(cell: object) -> object:
     for spec in unique_species:            # spec is a list in which item 1 is the actual unique specie
         cell.speclist.append(spec[1])    
 
-    print(f"{len(unique_species)} Species (Ligand or Molecules) to Characterize")
-    #print("unique_indices", unique_indices)
+    if len(unique_species) == 0:
+        print("Empty list of species found. Stopping")
+        sys.exit()
+    else:
+        print(f"{len(unique_species)} Species (Ligand or Molecules) to Characterize")
 
     # drive_get_poscharges adds posible charges to the metal, ligand, and molecule objects of all species in the unit cell
     # also, it retrieves "Selected_charge_states", which is a tuple with [the actual charge state, and the protonation it belongs to] for all objects except metals
     selected_charge_states, Warning = drive_get_poscharges(unique_species)
     cell.warning_list.append(Warning)
 
-    # Find possible charge distribution
+    # Find possible charge distribution(s)
     if not any(cell.warning_list):
         final_charge_distribution = balance_charge(unique_indices,unique_species)
+
+        ### DEALS WITH WARNINGS
         print("final_charge_distribution", final_charge_distribution)
         if len(final_charge_distribution) > 1:
             Warning = True
@@ -120,11 +130,15 @@ def determine_charge(cell: object) -> object:
         else:
             Warning = False
         cell.warning_list.append(Warning)
+        #######################
+
+        if len(final_charge_distribution) > 1:
+           pp_mols, pp_idx, pp_opt = prepare_unresolved(unique_indices,unique_species,final_charge_distribution)
+           cell.data_for_postproc(pp_mols, pp_idx, pp_opt)
 
     # Only one possible charge distribution -> getcharge for the repeated species
     if not any(cell.warning_list):
-        print("\nFINAL Charge Distribution:", final_charge_distribution)
-        print(" ")
+        print(f"\nFINAL Charge Distribution: {final_charge_distribution}\n")
         print("#########################################")
         print("Assigning Charges and Preparing Molecules")
         print("#########################################")
@@ -138,6 +152,7 @@ def determine_charge(cell: object) -> object:
     return cell
 
 
+##################################################################################
 def save_cell(cell: object, ext: str, output_dir: str):
     print("\n[Output files]")
 
@@ -150,6 +165,7 @@ def save_cell(cell: object, ext: str, output_dir: str):
             print(ext, "not found as a valid print extension in print_molecule")
 
 
+##################################################################################
 def load_cell_reset_charges (cellpath: str) -> object:
     
     file = open(cellpath, "rb")
@@ -192,7 +208,6 @@ def load_cell_reset_charges (cellpath: str) -> object:
                 met.totcharge = None
 
     return cell
-
 
 ##################################################################################
 ################################## MAIN ##########################################

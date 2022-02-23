@@ -160,7 +160,7 @@ def classify_mols(moleclist: list, debug: int=1) -> Tuple[list, list, list, list
 
 
 #######################################################
-def getcharge(labels: list, pos: list, conmat: np.ndarray, ich: int, cov_factor: float=1.3, debug: int=0)  -> list:
+def getcharge(labels: list, pos: list, conmat: np.ndarray, ich: int, cov_factor: float=1.3, allow: bool=True, debug: int=0)  -> list:
     ## Generates the connectivity of a molecule given a charge.
     # The molecule is described by the labels, and the atomic cartesian coordinates "pos"
     # The adjacency matrix is also provided (conmat)
@@ -182,7 +182,8 @@ def getcharge(labels: list, pos: list, conmat: np.ndarray, ich: int, cov_factor:
     # embed_chiral shouldn't ideally be necessary, but it runs a sanity check that improves the proposed connectivity
     # use_huckel false means that the xyz2mol adjacency will be generated based on atom distances and vdw radii.
     # Ideally, the adjacency matrix could be provided
-    mols = xyz2mol(atnums,pos,conmat,cov_factor,charge=ich,use_graph=True,allow_charged_fragments=True,embed_chiral=True,use_huckel=False)
+
+    mols = xyz2mol(atnums,pos,conmat,cov_factor,charge=ich,use_graph=True,allow_charged_fragments=allow,embed_chiral=True,use_huckel=False)
     if len(mols) > 1: print("WARNING: More than 1 mol received from xyz2mol for initcharge:", ich)
 
     # smiles is generated with rdkit
@@ -244,7 +245,7 @@ def getcharge(labels: list, pos: list, conmat: np.ndarray, ich: int, cov_factor:
 
     # Creates the charge_state
     try: 
-        ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, ich)
+        ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, ich, allow)
     except Exception as exc:
         if debug >= 0: print(f"    GETCHARGE: EXCEPTION in charge_state creation: {exc}")
 
@@ -540,7 +541,7 @@ def eval_chargelist(atom_charges: list) -> Tuple[np.ndarray, np.ndarray, bool]:
     return abstotal, abs_atcharge, zwitt
 
 #######################################################
-def get_poscharges(spec: list, debug: int=0) -> Tuple[list, bool]:
+def get_poscharges(spec: list, debug: int=1) -> Tuple[list, bool]:
     # This function drives the detrmination of the charge for a "ligand=lig" of a given "molecule=mol"
     # The whole process is done by the functions:
     # 1) define_sites, which determines which atoms must have added elements (see above)
@@ -624,6 +625,15 @@ def get_poscharges(spec: list, debug: int=0) -> Tuple[list, bool]:
             if debug >= 2: print(f"    POSCHARGE will try charges {chargestried}") 
 
             for ich in chargestried:
+                #if ich == 0: 
+                #    try:
+                #        ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor, False) 
+                #        ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
+                #        list_of_charge_states.append(ch_state)
+                #        list_of_protonations_for_each_state.append(prot)
+                #        if debug >= 1: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}")
+                #    except Exception as exc:
+                #        if debug >= 0: print(f"    POSCHARGE: EXCEPTION in get_poscharges: {exc}")
                 # Launches getcharge for each initial charge. Creates prot_charge_states
                 try:
                     ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor)
@@ -723,7 +733,7 @@ def get_metal_poscharge(metal: object, molecule: object) -> list:
     at_charge[21] = [3]  # Sc
     at_charge[22] = [2, 3, 4]  # Ti
     at_charge[23] = [1, 2, 3, 4]  # V
-    at_charge[24] = [0, 2, 3]  # Cr
+    at_charge[24] = [0, 2, 3] # Cr ; including 5 leads to worse results
     at_charge[25] = [1, 2, 3]  # Mn
     at_charge[26] = [2, 3]  # Fe
     at_charge[27] = [1, 2, 3]  # Co
@@ -769,6 +779,32 @@ def get_metal_poscharge(metal: object, molecule: object) -> list:
     
     return poscharge
 
+
+#######################################################
+def prepare_unresolved(unique_indices: list, unique_species: list, distributions: list, debug: int=0):
+
+    list_molecules = [] 
+    list_indices = []
+    list_options = []
+    if debug >= 1: print("")
+    for idx, spec_tuple in enumerate(unique_species): 
+        if spec_tuple[0] == "Metal":
+            pos = [jdx for jdx, uni in enumerate(unique_indices) if uni == idx]
+            if debug >= 1: print(f"UNRESOLVED: found metal in positions={pos} of the distribution")
+            values = []
+            for distr in distributions:
+                values.append(distr[pos[0]])
+            options = list(set(values))
+            if debug >= 1: print(f"UNRESOLVED: list of values={values}\n")
+            if debug >= 1: print(f"UNRESOLVED: options={options}\n")
+
+            if len(options) > 1:
+                list_molecules.append(spec_tuple[2])
+                list_indices.append(spec_tuple[1].atlist)
+                list_options.append(options)
+
+    return list_molecules, list_indices, list_options
+
 #######################################################
 def balance_charge(unique_indices: list, unique_species: list, debug: int=1) -> list:
 
@@ -792,15 +828,12 @@ def balance_charge(unique_indices: list, unique_species: list, debug: int=1) -> 
             toadd.append("-")
         iterlist.append(toadd)
 
-    if debug >= 1:
-        print("BALANCE: iterlist", iterlist)
-    if debug >= 1:
-        print("BALANCE: unique_indices", unique_indices)
+    if debug >= 1: print("BALANCE: iterlist", iterlist)
+    if debug >= 1: print("BALANCE: unique_indices", unique_indices)
 
     if not iserror:
         tmpdistr = list(itertools.product(*iterlist))
-        if debug >= 1:
-            print("BALANCE: tmpdistr", tmpdistr)
+        if debug >= 1: print("BALANCE: tmpdistr", tmpdistr)
 
         # Expands tmpdistr to include same species, generating alldistr:
         alldistr = []
@@ -809,19 +842,18 @@ def balance_charge(unique_indices: list, unique_species: list, debug: int=1) -> 
             for u in unique_indices:
                 tmp.append(distr[u])
             alldistr.append(tmp)
-            if debug >= 1:
-                print("BALANCE: alldistr added:", tmp)
+            if debug >= 1: print("BALANCE: alldistr added:", tmp)
 
-            final_charge_distr = []
+            final_charge_distribution = []
             for idx, d in enumerate(alldistr):
                 final_charge = np.sum(d)
                 if final_charge == 0:
-                    final_charge_distr.append(d)
+                    final_charge_distribution.append(d)
     elif iserror:
         print("Error found in BALANCE: one species has no possible charges")
-        final_charge_distr = []
+        final_charge_distribution = []
 
-    return final_charge_distr
+    return final_charge_distribution
 
 #######################################################
 def define_sites(ligand: object, molecule: object, debug: int=1) -> list:
@@ -1549,7 +1581,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                                 if debug >= 1: print(f"PREPARE: smiles: {ch_state.smiles}")
                             else:
                                 if debug >= 1: print(f"PREPARE: Sending getcharge with prot.added_atoms={prot.added_atoms} to obtain charge {ch}")
-                                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ch+prot.added_atoms, prot.factor)
+                                ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ch+prot.added_atoms, prot.factor, tgt_charge_state.allow)
                                 ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
         
                                 if debug >= 1: print(f"PREPARE: Wanted charge {ch}, obtained: {ch_state.corr_total_charge}")
@@ -1580,6 +1612,12 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                                 tmpobject = ["Ligand", lig, mol]
                                 chargestried = get_list_of_charges_to_try(tmpobject, prot)
                                 for ich in chargestried:
+                                    #if ich == 0:
+                                    #    ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor, False)
+                                    #    ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
+                                    #    list_of_charge_states.append(ch_state)
+                                    #    list_of_protonations_for_each_state.append(prot)
+                                    #    if debug >= 1: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}")
                                     ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor)
                                     ch_state.correction(prot.addedlist, prot.metal_electrons, prot.elemlist)
                                     list_of_charge_states.append(ch_state)
@@ -1862,13 +1900,14 @@ class protonation(object):
 #######################################################
 
 class charge_state(object):
-    def __init__(self, status, uncorr_total_charge, uncorr_atom_charges, mol_object, smiles, charge_tried):
+    def __init__(self, status, uncorr_total_charge, uncorr_atom_charges, mol_object, smiles, charge_tried, allow):
         self.status = status
         self.uncorr_total_charge = uncorr_total_charge
         self.uncorr_atom_charges = uncorr_atom_charges
         self.mol_object = mol_object
         self.smiles = smiles
         self.charge_tried = charge_tried
+        self.allow = allow
 
         self.uncorr_abstotal, self.uncorr_abs_atcharge, self.uncorr_zwitt = eval_chargelist(uncorr_atom_charges)
         
