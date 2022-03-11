@@ -178,15 +178,12 @@ if __name__ == "__main__" :
     pwd = os.getcwd()
     filename = parsing_arguments_BVS()
     print(filename)
-    df = pd.read_csv("bvparm2020.txt",delimiter="\t")  
+    df = pd.read_csv("bvparm2020.txt",delimiter="\t")
+    result = "BVS_result.txt"    
     file = open(filename,'rb')
     cell = pickle.load(file)
-    
-    result = "BVS_result.txt"  
     fail_reconstruct = "fail_in_reconstruct.txt"
     
-    # Several Cell objects do not contain cell.warning_after_reconstruction 
-    # so check the errors in cell reconstruction via cell.warning_list[:5]
     if any(cell.warning_list[:5]):
         with open(fail_reconstruct,'a') as fail: 
             fail.write("%s\n" % (cell.refcode))
