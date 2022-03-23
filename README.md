@@ -66,8 +66,6 @@ As a reference, cell2mol characterizes the crystal structure of "YOXKUS" (availa
 
 A few errors are known to occur, resulting from the cell2mol or xyz2mol algorithms.
 
-cell2mol determines the bond order between atoms based on their connectivity, typical atomic valence electrons of the atoms involved, and the most plausible total charge of the molecule. Therefore, it interprets incorrectly on the crystal structures (in parentheses) containing chemical species with unusual atomic valence electrons, such as counterions triiodide ion I<sub>3</sub><sup>-</sup> (XEBJIX) and azide ion N<sub>3</sub><sup>-</sup> () or radical anion ligands (YURWUE).
-
-Another error is 
+cell2mol determines the bond order between atoms based on their connectivity, typical atomic valence electrons of the atoms involved, and the most plausible total charge of the molecule. Since cell2mol cannot identify unusual valencies, cell2mol interpretation is inevitably incorrect if there is an extra electron or a radical present in chemical species. This type of error are found in radical ligands, triiodide ion I<sub>3</sub><sup>-</sup>, and azide ion N<sub>3</sub><sup>-</sup>.
 
 ---
