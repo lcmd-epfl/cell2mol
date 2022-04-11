@@ -14,7 +14,7 @@ if gmolfile.endswith(".gmol"):
     with open(pwd + "/" + gmolfile, "rb") as pickle_file:
         mol = pickle.load(pickle_file)
     
-        namexyz = mol.name+".xyz"
+        namexyz = mol.refcode+".xyz"
         writexyz(pwd, namexyz, mol.labels, mol.coord)
 else:
     print("File does not have .gmol extension")
