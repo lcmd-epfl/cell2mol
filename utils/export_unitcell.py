@@ -29,11 +29,13 @@ else:
 with open(pwd + "/" + gmolfile, "rb") as pickle_file:
     cell = pickle.load(pickle_file)
 
-    for idx, mol in enumerate(cell.speclist):
-         
-        if mol.type == "Other":
-            namexyz = mol.refcode+"_spec_"+str(idx)+".xyz"
-            writexyz(pwd, namexyz, mol.labels, mol.coord)
-    
-            namemol = mol.refcode+"_spec_"+str(idx)
-            print_molecule(mol, namemol, "gmol", pwd)
+    namecell = cell.refcode+"_unit_cell.xyz"
+
+    #print_molecule(cell, namecell, "xyz", pwd)
+    with open(namecell, "w") as fil:
+        print(len(cell.labels), file=fil)
+        print("", file=fil)
+        for mol in cell.moleclist:
+            #print(mol.labels, mol.natoms, len(mol.atoms))
+            for a in mol.atoms:
+                print("%s   %.6f   %.6f   %.6f" % (a.label, a.coord[0], a.coord[1], a.coord[2]),file=fil)

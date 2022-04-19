@@ -576,7 +576,7 @@ def get_poscharges(spec: list, debug: int=1) -> Tuple[list, bool]:
             list_of_charge_states = []
             list_of_protonations_for_each_state = [] 
             chargestried = get_list_of_charges_to_try(spec, prot)
-            if debug >= 2: print(f"    POSCHARGE will try charges {chargestried}") 
+            if debug >= 1: print(f"    POSCHARGE will try charges {chargestried}") 
 
             for ich in chargestried:
                 ch_state = getcharge(prot.labels, prot.coordinates, prot.conmat, ich, prot.factor)
@@ -1018,8 +1018,8 @@ def define_sites(ligand: object, molecule: object, debug: int=1) -> list:
                     if idx in g.atlist and a.mconnec == 1:
                         block[idx] = 1
 
-            elif ("h2-Benzene" in g.hapttype or "h2-Butadiene" in g.hapttype) and not Selected_Hapticity:
-                if debug >= 1: print("        DEFINE_SITES: It is either an h2-Benzene or an h2-Butadiene")
+            elif ("h2-Benzene" in g.hapttype or "h2-Butadiene" or "h2-ethylene" in g.hapttype) and not Selected_Hapticity:
+                if debug >= 1: print("        DEFINE_SITES: It is either an h2-Benzene, an h2-ethylene or an h2-Butadiene")
                 if debug >= 1: print("        DEFINE_SITES: No action is required")
                 Selected_Hapticity = True
                 tobeadded = 0
@@ -1321,6 +1321,11 @@ def define_sites(ligand: object, molecule: object, debug: int=1) -> list:
         # IF CREATE ALL # 
         #################
         else:
+
+            print("LOCAL COORD")
+            for aidx, l in enumerate(local_labels):
+                print(l, local_coords[aidx][0], local_coords[aidx][1], local_coords[aidx][2])
+
             if debug >= 1:  print(f"        DEFINE_SITES: chosen create_all={create_all}") 
             # Creates [0,1] tuples for each non_local
             tmp = []
@@ -1350,7 +1355,7 @@ def define_sites(ligand: object, molecule: object, debug: int=1) -> list:
                 added_atoms = local_added_atoms
                 non_local_added_atoms = 0
 
-                os = -np.sum(com)
+                os = np.sum(com)
                 toallocate = int(0)
                 for jdx, a in enumerate(ligand.atoms):
                     if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
@@ -1382,7 +1387,7 @@ def define_sites(ligand: object, molecule: object, debug: int=1) -> list:
                 smi = " "
             
                 new_prot = protonation(newlab, newcoord, ligand.factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, os, typ="Non-local") 
-                if new_prot.status == 1 and new_prot.added_atoms == -os:
+                if new_prot.status == 1 and new_prot.added_atoms == os+local_added_atoms:
                     list_of_protonations.append(new_prot)
                     if debug >= 1:  print(f"        DEFINE_SITES: Protonation SAVED with {added_atoms} atoms added to ligand. status={new_prot.status}")
                 else:
@@ -1637,9 +1642,13 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                                 p = list_of_protonations_for_each_state[idx]
                                 if debug >= 1: print(f"    POSCHARGE. {c.corr_total_charge}={ch}, {p.added_atoms}={tgt_protonation.added_atoms}")
                                 if c.corr_total_charge == ch and p.added_atoms == tgt_protonation.added_atoms:
-                                    lig.charge(ch_state.corr_atom_charges, ch_state.corr_total_charge, ch_state.mol_object, ch_state.smiles)
-                                    if debug >= 1: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={ch_state.corr_total_charge}") 
+                                    lig.charge(c.corr_atom_charges, c.corr_total_charge, c.mol_object, c.smiles)
+                                    if debug >= 1: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={c.corr_total_charge}") 
                                     found_charge_state = True
+                                #if c.corr_total_charge == ch and p.added_atoms == tgt_protonation.added_atoms:
+                                #    lig.charge(ch_state.corr_atom_charges, ch_state.corr_total_charge, ch_state.mol_object, ch_state.smiles)
+                                #    if debug >= 1: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={ch_state.corr_total_charge}") 
+                                #    found_charge_state = True
  
                             if not found_charge_state: Warning = True
 
@@ -1890,9 +1899,10 @@ class protonation(object):
         self.radii = getradii(labels)
         status, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(self.labels, self.coordinates, self.factor, self.radii)
 
-        #if status == 0:
-        #    for idx in range(len(self.labels)):
-        #        print("%s  %.6f  %.6f  %.6f" % (self.labels[idx], self.coordinates[idx][0], self.coordinates[idx][1], self.coordinates[idx][2]))
+        if status == 0:
+            print("PROTONATION WITH STATUS=0, meaning probable steric clashes")
+            for idx in range(len(self.labels)):
+                print("%s  %.6f  %.6f  %.6f" % (self.labels[idx], self.coordinates[idx][0], self.coordinates[idx][1], self.coordinates[idx][2]))
 
         self.status = status     # 1 when correct, 0 when steric clashes
         self.conmat = tmpconmat

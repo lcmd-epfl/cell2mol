@@ -32,8 +32,6 @@ with open(pwd + "/" + gmolfile, "rb") as pickle_file:
     for idx, mol in enumerate(cell.speclist):
          
         if mol.type == "Other":
-            namexyz = mol.refcode+"_spec_"+str(idx)+".xyz"
-            writexyz(pwd, namexyz, mol.labels, mol.coord)
     
-            namemol = mol.refcode+"_spec_"+str(idx)
+            namemol = mol.refcode+"_oth_"+str(idx)
             print_molecule(mol, namemol, "gmol", pwd)
