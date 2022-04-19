@@ -28,6 +28,12 @@ The code runs on pure python with minimal dependencies:
 - `networkx`
 - `RDkit` 
 
+For portability, we provide an exemplary conda environment in `environment.yml` which can be used to construct a conda environment with all necessary dependencies by running:
+
+`conda env create -f environment.yml`
+
+Afterwards, the created environment can be activated and the following steps should proceed smoothly.
+
 ## Install [↑](#install)
 
 Download and add c2m_driver.py to your path. No strings attached. Run as:
