@@ -56,6 +56,8 @@ def get_missingH(Z, valence, center, charge, edges, points):
     )
     report += report_shape
 
+    #missingH = False
+ 
     return missingH, report
 
 
@@ -90,6 +92,8 @@ def get_missingH_from_adjacency(Z, center, points):
         f"Summary of facts:\n -Atom has {num_adj_atoms} adjacent atoms \n -arranged in a shape {shape} that suggests coordination {shapeval} \n"
     )
     report += report_shape
+
+    #missingH = False
 
     return missingH, report
 

@@ -196,7 +196,7 @@ def get_reference_molecules(labels: list, pos: list, debug: int=1) -> Tuple[list
         if found_covalent_factor and found_metal_factor:
             found_both_factors = True
             Warning = False
-            if debug >= 1: print("GETREFS: Found both factors. Breaking")
+            if debug >= 1: print("GETREFS: Found both factors. Breaking with", len(listofreferences), "references found")
             break
         elif (metal_factor > max_metal_factor) or (metal_factor < min_metal_factor):
             if debug >= 1: print("GETREFS: metal_factor outside the limits", metal_factor)
@@ -211,6 +211,9 @@ def get_reference_molecules(labels: list, pos: list, debug: int=1) -> Tuple[list
         if iteration == maxiter:
             if debug >= 1: print("GETREFS: maximum number of iterations reached")
             Warning = True
+
+    ### RIGHT NOW, we ignore the warning because if there is really a problem, the program will fail later. i
+    ### If the problem is not important, a meaningful result can still be reached
 
     #return listofreferences, covalent_factor, metal_factor, Warning
     return listofreferences, covalent_factor, metal_factor, False
@@ -1149,11 +1152,15 @@ def identify_frag_molec_H(blocklist: list, moleclist: list, refmoleclist: list, 
     fraglist = []
     Hlist = []
 
+    for ref in refmoleclist: 
+        print(f"{ref.formula} found as reference")
+
     # Convert blocks' coordinates and get centroid
     for b in blocklist:
         b.frac = cart2frac(b.coord, cellvec)
         b.centroid = getcentroid(b.frac)
         init_natoms += b.natoms
+        #print(f"BLOCK: {b.labels}")
 
     for idx, block in enumerate(blocklist):
         if any((block.elemcountvec == ref.elemcountvec).all() for ref in refmoleclist):
@@ -1170,13 +1177,7 @@ def identify_frag_molec_H(blocklist: list, moleclist: list, refmoleclist: list, 
                 block.type = "Fragment"
                 fraglist.append(block)
 
-    print(
-        len(blocklist),
-        "Blocks sorted for reconstructrion as (Molec, Frag, H):",
-        len(moleclist),
-        len(fraglist),
-        len(Hlist),
-    )
+    print(len(blocklist),"Blocks sorted for reconstruction as (Molec, Frag, H):",len(moleclist),len(fraglist),len(Hlist))
     print("With a total of", init_natoms, "atoms")
 
     return moleclist, fraglist, Hlist, init_natoms
@@ -1196,7 +1197,7 @@ def fragments_reconstruct(
         print(len(fraglist), "molecules submitted to SEQUENTIAL with Heavy")
         print("##############################################")
         newmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "Heavy", debug)
-        print(len(newmols), len(remfrag), "molecules out of SEQUENTIAL with Heavy")
+        print(f"{len(newmols)} molecules and {len(remfrag)} fragments out of SEQUENTIAL with Heavy")
         moleclist.extend(newmols)
         fraglist = []
         fraglist.extend(remfrag)
@@ -1237,9 +1238,20 @@ def fragments_reconstruct(
             Warning = False
         print(" ")
     else:
-        print("Not necessary to reconstruct Hydrogens")
-        finalmols = fraglist.copy()  # IF not Hidrogen fragments, then is done
-        remfrag = []
+        if len(remfrag) > 0 and len(Hlist) == 0: 
+            Warning = True
+            print("There are remaining Fragments and no H in list")
+            finalmols = []
+            remfrag = []
+        elif len(remfrag) == 0 and len(Hlist) > 0: 
+            Warning = True
+            print("There are isolated H atoms in cell")
+            finalmols = []
+            remfrag = []
+        elif len(remfrag) == 0 and len(Hlist) == 0: 
+            print("Not necessary to reconstruct Hydrogens")
+            finalmols = fraglist.copy()  # IF not Hidrogen fragments, then is done
+            remfrag = []
 
     return moleclist, finalmols, Warning
 
@@ -1380,7 +1392,7 @@ def get_hapticity(molecule: object, debug: int=0) -> bool:
                 numO = list_of_coord_atoms.count("O")  # For h4-Enone
                 ## Carbon-based Haptic Ligands
                 if numC == 2:
-                    group_hapttype = ["h2-Benzene", "h2-Butadiene"]
+                    group_hapttype = ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]
                     has_hapticity = True
                 elif numC == 3 and numO == 0:
                     group_hapttype = ["h3-Allyl", "h3-Cp"]

@@ -24,17 +24,16 @@ def readxyz(file):
 
 
 ##############
-def writexyz(fdir, fname, labels, pos):
+def writexyz(fdir, fname, labels, pos, charge: int=0, spin: int=1):
     if fdir[-1] != "/":
         fdir = fdir + "/"
     natoms = len(labels)
     fullname = fdir + fname
     with open(fullname, "w") as fil:
         print(natoms, file=fil)
-        print(" ", file=fil)
+        print(charge, spin, file=fil)
         for idx, l in enumerate(labels):
             print("%s  %.6f  %.6f  %.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]),file=fil)
-
 
 ##############
 def search_string_in_file(file_name, string_to_search):
