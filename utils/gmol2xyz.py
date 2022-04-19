@@ -30,6 +30,7 @@ if gmolfile.endswith(".gmol"):
         else:
             spin = 2
     
+<<<<<<< HEAD
         #namexyz = mol.name+".xyz"
         if hasattr(mol, "totcharge") and hasattr(mol, "spin"): 
             writexyz(pwd, namexyz, mol.labels, mol.coord, mol.totcharge, mol.spin)
@@ -40,6 +41,10 @@ if gmolfile.endswith(".gmol"):
         else:
             writexyz(pwd, namexyz, mol.labels, mol.coord, 0, spin)
             print("Assuming defaults for", mol.refcode)
+=======
+        namexyz = mol.refcode+".xyz"
+        writexyz(pwd, namexyz, mol.labels, mol.coord)
+>>>>>>> 263552e95951b9ca4afd1ec9b05c470712ca3e06
 else:
     print("File does not have .gmol extension")
     exit()
