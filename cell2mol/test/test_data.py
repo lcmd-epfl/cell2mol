@@ -25,7 +25,7 @@ def test_check_cell_vs_data():
 
     cell = test_cell2mol()
 
-    assert cell.version == "V17"
+    assert cell.version == "V1.0"
     assert cell.refcode == "YOXKUS"
     assert np.allclose(
         cell.cellvec,
