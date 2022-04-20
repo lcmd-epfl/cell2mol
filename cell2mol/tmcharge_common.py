@@ -319,7 +319,7 @@ def find_closest_metal(atom: object, metalist: list, debug: int=0) -> Tuple[np.n
 ###############
 class atom(object):
     def __init__(self, index: int, label: str, coord: list, radii: float) -> None:
-        self.version = "V16"
+        self.version = "V1.0"
         self.index = index
         self.label = label
         self.coord = coord
@@ -384,6 +384,7 @@ class atom(object):
 ###############
 class molecule(object):
     def __init__(self, name: str, atlist: list, labels: list, coord: list, radii:list) -> None:
+        self.version = "V1.0"
         self.refcode = ""  
         self.name = name
         self.atlist = atlist
@@ -481,6 +482,7 @@ class molecule(object):
 ###############
 class ligand(object):
     def __init__(self, name: str, atlist: list, labels: list, coord: list, radii: list) -> None:
+        self.version = "V1.0"
         self.refcode = ""  
         self.name = name      # creates as ligand index, later modified
         self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
@@ -561,6 +563,7 @@ class ligand(object):
 ###############
 class group(object):
     def __init__(self, atlist: list, hapticity: bool, hapttype: list) -> None:
+        self.version = "V1.0"
         self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
         self.hapticity = hapticity
         self.hapttype = hapttype
@@ -571,6 +574,7 @@ class group(object):
 ###############
 class metal(object):
     def __init__(self, name: int, atlist: int, label: str, coord: list, radii: float) -> None:
+        self.version = "V1.0"
         self.name = name  # creates as metal index, later modified
         self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
         self.label = label
@@ -607,7 +611,7 @@ class metal(object):
 class Cell(object):
     def __init__(self, refcode: str, labels: list, pos: list, cellvec: list, cellparam: list, warning_list: list) -> None:
 
-        self.version = "V17"
+        self.version = "V1.0"
         self.refcode = refcode
 
         self.cellvec = cellvec
