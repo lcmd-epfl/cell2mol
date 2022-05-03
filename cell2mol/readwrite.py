@@ -90,20 +90,31 @@ def readinfo(filepath):
         if (l == latparamsone) or (l == latparamstwo):
             a, b, c = line.split()
             cellparam += [float(a), float(b), float(c)]
+
         # reads fractional coordinates
         if (l >= fracstart) and (l <= fracend):
-            label, x, y, z = line.split()
-            lfracs.append(label)
+            line_data = line.split()
+            if len(line_data) == 4:
+                label, x, y, z = line.split()
+            elif len(line_data) == 5:  #sometimes, an occupation value is also given.
+                label, x, y, z, occ = line.split()
             fracs.append([float(x), float(y), float(z)])
+            lfracs.append(label)
+
         # reads cell vectors
         if (l >= cellvecstart) and (l <= cellvecend):
             v1, v2, v3 = line.split()
             cellvec.append([float(v1), float(v2), float(v3)])
+
         # reads cartesian coordinates
         if (l >= coordstart) and (l <= coordend):
-            label, x, y, z = line.split()
-            labels.append(label)
+            line_data = line.split()
+            if len(line_data) == 4:
+                label, x, y, z = line.split()
+            elif len(line_data) == 5:  #sometimes, an occupation value is also given.
+                label, x, y, z, occ = line.split()
             pos.append([float(x), float(y), float(z)])
+            labels.append(label)
 
     return labels, pos, lfracs, fracs, cellvec, cellparam
 
