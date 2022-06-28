@@ -66,12 +66,13 @@ python -m cell2mol -i [FILENAME]
 
 An output file will be created locally. Additionally, a .gmol file containing the analyzed unit cell will be written by cell2mol. The cell object contains all the information following the class specifications, and can be loaded using the pickle library for further usage.
 
-As a reference, cell2mol characterizes the crystal structure of "YOXKUS" (available in the test/infodata directory) as follows: YOXKUS has 4 Re complexes and no counterion or solvent molecules. Each complex has 3 types of ligands. The first ligand bears a -1 charge, and is connected to the Rh ion through two groups of atoms. The first group consists of a substituted Cp ring with η5 hapticity, and the other is the P atom of a diphenylphosphine, with κ1 denticity. The second ligand is an iodine atom with -1 charge, and appears twice. The third is a neutral CO ligand, with a -1 and a +1 formal charge in the C and O atoms, respectively, and a triple bond between them.
+As a reference, cell2mol characterizes the crystal structure of "YOXKUS" (available in the test/infodata directory) as follows: YOXKUS has 4 Re complexes and no counterion or solvent molecules. Each complex has 3 types of ligands. The first ligand bears a -1 charge, and is connected to the Re ion through two groups of atoms. The first group consists of a substituted Cp ring with η5 hapticity, and the other is the P atom of a diphenylphosphine, with κ1 denticity. The second ligand is an iodine atom with -1 charge, and appears twice. The third is a neutral CO ligand, with a -1 and a +1 formal charge in the C and O atoms, respectively, and a triple bond between them.
 
 ## Known errors [↑](#errors)
 
-A few errors are known to occur, resulting from the cell2mol or xyz2mol algorithms.
+Few chemical patterns tend to be poorly interpreted by cell2mol, because of inconsistencies in either cell2mol itself, or in xyz2mol.
 
-cell2mol determines the bond order between atoms based on their connectivity, typical atomic valence electrons of the atoms involved, and the most plausible total charge of the molecule. Since cell2mol cannot identify unusual valencies, cell2mol interpretation is inevitably incorrect if there is an extra electron or a radical present in chemical species. This type of error is found in radical ligands, triiodide ion I<sub>3</sub><sup>-</sup>, and azide ion N<sub>3</sub><sup>-</sup>.
+cell2mol determines the bond order between atoms based on their connectivity, typical atomic valence electrons of the atoms involved, and the most plausible total charge of the molecule. cell2mol is inevitably incorrect if there is an extra electron or radical chemical species. Other known ligands with wrong interpretations are the triiodide (I<sub>3</sub><sup>-</sup>), and azide (N<sub>3</sub><sup>-</sup>) ions. Future development of cell2mol will aim a fixing those errors. If users identify other common misinterpretations, please contact the authors. 
+
 
 ---
