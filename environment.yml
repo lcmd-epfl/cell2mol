@@ -1,4 +1,4 @@
-name: environment
+name: cell2mol
 channels:
   - conda-forge
   - defaults
