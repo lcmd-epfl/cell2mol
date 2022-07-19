@@ -30,7 +30,7 @@ The code runs on pure python with minimal dependencies:
 
 For portability, we provide an exemplary conda environment in `environment.yml` which can be used to construct a conda environment with all necessary dependencies by running:
 
-`conda env create -f environment.yml`
+`conda env create -f cell2mol.yml`
 
 Afterwards, the created environment can be activated and the following steps should proceed smoothly.
 
@@ -67,6 +67,10 @@ python -m cell2mol -i [FILENAME]
 An output file will be created locally. Additionally, a .gmol file containing the analyzed unit cell will be written by cell2mol. The cell object contains all the information following the class specifications, and can be loaded using the pickle library for further usage.
 
 As a reference, cell2mol characterizes the crystal structure of "YOXKUS" (available in the test/infodata directory) as follows: YOXKUS has 4 Re complexes and no counterion or solvent molecules. Each complex has 3 types of ligands. The first ligand bears a -1 charge, and is connected to the Re ion through two groups of atoms. The first group consists of a substituted Cp ring with η5 hapticity, and the other is the P atom of a diphenylphosphine, with κ1 denticity. The second ligand is an iodine atom with -1 charge, and appears twice. The third is a neutral CO ligand, with a -1 and a +1 formal charge in the C and O atoms, respectively, and a triple bond between them.
+
+A flowchart of the entire process is given below:
+
+![Flowchart of cell2mol](./images/Flowchart_cell2mol.png)
 
 ## Known errors [↑](#errors)
 
