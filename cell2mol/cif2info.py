@@ -682,8 +682,8 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
     version = "2.0.0"
 
     (options, args) = parsing_input()
-    sys.stdout = open(infopath, "w")
-    sys.stderr = open(errorpath, "w")   
+    infofilename = open(infopath, "w")
+    errorfilename = open(errorpath, "w")   
 
     # python cif2info.py input_path --cartesian --force 
     options.file = input_path
@@ -693,32 +693,32 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
 
     # Print version number and exit
     if options.version:
-        sys.stdout.write(programname + " version " + version + "\n")
+        infofilename.write(programname + " version " + version + "\n")
     
     #############################################################
     # Check that options given are possible
     if options.append and not options.outputfile:
-        sys.stderr.write(
+        errorfilename.write(
             "***Error: option --append requires an output file to be specified.\n"
         )
         sys.exit(1)
     if options.append and (options.program == "emto" or options.program == "ncol"):
-        sys.stderr.write(
+        errorfilename.write(
             "***Error: option --append can not be used with " + options.program + ".\n"
         )
         sys.exit(1)
     if options.setupall and options.program not in setupallprogs:
-        sys.stderr.write(
+        errorfilename.write(
             "***Error: option --setup-all not supported for " + options.program + ".\n"
         )
         sys.exit(1)
     if options.filenamequery and not options.program:
-        sys.stderr.write(
+        errorfilename.write(
             "***Error: option --which-filename requires that --program is given.\n"
         )
         sys.exit(1)
     if options.supercellmap and options.supercelldims:
-        sys.stderr.write(
+        errorfilename.write(
             "***Error: cannot use both --supercell and --supercell-dimensions.\n"
         )
         sys.exit(1)
@@ -729,7 +729,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
     if options.program:
         outputprogram = options.program.lower()
         if not outputprogram in outputprograms:
-            sys.stderr.write("Error: Unknown output format: " + outputprogram + "\n")
+            errorfilename.write("Error: Unknown output format: " + outputprogram + "\n")
             sys.exit(1)
         # Quantum Espresso is just an alias...
         if outputprogram == "quantum-espresso":
@@ -857,7 +857,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
         cif_file = options.file
     if cif_file:
         if not os.path.exists(cif_file):
-            sys.stderr.write(
+            errorfilename.write(
                 "***Error: The file " + cif_file + " could not be found.\n"
             )
             sys.exit(2)
@@ -900,43 +900,43 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                     f.close()
                     cf = CifFile.ReadCif(tmpname, grammar=cif_grammar)
                     wrongfile = cif_file.replace(".cif", "_wrong.cif")
-                    sys.stderr.write(
+                    errorfilename.write(
                         "***Warning: The cif file is missing a data statement."
                     )
-                    sys.stderr.write(
+                    errorfilename.write(
                         " The file has been renamed '"
                         + wrongfile
                         + "' and replaced by a"
                     )
-                    sys.stderr.write(" corrected file.\n")
+                    errorfilename.write(" corrected file.\n")
                     os.rename(cif_file, wrongfile)
                     os.rename(tmpname, cif_file)
                 else:
-                    sys.stderr.write("***Error: could not read " + cif_file + ".\n")
-                    sys.stderr.write(
+                    errorfilename.write("***Error: could not read " + cif_file + ".\n")
+                    errorfilename.write(
                         "Something may be wrong with the CIF file, you can check it with "
                     )
-                    sys.stderr.write(
+                    errorfilename.write(
                         "the free IUCr CIF valitation tool at http://checkcif.iucr.org/\n"
                     )
-                    sys.stderr.write(e1.value + "\n")
+                    errorfilename.write(e1.value + "\n")
                     sys.exit(2)
             except Exception as er2:
                 try:
                     os.remove(tmpname)
                 except:
                     pass
-                sys.stderr.write("***Error: could not read " + cif_file + ".\n")
-                sys.stderr.write(
+                errorfilename.write("***Error: could not read " + cif_file + ".\n")
+                errorfilename.write(
                     "Something may be wrong with the CIF file, you can check it with "
                 )
-                sys.stderr.write(
+                errorfilename.write(
                     "the free IUCr CIF valitation tool at http://checkcif.iucr.org/\n"
                 )
-                sys.stderr.write(er2.value + "\n")
+                errorfilename.write(er2.value + "\n")
     #            sys.exit(2)
     else:
-        sys.stderr.write("***Error: No input CIF file given\n")
+        errorfilename.write("***Error: No input CIF file given\n")
         sys.exit(2)
 
     # Make supercell?
@@ -985,7 +985,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
     if options.block:
         cb = cf.get(options.block)
         if type(cb) == type(None):
-            sys.stderr.write(
+            errorfilename.write(
                 "***Error: No block " + options.block + " in " + cif_file + ".\n"
             )
             sys.exit(2)
@@ -995,7 +995,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
     ref = ReferenceData()
     ref.getFromCIF(cb)
     if bibtexref:
-        sys.stdout.write(ref.bibtexref())
+        infofilename.write(ref.bibtexref())
 
     if options.coordtol:
         # Get cell data
@@ -1010,13 +1010,13 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
     try:
         cd.getFromCIF(cb)
     except PositionError as e:
-        sys.stderr.write("***Error: cell setup: " + e.value + "\n")
+        errorfilename.write("***Error: cell setup: " + e.value + "\n")
         sys.exit(2)
     except CellError as e:
-        sys.stderr.write("***Error: cell setup: " + e.value + "\n")
+        errorfilename.write("***Error: cell setup: " + e.value + "\n")
         sys.exit(2)
     except SymmetryError as e:
-        sys.stderr.write("***Error: cell setup: " + e.value + "\n")
+        errorfilename.write("***Error: cell setup: " + e.value + "\n")
         sys.exit(2)
 
     ##############################################
@@ -1032,10 +1032,10 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
         else:
             cd.conventional()
     except SymmetryError as e:
-        sys.stderr.write("***Error: cell setup: " + e.value + "\n")
+        errorfilename.write("***Error: cell setup: " + e.value + "\n")
         sys.exit(2)
     except CellError as e:
-        sys.stderr.write("***Error: cell setup: " + e.value + "\n")
+        errorfilename.write("***Error: cell setup: " + e.value + "\n")
         sys.exit(2)
 
     ##############################################
@@ -1051,7 +1051,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                 wizardstr += str(j) + ","
             wizardstr = wizardstr.rstrip(",") + "],"
         wizardstr = wizardstr.rstrip(",") + "]\n"
-        sys.stdout.write(wizardstr)
+        infofilename.write(wizardstr)
         sys.exit()
 
     ##############################################
@@ -1061,12 +1061,12 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
         if ref.ChemicalComposition != cd.ChemicalComposition:
             if force:
                 if force_warning_print :
-                    sys.stderr.write(
+                    errorfilename.write(
                         "***Warning: Chemical composition of the generated cell differs from that given\n"
                         + "            by _chemical_formula_sum.\n"
                     )
             else:
-                sys.stderr.write(
+                errorfilename.write(
                     "***Error: Chemical composition of the generated cell differs from that given\n"
                     + "          by _chemical_formula_sum. Use --force to generate a cell anyway.\n"
                 )
@@ -1083,7 +1083,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
         try:
             cd.randomDisplacements(float(options.randomdisp), distribution=distr)
         except SetupError as e:
-            sys.stderr.write("***Error: random displacements: " + e.value + "\n")
+            errorfilename.write("***Error: random displacements: " + e.value + "\n")
             sys.exit(3)
         # Reset space group operations
         cd.HallSymbol = "P 1"
@@ -1094,8 +1094,8 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
     ##############################################
     # Print cell
     if verbose or not options.program and not options.quiet:
-        sys.stdout.write(programname.upper() + " " + version + "\n")
-        sys.stdout.write(datestring + "\n")
+        infofilename.write(programname.upper() + " " + version + "\n")
+        infofilename.write(datestring + "\n")
         # Print compound
         compoundstring = "Output for "
         if ref.cpd == "" and ref.compound == "":
@@ -1104,16 +1104,16 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
             compoundstring += ref.cpd
         if ref.compound != "":
             compoundstring += " (" + ref.compound + ")"
-        sys.stdout.write(compoundstring + "\n")
+        infofilename.write(compoundstring + "\n")
         # Print database
-        sys.stdout.write(ref.databasestring)
+        infofilename.write(ref.databasestring)
         if cd.alloy and forcealloy and options.program:
-            sys.stdout.write(
+            infofilename.write(
                 "\nEnforcing generation of file(s) for "
                 + outputprogram
                 + " for an alloy."
             )
-        sys.stdout.write("\n BIBLIOGRAPHIC INFORMATION\n")
+        infofilename.write("\n BIBLIOGRAPHIC INFORMATION\n")
         refstrings = ref.referencestring().split()
         tmpstring = ""
         i = 0
@@ -1122,34 +1122,34 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                 tmpstring += refstrings[i] + " "
                 i += 1
             else:
-                sys.stdout.write(tmpstring)
+                infofilename.write(tmpstring)
                 tmpstring = ""
         if tmpstring != "":
-            sys.stdout.write(tmpstring)
-        sys.stdout.write("\n INPUT CELL INFORMATION\n")
-        sys.stdout.write("Symmetry information:\n")
+            infofilename.write(tmpstring)
+        infofilename.write("\n INPUT CELL INFORMATION\n")
+        infofilename.write("Symmetry information:\n")
         if inputcell.HallSymbol != "":
-            sys.stdout.write(
+            infofilename.write(
                 inputcell.crystal_system()[0].upper()
                 + inputcell.crystal_system()[1:]
                 + " crystal system.\n"
             )
-            sys.stdout.write(
+            infofilename.write(
                 "Space group number     : ".rjust(2)
                 + str(inputcell.spacegroupnr)
                 + "\n"
             )
-            sys.stdout.write("Hall symbol            : " + inputcell.HallSymbol + "\n")
-            sys.stdout.write("Hermann-Mauguin symbol : " + inputcell.HMSymbol + "\n")
+            infofilename.write("Hall symbol            : " + inputcell.HallSymbol + "\n")
+            infofilename.write("Hermann-Mauguin symbol : " + inputcell.HMSymbol + "\n")
         else:
-            sys.stdout.write("No space group information found.\n")
+            infofilename.write("No space group information found.\n")
         # only print these if verbose
         if verbose:
-            sys.stdout.write("Symmetry equivalent sites:\n")
+            infofilename.write("Symmetry equivalent sites:\n")
             symops = list(inputcell.symops)
             symops.sort()
             for i in range(len(symops)):
-                sys.stdout.write(
+                infofilename.write(
                     "%4i  %8s, %8s, %8s"
                     % (
                         i + 1,
@@ -1159,11 +1159,11 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                     )
                     + "\n"
                 )
-        sys.stdout.write("\nLattice parameters:\n")
+        infofilename.write("\nLattice parameters:\n")
         tmpstring = ""
         for i in ["a", "b", "c"]:
             tmpstring += i.rjust(decpos) + " "
-        sys.stdout.write(tmpstring + "\n")
+        infofilename.write(tmpstring + "\n")
         formatstring = ""
         if options.printau:
             aprint = inputcell.a * angtobohr
@@ -1175,15 +1175,15 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
             cprint = inputcell.c
         for i in range(3):
             formatstring = formatstring + decform + " "
-        sys.stdout.write(formatstring % (aprint, bprint, cprint) + "\n")
+        infofilename.write(formatstring % (aprint, bprint, cprint) + "\n")
         tmpstring = ""
         for i in ["alpha", "beta", "gamma"]:
             tmpstring += i.rjust(decpos) + " "
-        sys.stdout.write(tmpstring + "\n")
-        sys.stdout.write(
+        infofilename.write(tmpstring + "\n")
+        infofilename.write(
             formatstring % (inputcell.alpha, inputcell.beta, inputcell.gamma) + "\n"
         )
-        ## sys.stdout.write(formatstring % (inputcell.alphainit, inputcell.betainit, inputcell.gammainit))
+        ## infofilename.write(formatstring % (inputcell.alphainit, inputcell.betainit, inputcell.gammainit))
         # Pretty printing in columns that need to have variable width
         # w1 = width of the atomic species column
         # w2 = width of a decimal column
@@ -1227,7 +1227,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                 w4 = 0
         # Now for the output...
         tmpstring = "Representative sites :"
-        sys.stdout.write(tmpstring + "\n")
+        infofilename.write(tmpstring + "\n")
         siteheader = "Atom".ljust(w1) + " "
         if options.printcart:
             transmtx = []
@@ -1251,7 +1251,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                 siteheader += "occ.".rjust(w3)
         if printcharges:
             siteheader += " " + "charge".rjust(w4)
-        sys.stdout.write(siteheader + "\n")
+        infofilename.write(siteheader + "\n")
         # Representative sites
         for i in range(len(inputcell.ineqsites)):
             tmpstring = ""
@@ -1273,31 +1273,31 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                 tmpstring += " " + occstring.rjust(w3)
             if printcharges:
                 tmpstring += " " + chargestring.rjust(w4)
-            sys.stdout.write(tmpstring + "\n")
+            infofilename.write(tmpstring + "\n")
 
         # Output cell
-        sys.stdout.write("\n OUTPUT CELL INFORMATION\n")
-        sys.stdout.write("Symmetry information:\n")
+        infofilename.write("\n OUTPUT CELL INFORMATION\n")
+        infofilename.write("Symmetry information:\n")
         if cd.HallSymbol != "":
-            sys.stdout.write(
+            infofilename.write(
                 cd.crystal_system()[0].upper()
                 + cd.crystal_system()[1:]
                 + " crystal system.\n"
             )
-            sys.stdout.write(
+            infofilename.write(
                 "Space group number     : ".rjust(2) + str(cd.spacegroupnr) + "\n"
             )
-            sys.stdout.write("Hall symbol            : " + cd.HallSymbol + "\n")
-            sys.stdout.write("Hermann-Mauguin symbol : " + cd.HMSymbol + "\n")
+            infofilename.write("Hall symbol            : " + cd.HallSymbol + "\n")
+            infofilename.write("Hermann-Mauguin symbol : " + cd.HMSymbol + "\n")
         else:
-            sys.stdout.write("No space group information found.\n")
+            infofilename.write("No space group information found.\n")
         # only print these if verbose
         if verbose:
-            sys.stdout.write("Symmetry equivalent sites:\n")
+            infofilename.write("Symmetry equivalent sites:\n")
             symops = list(cd.symops)
             symops.sort()
             for i in range(len(symops)):
-                sys.stdout.write(
+                infofilename.write(
                     "%4i  %8s, %8s, %8s\n"
                     % (
                         i + 1,
@@ -1307,7 +1307,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                     )
                 )
 
-        sys.stdout.write("\n")
+        infofilename.write("\n")
         cd.printCell(
             printcart=options.printcart,
             printdigits=printdigits,
@@ -1320,7 +1320,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
         else:
             volume = cd.volume() * cd.lengthscale ** 3
             volstring = "A"
-        sys.stdout.write(
+        infofilename.write(
             "\nUnit cell volume  : " + decform % volume + " " + volstring + "^3\n"
         )
         try:
@@ -1330,7 +1330,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                     for k, v in b.species.items():
                         weight += ed.elementweight[k] * v
             density = weight / volume
-            sys.stdout.write(
+            infofilename.write(
                 "Unit cell density : "
                 + decform % density
                 + " u/"
@@ -1341,7 +1341,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
             )
         except:
             if not options.quiet:
-                sys.stderr.write("***Warning: Error printing unit cell density.\n")
+                errorfilename.write("***Warning: Error printing unit cell density.\n")
 
     ##############################################
     # Rotate cell
@@ -1357,11 +1357,11 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                 ]
             )
             if cd.crystal_system() != "cubic":
-                sys.stderr.write(
+                errorfilename.write(
                     "***Error: Only cubic structures are properly aligned to the z axis by --cubic-diagonal-z.\n"
                 )
                 if not force:
-                    sys.stderr.write("          Use --force to go ahead anyway.\n")
+                    errorfilename.write("          Use --force to go ahead anyway.\n")
                     sys.exit(1)
 
         if options.rhombdiag:
@@ -1383,14 +1383,14 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                 ]
             )
             if not cd.rhombohedral:
-                sys.stderr.write(
+                errorfilename.write(
                     "***Error: Only rhombohedral cells are properly aligned to the\n"
                 )
-                sys.stderr.write(
+                errorfilename.write(
                     "          pseudocubic (111) axis by --rhombohedral-diagonal.\n"
                 )
                 if not force:
-                    sys.stderr.write("          Use --force to go ahead anyway.\n")
+                    errorfilename.write("          Use --force to go ahead anyway.\n")
                     sys.exit(1)
         # explicitly giving the transformation overrides any other transformation
         if options.celltransformation:
@@ -1398,10 +1398,10 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
         try:
             cd.transformCell(celltransformation)
         except CellError as e:
-            sys.stderr.write("***Error: Cell transformation: " + e.value + "\n")
+            errorfilename.write("***Error: Cell transformation: " + e.value + "\n")
             sys.exit(2)
         if verbose or not options.program and not options.quiet:
-            sys.stdout.write("\n TRANSFORMED CELL")
+            infofilename.write("\n TRANSFORMED CELL")
             cd.printCell(
                 printcart=options.printcart,
                 printdigits=printdigits,
@@ -1435,7 +1435,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                 realign=supercellrealign,
             )
         except CellError as e:
-            sys.stderr.write("***Error: Supercell setup: " + e.value + "\n")
+            errorfilename.write("***Error: Supercell setup: " + e.value + "\n")
             sys.exit(2)
         # Randomly displace atoms if requested. This erases all symmetry operations.
         if options.randomdisp:
@@ -1446,13 +1446,13 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
             try:
                 cd.randomDisplacements(float(options.randomdisp), distribution=distr)
             except SetupError as e:
-                sys.stderr.write("***Error: random displacements: " + e.value + "\n")
+                errorfilename.write("***Error: random displacements: " + e.value + "\n")
                 sys.exit(3)
             cd.symops = set([SymmetryOperation(["x", "y", "z"])])
 
         # Print supercell
         if verbose or not options.program and not options.quiet:
-            sys.stdout.write("\n SUPERCELL INFORMATION\n")
+            infofilename.write("\n SUPERCELL INFORMATION\n")
             cd.printCell(
                 printcart=options.printcart,
                 printdigits=printdigits,
@@ -1462,26 +1462,26 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
     if printsymops or printseitz or verbose:
         # Print symmetry operations. Need to make list of it to control order.
         symoplist = sorted(list(cd.symops))
-        sys.stdout.write("\nSymmetry operations :\n")
+        infofilename.write("\nSymmetry operations :\n")
         if printsymops or verbose:
-            sys.stdout.write("  3x3 rotation matrix +\n")
-            sys.stdout.write("  3x1 translation vector\n")
+            infofilename.write("  3x3 rotation matrix +\n")
+            infofilename.write("  3x1 translation vector\n")
             i = 1
             for op in symoplist:
-                sys.stdout.write("Operation " + str(i) + "\n")
+                infofilename.write("Operation " + str(i) + "\n")
                 for v in op.rotation:
-                    sys.stdout.write(threedecs % (v[0], v[1], v[2]))
-                sys.stdout.write(
+                    infofilename.write(threedecs % (v[0], v[1], v[2]))
+                infofilename.write(
                     threedecs
                     % (op.translation[0], op.translation[1], op.translation[2])
                     + "\n"
                 )
                 i += 1
         if printseitz:
-            sys.stdout.write("  In Seitz matrix form\n")
+            infofilename.write("  In Seitz matrix form\n")
             i = 1
             for op in symoplist:
-                sys.stdout.write("Operation " + str(i) + "\n")
+                infofilename.write("Operation " + str(i) + "\n")
                 tmpstring = ""
                 for j in range(3):
                     tmpstring += (
@@ -1495,16 +1495,16 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                         + "\n"
                     )
                 tmpstring += fourdecs % (0, 0, 0, 1)
-                sys.stdout.write(tmpstring)
+                infofilename.write(tmpstring)
                 i += 1
 
     # Remind that the result may be junk when using --force
     if force:
         if force_warning_print:
-            sys.stderr.write(
+            errorfilename.write(
                 "\n***Warning: You invoked the --force flag, presumably to bypass some error message.\n"
             )
-            sys.stderr.write(
+            errorfilename.write(
                 "            Carefully check the results, which may be rubbish, nonsense or both!\n"
             )
 
@@ -1609,7 +1609,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
     # Print output filename to screen
     if outputprogram != "":
         if (verbose or options.filenamequery) and outputfile != "":
-            sys.stdout.write("Data will be written to the file " + outputfile)
+            infofilename.write("Data will be written to the file " + outputfile)
 
     ################################################################################################
     # stuff that should be printed irrespective of the verbose flag
@@ -1620,10 +1620,10 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
             or outputprogram == "vasp"
             or outputprogram == "cpmd"
         ):
-            sys.stdout.write(tmpstring + "\n")
+            infofilename.write(tmpstring + "\n")
         else:
             tmpstring += "Warning! The file(s) will be incomplete!"
-            sys.stdout.write(tmpstring + "\n")
+            infofilename.write(tmpstring + "\n")
 
     ################################################################################################
     # Stop here if no specific output was requested
@@ -1636,7 +1636,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
         and not forcealloy
         and not (outputprogram in alloyprograms or outputprogram in vcaprograms)
     ):
-        sys.stderr.write(
+        errorfilename.write(
             "Error: This system is an alloy, but "
             + codename[outputprogram]
             + " has no way of dealing with alloys.\n       Run again with --force-alloy (or --force) if you want to generate an (incomplete) output file anyway.\n"
@@ -1645,7 +1645,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
     # Deal with VCA
     if cd.alloy and outputprogram in vcaprograms:
         if not options.vca and not forcealloy:
-            sys.stderr.write(
+            errorfilename.write(
                 "Error: This system is an alloy. "
                 + codename[outputprogram]
                 + " can deal with some alloys using the virtual crystal approximation (VCA).\n       Run again with the flag --vca if you want to produce a VCA setup.\n"
@@ -1666,19 +1666,19 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
             if g[1] - g[0] > 1:
                 vcawarning2 = True
         if vcawarning1 and vcawarning2:
-            sys.stderr.write(
+            errorfilename.write(
                 "Warning: You are setting up a VCA calculation for an alloy with more than two components\n         and not all alloy sites are occupied by species from neighbouring groups in the periodic\n         table. Make doubly sure that you know what you are doing!\n"
             )
         elif vcawarning1:
-            sys.stderr.write(
+            errorfilename.write(
                 "Warning: You are setting up a VCA calculation for an alloy with more than two components.\n         Make sure that you know what you are doing!\n"
             )
         elif vcawarning2:
-            sys.stderr.write(
+            errorfilename.write(
                 "Warning: You are setting up a VCA calculation but not all alloy sites are occupied by species\n         from neighbouring groups in the periodic table. Make sure that you know what you are doing!\n"
             )
-    sys.stdout.close()
-    sys.stderr.close()
+    infofilename.close()
+    errorfilename.close()
 
 
     # Function for printing a standard docstring
@@ -2235,7 +2235,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
             elif options.mopacfreeze.upper() == "T":
                 mopacfreeze = 0
             else:
-                sys.stderr.write(
+                errorfilename.write(
                     "***Warning: I do not understand. --mopac-freeze-structure takes T (t) or F (f) as inputs.\n"
                 )
         mopacinput = MOPACFile(
@@ -2365,7 +2365,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
         f.close()
         # Print species order to screen if requested
         if options.vaspprintspcs:
-            sys.stdout.write(poscar.SpeciesOrder())
+            infofilename.write(poscar.SpeciesOrder())
         # Set up all files?
         if setupall:
             # POTCAR
@@ -2377,7 +2377,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
             if options.vasppppriority:
                 prioritylist = options.vasppppriority.split(",")
                 prioritylist.append("")
-                sys.stdout.write(prioritylist)
+                infofilename.write(prioritylist)
             else:
                 try:
                     pl = os.environ["VASP_PP_PRIORITY"]
@@ -2583,5 +2583,6 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
         f.write(str(sysfile))
         f.close()
     
-
+    infofilename.close()
+    errorfilename.close()
     return
