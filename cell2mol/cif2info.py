@@ -138,13 +138,13 @@ def parsing_input():
     description = "A program for generating input lattice structures to various electronic structure programs from a CIF (Crystallographic Information Framework) file. This code was published in Comput. Phys. Commun. 182, 1183 (2011). Please cite generously."
     usage = "usage: %prog FILE [-p PROGRAM] [other options]"
     parser = OptionParser(usage=usage, description=description)
-    
+
     parser.add_option(
         "-i",
         "--input",
         dest="filename",
         type=str,
-        help="Filename of Input (.info or .cif file)",   
+        help="Filename of Input (.info or .cif file)",
     )
     parser.add_option(
         "-s",
@@ -671,8 +671,15 @@ def parsing_input():
     return (options, args)
 
 
-def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=codename, uperautogpercm=uperautogpercm):
-    
+def cif_2_info(
+    input_path,
+    infopath,
+    errorpath,
+    angtobohr=angtobohr,
+    codename=codename,
+    uperautogpercm=uperautogpercm,
+):
+
     angtobohr = angtobohr
     codename = codename
     uperautogpercm = uperautogpercm
@@ -683,18 +690,18 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
 
     (options, args) = parsing_input()
     infofilename = open(infopath, "w")
-    errorfilename = open(errorpath, "w")   
+    errorfilename = open(errorpath, "w")
 
-    # python cif2info.py input_path --cartesian --force 
+    # python cif2info.py input_path --cartesian --force
     options.file = input_path
     options.cartesian = True
     options.force = True
-    force_warning_print = False # suppress warning if force is True
+    force_warning_print = False  # suppress warning if force is True
 
     # Print version number and exit
     if options.version:
         infofilename.write(programname + " version " + version + "\n")
-    
+
     #############################################################
     # Check that options given are possible
     if options.append and not options.outputfile:
@@ -1060,7 +1067,7 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
     if len(ref.ChemicalComposition) > 0 and not cd.alloy:
         if ref.ChemicalComposition != cd.ChemicalComposition:
             if force:
-                if force_warning_print :
+                if force_warning_print:
                     errorfilename.write(
                         "***Warning: Chemical composition of the generated cell differs from that given\n"
                         + "            by _chemical_formula_sum.\n"
@@ -1139,7 +1146,9 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
                 + str(inputcell.spacegroupnr)
                 + "\n"
             )
-            infofilename.write("Hall symbol            : " + inputcell.HallSymbol + "\n")
+            infofilename.write(
+                "Hall symbol            : " + inputcell.HallSymbol + "\n"
+            )
             infofilename.write("Hermann-Mauguin symbol : " + inputcell.HMSymbol + "\n")
         else:
             infofilename.write("No space group information found.\n")
@@ -1312,13 +1321,14 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
             printcart=options.printcart,
             printdigits=printdigits,
             printcharges=options.printcharges,
+            unit_to_write=infofilename,
         )
         # Print volume and density
         if options.printau:
             volume = cd.volume() * (cd.lengthscale * angtobohr) ** 3
             volstring = "(a.u.)"
         else:
-            volume = cd.volume() * cd.lengthscale ** 3
+            volume = cd.volume() * cd.lengthscale**3
             volstring = "A"
         infofilename.write(
             "\nUnit cell volume  : " + decform % volume + " " + volstring + "^3\n"
@@ -1679,7 +1689,6 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
             )
     infofilename.close()
     errorfilename.close()
-
 
     # Function for printing a standard docstring
     def StandardDocstring():
@@ -2582,7 +2591,11 @@ def cif_2_info(input_path, infopath, errorpath, angtobohr=angtobohr, codename=co
         f = open(outputfile, outmode)
         f.write(str(sysfile))
         f.close()
-    
+
     infofilename.close()
     errorfilename.close()
     return
+
+
+if __name__ == "__main__":
+    cif_2_info(sys.argv[1], "test.info", "test.err")
