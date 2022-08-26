@@ -52,7 +52,8 @@ def search_string_in_file(file_name, string_to_search):
 def readinfo(filepath):
 
     info = open(filepath, "r")
-    lines = info.readlines()
+    lines = list(info.readlines())
+    info.close()
 
     strings = [
         "Lattice parameters:",
@@ -68,6 +69,7 @@ def readinfo(filepath):
         for stx, string in enumerate(strings):
             if string in line:
                 lint[stx] = l
+
 
     latparamsone = int(lint[0] + 2)
     latparamstwo = int(lint[1] - 1)
@@ -116,6 +118,7 @@ def readinfo(filepath):
             pos.append([float(x), float(y), float(z)])
             labels.append(label)
 
+
     return labels, pos, lfracs, fracs, cellvec, cellparam
 
 
@@ -123,7 +126,8 @@ def readinfo(filepath):
 def readcif(filepath):
 
     info = open(filepath, "r")
-    lines = info.readlines()
+    lines = list(info.readlines())
+    info.close()
 
     strings = [
         "_journal_name_full",

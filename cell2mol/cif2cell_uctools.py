@@ -1710,6 +1710,7 @@ class CellData(GeometryObject):
         printcart=False,
         printdigits=8,
         printcharges=False,
+        unit_to_write=sys.stdout,
     ):
         # format string for outputting decimal numbers to screen
         decpos = printdigits + 3
@@ -1758,7 +1759,7 @@ class CellData(GeometryObject):
             else:
                 w4 = 0
         # Start output
-        sys.stdout.write("Bravais lattice vectors :\n")
+        unit_to_write.write("Bravais lattice vectors :\n")
         # Site header
         siteheader = "Atom".ljust(w1) + " "
         if printcart:
@@ -1790,7 +1791,7 @@ class CellData(GeometryObject):
         for i in range(3):
             formatstring = formatstring + decform + " "
         for i in range(3):
-            sys.stdout.write(
+            unit_to_write.write(
                 formatstring
                 % (
                     self.latticevectors[i][0] * fact,
@@ -1805,8 +1806,8 @@ class CellData(GeometryObject):
             tmpstring += "(cartesian coordinates):"
         else:
             tmpstring += "(lattice coordinates):"
-        sys.stdout.write(tmpstring + "\n")
-        sys.stdout.write(siteheader + "\n")
+        unit_to_write.write(tmpstring + "\n")
+        unit_to_write.write(siteheader + "\n")
         for a in self.atomdata:
             for b in a:
                 spcsstring = ""
@@ -1828,7 +1829,7 @@ class CellData(GeometryObject):
                     tmpstring += " " + occstring.rjust(w3)
                 if printcharges:
                     tmpstring += " " + chargestring.rjust(w4)
-                sys.stdout.write(tmpstring + "\n")
+                unit_to_write.write(tmpstring + "\n")
 
 
 ################################################################################################
