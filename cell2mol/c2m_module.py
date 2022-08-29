@@ -17,12 +17,12 @@ from typing import Tuple
 
 
 ##################################################################################
-def get_refmoleclist_and_check_missingH(cell: object, reflabels: list, fracs: list) -> Tuple[object, float, float]:
+def get_refmoleclist_and_check_missingH(cell: object, reflabels: list, fracs: list, debug: int=0) -> Tuple[object, float, float]:
 
     refpos = frac2cart_fromparam(fracs, cell.cellparam)
 
     # Get ref.molecules --> output: a valid list of ref.molecules
-    refmoleclist, covalent_factor, metal_factor, Warning = get_reference_molecules(reflabels, refpos)
+    refmoleclist, covalent_factor, metal_factor, Warning = get_reference_molecules(reflabels, refpos, debug=debug)
     cell.warning_list.append(Warning)
 
     # Check missing hydrogens in ref.molecules
@@ -49,30 +49,31 @@ def reconstruct(cell: object, reflabels: list, fracs: list, debug: int=0) -> obj
     Warning = False
 
     # Get a list of ref.molecules and Check missing H in ref.molecules
-    cell, covalent_factor, metal_factor = get_refmoleclist_and_check_missingH(cell, reflabels, fracs)
+    cell, covalent_factor, metal_factor = get_refmoleclist_and_check_missingH(cell, reflabels, fracs, debug=debug)
 
     # Get blocks in the unit cells constructing the adjacency matrix (A)
     if not any(cell.warning_list):
-        Warning, blocklist = getmolecs(cell.labels, cell.pos, covalent_factor, metal_factor)
+        Warning, blocklist = getmolecs(cell.labels, cell.pos, covalent_factor, metal_factor, debug=debug)
         cell.warning_list.append(Warning)
 
     # Indentify blocks and Reconstruct Fragments
     if not any(cell.warning_list):
-        moleclist, fraglist, Hlist, init_natoms = identify_frag_molec_H(blocklist, moleclist, cell.refmoleclist, cell.cellvec)
-        moleclist, finalmols, Warning = fragments_reconstruct(moleclist,fraglist,Hlist,cell.refmoleclist,cell.cellvec,covalent_factor,metal_factor,debug)
+        moleclist, fraglist, Hlist, init_natoms = identify_frag_molec_H(blocklist, moleclist, cell.refmoleclist, cell.cellvec, debug=debug)
+        moleclist, finalmols, Warning = fragments_reconstruct(moleclist,fraglist,Hlist,cell.refmoleclist,cell.cellvec,covalent_factor,metal_factor,debug=debug)
         moleclist.extend(finalmols)
         
     # Split Complexes and Reassign Type
     if not any(cell.warning_list):
-        cell = split_complexes_reassign_type(cell, moleclist)
-
-        #print("Molecule Types assigned. These are:")
-        #for mol in moleclist:
-        #    print(mol.formula, mol.type)
+        cell = split_complexes_reassign_type(cell, moleclist, debug=debug)
+  
+        if debug >= 2: 
+            print("Molecule Types assigned. These are:")
+            for mol in moleclist:
+                print(mol.formula, mol.type)
          
         if any(mol.type != "Complex" and mol.type != "Other" for mol in moleclist):
             Warning = True
-            print(f"Fragment hasn't been fully reconstructed. Stopping")
+            if debug >= 1: print(f"Fragment hasn't been fully reconstructed. Stopping")
                
     # Check final number of atoms after reconstruction   
     if not any(cell.warning_list):
@@ -82,7 +83,7 @@ def reconstruct(cell: object, reflabels: list, fracs: list, debug: int=0) -> obj
 
         if final_natoms != init_natoms:
             Warning = True
-            print(f"Final and initial atoms do not coincide. Final/Initial {final_natoms}/{init_natoms}\n")
+            if debug >= 1: print(f"Final and initial atoms do not coincide. Final/Initial {final_natoms}/{init_natoms}\n")
 
     cell.warning_list.append(Warning)
     cell.warning_after_reconstruction = copy.deepcopy(cell.warning_list)
@@ -91,58 +92,59 @@ def reconstruct(cell: object, reflabels: list, fracs: list, debug: int=0) -> obj
 
 
 ##################################################################################
-def determine_charge(cell: object) -> object:
+def determine_charge(cell: object, debug: int=0) -> object:
 
     # Indentify unique chemical species
-    molec_indices, ligand_indices, unique_indices, unique_species = classify_mols(cell.moleclist)
+    molec_indices, ligand_indices, unique_indices, unique_species = classify_mols(cell.moleclist, debug=debug)
  
     # Group all unique species in a cell variable
     for spec in unique_species:            # spec is a list in which item 1 is the actual unique specie
         cell.speclist.append(spec[1])    
 
     if len(unique_species) == 0:
-        print("Empty list of species found. Stopping")
+        if debug >= 1: print("Empty list of species found. Stopping")
         sys.exit()
     else:
-        print(f"{len(unique_species)} Species (Ligand or Molecules) to Characterize")
+        if debug >= 1: print(f"{len(unique_species)} Species (Ligand or Molecules) to Characterize")
 
     # drive_get_poscharges adds posible charges to the metal, ligand, and molecule objects of all species in the unit cell
     # also, it retrieves "Selected_charge_states", which is a tuple with [the actual charge state, and the protonation it belongs to] for all objects except metals
-    selected_charge_states, Warning = drive_get_poscharges(unique_species)
+    selected_charge_states, Warning = drive_get_poscharges(unique_species, debug=debug)
     cell.warning_list.append(Warning)
 
     # Find possible charge distribution(s)
     if not any(cell.warning_list):
-        final_charge_distribution = balance_charge(unique_indices,unique_species)
+        final_charge_distribution = balance_charge(unique_indices,unique_species,debug=debug)
 
         ### DEALS WITH WARNINGS
-        print("final_charge_distribution", final_charge_distribution)
+        if debug >= 1: print("final_charge_distribution", final_charge_distribution)
         if len(final_charge_distribution) > 1:
             Warning = True
-            print("More than one Possible Distribution Found:", final_charge_distribution)
+            if debug >= 1: print("More than one Possible Distribution Found:", final_charge_distribution)
         else:
             Warning = False
         cell.warning_list.append(Warning)
 
         if len(final_charge_distribution) == 0:
             Warning = True
-            print("No valid Distribution Found", final_charge_distribution)
+            if debug >= 1: print("No valid Distribution Found", final_charge_distribution)
         else:
             Warning = False
         cell.warning_list.append(Warning)
         #######################
 
         if len(final_charge_distribution) > 1:
-           pp_mols, pp_idx, pp_opt = prepare_unresolved(unique_indices,unique_species,final_charge_distribution)
+           pp_mols, pp_idx, pp_opt = prepare_unresolved(unique_indices,unique_species,final_charge_distribution, debug=debug)
            cell.data_for_postproc(pp_mols, pp_idx, pp_opt)
 
     # Only one possible charge distribution -> getcharge for the repeated species
     if not any(cell.warning_list):
-        print(f"\nFINAL Charge Distribution: {final_charge_distribution}\n")
-        print("#########################################")
-        print("Assigning Charges and Preparing Molecules")
-        print("#########################################")
-        cell.moleclist, Warning = prepare_mols(cell.moleclist, unique_indices, unique_species, selected_charge_states, final_charge_distribution[0])
+        if debug >= 1:
+            print(f"\nFINAL Charge Distribution: {final_charge_distribution}\n")
+            print("#########################################")
+            print("Assigning Charges and Preparing Molecules")
+            print("#########################################")
+        cell.moleclist, Warning = prepare_mols(cell.moleclist, unique_indices, unique_species, selected_charge_states, final_charge_distribution[0], debug=debug)
         cell.warning_list.append(Warning)
 
     # Build Bond objects for molecules
@@ -151,30 +153,28 @@ def determine_charge(cell: object) -> object:
 
     return cell
 
-
 ##################################################################################
-def save_cell(cell: object, ext: str, output_dir: str):
-    print("\n[Output files]")
+def save_cell(cell: object, ext: str, output_dir: str, debug: int=0):
+    if debug >= 1: print("\n[Output files]")
 
     cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(cell.refcode))
     with open(cellpath, "wb") as fil:
         if ext == "gmol":
-            print("Output file path", cellpath)
+            if debug >= 1: print("Output file path", cellpath)
             pickle.dump(cell, fil)
         else:
-            print(ext, "not found as a valid print extension in print_molecule")
-
+            if debug >= 1: print(ext, "not found as a valid print extension in print_molecule")
 
 ##################################################################################
-def load_cell_reset_charges (cellpath: str) -> object:
+def load_cell_reset_charges (cellpath: str, debug: int=0) -> object:
     
     file = open(cellpath, "rb")
     cell = pickle.load(file)
-    print("[Refcode]", cell.refcode, cell)
-    # print(f"{cell.moleclist=}")  
-    print(f"{cell.warning_list=}")
+    if debug >= 1: print("[Refcode]", cell.refcode, cell)
+    # if debug >= 1: print(f"{cell.moleclist=}")  
+    if debug >= 1: print(f"{cell.warning_list=}")
     cell.warning_list = copy.deepcopy(cell.warning_after_reconstruction)
-    print(f"{cell.warning_after_reconstruction=}")
+    if debug >= 1: print(f"{cell.warning_after_reconstruction=}")
 
     for mol in cell.moleclist:
         mol.poscharge = []
@@ -212,7 +212,7 @@ def load_cell_reset_charges (cellpath: str) -> object:
 ##################################################################################
 ################################## MAIN ##########################################
 ##################################################################################
-def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3) -> object:
+def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, debug: int=1) -> object:
 
     if step == 1 or step == 3:
 
@@ -224,52 +224,52 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3) -> objec
         # Initialize cell object
         warning_list = []
         cell = Cell(refcode, labels, pos, cellvec, cellparam, warning_list)
-        print("[Refcode]", cell.refcode)
+        if debug >= 1: print("[Refcode]", cell.refcode)
 
         # Cell Reconstruction
-        print("===================================== step 1 : Cell reconstruction =====================================\n")
-        cell = reconstruct(cell, ref_labels, ref_fracs)
+        if debug >= 1: print("===================================== step 1 : Cell reconstruction =====================================\n")
+        cell = reconstruct(cell, ref_labels, ref_fracs, debug=debug)
         tend = time.time()
-        print(f"\nTotal execution time for Cell Reconstruction: {tend - tini:.2f} seconds")
+        if debug >= 1: print(f"\nTotal execution time for Cell Reconstruction: {tend - tini:.2f} seconds")
 
     elif step == 2:
-        print("\n***Runing only Charge Assignment***")
-        print("\nCell object loaded with pickle")
+        if debug >= 1: print("\n***Runing only Charge Assignment***")
+        if debug >= 1: print("\nCell object loaded with pickle")
         cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(refcode))
         cell = load_cell_reset_charges(cellpath)
     else:
-        print("Inproper step number")
+        if debug >= 1: print("Step number is incorrect. Only values 1, 2 or 3 are accepted")
         sys.exit(1)
 
     if not any(cell.warning_after_reconstruction):
         if step == 1 or step == 3:
-            print("Cell reconstruction successfully finished.\n")
+            if debug >= 1: print("Cell reconstruction successfully finished.\n")
         elif step == 2:
-            print("No Warnings in loaded Cell object in cell reconstruction \n")
+            if debug >= 1: print("No Warnings in loaded Cell object in cell reconstruction \n")
 
         if step == 1:
             pass
         elif step == 2 or step == 3:
             # Charge Assignment
             tini_2 = time.time()
-            print("===================================== step 2 : Charge Assignment =======================================\n")
-            cell = determine_charge(cell)
+            if debug >= 1: print("===================================== step 2 : Charge Assignment =======================================\n")
+            cell = determine_charge(cell, debug=debug)
             tend_2 = time.time()
-            print(f"\nTotal execution time for Charge Assignment: {tend_2 - tini_2:.2f} seconds")
+            if debug >= 1: print(f"\nTotal execution time for Charge Assignment: {tend_2 - tini_2:.2f} seconds")
 
             if not any(cell.warning_list):
-                print("Charge Assignment successfully finished.\n")
-                cell.print_charge_assignment()
-                cell.print_Warning()
+                if debug >= 1: print("Charge Assignment successfully finished.\n")
+                if debug >= 1: cell.print_charge_assignment()
+                if debug >= 1: cell.print_Warning()
             else:
-                print("Charge Assignment failed.\n")
-                cell.print_Warning()
+                if debug >= 1: print("Charge Assignment failed.\n")
+                if debug >= 1: cell.print_Warning()
     else:
         if step == 1 or step == 3:
-            print("Cell reconstruction failed.\n")
+            if debug >= 1: print("Cell reconstruction failed.\n")
         elif step == 2:
-            print("Warnings in loaded Cell object\n")
-        cell.print_Warning()
-        print("Cannot proceed step 2 Charge Assignment")
+            if debug >= 1: print("Warnings in loaded Cell object\n")
+        if debug >= 1: cell.print_Warning()
+        if debug >= 1: print("Cannot proceed step 2 Charge Assignment")
 
     return cell

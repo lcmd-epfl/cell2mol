@@ -12,7 +12,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
 
     pwd = os.getcwd()
 
-    input, step = parsing_arguments()
+    input, step, isverbose, isquiet = parsing_arguments()
     input_path = os.path.normpath(input)
     dir, file = os.path.split(input_path)
     root, extension = os.path.splitext(file)
@@ -23,7 +23,14 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
 
     stdout = sys.stdout
     stderr = sys.stderr
+
+    ##### Deals with the parsed arguments for verbosity ######
+    if isverbose and not isquiet: debug = 2
+    elif isverbose and isquiet: debug = 0
+    elif not isverbose and isquiet: debug = 0
+    elif not isverbose and not isquiet: debug = 1
     
+    ##### Deals with the parsed argument "STEP" ######
     if step == None:
         step = 3
         pass
@@ -74,9 +81,15 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
         output = open(output_fname, "a")
 
     sys.stdout = output
-    cell = cell2mol(infopath, refcode, output_dir, step)
+
+    ######################
+    ### CALLS CELL2MOL ###
+    ######################
+    print(f"running cell2mol with debug={debug}")
+
+    cell = cell2mol(infopath, refcode, output_dir, step, debug)
     print_types = "gmol"
-    save_cell(cell, print_types, output_dir)
+    save_cell(cell, print_types, output_dir, debug=debug)
     output.close()
 
     sys.stdout = stdout

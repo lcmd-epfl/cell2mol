@@ -154,31 +154,30 @@ def find_shape(vecs):
                 shape = "Tetrahedron"
                 shapeval = 4
 
-    # print(f"Center is shaped as a {shape}")
-
     return shape, shapeval, report_shape
 
 
 ######################
-def check_missingH(refmoleclist):
-    #################################
-    # Checks Missing H - New in V14 #
-    #################################
+
+def check_missingH(refmoleclist: list, debug: int=0):
+
     Missing_H_in_C = False
     Missing_H_in_CoordWater = False
     ismissingH = False
     Warning = False
 
+    # List of Metal Atoms for which O atoms might appear connected directly.
     Exceptions_for_CoordWater = ["Re"]
-    print("")
-    print("##################")
-    print("Checking Missing H")
-    print("##################")
+
+    if debug >= 2: print("")
+    if debug >= 2: print("##################")
+    if debug >= 2: print("Checking Missing H")
+    if debug >= 2: print("##################")
     for idx, ref in enumerate(refmoleclist):
         if ref.type != "Complex":
             if ref.natoms == 1 and "O" in ref.labels: 
                 Missing_H_in_CoordWater = True
-                print(f"WARNING found isolated O atom in the cell. This tends to be a water with missing H, so stopping")
+                if debug >= 2: print(f"WARNING found isolated O atom in the cell. This tends to be a water with missing H, so stopping")
             else:
                 for kdx, a in enumerate(ref.atoms):
                     if a.label == "C":
@@ -187,48 +186,37 @@ def check_missingH(refmoleclist):
                             bonded_atom_coord.append(ref.coord[adj])
                         ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord)
                         if ismissingH:
-                            print("")
-                            print(f"WARNING in Missing H function for: {ref.type}, {idx}, {ref.labels}")
-                            print(f"C Atom {kdx} has missing H atoms")
-                            print(report)
+                            if debug >= 2: print("")
+                            if debug >= 2: print(f"WARNING in Missing H function for: {ref.type}, {idx}, {ref.labels}")
+                            if debug >= 2: print(f"C Atom {kdx} has missing H atoms")
+                            if debug >= 2: print(report)
                             Missing_H_in_C = True
         elif ref.type == "Complex":
             for jdx, lig in enumerate(ref.ligandlist):
                 if lig.natoms == 1 and "O" in lig.labels and lig.totmconnec <= 1:
-                    if any(
-                        m.label in Exceptions_for_CoordWater for m in lig.metalatoms
-                    ):
-                        pass
+                    if any(m.label in Exceptions_for_CoordWater for m in lig.metalatoms): pass
                     else:
                         Missing_H_in_CoordWater = True
-                        print("")
-                        print(
-                            "WARNING in Missing H function for ligand",
-                            lig.natoms,
-                            lig.labels,
-                        )
+                        if debug >= 2: print("")
+                        if debug >= 2: print("WARNING in Missing H function for ligand",lig.natoms,lig.labels)
                 else:
                     for kdx, a in enumerate(lig.atoms):
                         if a.label == "C" and a.mconnec == 0:
                             bonded_atom_coord = []
                             for adj in a.adjacency:
                                 bonded_atom_coord.append(lig.coord[adj])
-                            ismissingH, report = get_missingH_from_adjacency(
-                                a.atnum, a.coord, bonded_atom_coord
-                            )
+                            ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord)
                             if ismissingH:
-                                print("")
-                                print(
-                                    f"WARNING in Missing H function for: {ref.type}, {idx}, {jdx}, {lig.labels}"
-                                )
-                                print(f"Atom {kdx} has missing H atoms")
-                                print(report)
+                                if debug >= 2: print("")
+                                if debug >= 2: print(f"WARNING in Missing H function for: {ref.type}, {idx}, {jdx}, {lig.labels}")
+                                if debug >= 2: print(f"Atom {kdx} has missing H atoms")
+                                if debug >= 2: print(report)
                                 Missing_H_in_C = True
 
     if Missing_H_in_C or Missing_H_in_CoordWater:
         Warning = True
 
     if not Warning:
-        print("Not a Single Molecule has Missing H atoms (apparently)")
+        if debug >= 2: print("Not a Single Molecule has Missing H atoms (apparently)")
 
     return Warning, ismissingH, Missing_H_in_C, Missing_H_in_CoordWater

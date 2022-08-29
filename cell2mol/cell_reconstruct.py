@@ -17,7 +17,7 @@ from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
 #######################################################
-def verify_connectivity(ligand: object, molecule: object, debug: int = 1) -> None:
+def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> None:
 
     metalist = molecule.metalist.copy()
 
@@ -29,16 +29,16 @@ def verify_connectivity(ligand: object, molecule: object, debug: int = 1) -> Non
     # position (index) of the added atom
     posadded = len(ligand.labels)
 
-    if debug >= 1: print("")
-    if debug >= 1: print(f"VERIFY: checking connectivity of ligand {ligand.formula}")
-    if debug >= 1: print(f"VERIFY: initial connectivity is {ligand.totmconnec}")
+    if debug >= 2: print("")
+    if debug >= 2: print(f"VERIFY: checking connectivity of ligand {ligand.formula}")
+    if debug >= 2: print(f"VERIFY: initial connectivity is {ligand.totmconnec}")
     for g in ligand.grouplist:
         if g.hapticity is True:
-            if debug >= 1: print("VERIFY: group has hapticity, skipping check")
+            if debug >= 2: print("VERIFY: group has hapticity, skipping check")
         else:
             for idx, a in enumerate(ligand.atoms):
                 if a.mconnec >= 1 and a.index in g.atlist:
-                    if debug >= 1: print(f"VERIFY: connectivity={a.mconnec} in atom idx={idx}, label={a.label}")
+                    if debug >= 2: print(f"VERIFY: connectivity={a.mconnec} in atom idx={idx}, label={a.label}")
                     tgt, apos, dist = find_closest_metal(a, metalist)
                     idealdist = a.radii + elemdatabase.CovalentRadius2["H"]
                     addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
@@ -49,21 +49,21 @@ def verify_connectivity(ligand: object, molecule: object, debug: int = 1) -> Non
                     dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, newcoord, ligand.factor, tmpradii)
                     # If no undesired adjacencies have been created, the coordinates are kept. Otherwise, data is corrected
                     if tmpconnec[posadded] == 1:
-                        if debug >= 1: print(f"VERIFY: connectivity verified for atom {idx} with label {a.label}")
+                        if debug >= 2: print(f"VERIFY: connectivity verified for atom {idx} with label {a.label}")
                     else:
                         # Corrects data of atom object
                         a.mconnec = 0
-                        if debug >= 1: print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label}")
+                        if debug >= 2: print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label}")
                         # Now it should correct data of metal, ligand and molecule objects. Not yet implemented
 
     # Corrects data of ligand object
     ligand.totmconnec = 0
     for a in ligand.atoms:
         ligand.totmconnec += a.mconnec
-    if debug >= 1: print(f"VERIFY: final connectivity is {ligand.totmconnec}")
+    if debug >= 2: print(f"VERIFY: final connectivity is {ligand.totmconnec}")
 
 #######################################################
-def get_reference_molecules(labels: list, pos: list, debug: int=1) -> Tuple[list, float, float, bool]:
+def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list, float, float, bool]:
     ## Retrieves the reference molecules from the information in the .cif file
     # Molecules are extracted from the adjacency matrix, and the results are evaluated. How? Well, the adjacency matrix is constructed using a covalent factor.
     # This factor is taken as 1.3, but it can occasionally be too small or too large. If it is too small, it results on some atoms being detached from their molecule.
@@ -105,8 +105,8 @@ def get_reference_molecules(labels: list, pos: list, debug: int=1) -> Tuple[list
     while (not found_both_factors) and (iteration <= maxiter):#and not Warning:
 
         # Tries to find the reference molecules
-        print("")
-        if debug >= 1: print(f"GETREFS: sending listofreferences with {covalent_factor} {metal_factor}")
+        if debug >= 2: print("")
+        if debug >= 2: print(f"GETREFS: sending listofreferences with {covalent_factor} {metal_factor}")
         Warning, listofreferences = getmolecs(labels, pos, covalent_factor, metal_factor)
  
         ##################################################
@@ -122,7 +122,7 @@ def get_reference_molecules(labels: list, pos: list, debug: int=1) -> Tuple[list
                     or elemdatabase.elementgroup[ref.atoms[0].label] == 17):
                     pass
                 else:
-                    if debug >= 1: print(f"GETREFS: found ref molecule with only one atom {ref.labels}")
+                    if debug >= 2: print(f"GETREFS: found ref molecule with only one atom {ref.labels}")
                     valid_list_of_references = False
 
         if not valid_list_of_references:
@@ -130,7 +130,7 @@ def get_reference_molecules(labels: list, pos: list, debug: int=1) -> Tuple[list
                 found_covalent_factor = False
                 covalent_factor += increase_covalent_factor
                 covalent_factor = np.round(covalent_factor,2)
-                if debug >= 1: print("GETREFS: Increasing covalent_factor to:", covalent_factor)
+                if debug >= 2: print("GETREFS: Increasing covalent_factor to:", covalent_factor)
             else:
                 print("GETREFS: Reached Maximum Covalent_factor:", max_covalent_factor)
                 Warning = True
@@ -149,12 +149,11 @@ def get_reference_molecules(labels: list, pos: list, debug: int=1) -> Tuple[list
 
                 # Checks Hapticity
                 potential_hapticity = get_hapticity(ref)
-                print(f"Potential hapticity={potential_hapticity} for molecule {ref.formula}")
+                if debug >= 2: print(f"Potential hapticity={potential_hapticity} for molecule {ref.formula}")
 
                 for lig in ref.ligandlist:
-                    verify_connectivity(lig, ref)
-                    print(f"Verifying Connectivity for Lig in Ref molec {lig.natoms}, {lig.formula}, {lig.totmconnec}")  # , len(lig.metalatoms))
-                    #print(f"Metalatoms for this ligand: {len(lig.metalatoms)}")  # , len(lig.metalatoms))
+                    verify_connectivity(lig, ref, debug)
+                    if debug >= 2: print(f"Verifying Connectivity for Lig in Ref molec {lig.natoms}, {lig.formula}, {lig.totmconnec}")  # , len(lig.metalatoms))
 
                 # Checks Shared Ligands in Polymetallic complexes
                 if any(len(lig.metalatoms) >= 2 for lig in ref.ligandlist):
@@ -166,12 +165,12 @@ def get_reference_molecules(labels: list, pos: list, debug: int=1) -> Tuple[list
                 if (not potential_hapticity and not ispolymetallic_and_shared):  # then tries to adjust the metal_factor
                     for a in ref.atoms:
                         if a.block == "d" or a.block == "f":
-                            if debug >= 1: print(f"GETREFS: sending {a.label} {a.mconnec} to coordcheck")
-                            good, increase, decrease = metalcoordcheck(a.label, a.mconnec)
+                            if debug >= 2: print(f"GETREFS: sending {a.label} {a.mconnec} to coordcheck")
+                            good, increase, decrease = metalcoordcheck(a.label, a.mconnec, debug)
                             glist.append(good)
                             ilist.append(increase)
                             dlist.append(decrease)
-                            if debug >= 1: print(f"GETREFS: received {good}, {increase}, {decrease} from coordcheck")
+                            if debug >= 2: print(f"GETREFS: received {good}, {increase}, {decrease} from coordcheck")
                 else:
                     glist.append(True)
                     ilist.append(False)
@@ -181,14 +180,14 @@ def get_reference_molecules(labels: list, pos: list, debug: int=1) -> Tuple[list
             if (any((item == True for item in ilist)) and all((item2 == False for item2 in dlist)) and (metal_factor < max_metal_factor)):
                 metal_factor += change_metal_factor
                 metal_factor = np.round(metal_factor,2)
-                if debug >= 1: print("GETREFS: Increasing metal_factor to:", metal_factor)
+                if debug >= 2: print("GETREFS: Increasing metal_factor to:", metal_factor)
             if (all((item == False for item in ilist)) and any((item2 == True for item2 in dlist)) and (metal_factor > min_metal_factor)):
                 metal_factor -= change_metal_factor
                 metal_factor = np.round(metal_factor,2)
-                if debug >= 1: print("GETREFS: Decreasing metal_factor to:", metal_factor)
+                if debug >= 2: print("GETREFS: Decreasing metal_factor to:", metal_factor)
             if all((item == True for item in glist)):
                 found_metal_factor = True
-                if debug >= 1: print("GETREFS: Metal_factor set at:", metal_factor)
+                if debug >= 2: print("GETREFS: Metal_factor set at:", metal_factor)
 
         ##########################
         # Part 3: Takes a decision 
@@ -196,20 +195,20 @@ def get_reference_molecules(labels: list, pos: list, debug: int=1) -> Tuple[list
         if found_covalent_factor and found_metal_factor:
             found_both_factors = True
             Warning = False
-            if debug >= 1: print("GETREFS: Found both factors. Breaking with", len(listofreferences), "references found")
+            if debug >= 2: print("GETREFS: Found both factors. Breaking with", len(listofreferences), "references found")
             break
         elif (metal_factor > max_metal_factor) or (metal_factor < min_metal_factor):
-            if debug >= 1: print("GETREFS: metal_factor outside the limits", metal_factor)
+            if debug >= 2: print("GETREFS: metal_factor outside the limits", metal_factor)
             Warning = True
             break
         else:
-            if debug >= 1: print(f"GETREFS: finished iteration number {iteration}/{maxiter}")
+            if debug >= 2: print(f"GETREFS: finished iteration number {iteration}/{maxiter}")
             iteration += 1
             Warning = True
             continue
 
         if iteration == maxiter:
-            if debug >= 1: print("GETREFS: maximum number of iterations reached")
+            if debug >= 2: print("GETREFS: maximum number of iterations reached")
             Warning = True
 
     ### RIGHT NOW, we ignore the warning because if there is really a problem, the program will fail later. i
@@ -235,7 +234,7 @@ def metalcoordcheck(label: str, coordination: int, debug: int=0) -> Tuple[bool, 
     decrease = False
 
     atnum = elemdatabase.elementnr[label]
-    if debug >= 1:
+    if debug >= 2:
         print("Metalcoordcheck function: got atnum", atnum, "for label", label)
 
     coordnum = defaultdict(list)
@@ -413,16 +412,18 @@ def getmolecs(labels: list, pos: list, factor: float=1.3, metal_factor: float=1.
     elif status == 0:
         Warning = True
         mlist = []
-        print("GETMOLECS: steric clashes found. Printing Coordinates")
-        for idx, lab in enumerate(labels):
-            print("%s   %.6f   %.6f   %.6f" % (lab, pos[idx][0], pos[idx][1], pos[idx][2]))
-        print("")
+        if debug >=1: print("GETMOLECS: steric clashes found.")
+        if debug >=2: 
+            print("GETMOLECS: steric clashes found. Printing Coordinates for Debugging")
+            for idx, lab in enumerate(labels):
+                print("%s   %.6f   %.6f   %.6f" % (lab, pos[idx][0], pos[idx][1], pos[idx][2]))
+            print("")
 
     return Warning, mlist
 
 
 #######################################################
-def splitcomplex(molecule: object, factor: float=1.3, metal_factor: float=1.0) -> Tuple[list, list]:
+def splitcomplex(molecule: object, factor: float=1.3, metal_factor: float=1.0, debug: int=0) -> Tuple[list, list]:
     ## Similar function to getmolecs, but with a prelude in which the molecule (it must be a molecule of type "Complex"), is split into ligands and metals.
     #:return ligandlist, metalist. List of ligands and metals, respectively, saved as objects
 
@@ -546,7 +547,7 @@ def absolute_value(num):
 
 
 #######################################################
-def tmatgenerator(centroid, thres=0.40, full=False):
+def tmatgenerator(centroid, thres=0.40, full=False, debug: int=0):
     # This function generates a list of the translations that a fragment should undergo depending on the centroid of its fractional coordinates
     # For instance, if the centroid of a fragment is at 0.9 in any given axis, it is unlikely that a one-cell-length translation along such axis (resulting in 1.9) would help.
     # Also, a fragment right at the center of the unit cell (centroid=(0.5, 0.5, 0.5) is unlikely to require reconstruction
@@ -679,19 +680,17 @@ def tmatgenerator(centroid, thres=0.40, full=False):
 
 
 #######################################################
-def sequential(
-    fragmentlist: list, refmoleclist: list, cellvec: list, factor: float, metal_factor: float, typ: str="All", debug: int=0
-) -> Tuple[list, list]:
-    # Crappy function that controls the reconstruction process. It is called sequential because pairs of fragments are sent one by one. Ideally, a parallel version would be desirable.
+def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: float, metal_factor: float, typ: str="All", debug: int=0) -> Tuple[list, list]:
+    # Function that controls the reconstruction process. It is called sequential because pairs of fragments are sent one by one. Ideally, a parallel version would be desirable.
     # Given a list of fragments(fragmentlist), a list of reference molecules(refmoleclist), and some other minor parameters, the function sends pairs of fragments and evaluates if they...
-    # ...form a bigger fragment. If so, the bigger fragment is evaluated. If it coincides with one of the molecules in refmoleclist, than it means that it is a full molecule that requires no further work.
+    # ...form a bigger fragment. If so, the bigger fragment is evaluated. If it coincides with one of the molecules in refmoleclist, then it means that it is a full molecule that requires no further work.
     # ...if it does not, then it means that requires further reconstruction, and is again introduced in the loop.
-    # typ is a variable that defines how to combine the fragments. To speed up the process, this function is called twice in main.
+    # typ is a variable that defines how to combine the fragments. To speed up the process, this function is called two times:
     # -First, to combine heavy fragments among themselves (typ="Heavy")
     # -Second, to combie heavy fragments with H atoms (typ="All")
     #:return molecsfoundlist, remainingfragments: lists of molecules and fragments, respectively, saved as objects
 
-    if debug >= 1:
+    if debug >= 2:
         print("Entered sequential with", len(fragmentlist), "fragments to reconstruct")
 
     # Finds How many atoms, at max, can a molecule have. It is used to skip meaningless combinations
@@ -732,7 +731,7 @@ def sequential(
             frag.type = "Heavy"
             remlist.append(frag)
 
-    if debug >= 1:
+    if debug >= 2:
         print(
             "Found",
             len(remlist),
@@ -797,9 +796,9 @@ def sequential(
         #################
         #  This part handles sublist, keeplist1 and keeplist2. They are necessary to handle the results of the function "Combine", which is called later.
         #################
-        if debug >= 1:
+        if debug >= 2:
             print(" ")
-        if debug >= 1:
+        if debug >= 2:
             print(
                 "Fragments to allocate this iteration:",
                 Frag1_toallocate,
@@ -839,7 +838,7 @@ def sequential(
         #  This part evaluates that the fragments that are going to be combined, can form one of the reference molecules. The resulting number of atoms is used.
         #################
         if list1[Frag1_toallocate].natoms + list2[Frag2_toallocate].natoms > maxatoms:
-            if debug >= 1:
+            if debug >= 2:
                 print(
                     "SEQUENTIAL",
                     typ,
@@ -849,7 +848,7 @@ def sequential(
                     list2[Frag2_toallocate].natoms,
                 )
         else:
-            if debug >= 1:
+            if debug >= 2:
                 print(
                     "SEQUENTIAL",
                     typ,
@@ -861,7 +860,7 @@ def sequential(
                     len(list2),
                     "Remaining in each list",
                 )
-            if debug >= 1:
+            if debug >= 2:
                 print(
                     "SEQUENTIAL",
                     typ,
@@ -893,7 +892,7 @@ def sequential(
                 g.type = assigntype(g, refmoleclist)
                 molecsfoundlist.append(g)
             if len(goodlist) >= 1:
-                if debug >= 1:
+                if debug >= 2:
                     print("SEQUENTIAL: Molecules found so far:")
                     for i, item in enumerate(molecsfoundlist):
                         print(i, item.natoms, item.labels)
@@ -923,18 +922,18 @@ def sequential(
                 list2.append(k2)
 
             if len(list1) + len(list2) == 0:
-                print("FINISHED succesfully")
+                if debug >= 1: print("FINISHED succesfully")
                 break
 
             if typ == "Heavy":
                 if len(list1) == 1:
                     for l in list1:
                         remainingfragments.append(l)
-                        print("FINISHED with Remaining Fragment")
+                        if debug >= 1: print("FINISHED with Remaining Fragment")
                     break
 
             if (len(list1) == 0) and (len(list2) == 0):
-                print("FINISHED succesfully")
+                if debug >= 1: print("FINISHED succesfully")
                 break
 
         #################
@@ -954,8 +953,7 @@ def sequential(
                 threshold_tmat += increase_tmat
                 if threshold_tmat >= 1:
                     Last_Attempt = True
-                    if debug >= 1:
-                        print("Launching Last Attempt")
+                    if debug >= 2: print("Launching Last Attempt")
                 if not Last_Attempt:
                     maxsize = 0
                     for l in list1:
@@ -966,16 +964,15 @@ def sequential(
                         l.tmatrix = tmatgenerator(l.centroid, threshold_tmat)
                         if len(l.tmatrix) > maxsize:
                             maxsize = len(l.tmatrix)
-                    if debug >= 1:
+                    if debug >= 2:
                         print(" Increased Threshold_tmat. Now:", threshold_tmat)
-                    if debug >= 1:
                         print(" Maxsize of the translation matrix is=", maxsize)
                 elif Last_Attempt:
                     for l in list1:
                         l.tmatrix = tmatgenerator(l.centroid, threshold_tmat, full=True)
                     for l in list2:
                         l.tmatrix = tmatgenerator(l.centroid, threshold_tmat, full=True)
-                    if debug >= 1:
+                    if debug >= 2:
                         print("Trying Full Tmatrix for all Items in list")
 
                 niter = 1
@@ -983,23 +980,18 @@ def sequential(
                 Frag2_toallocate = 0
             else:
                 for l in list1:
-                    if debug >= 1:
-                        print("Sequential: list1 end:", l.labels)
+                    if debug >= 2: print("Sequential: list1 end:", l.labels)
                     remainingfragments.append(l)
                 for l in list2:
-                    if typ == "All" and debug >= 1:
-                        print("Sequential: list2 end:", l.labels)
-                    if typ == "All":
-                        remainingfragments.append(l)
+                    if typ == "All" and debug >= 2: print("Sequential: list2 end:", l.labels)
+                    if typ == "All": remainingfragments.append(l)
                 break
 
     return molecsfoundlist, remainingfragments
 
 
 #######################################################
-def combine(
-    tobeallocated: list, references: list, cellvec: list, threshold_tmat: float, factor: float, metal_factor: float, debug: int=0
-) -> Tuple[list, list, list]:
+def combine(tobeallocated: list, references: list, cellvec: list, threshold_tmat: float, factor: float, metal_factor: float, debug: int=0) -> Tuple[list, list, list]:
 
     goodlist = []
     avglist = []
@@ -1034,7 +1026,7 @@ def combine(
                         available[m] = 0
 
                     if newmoleclist[0].natoms != mergedatoms:
-                        if debug >= 1:
+                        if debug >= 2:
                             print(
                                 "COMBINE WARNING: I sent",
                                 mergedatoms,
@@ -1060,7 +1052,7 @@ def combine(
                                 shit = 1
                                 newmolec.type = ref.type
                                 goodlist.append(newmolec)
-                                if debug >= 1:
+                                if debug >= 2:
                                     print(
                                         "COMBINE: Fragment",
                                         newmolec.labels,
@@ -1069,7 +1061,7 @@ def combine(
                     if shit == 0:
                         newmolec.type = "Rec. Fragment"
                         avglist.append(newmolec)
-                        if debug >= 1:
+                        if debug >= 2:
                             print(
                                 "COMBINE: Fragment", newmolec.labels, "added to avglist"
                             )
@@ -1090,7 +1082,7 @@ def combine(
 
 
 #######################################################
-def merge_fragments(fraglist: list, listofids: list, reflist: list, cellvec: list, factor: float, metal_factor: float) -> Tuple[int, list]:
+def merge_fragments(fraglist: list, listofids: list, reflist: list, cellvec: list, factor: float, metal_factor: float, debug: int=0) -> Tuple[int, list]:
     # function also used fraglist
 
     tmatlist = []
@@ -1145,22 +1137,22 @@ def merge_fragments(fraglist: list, listofids: list, reflist: list, cellvec: lis
 
 
 #######################################################
-def identify_frag_molec_H(blocklist: list, moleclist: list, refmoleclist: list, cellvec: list) -> Tuple[list, list, list, int]:
+def identify_frag_molec_H(blocklist: list, moleclist: list, refmoleclist: list, cellvec: list, debug: int=0) -> Tuple[list, list, list, int]:
 
     init_natoms = 0
 
     fraglist = []
     Hlist = []
 
-    for ref in refmoleclist: 
-        print(f"{ref.formula} found as reference")
+    if debug >= 1: 
+        for ref in refmoleclist: 
+            print(f"{ref.formula} found as reference")
 
     # Convert blocks' coordinates and get centroid
     for b in blocklist:
         b.frac = cart2frac(b.coord, cellvec)
         b.centroid = getcentroid(b.frac)
         init_natoms += b.natoms
-        #print(f"BLOCK: {b.labels}")
 
     for idx, block in enumerate(blocklist):
         if any((block.elemcountvec == ref.elemcountvec).all() for ref in refmoleclist):
@@ -1177,34 +1169,32 @@ def identify_frag_molec_H(blocklist: list, moleclist: list, refmoleclist: list, 
                 block.type = "Fragment"
                 fraglist.append(block)
 
-    print(len(blocklist),"Blocks sorted for reconstruction as (Molec, Frag, H):",len(moleclist),len(fraglist),len(Hlist))
-    print("With a total of", init_natoms, "atoms")
+    if debug >= 1: print(len(blocklist),"Blocks sorted for reconstruction as (Molec, Frag, H):",len(moleclist),len(fraglist),len(Hlist))
+    if debug >= 1: print("With a total of", init_natoms, "atoms")
 
     return moleclist, fraglist, Hlist, init_natoms
 
 
 #######################################################
-def fragments_reconstruct(
-    moleclist: list, fraglist: list, Hlist: list, refmoleclist: list, cellvec: list, factor: float, metal_factor: float, debug: int=0
-) -> Tuple[list, list, bool]:
+def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmoleclist: list, cellvec: list, factor: float, metal_factor: float, debug: int=0) -> Tuple[list, list, bool]:
 
     Warning = False
 
     # Reconstruct Heavy Fragments
     if len(fraglist) > 1:
-        print("")
-        print("##############################################")
-        print(len(fraglist), "molecules submitted to SEQUENTIAL with Heavy")
-        print("##############################################")
+        if debug >= 2: print("")
+        if debug >= 2: print("##############################################")
+        if debug >= 2: print(len(fraglist), "molecules submitted to SEQUENTIAL with Heavy")
+        if debug >= 2: print("##############################################")
         newmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "Heavy", debug)
-        print(f"{len(newmols)} molecules and {len(remfrag)} fragments out of SEQUENTIAL with Heavy")
+        if debug >= 1: print(f"{len(newmols)} molecules and {len(remfrag)} fragments out of SEQUENTIAL with Heavy")
         moleclist.extend(newmols)
         fraglist = []
         fraglist.extend(remfrag)
         fraglist.extend(Hlist)
 
         # For debugging
-        if debug >= 1:
+        if debug >= 2:
             print(" ")
             # Prints molecules after Heavy Fragment Reconstruction
             if len(newmols) > 0:
@@ -1224,32 +1214,32 @@ def fragments_reconstruct(
 
     # Reconstruct Hydrogens with remaining Fragments
     if len(remfrag) > 0 and len(Hlist) > 0:
-        print("")
-        print("##############################################")
-        print(len(fraglist), "molecules submitted to sequential with All")
-        print("##############################################")
+        if debug >= 2: print("")
+        if debug >= 2: print("##############################################")
+        if debug >= 2: print(len(fraglist), "molecules submitted to sequential with All")
+        if debug >= 2: print("##############################################")
         finalmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "All", debug)
         if len(remfrag) > 0:
             Warning = True
             for rem in remfrag:
-                print("Remaining after Hydrogen reconstruction",rem.natoms,rem.formula,rem.type)
+                if debug >= 1: print("Remaining after Hydrogen reconstruction",rem.natoms,rem.formula,rem.type)
         else:
-            print("NO remaining Molecules after Hydrogen reconstruction")
+            if debug >= 1: print("NO remaining Molecules after Hydrogen reconstruction")
             Warning = False
         print(" ")
     else:
         if len(remfrag) > 0 and len(Hlist) == 0: 
             Warning = True
-            print("There are remaining Fragments and no H in list")
+            if debug >= 1: print("There are remaining Fragments and no H in list")
             finalmols = []
             remfrag = []
         elif len(remfrag) == 0 and len(Hlist) > 0: 
             Warning = True
-            print("There are isolated H atoms in cell")
+            if debug >= 1: print("There are isolated H atoms in cell")
             finalmols = []
             remfrag = []
         elif len(remfrag) == 0 and len(Hlist) == 0: 
-            print("Not necessary to reconstruct Hydrogens")
+            if debug >= 1: print("Not necessary to reconstruct Hydrogens")
             finalmols = fraglist.copy()  # IF not Hidrogen fragments, then is done
             remfrag = []
 
@@ -1282,7 +1272,7 @@ def fragments_reconstruct(
 #        print("Wrong molecules in moleclist")
 #        for wrong in not_found: 
 #            print("Wrong: the number of atoms", len(wrong.labels), wrong.labels)
-#        if debug >= 1 : 
+#        if debug >= 2 : 
 #            print("\nRefmoleclist")
 #            for j, ref in enumerate(refmoleclist):
 #                print("Ref {}".format(j), "the number of atoms:", len(ref.labels), ref.labels)
@@ -1293,7 +1283,7 @@ def fragments_reconstruct(
 #
 #
 #######################################################
-def assigntype(molecule: object, references: list) -> str:
+def assigntype(molecule: object, references: list, debug: int=0) -> str:
     Found = False
     for ref in references:
         if (
@@ -1312,7 +1302,7 @@ def assigntype(molecule: object, references: list) -> str:
 
 
 #######################################################
-def split_complexes_reassign_type(cell: object, moleclist: list) -> object:
+def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -> object:
 
     if not all(cell.warning_list):
         # Split Complexes

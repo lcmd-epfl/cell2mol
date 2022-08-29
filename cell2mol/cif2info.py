@@ -151,7 +151,7 @@ def parsing_input():
         "--step",
         dest="step",
         type=int,
-        help="Generate cell by the step of cell reconstruction (1), only charge assignment (2), or cell reconstruction and charge assignment (3)",
+        help="Executes (1) only cell reconstruction, (2) only charge assignment, or (3) both cell reconstruction and charge assignment",
     )
 
     parser.add_option(
@@ -671,14 +671,7 @@ def parsing_input():
     return (options, args)
 
 
-def cif_2_info(
-    input_path,
-    infopath,
-    errorpath,
-    angtobohr=angtobohr,
-    codename=codename,
-    uperautogpercm=uperautogpercm,
-):
+def cif_2_info(input_path,infopath,errorpath,angtobohr=angtobohr,codename=codename,uperautogpercm=uperautogpercm):
 
     angtobohr = angtobohr
     codename = codename
@@ -696,6 +689,8 @@ def cif_2_info(
     options.file = input_path
     options.cartesian = True
     options.force = True
+    options.verbose = False
+    options.quiet = False
     force_warning_print = False  # suppress warning if force is True
 
     # Print version number and exit
