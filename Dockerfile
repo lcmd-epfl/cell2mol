@@ -1,17 +1,14 @@
 # Container for building the environment
 FROM condaforge/mambaforge:4.9.2-5 as conda
 
+RUN python3 -m pip install --no-cache-dir notebook jupyterlab jupyterhub
 COPY conda-linux-64.lock .
 RUN mamba create --copy -p /env --file conda-linux-64.lock && conda clean -afy
-RUN python3 -m pip install --no-cache-dir notebook jupyterlab
-RUN python3 -m pip install --no-cache-dir notebook jupyterlab
 COPY . /pkg
-RUN conda run -p /env python -m pip install --no-deps /pkg
 
 # Distroless for execution
-FROM gcr.io/distroless/base-debian10
-
-COPY --from=conda /env /env
+#FROM gcr.io/distroless/base-debian10
+#COPY --from=conda /env /env
 
 # User for binder
 ARG NB_USER=joyvan
@@ -28,7 +25,13 @@ RUN adduser --disabled-password \
 # Make sure the contents of our repo are in ${HOME}
 COPY . ${HOME}
 USER root
-RUN chown -R ${NB_UID} ${HOME}
+RUN chown -R ${NB_UID} ${HOME} /env
+
+# Setup conda env
+RUN conda run -p /env python -m pip install --no-deps /pkg
+SHELL ["conda", "run", "-p", "/env", "/bin/bash", "-c"]
+RUN python -m ipykernel install --name cell2mol --display-name "cell2mol env"
 USER ${NB_USER}
+RUN python -c "import numpy"
 
 
