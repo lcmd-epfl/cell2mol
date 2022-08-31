@@ -1,7 +1,7 @@
 # Container for building the environment
 FROM condaforge/mambaforge:4.9.2-5 as conda
 
-RUN python3 -m pip install --no-cache-dir notebook jupyterlab jupyterhub
+RUN python3 -m pip install --no-cache-dir notebook jupyterlab jupyterhub nodejs npm ipywidgets
 COPY conda-linux-64.lock .
 RUN mamba create --copy -p /env --file conda-linux-64.lock && conda clean -afy
 COPY . /pkg
@@ -29,9 +29,8 @@ RUN chown -R ${NB_UID} ${HOME} /env
 
 # Setup conda env
 RUN conda run -p /env python -m pip install --no-deps /pkg
-SHELL ["conda", "run", "-p", "/env", "/bin/bash", "-c"]
+SHELL ["conda", "run", "-p", "/env", "/bin/bash", "-c" ]
 RUN python -m ipykernel install --name cell2mol --display-name "cell2mol env"
 USER ${NB_USER}
-RUN python -c "import numpy"
 
 
