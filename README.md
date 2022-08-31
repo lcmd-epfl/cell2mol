@@ -3,6 +3,8 @@ cell2mol: Unit Cell to Molecule Interpretation
 
 ![cell2mol logo](./images/cell2mol_logo.png)
 
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/lcmd-epfl/cell2mol/dev?labpath=App.ipynb)
+
 ## Contents
 * [About](#about-)
 * [Install](#install-)
