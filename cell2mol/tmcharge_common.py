@@ -538,7 +538,7 @@ class ligand(object):
         self.object = object
 
         for idx, a in enumerate(self.atoms):
-            a.atom_charge(self.atcharge[idx])
+            a.atom_charge(int(self.atcharge[idx]))
 
     # Spin State Variables
     def magnetism(self, spin):
