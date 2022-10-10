@@ -1,0 +1,208 @@
+{
+  "build": "hca72f7f_2",
+  "build_number": 2,
+  "channel": "https://conda.anaconda.org/anaconda/osx-64",
+  "constrains": [],
+  "depends": [],
+  "extracted_package_dir": "/Users/sergivela/opt/anaconda3/pkgs/libiconv-1.16-hca72f7f_2",
+  "features": "",
+  "files": [
+    "bin/iconv",
+    "include/iconv.h",
+    "include/libcharset.h",
+    "include/localcharset.h",
+    "lib/libcharset.1.dylib",
+    "lib/libcharset.a",
+    "lib/libcharset.dylib",
+    "lib/libiconv.2.dylib",
+    "lib/libiconv.a",
+    "lib/libiconv.dylib",
+    "share/doc/iconv.1.html",
+    "share/doc/iconv.3.html",
+    "share/doc/iconv_close.3.html",
+    "share/doc/iconv_open.3.html",
+    "share/doc/iconv_open_into.3.html",
+    "share/doc/iconvctl.3.html",
+    "share/man/man1/iconv.1",
+    "share/man/man3/iconv.3",
+    "share/man/man3/iconv_close.3",
+    "share/man/man3/iconv_open.3",
+    "share/man/man3/iconv_open_into.3",
+    "share/man/man3/iconvctl.3"
+  ],
+  "fn": "libiconv-1.16-hca72f7f_2.tar.bz2",
+  "license": "GPL-3.0-or-later",
+  "license_family": "GPL3",
+  "link": {
+    "source": "/Users/sergivela/opt/anaconda3/pkgs/libiconv-1.16-hca72f7f_2",
+    "type": 1
+  },
+  "md5": "c90372428e1e4eed4fdcd790979d06b4",
+  "name": "libiconv",
+  "package_tarball_full_path": "/Users/sergivela/opt/anaconda3/pkgs/libiconv-1.16-hca72f7f_2.tar.bz2",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "bin/iconv",
+        "path_type": "hardlink",
+        "sha256": "95785bab158c54892b0c1806ada854b97357a4ccfc545a2758549bdd2273b161",
+        "sha256_in_prefix": "95785bab158c54892b0c1806ada854b97357a4ccfc545a2758549bdd2273b161",
+        "size_in_bytes": 33348
+      },
+      {
+        "_path": "include/iconv.h",
+        "path_type": "hardlink",
+        "sha256": "c2b11bc0d8ebc01cd109b89c81fc95b0fc0c6ee71cc61fb6fe7dce828b379ad8",
+        "sha256_in_prefix": "c2b11bc0d8ebc01cd109b89c81fc95b0fc0c6ee71cc61fb6fe7dce828b379ad8",
+        "size_in_bytes": 9249
+      },
+      {
+        "_path": "include/libcharset.h",
+        "path_type": "hardlink",
+        "sha256": "754ec1b3fcebdaae4e05506aefbfeafcff584c198a6de45d4a44a2f799011c46",
+        "sha256_in_prefix": "754ec1b3fcebdaae4e05506aefbfeafcff584c198a6de45d4a44a2f799011c46",
+        "size_in_bytes": 1513
+      },
+      {
+        "_path": "include/localcharset.h",
+        "path_type": "hardlink",
+        "sha256": "3fefd9e4033d7ba4690ed19e65905c2b9b41395b307af7155175d2bd7e363b56",
+        "sha256_in_prefix": "3fefd9e4033d7ba4690ed19e65905c2b9b41395b307af7155175d2bd7e363b56",
+        "size_in_bytes": 6059
+      },
+      {
+        "_path": "lib/libcharset.1.dylib",
+        "path_type": "hardlink",
+        "sha256": "54f4e5bcb33fb53c349eec56e85c4476caad11d85777785f9b4ed453ac2669bc",
+        "sha256_in_prefix": "54f4e5bcb33fb53c349eec56e85c4476caad11d85777785f9b4ed453ac2669bc",
+        "size_in_bytes": 12784
+      },
+      {
+        "_path": "lib/libcharset.a",
+        "path_type": "hardlink",
+        "sha256": "42a40edac07741b505c5286e0174fcc2c46a2cd130bfb6754fb07eec82c9d1e4",
+        "sha256_in_prefix": "42a40edac07741b505c5286e0174fcc2c46a2cd130bfb6754fb07eec82c9d1e4",
+        "size_in_bytes": 2824
+      },
+      {
+        "_path": "lib/libcharset.dylib",
+        "path_type": "softlink",
+        "sha256": "54f4e5bcb33fb53c349eec56e85c4476caad11d85777785f9b4ed453ac2669bc",
+        "size_in_bytes": 12784
+      },
+      {
+        "_path": "lib/libiconv.2.dylib",
+        "path_type": "hardlink",
+        "sha256": "19f400bc660e927b16f01f9971c0cdd0076b5c0076dc49734c02f1738a4789cd",
+        "sha256_in_prefix": "19f400bc660e927b16f01f9971c0cdd0076b5c0076dc49734c02f1738a4789cd",
+        "size_in_bytes": 956504
+      },
+      {
+        "_path": "lib/libiconv.a",
+        "path_type": "hardlink",
+        "sha256": "da8c0e87fc1ee8bc4cdc6818cd2eadfcc64b375d2981fff4b00371977324b5f1",
+        "sha256_in_prefix": "da8c0e87fc1ee8bc4cdc6818cd2eadfcc64b375d2981fff4b00371977324b5f1",
+        "size_in_bytes": 979040
+      },
+      {
+        "_path": "lib/libiconv.dylib",
+        "path_type": "softlink",
+        "sha256": "19f400bc660e927b16f01f9971c0cdd0076b5c0076dc49734c02f1738a4789cd",
+        "size_in_bytes": 956504
+      },
+      {
+        "_path": "share/doc/iconv.1.html",
+        "path_type": "hardlink",
+        "sha256": "04ccd138b47beafeec1f8f3d76dde244cff865c56eddcdd9134c57c73de17b05",
+        "sha256_in_prefix": "04ccd138b47beafeec1f8f3d76dde244cff865c56eddcdd9134c57c73de17b05",
+        "size_in_bytes": 6438
+      },
+      {
+        "_path": "share/doc/iconv.3.html",
+        "path_type": "hardlink",
+        "sha256": "4cd69e9b4af572e0c15d2103fade823daf63e28ee669a0944cb7cac380791ea0",
+        "sha256_in_prefix": "4cd69e9b4af572e0c15d2103fade823daf63e28ee669a0944cb7cac380791ea0",
+        "size_in_bytes": 6335
+      },
+      {
+        "_path": "share/doc/iconv_close.3.html",
+        "path_type": "hardlink",
+        "sha256": "734221f2cb9f36fabce70db745e63f962b407d994c596d29da5ebc9131479fa4",
+        "sha256_in_prefix": "734221f2cb9f36fabce70db745e63f962b407d994c596d29da5ebc9131479fa4",
+        "size_in_bytes": 2054
+      },
+      {
+        "_path": "share/doc/iconv_open.3.html",
+        "path_type": "hardlink",
+        "sha256": "409f94466abc0d6be0076f1341510f3c2f3f1c7b34c30871bddee741b314da8e",
+        "sha256_in_prefix": "409f94466abc0d6be0076f1341510f3c2f3f1c7b34c30871bddee741b314da8e",
+        "size_in_bytes": 8489
+      },
+      {
+        "_path": "share/doc/iconv_open_into.3.html",
+        "path_type": "hardlink",
+        "sha256": "8e88aee5f85b2ea44e3884c7b20d081de7c561b9b3eb607cd7a9a5c4046d174d",
+        "sha256_in_prefix": "8e88aee5f85b2ea44e3884c7b20d081de7c561b9b3eb607cd7a9a5c4046d174d",
+        "size_in_bytes": 3406
+      },
+      {
+        "_path": "share/doc/iconvctl.3.html",
+        "path_type": "hardlink",
+        "sha256": "014e9090c71736e5e3bd3171fe26e9a98e2d4c4425751549fb42816edb45e2fd",
+        "sha256_in_prefix": "014e9090c71736e5e3bd3171fe26e9a98e2d4c4425751549fb42816edb45e2fd",
+        "size_in_bytes": 4399
+      },
+      {
+        "_path": "share/man/man1/iconv.1",
+        "path_type": "hardlink",
+        "sha256": "ebf2471df5e491515a2f5895365256900483139ecffaddbfbdb6944e740f6fb7",
+        "sha256_in_prefix": "ebf2471df5e491515a2f5895365256900483139ecffaddbfbdb6944e740f6fb7",
+        "size_in_bytes": 4231
+      },
+      {
+        "_path": "share/man/man3/iconv.3",
+        "path_type": "hardlink",
+        "sha256": "a2fa74a5953761e665a145974447d46611fc87dc630ba79308731102e56f0104",
+        "sha256_in_prefix": "a2fa74a5953761e665a145974447d46611fc87dc630ba79308731102e56f0104",
+        "size_in_bytes": 4239
+      },
+      {
+        "_path": "share/man/man3/iconv_close.3",
+        "path_type": "hardlink",
+        "sha256": "dd551c417a6ba805987735de4eddf37920f6b369c06b076a723062c3219c2ceb",
+        "sha256_in_prefix": "dd551c417a6ba805987735de4eddf37920f6b369c06b076a723062c3219c2ceb",
+        "size_in_bytes": 1044
+      },
+      {
+        "_path": "share/man/man3/iconv_open.3",
+        "path_type": "hardlink",
+        "sha256": "2e8a98876f008533977b9c377d7a92c48ad58b482b4dd24155a35ce49cb9740b",
+        "sha256_in_prefix": "2e8a98876f008533977b9c377d7a92c48ad58b482b4dd24155a35ce49cb9740b",
+        "size_in_bytes": 4671
+      },
+      {
+        "_path": "share/man/man3/iconv_open_into.3",
+        "path_type": "hardlink",
+        "sha256": "5c710423e822a4ddbec2c0e39c4a536096efc4c8975fcb2ab8a14e8ceada6360",
+        "sha256_in_prefix": "5c710423e822a4ddbec2c0e39c4a536096efc4c8975fcb2ab8a14e8ceada6360",
+        "size_in_bytes": 1822
+      },
+      {
+        "_path": "share/man/man3/iconvctl.3",
+        "path_type": "hardlink",
+        "sha256": "1b5390b90fbd831aeea0915857b27a408c1ca47f2fd93158585cb44c3f92e56a",
+        "sha256_in_prefix": "1b5390b90fbd831aeea0915857b27a408c1ca47f2fd93158585cb44c3f92e56a",
+        "size_in_bytes": 2385
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "libiconv=1.16",
+  "sha256": "f3456f50b3b9cdd989ecc308bad441cd21dcc246c574243eb8f6895f5f3eb9ed",
+  "size": 1409377,
+  "subdir": "osx-64",
+  "timestamp": 1650983531933,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/anaconda/osx-64/libiconv-1.16-hca72f7f_2.tar.bz2",
+  "version": "1.16"
+}

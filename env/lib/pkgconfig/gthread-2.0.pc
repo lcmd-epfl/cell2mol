@@ -1,0 +1,11 @@
+prefix=/Users/sergivela/Documents/Programes/cell2mol/env
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: GThread
+Description: Thread support for GLib
+Version: 2.70.2
+Requires: glib-2.0
+Libs: -L${libdir} -lgthread-2.0
+Libs.private: -lintl
+Cflags: -I${includedir}

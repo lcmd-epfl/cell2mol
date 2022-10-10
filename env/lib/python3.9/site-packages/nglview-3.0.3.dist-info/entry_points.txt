@@ -1,0 +1,3 @@
+[console_scripts]
+nglview = nglview.scripts.nglview:main
+

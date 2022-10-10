@@ -1,0 +1,33 @@
+{
+  "build": "0",
+  "build_number": 0,
+  "channel": "https://conda.anaconda.org/anaconda/osx-64",
+  "constrains": [],
+  "depends": [
+    "blas 1.0 openblas"
+  ],
+  "extracted_package_dir": "/Users/sergivela/opt/anaconda3/pkgs/nomkl-3.0-0",
+  "features": "",
+  "files": [],
+  "fn": "nomkl-3.0-0.tar.bz2",
+  "license": "BSD",
+  "link": {
+    "source": "/Users/sergivela/opt/anaconda3/pkgs/nomkl-3.0-0",
+    "type": 1
+  },
+  "md5": "d6fab0c8315628f7594ed7e0f23bb64d",
+  "name": "nomkl",
+  "package_tarball_full_path": "/Users/sergivela/opt/anaconda3/pkgs/nomkl-3.0-0.tar.bz2",
+  "paths_data": {
+    "paths": [],
+    "paths_version": 1
+  },
+  "requested_spec": "nomkl=3.0",
+  "sha256": "50569546124408aaf80dcc226fbd0f44a1f35823a9a2b79df34bea518ee9f4c5",
+  "size": 49116,
+  "subdir": "osx-64",
+  "timestamp": 1527877622890,
+  "track_features": "nomkl",
+  "url": "https://conda.anaconda.org/anaconda/osx-64/nomkl-3.0-0.tar.bz2",
+  "version": "3.0"
+}

@@ -1,0 +1,333 @@
+{
+  "build": "py39h701faf5_1",
+  "build_number": 1,
+  "channel": "https://conda.anaconda.org/conda-forge/osx-64",
+  "constrains": [],
+  "depends": [
+    "python >=3.9,<3.10.0a0",
+    "python_abi 3.9.* *_cp39"
+  ],
+  "extracted_package_dir": "/Users/sergivela/opt/anaconda3/pkgs/pycifrw-4.4.3-py39h701faf5_1",
+  "features": "",
+  "files": [
+    "lib/python3.9/site-packages/CifFile/CifFile_module.py",
+    "lib/python3.9/site-packages/CifFile/StarFile.py",
+    "lib/python3.9/site-packages/CifFile/StarScan.cpython-39-darwin.so",
+    "lib/python3.9/site-packages/CifFile/TypeContentsParser.py",
+    "lib/python3.9/site-packages/CifFile/YappsStarParser_1_0.py",
+    "lib/python3.9/site-packages/CifFile/YappsStarParser_1_1.py",
+    "lib/python3.9/site-packages/CifFile/YappsStarParser_2_0.py",
+    "lib/python3.9/site-packages/CifFile/YappsStarParser_STAR2.py",
+    "lib/python3.9/site-packages/CifFile/__init__.py",
+    "lib/python3.9/site-packages/CifFile/__pycache__/CifFile_module.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/__pycache__/StarFile.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/__pycache__/TypeContentsParser.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/__pycache__/YappsStarParser_1_0.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/__pycache__/YappsStarParser_1_1.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/__pycache__/YappsStarParser_2_0.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/__pycache__/YappsStarParser_STAR2.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/__pycache__/__init__.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/__pycache__/parsetab.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/__pycache__/yapps3_compiled_rt.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/drel/__init__.py",
+    "lib/python3.9/site-packages/CifFile/drel/__pycache__/__init__.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/drel/__pycache__/drel_ast_yacc.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/drel/__pycache__/drel_lex.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/drel/__pycache__/drel_runtime.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/drel/__pycache__/parsetab.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/drel/__pycache__/py_from_ast.cpython-39.pyc",
+    "lib/python3.9/site-packages/CifFile/drel/drel_ast_yacc.py",
+    "lib/python3.9/site-packages/CifFile/drel/drel_lex.py",
+    "lib/python3.9/site-packages/CifFile/drel/drel_runtime.py",
+    "lib/python3.9/site-packages/CifFile/drel/parsetab.py",
+    "lib/python3.9/site-packages/CifFile/drel/py_from_ast.py",
+    "lib/python3.9/site-packages/CifFile/parsetab.py",
+    "lib/python3.9/site-packages/CifFile/yapps3_compiled_rt.py",
+    "lib/python3.9/site-packages/PyCifRW-4.4.3-py3.9.egg-info/PKG-INFO",
+    "lib/python3.9/site-packages/PyCifRW-4.4.3-py3.9.egg-info/SOURCES.txt",
+    "lib/python3.9/site-packages/PyCifRW-4.4.3-py3.9.egg-info/dependency_links.txt",
+    "lib/python3.9/site-packages/PyCifRW-4.4.3-py3.9.egg-info/top_level.txt"
+  ],
+  "fn": "pycifrw-4.4.3-py39h701faf5_1.tar.bz2",
+  "license": "LicenseRef-PyCIFRW-PSF-2.0-like",
+  "license_family": "other",
+  "link": {
+    "source": "/Users/sergivela/opt/anaconda3/pkgs/pycifrw-4.4.3-py39h701faf5_1",
+    "type": 1
+  },
+  "md5": "3f3db7949a3c59223c62cdf4aed90650",
+  "name": "pycifrw",
+  "package_tarball_full_path": "/Users/sergivela/opt/anaconda3/pkgs/pycifrw-4.4.3-py39h701faf5_1.tar.bz2",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/CifFile_module.py",
+        "path_type": "hardlink",
+        "sha256": "14be6da2e106e7e8ae2fd4cc6ee87e66f5d8c7a26cb53ca5ae260afb3e7ea05d",
+        "sha256_in_prefix": "14be6da2e106e7e8ae2fd4cc6ee87e66f5d8c7a26cb53ca5ae260afb3e7ea05d",
+        "size_in_bytes": 152712
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/StarFile.py",
+        "path_type": "hardlink",
+        "sha256": "ded87aa1b4dd62c737a92870e2d57faa58c3640568c9234270b0fe7ac2814963",
+        "sha256_in_prefix": "ded87aa1b4dd62c737a92870e2d57faa58c3640568c9234270b0fe7ac2814963",
+        "size_in_bytes": 117625
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/StarScan.cpython-39-darwin.so",
+        "path_type": "hardlink",
+        "sha256": "29eae85a52583a4bf1208aed7822bc18a90393c943ba89877113c2451ffef573",
+        "sha256_in_prefix": "29eae85a52583a4bf1208aed7822bc18a90393c943ba89877113c2451ffef573",
+        "size_in_bytes": 25024
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/TypeContentsParser.py",
+        "path_type": "hardlink",
+        "sha256": "2550fe86469d33dca692659c7f3a085eac1e98763caa0def1e0d69ce508fcabf",
+        "sha256_in_prefix": "2550fe86469d33dca692659c7f3a085eac1e98763caa0def1e0d69ce508fcabf",
+        "size_in_bytes": 2905
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/YappsStarParser_1_0.py",
+        "path_type": "hardlink",
+        "sha256": "1993349eba4767adcd26470deeb36406e4b95fa7e6c1f7ac0b28fbc2a5ddddc4",
+        "sha256_in_prefix": "1993349eba4767adcd26470deeb36406e4b95fa7e6c1f7ac0b28fbc2a5ddddc4",
+        "size_in_bytes": 14238
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/YappsStarParser_1_1.py",
+        "path_type": "hardlink",
+        "sha256": "8bbfc46a3201a5b2b1835905e359722aad84d052e957b0c05f0b70560144d76f",
+        "sha256_in_prefix": "8bbfc46a3201a5b2b1835905e359722aad84d052e957b0c05f0b70560144d76f",
+        "size_in_bytes": 14246
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/YappsStarParser_2_0.py",
+        "path_type": "hardlink",
+        "sha256": "e70f995e9b55936b0813859e5d09e08d9b400378c4685891c6d6a2e07bed5c5c",
+        "sha256_in_prefix": "e70f995e9b55936b0813859e5d09e08d9b400378c4685891c6d6a2e07bed5c5c",
+        "size_in_bytes": 21486
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/YappsStarParser_STAR2.py",
+        "path_type": "hardlink",
+        "sha256": "7d842b7367e0d01b5a267c9daa85e9cccf1fd840a595000959f4c9d5157a9969",
+        "sha256_in_prefix": "7d842b7367e0d01b5a267c9daa85e9cccf1fd840a595000959f4c9d5157a9969",
+        "size_in_bytes": 22321
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/__init__.py",
+        "path_type": "hardlink",
+        "sha256": "fcd6404ea9c00d675e95328b834f6de4fcbf561a2e5e4fa69bd9711506c828e0",
+        "sha256_in_prefix": "fcd6404ea9c00d675e95328b834f6de4fcbf561a2e5e4fa69bd9711506c828e0",
+        "size_in_bytes": 447
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/__pycache__/CifFile_module.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "0b6f4c7d235cf8840943b70d8854fb89f8ec281b8c5f64a3bef52e2b1e3af65e",
+        "sha256_in_prefix": "0b6f4c7d235cf8840943b70d8854fb89f8ec281b8c5f64a3bef52e2b1e3af65e",
+        "size_in_bytes": 116327
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/__pycache__/StarFile.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "9c888833d9541b43e68d10740e83b7bca2dfcdbb0811089f33e8a813461356fc",
+        "sha256_in_prefix": "9c888833d9541b43e68d10740e83b7bca2dfcdbb0811089f33e8a813461356fc",
+        "size_in_bytes": 88944
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/__pycache__/TypeContentsParser.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "02ebc83cc1c3948c56eb4fa1d3a9d3705a1f2735ec656513342203b1d197fdf7",
+        "sha256_in_prefix": "02ebc83cc1c3948c56eb4fa1d3a9d3705a1f2735ec656513342203b1d197fdf7",
+        "size_in_bytes": 2633
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/__pycache__/YappsStarParser_1_0.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "46c14ebfb4c6e79a235816981282cc000273965c82dea549c55e7d02735e5cd2",
+        "sha256_in_prefix": "46c14ebfb4c6e79a235816981282cc000273965c82dea549c55e7d02735e5cd2",
+        "size_in_bytes": 9444
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/__pycache__/YappsStarParser_1_1.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "0b1fec1699649413988f6582e0fe87384c027ee9f6c47f6a297abdbd12bc5ad9",
+        "sha256_in_prefix": "0b1fec1699649413988f6582e0fe87384c027ee9f6c47f6a297abdbd12bc5ad9",
+        "size_in_bytes": 9450
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/__pycache__/YappsStarParser_2_0.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "dea1a4d169c5e38e42f849c148870c4e590d397e94f11a25069f4c4266a97cb7",
+        "sha256_in_prefix": "dea1a4d169c5e38e42f849c148870c4e590d397e94f11a25069f4c4266a97cb7",
+        "size_in_bytes": 12563
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/__pycache__/YappsStarParser_STAR2.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "f05069d4125f9555aff0b8117808b8d5b5b2fc94ed7e4e69a25060f8ecfe52e5",
+        "sha256_in_prefix": "f05069d4125f9555aff0b8117808b8d5b5b2fc94ed7e4e69a25060f8ecfe52e5",
+        "size_in_bytes": 12794
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/__pycache__/__init__.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "2d19ded35119cb36d8f2cc13f1b01d3704d367c0d57d43d96bcc1eaafeaf8478",
+        "sha256_in_prefix": "2d19ded35119cb36d8f2cc13f1b01d3704d367c0d57d43d96bcc1eaafeaf8478",
+        "size_in_bytes": 717
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/__pycache__/parsetab.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "464073df440b452be4dc64d95a374157ab7ace4d35716d744b68cb11cd420896",
+        "sha256_in_prefix": "464073df440b452be4dc64d95a374157ab7ace4d35716d744b68cb11cd420896",
+        "size_in_bytes": 71621
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/__pycache__/yapps3_compiled_rt.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "b7304b4924e2e9fdd0ba72a5ed6eb56322ea1fde768d9f9ac79c6a3a59c96f2a",
+        "sha256_in_prefix": "b7304b4924e2e9fdd0ba72a5ed6eb56322ea1fde768d9f9ac79c6a3a59c96f2a",
+        "size_in_bytes": 10859
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/__init__.py",
+        "path_type": "hardlink",
+        "sha256": "c78f9203f3a9fc3323a09abaf6ebd6c81c2b5f4f76e4783024a5cb0dab3352c3",
+        "sha256_in_prefix": "c78f9203f3a9fc3323a09abaf6ebd6c81c2b5f4f76e4783024a5cb0dab3352c3",
+        "size_in_bytes": 13
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/__pycache__/__init__.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "e6d6a45896ba2d3b0e9beb86ceb87459bb72b258eebd311e61a8fc0f214cb3c2",
+        "sha256_in_prefix": "e6d6a45896ba2d3b0e9beb86ceb87459bb72b258eebd311e61a8fc0f214cb3c2",
+        "size_in_bytes": 143
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/__pycache__/drel_ast_yacc.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "5e5d6b93d2722d298ab5fcf8eb5b1e88cd376a86f108b72233cfad020e417d82",
+        "sha256_in_prefix": "5e5d6b93d2722d298ab5fcf8eb5b1e88cd376a86f108b72233cfad020e417d82",
+        "size_in_bytes": 18159
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/__pycache__/drel_lex.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "1ed57d238651a3255cfebbb6c7f7b7080a42db088e848593936ecfb3a0b7bf0e",
+        "sha256_in_prefix": "1ed57d238651a3255cfebbb6c7f7b7080a42db088e848593936ecfb3a0b7bf0e",
+        "size_in_bytes": 4951
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/__pycache__/drel_runtime.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "811a34cc6af078ae0aefb7fc62fc8908f540254387ae0f272d4440eb520d95e1",
+        "sha256_in_prefix": "811a34cc6af078ae0aefb7fc62fc8908f540254387ae0f272d4440eb520d95e1",
+        "size_in_bytes": 3839
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/__pycache__/parsetab.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "c34034992debe7338dd8551a4ca47a6d63408445f5b6c05bc193b8c2cfbf07fd",
+        "sha256_in_prefix": "c34034992debe7338dd8551a4ca47a6d63408445f5b6c05bc193b8c2cfbf07fd",
+        "size_in_bytes": 71620
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/__pycache__/py_from_ast.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "e50450434a636c0948c3c8871ed996173a4a060640507b317b99e9a07ba10129",
+        "sha256_in_prefix": "e50450434a636c0948c3c8871ed996173a4a060640507b317b99e9a07ba10129",
+        "size_in_bytes": 15898
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/drel_ast_yacc.py",
+        "path_type": "hardlink",
+        "sha256": "c03ea2d1f25cf1bf10988d34c7188acbaa7c5952c6a2b13d630ed37759d5bb39",
+        "sha256_in_prefix": "c03ea2d1f25cf1bf10988d34c7188acbaa7c5952c6a2b13d630ed37759d5bb39",
+        "size_in_bytes": 16879
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/drel_lex.py",
+        "path_type": "hardlink",
+        "sha256": "4b375142a8850b7a337fb8dc92c60481e693062d54fb312c4baeef701b62e22a",
+        "sha256_in_prefix": "4b375142a8850b7a337fb8dc92c60481e693062d54fb312c4baeef701b62e22a",
+        "size_in_bytes": 4645
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/drel_runtime.py",
+        "path_type": "hardlink",
+        "sha256": "1e968085e164416147d9114725c4084700dc6dcbb3530ced07dd82b9484eefb5",
+        "sha256_in_prefix": "1e968085e164416147d9114725c4084700dc6dcbb3530ced07dd82b9484eefb5",
+        "size_in_bytes": 4383
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/parsetab.py",
+        "path_type": "hardlink",
+        "sha256": "9d83212c621c852caf46414c8a789b95e2ad714b652d52eaf54055dd7232199e",
+        "sha256_in_prefix": "9d83212c621c852caf46414c8a789b95e2ad714b652d52eaf54055dd7232199e",
+        "size_in_bytes": 81599
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/drel/py_from_ast.py",
+        "path_type": "hardlink",
+        "sha256": "be55acf9a32ad8819c60151160ad5b4c9f86700e4957c6ec35d6543592d435be",
+        "sha256_in_prefix": "be55acf9a32ad8819c60151160ad5b4c9f86700e4957c6ec35d6543592d435be",
+        "size_in_bytes": 29698
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/parsetab.py",
+        "path_type": "hardlink",
+        "sha256": "b7edd5a8e4ba4f2024f957afaf0f65d34ab967554cb0bab11436e4ae47dd0598",
+        "sha256_in_prefix": "b7edd5a8e4ba4f2024f957afaf0f65d34ab967554cb0bab11436e4ae47dd0598",
+        "size_in_bytes": 82535
+      },
+      {
+        "_path": "lib/python3.9/site-packages/CifFile/yapps3_compiled_rt.py",
+        "path_type": "hardlink",
+        "sha256": "3a87eea9e7a1262578c819e34fa99f01a83e36e1d8cbd2e96f0daeff0a662353",
+        "sha256_in_prefix": "3a87eea9e7a1262578c819e34fa99f01a83e36e1d8cbd2e96f0daeff0a662353",
+        "size_in_bytes": 14025
+      },
+      {
+        "_path": "lib/python3.9/site-packages/PyCifRW-4.4.3-py3.9.egg-info/PKG-INFO",
+        "path_type": "hardlink",
+        "sha256": "67430eb2c014c0df3332e18487616629d5f20d2f03f232420aff4599098dd089",
+        "sha256_in_prefix": "67430eb2c014c0df3332e18487616629d5f20d2f03f232420aff4599098dd089",
+        "size_in_bytes": 794
+      },
+      {
+        "_path": "lib/python3.9/site-packages/PyCifRW-4.4.3-py3.9.egg-info/SOURCES.txt",
+        "path_type": "hardlink",
+        "sha256": "5b37fd827ae8cd76109dbef3d8cd838a270de00a452fe02470246c4b0f61d0e3",
+        "sha256_in_prefix": "5b37fd827ae8cd76109dbef3d8cd838a270de00a452fe02470246c4b0f61d0e3",
+        "size_in_bytes": 2072
+      },
+      {
+        "_path": "lib/python3.9/site-packages/PyCifRW-4.4.3-py3.9.egg-info/dependency_links.txt",
+        "path_type": "hardlink",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "sha256_in_prefix": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "size_in_bytes": 1
+      },
+      {
+        "_path": "lib/python3.9/site-packages/PyCifRW-4.4.3-py3.9.egg-info/top_level.txt",
+        "path_type": "hardlink",
+        "sha256": "71d54814517eca8cda425fcca94af71b9eae5ad062cc99f166dd4b90558253c1",
+        "sha256_in_prefix": "71d54814517eca8cda425fcca94af71b9eae5ad062cc99f166dd4b90558253c1",
+        "size_in_bytes": 8
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "pycifrw=4.4.3",
+  "sha256": "5a84ad08484d6cefb31a59259cf9fce6e7fded5dcc8c52a1bf467205eb58d727",
+  "size": 213550,
+  "subdir": "osx-64",
+  "timestamp": 1655458661779,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/conda-forge/osx-64/pycifrw-4.4.3-py39h701faf5_1.tar.bz2",
+  "version": "4.4.3"
+}

@@ -1,0 +1,135 @@
+{
+  "build": "hcf210ce_4",
+  "build_number": 4,
+  "channel": "https://conda.anaconda.org/conda-forge/osx-64",
+  "constrains": [],
+  "depends": [
+    "libcxx >=11.1.0",
+    "libglib 2.70.2 hf1fb8c0_4",
+    "libzlib >=1.2.11,<1.3.0a0"
+  ],
+  "extracted_package_dir": "/Users/sergivela/opt/anaconda3/pkgs/glib-tools-2.70.2-hcf210ce_4",
+  "features": "",
+  "files": [
+    "bin/gdbus",
+    "bin/gio",
+    "bin/gio-querymodules",
+    "bin/glib-compile-schemas",
+    "bin/gresource",
+    "bin/gsettings",
+    "share/bash-completion/completions/gapplication",
+    "share/bash-completion/completions/gdbus",
+    "share/bash-completion/completions/gio",
+    "share/bash-completion/completions/gresource",
+    "share/bash-completion/completions/gsettings"
+  ],
+  "fn": "glib-tools-2.70.2-hcf210ce_4.tar.bz2",
+  "license": "LGPL-2.1-or-later",
+  "link": {
+    "source": "/Users/sergivela/opt/anaconda3/pkgs/glib-tools-2.70.2-hcf210ce_4",
+    "type": 1
+  },
+  "md5": "b74169325111c66f87d7b4d78a37f354",
+  "name": "glib-tools",
+  "package_tarball_full_path": "/Users/sergivela/opt/anaconda3/pkgs/glib-tools-2.70.2-hcf210ce_4.tar.bz2",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "bin/gdbus",
+        "file_mode": "binary",
+        "path_type": "hardlink",
+        "prefix_placeholder": "/Users/runner/miniforge3/conda-bld/glib-split_1644786949321/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol",
+        "sha256": "3e61e8d32093ed7c169ed8320129f8ca4f8264eb5c9ebf1d9e5cef046ef4f0e5",
+        "sha256_in_prefix": "6c08b4cf9c71099cf3f339d39ea8b05d6a75f81293aab21145654f4ad5553381",
+        "size_in_bytes": 51504
+      },
+      {
+        "_path": "bin/gio",
+        "file_mode": "binary",
+        "path_type": "hardlink",
+        "prefix_placeholder": "/Users/runner/miniforge3/conda-bld/glib-split_1644786949321/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol",
+        "sha256": "8b278e724a89bda286abd411d16c412d1beb2c46eb8c7fc9a21b67bc641bc807",
+        "sha256_in_prefix": "08f93bcaf0c7af6c590efaf276016eacb52431e2017d6853aea7374922254a06",
+        "size_in_bytes": 83120
+      },
+      {
+        "_path": "bin/gio-querymodules",
+        "path_type": "hardlink",
+        "sha256": "8dd23fc5bba90a3e58d0753525244ee96c2cc3633761765974e306470932506b",
+        "sha256_in_prefix": "8dd23fc5bba90a3e58d0753525244ee96c2cc3633761765974e306470932506b",
+        "size_in_bytes": 18944
+      },
+      {
+        "_path": "bin/glib-compile-schemas",
+        "file_mode": "binary",
+        "path_type": "hardlink",
+        "prefix_placeholder": "/Users/runner/miniforge3/conda-bld/glib-split_1644786949321/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol",
+        "sha256": "6690e7115ba1a246a3d98fb99f9f7163d0eaf46110de490d9f591e80b1e9b850",
+        "sha256_in_prefix": "1f8649e14f2d67a649b8d76694bec8f5a9ffe810eca9dce8d0f8dafcde854b7c",
+        "size_in_bytes": 57320
+      },
+      {
+        "_path": "bin/gresource",
+        "file_mode": "binary",
+        "path_type": "hardlink",
+        "prefix_placeholder": "/Users/runner/miniforge3/conda-bld/glib-split_1644786949321/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol",
+        "sha256": "3e21e7ecdf454d2255cefb918eaf92cc7c6a4aec8ce487865f0642a34e1a2e1e",
+        "sha256_in_prefix": "471e3f1125eaaf824b62572629809d2e45b3deb21b224c957b842e9ae43a0872",
+        "size_in_bytes": 18896
+      },
+      {
+        "_path": "bin/gsettings",
+        "file_mode": "binary",
+        "path_type": "hardlink",
+        "prefix_placeholder": "/Users/runner/miniforge3/conda-bld/glib-split_1644786949321/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol",
+        "sha256": "6fa387b7b5e19227bf269989d7e7eac3253e08263916ad0b2d896c049fb7522c",
+        "sha256_in_prefix": "8d49cc4a78150a299bcf33f69c91558e14fd7323bf2129b7b06172b3f2351eef",
+        "size_in_bytes": 31024
+      },
+      {
+        "_path": "share/bash-completion/completions/gapplication",
+        "path_type": "hardlink",
+        "sha256": "199885a791120de218784b28d189becea2cdbdd1c297e8a4a92602a969857fe7",
+        "sha256_in_prefix": "199885a791120de218784b28d189becea2cdbdd1c297e8a4a92602a969857fe7",
+        "size_in_bytes": 1389
+      },
+      {
+        "_path": "share/bash-completion/completions/gdbus",
+        "path_type": "hardlink",
+        "sha256": "819c76693b994a291c175c3d7a394022b7429644794816071ae40b5ca405105e",
+        "sha256_in_prefix": "819c76693b994a291c175c3d7a394022b7429644794816071ae40b5ca405105e",
+        "size_in_bytes": 935
+      },
+      {
+        "_path": "share/bash-completion/completions/gio",
+        "path_type": "hardlink",
+        "sha256": "5da96db9ea9295e068a1c6c046b5ee32718489af43a949425b7d8c6cdc2ca493",
+        "sha256_in_prefix": "5da96db9ea9295e068a1c6c046b5ee32718489af43a949425b7d8c6cdc2ca493",
+        "size_in_bytes": 3830
+      },
+      {
+        "_path": "share/bash-completion/completions/gresource",
+        "path_type": "hardlink",
+        "sha256": "a659c4fec532301c07e89d171c77b057d70941d625ab4c880c8046d9ed7148a3",
+        "sha256_in_prefix": "a659c4fec532301c07e89d171c77b057d70941d625ab4c880c8046d9ed7148a3",
+        "size_in_bytes": 1356
+      },
+      {
+        "_path": "share/bash-completion/completions/gsettings",
+        "path_type": "hardlink",
+        "sha256": "8b0b278b6e20a401e94afb6164f99f73ee49af70e12e6c7c054a48fc8dccb552",
+        "sha256_in_prefix": "8b0b278b6e20a401e94afb6164f99f73ee49af70e12e6c7c054a48fc8dccb552",
+        "size_in_bytes": 2829
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "None",
+  "sha256": "9e852a4559847ea52cba617d9be61d1105fa1be2c572f7273c33fb4a402e61f4",
+  "size": 94734,
+  "subdir": "osx-64",
+  "timestamp": 1644787402906,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/conda-forge/osx-64/glib-tools-2.70.2-hcf210ce_4.tar.bz2",
+  "version": "2.70.2"
+}

@@ -1,0 +1,66 @@
+{
+  "build": "hecd8cb5_3538",
+  "build_number": 3538,
+  "channel": "https://conda.anaconda.org/anaconda/osx-64",
+  "constrains": [],
+  "depends": [],
+  "extracted_package_dir": "/Users/sergivela/opt/anaconda3/pkgs/intel-openmp-2021.4.0-hecd8cb5_3538",
+  "features": "",
+  "files": [
+    "lib/libiomp5.dylib",
+    "lib/libiomp5_db.dylib",
+    "lib/libiompstubs5.dylib",
+    "licensing/compiler/openmp/third-party-programs.txt"
+  ],
+  "fn": "intel-openmp-2021.4.0-hecd8cb5_3538.tar.bz2",
+  "license": "LicenseRef-ProprietaryIntel",
+  "license_family": "Proprietary",
+  "link": {
+    "source": "/Users/sergivela/opt/anaconda3/pkgs/intel-openmp-2021.4.0-hecd8cb5_3538",
+    "type": 1
+  },
+  "md5": "3042034115ba361441d5e03bf4ae848a",
+  "name": "intel-openmp",
+  "package_tarball_full_path": "/Users/sergivela/opt/anaconda3/pkgs/intel-openmp-2021.4.0-hecd8cb5_3538.tar.bz2",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "lib/libiomp5.dylib",
+        "path_type": "hardlink",
+        "sha256": "117838bc37faef987c14f4b0acdf06ac65009093f12ae6db393f6cdf7bdcfd5b",
+        "sha256_in_prefix": "117838bc37faef987c14f4b0acdf06ac65009093f12ae6db393f6cdf7bdcfd5b",
+        "size_in_bytes": 2958128
+      },
+      {
+        "_path": "lib/libiomp5_db.dylib",
+        "path_type": "hardlink",
+        "sha256": "c03badc9f493e039504a88103cdc2748f1ea6bf5113d8a632dbf517e8ebe7a87",
+        "sha256_in_prefix": "c03badc9f493e039504a88103cdc2748f1ea6bf5113d8a632dbf517e8ebe7a87",
+        "size_in_bytes": 290240
+      },
+      {
+        "_path": "lib/libiompstubs5.dylib",
+        "path_type": "hardlink",
+        "sha256": "b2a7e714a101261c1c0c46bdf91eff5512990181b5bd1b38580c1016ea83fb19",
+        "sha256_in_prefix": "b2a7e714a101261c1c0c46bdf91eff5512990181b5bd1b38580c1016ea83fb19",
+        "size_in_bytes": 186176
+      },
+      {
+        "_path": "licensing/compiler/openmp/third-party-programs.txt",
+        "path_type": "hardlink",
+        "sha256": "753301db61ffc9b486e9d3e8c6758ffc5db6679ea0cee32c4935b9e1a2d56bc5",
+        "sha256_in_prefix": "753301db61ffc9b486e9d3e8c6758ffc5db6679ea0cee32c4935b9e1a2d56bc5",
+        "size_in_bytes": 31156
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "intel-openmp=2021.4.0",
+  "sha256": "343d6473aa79100bf02dd1522edccee364fd38230c59c3145dd59fd17ce44b46",
+  "size": 1261511,
+  "subdir": "osx-64",
+  "timestamp": 1634551120500,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/anaconda/osx-64/intel-openmp-2021.4.0-hecd8cb5_3538.tar.bz2",
+  "version": "2021.4.0"
+}

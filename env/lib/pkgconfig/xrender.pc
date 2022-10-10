@@ -1,0 +1,12 @@
+prefix=/Users/sergivela/Documents/Programes/cell2mol/env
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: Xrender
+Description: X Render Library
+Version: 0.9.10
+Requires: xproto renderproto >= 0.9 x11
+Requires.private: x11
+Cflags: -I${includedir}
+Libs: -L${libdir} -lXrender

@@ -1,0 +1,5 @@
+DEFAULT_TEXT_WIDTH = '100px'
+DROPDOWN_MAX_WIDTH = '30px'
+DEFAULT_SLIDER_WIDTH = '200px'
+DEFAULT_PADDING = '40px'
+NGL_BASE_URL = 'http://nglviewer.org/ngl/'

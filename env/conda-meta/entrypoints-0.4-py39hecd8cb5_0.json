@@ -1,0 +1,108 @@
+{
+  "build": "py39hecd8cb5_0",
+  "build_number": 0,
+  "channel": "https://conda.anaconda.org/anaconda/osx-64",
+  "constrains": [],
+  "depends": [
+    "python >=3.9,<3.10.0a0"
+  ],
+  "extracted_package_dir": "/Users/sergivela/opt/anaconda3/pkgs/entrypoints-0.4-py39hecd8cb5_0",
+  "features": "",
+  "files": [
+    "lib/python3.9/site-packages/__pycache__/entrypoints.cpython-39.pyc",
+    "lib/python3.9/site-packages/entrypoints-0.4.dist-info/INSTALLER",
+    "lib/python3.9/site-packages/entrypoints-0.4.dist-info/LICENSE",
+    "lib/python3.9/site-packages/entrypoints-0.4.dist-info/METADATA",
+    "lib/python3.9/site-packages/entrypoints-0.4.dist-info/RECORD",
+    "lib/python3.9/site-packages/entrypoints-0.4.dist-info/REQUESTED",
+    "lib/python3.9/site-packages/entrypoints-0.4.dist-info/WHEEL",
+    "lib/python3.9/site-packages/entrypoints-0.4.dist-info/direct_url.json",
+    "lib/python3.9/site-packages/entrypoints.py"
+  ],
+  "fn": "entrypoints-0.4-py39hecd8cb5_0.tar.bz2",
+  "license": "MIT License",
+  "license_family": "MIT",
+  "link": {
+    "source": "/Users/sergivela/opt/anaconda3/pkgs/entrypoints-0.4-py39hecd8cb5_0",
+    "type": 1
+  },
+  "md5": "ef0e825982f242085574f502dfff4f6b",
+  "name": "entrypoints",
+  "package_tarball_full_path": "/Users/sergivela/opt/anaconda3/pkgs/entrypoints-0.4-py39hecd8cb5_0.tar.bz2",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "lib/python3.9/site-packages/__pycache__/entrypoints.cpython-39.pyc",
+        "path_type": "hardlink",
+        "sha256": "4e618b26d7b144e5ff7440552fdf5b163576309a292807f3d80bba07b733ee97",
+        "sha256_in_prefix": "4e618b26d7b144e5ff7440552fdf5b163576309a292807f3d80bba07b733ee97",
+        "size_in_bytes": 7508
+      },
+      {
+        "_path": "lib/python3.9/site-packages/entrypoints-0.4.dist-info/INSTALLER",
+        "path_type": "hardlink",
+        "sha256": "d0edee15f91b406f3f99726e44eb990be6e34fd0345b52b910c568e0eef6a2a8",
+        "sha256_in_prefix": "d0edee15f91b406f3f99726e44eb990be6e34fd0345b52b910c568e0eef6a2a8",
+        "size_in_bytes": 5
+      },
+      {
+        "_path": "lib/python3.9/site-packages/entrypoints-0.4.dist-info/LICENSE",
+        "path_type": "hardlink",
+        "sha256": "de5fcd7349cdf399b0707a2a024833c4704743650133c72d6f0ff7561a03a848",
+        "sha256_in_prefix": "de5fcd7349cdf399b0707a2a024833c4704743650133c72d6f0ff7561a03a848",
+        "size_in_bytes": 1098
+      },
+      {
+        "_path": "lib/python3.9/site-packages/entrypoints-0.4.dist-info/METADATA",
+        "path_type": "hardlink",
+        "sha256": "952c55cf89ff4db06017f89650be1c91c93631b9289835a0f4c3e289e7acd267",
+        "sha256_in_prefix": "952c55cf89ff4db06017f89650be1c91c93631b9289835a0f4c3e289e7acd267",
+        "size_in_bytes": 2589
+      },
+      {
+        "_path": "lib/python3.9/site-packages/entrypoints-0.4.dist-info/RECORD",
+        "path_type": "hardlink",
+        "sha256": "0bcca5e2f1d6e17f790c166079276753b6308f78de53485d08ff58610f413ae2",
+        "sha256_in_prefix": "0bcca5e2f1d6e17f790c166079276753b6308f78de53485d08ff58610f413ae2",
+        "size_in_bytes": 698
+      },
+      {
+        "_path": "lib/python3.9/site-packages/entrypoints-0.4.dist-info/REQUESTED",
+        "path_type": "hardlink",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sha256_in_prefix": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_in_bytes": 0
+      },
+      {
+        "_path": "lib/python3.9/site-packages/entrypoints-0.4.dist-info/WHEEL",
+        "path_type": "hardlink",
+        "sha256": "8cf311fc3ce47385f889c42d9b3f35967358fe402c7e883baf2eeaa11bd82d7c",
+        "sha256_in_prefix": "8cf311fc3ce47385f889c42d9b3f35967358fe402c7e883baf2eeaa11bd82d7c",
+        "size_in_bytes": 81
+      },
+      {
+        "_path": "lib/python3.9/site-packages/entrypoints-0.4.dist-info/direct_url.json",
+        "path_type": "hardlink",
+        "sha256": "97fb9e433c5f8ea9db9b32ee1ec2f2d1009b73426aef24e94a5e51af857fe96e",
+        "sha256_in_prefix": "97fb9e433c5f8ea9db9b32ee1ec2f2d1009b73426aef24e94a5e51af857fe96e",
+        "size_in_bytes": 143
+      },
+      {
+        "_path": "lib/python3.9/site-packages/entrypoints.py",
+        "path_type": "hardlink",
+        "sha256": "1fde7c2c1985ae0201a14925bdc162a847f58d5d24c5520f10d34613541a51dd",
+        "sha256_in_prefix": "1fde7c2c1985ae0201a14925bdc162a847f58d5d24c5520f10d34613541a51dd",
+        "size_in_bytes": 8264
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "entrypoints=0.4",
+  "sha256": "3888d879bfa7f6d4c4b576bf0e7f96dec35090795f4140c96b7fa63041138ea9",
+  "size": 16594,
+  "subdir": "osx-64",
+  "timestamp": 1649926538106,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/anaconda/osx-64/entrypoints-0.4-py39hecd8cb5_0.tar.bz2",
+  "version": "0.4"
+}

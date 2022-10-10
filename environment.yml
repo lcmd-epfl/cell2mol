@@ -1,4 +1,4 @@
-name: cell2mol
+name: cell2mol-test-3
 channels:
   - anaconda
   - conda-forge

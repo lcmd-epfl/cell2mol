@@ -1,0 +1,3 @@
+[console_scripts]
+cell2mol = cell2mol.c2m_driver:main
+

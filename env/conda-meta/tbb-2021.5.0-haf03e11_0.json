@@ -1,0 +1,80 @@
+{
+  "build": "haf03e11_0",
+  "build_number": 0,
+  "channel": "https://conda.anaconda.org/anaconda/osx-64",
+  "constrains": [],
+  "depends": [
+    "libcxx >=12.0.0"
+  ],
+  "extracted_package_dir": "/Users/sergivela/opt/anaconda3/pkgs/tbb-2021.5.0-haf03e11_0",
+  "features": "",
+  "files": [
+    "lib/libtbb.12.5.dylib",
+    "lib/libtbb.12.dylib",
+    "lib/libtbbmalloc.2.5.dylib",
+    "lib/libtbbmalloc.2.dylib",
+    "lib/libtbbmalloc_proxy.2.5.dylib",
+    "lib/libtbbmalloc_proxy.2.dylib"
+  ],
+  "fn": "tbb-2021.5.0-haf03e11_0.tar.bz2",
+  "license": "Apache-2.0",
+  "link": {
+    "source": "/Users/sergivela/opt/anaconda3/pkgs/tbb-2021.5.0-haf03e11_0",
+    "type": 1
+  },
+  "md5": "2dc91295484cefd411ee0a005d6ec56a",
+  "name": "tbb",
+  "package_tarball_full_path": "/Users/sergivela/opt/anaconda3/pkgs/tbb-2021.5.0-haf03e11_0.tar.bz2",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "lib/libtbb.12.5.dylib",
+        "path_type": "hardlink",
+        "sha256": "8dde6044ac0ddead5cb0ccd37f21f7f2388e2457ae551762547291c0ba75a9e7",
+        "sha256_in_prefix": "8dde6044ac0ddead5cb0ccd37f21f7f2388e2457ae551762547291c0ba75a9e7",
+        "size_in_bytes": 344360
+      },
+      {
+        "_path": "lib/libtbb.12.dylib",
+        "path_type": "softlink",
+        "sha256": "8dde6044ac0ddead5cb0ccd37f21f7f2388e2457ae551762547291c0ba75a9e7",
+        "size_in_bytes": 344360
+      },
+      {
+        "_path": "lib/libtbbmalloc.2.5.dylib",
+        "path_type": "hardlink",
+        "sha256": "caae61acbe33f1e76fb467824d15ad4bec1d888c5cd5540bb9f25aa52150a5fa",
+        "sha256_in_prefix": "caae61acbe33f1e76fb467824d15ad4bec1d888c5cd5540bb9f25aa52150a5fa",
+        "size_in_bytes": 126808
+      },
+      {
+        "_path": "lib/libtbbmalloc.2.dylib",
+        "path_type": "softlink",
+        "sha256": "caae61acbe33f1e76fb467824d15ad4bec1d888c5cd5540bb9f25aa52150a5fa",
+        "size_in_bytes": 126808
+      },
+      {
+        "_path": "lib/libtbbmalloc_proxy.2.5.dylib",
+        "path_type": "hardlink",
+        "sha256": "256797dda61a85bf33c7d303ab2f5f17fa2d7ca3f130cd7f1a317cb5d7e03bda",
+        "sha256_in_prefix": "256797dda61a85bf33c7d303ab2f5f17fa2d7ca3f130cd7f1a317cb5d7e03bda",
+        "size_in_bytes": 20488
+      },
+      {
+        "_path": "lib/libtbbmalloc_proxy.2.dylib",
+        "path_type": "softlink",
+        "sha256": "256797dda61a85bf33c7d303ab2f5f17fa2d7ca3f130cd7f1a317cb5d7e03bda",
+        "size_in_bytes": 20488
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "tbb=2021.5.0",
+  "sha256": "7c3a3adf1517a0f92bf8c75cdd6ba37a2fccf60451198e5d15ff86fde86812b8",
+  "size": 176303,
+  "subdir": "osx-64",
+  "timestamp": 1642690104648,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/anaconda/osx-64/tbb-2021.5.0-haf03e11_0.tar.bz2",
+  "version": "2021.5.0"
+}

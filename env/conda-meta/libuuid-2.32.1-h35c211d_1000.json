@@ -1,0 +1,75 @@
+{
+  "build": "h35c211d_1000",
+  "build_number": 1000,
+  "channel": "https://conda.anaconda.org/conda-forge/osx-64",
+  "constrains": [],
+  "depends": [],
+  "extracted_package_dir": "/Users/sergivela/opt/anaconda3/pkgs/libuuid-2.32.1-h35c211d_1000",
+  "features": "",
+  "files": [
+    "include/uuid/uuid.h",
+    "lib/libuuid.1.dylib",
+    "lib/libuuid.a",
+    "lib/libuuid.dylib",
+    "lib/pkgconfig/uuid.pc"
+  ],
+  "fn": "libuuid-2.32.1-h35c211d_1000.tar.bz2",
+  "license": "BSD-3-Clause",
+  "license_family": "BSD",
+  "link": {
+    "source": "/Users/sergivela/opt/anaconda3/pkgs/libuuid-2.32.1-h35c211d_1000",
+    "type": 1
+  },
+  "md5": "0e4ef5b0f779d2d87240496fe6337fbe",
+  "name": "libuuid",
+  "package_tarball_full_path": "/Users/sergivela/opt/anaconda3/pkgs/libuuid-2.32.1-h35c211d_1000.tar.bz2",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "include/uuid/uuid.h",
+        "path_type": "hardlink",
+        "sha256": "926b9441cae3c113950827ef438cb0b07657f6ec1d2fe5f3ba557662ddbb526b",
+        "sha256_in_prefix": "926b9441cae3c113950827ef438cb0b07657f6ec1d2fe5f3ba557662ddbb526b",
+        "size_in_bytes": 3910
+      },
+      {
+        "_path": "lib/libuuid.1.dylib",
+        "path_type": "hardlink",
+        "sha256": "511dea7137cb899cbbe2f4f5f3df7b05b66480132132736d9df09c1a0ab2ff0d",
+        "sha256_in_prefix": "511dea7137cb899cbbe2f4f5f3df7b05b66480132132736d9df09c1a0ab2ff0d",
+        "size_in_bytes": 29104
+      },
+      {
+        "_path": "lib/libuuid.a",
+        "path_type": "hardlink",
+        "sha256": "2a31fca93e6174028b8a965816498410dfe2bbc150730ab5aeca33b06f0b94d1",
+        "sha256_in_prefix": "2a31fca93e6174028b8a965816498410dfe2bbc150730ab5aeca33b06f0b94d1",
+        "size_in_bytes": 33112
+      },
+      {
+        "_path": "lib/libuuid.dylib",
+        "path_type": "softlink",
+        "sha256": "511dea7137cb899cbbe2f4f5f3df7b05b66480132132736d9df09c1a0ab2ff0d",
+        "size_in_bytes": 29104
+      },
+      {
+        "_path": "lib/pkgconfig/uuid.pc",
+        "file_mode": "text",
+        "path_type": "hardlink",
+        "prefix_placeholder": "/Users/runner/miniforge3/conda-bld/libuuid_1607292527480/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_p",
+        "sha256": "7e06dd0b2f80fbe78831d348615b028a4589d02ea1922ebb30ca001c6b24fb02",
+        "sha256_in_prefix": "acc3aa8131b7c817d0f286f09d9e5eec9f564403fcaa7baa6eab4ddedf48e532",
+        "size_in_bytes": 1208
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "libuuid=2.32.1",
+  "sha256": "6daec2cc986c1bcee2f1fd60a9401d1e4385a5fea1b0fb2f3e77685062ac95aa",
+  "size": 24028,
+  "subdir": "osx-64",
+  "timestamp": 1607292711965,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/conda-forge/osx-64/libuuid-2.32.1-h35c211d_1000.tar.bz2",
+  "version": "2.32.1"
+}

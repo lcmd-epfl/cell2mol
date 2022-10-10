@@ -1,0 +1,21 @@
+attrs>=19.2.0
+iniconfig
+packaging
+pluggy<2.0,>=0.12
+py>=1.8.2
+toml
+
+[:python_version < "3.8"]
+importlib-metadata>=0.12
+
+[:sys_platform == "win32"]
+atomicwrites>=1.0
+colorama
+
+[testing]
+argcomplete
+hypothesis>=3.56
+mock
+nose
+requests
+xmlschema

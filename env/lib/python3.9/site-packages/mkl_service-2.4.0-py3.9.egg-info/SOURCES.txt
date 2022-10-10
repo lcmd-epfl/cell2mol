@@ -1,0 +1,9 @@
+README.md
+setup.py
+mkl/__init__.py
+mkl/_mkl_service.c
+mkl/_mklinitmodule.c
+mkl_service.egg-info/PKG-INFO
+mkl_service.egg-info/SOURCES.txt
+mkl_service.egg-info/dependency_links.txt
+mkl_service.egg-info/top_level.txt

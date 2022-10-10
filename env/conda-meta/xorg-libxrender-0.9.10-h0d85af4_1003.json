@@ -1,0 +1,70 @@
+{
+  "build": "h0d85af4_1003",
+  "build_number": 1003,
+  "channel": "https://conda.anaconda.org/conda-forge/osx-64",
+  "constrains": [],
+  "depends": [
+    "xorg-libx11 >=1.7.0,<2.0a0",
+    "xorg-renderproto"
+  ],
+  "extracted_package_dir": "/Users/sergivela/opt/anaconda3/pkgs/xorg-libxrender-0.9.10-h0d85af4_1003",
+  "features": "",
+  "files": [
+    "include/X11/extensions/Xrender.h",
+    "lib/libXrender.1.dylib",
+    "lib/libXrender.dylib",
+    "lib/pkgconfig/xrender.pc"
+  ],
+  "fn": "xorg-libxrender-0.9.10-h0d85af4_1003.tar.bz2",
+  "license": "MIT",
+  "license_family": "MIT",
+  "link": {
+    "source": "/Users/sergivela/opt/anaconda3/pkgs/xorg-libxrender-0.9.10-h0d85af4_1003",
+    "type": 1
+  },
+  "md5": "b455388502383b388c5ee5b6f5ee4509",
+  "name": "xorg-libxrender",
+  "package_tarball_full_path": "/Users/sergivela/opt/anaconda3/pkgs/xorg-libxrender-0.9.10-h0d85af4_1003.tar.bz2",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "include/X11/extensions/Xrender.h",
+        "path_type": "hardlink",
+        "sha256": "446bcfb2854ba4aa941bb4b7e372ba8606d5ecd1ab30d413cd376eb77ed105f0",
+        "sha256_in_prefix": "446bcfb2854ba4aa941bb4b7e372ba8606d5ecd1ab30d413cd376eb77ed105f0",
+        "size_in_bytes": 12805
+      },
+      {
+        "_path": "lib/libXrender.1.dylib",
+        "path_type": "hardlink",
+        "sha256": "f69f09e664989bde009f72684bc0f28fa73d7606c6f21e9e32ef0620fb39cea5",
+        "sha256_in_prefix": "f69f09e664989bde009f72684bc0f28fa73d7606c6f21e9e32ef0620fb39cea5",
+        "size_in_bytes": 42224
+      },
+      {
+        "_path": "lib/libXrender.dylib",
+        "path_type": "softlink",
+        "sha256": "f69f09e664989bde009f72684bc0f28fa73d7606c6f21e9e32ef0620fb39cea5",
+        "size_in_bytes": 42224
+      },
+      {
+        "_path": "lib/pkgconfig/xrender.pc",
+        "file_mode": "text",
+        "path_type": "hardlink",
+        "prefix_placeholder": "/Users/runner/miniforge3/conda-bld/xorg-libxrender_1614866947241/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla",
+        "sha256": "71945ccc2d5840fcb7c394c1c1835fc3ab6592a6ecaab135a07d4d846e923287",
+        "sha256_in_prefix": "8add5a0819bd636f1460879c48270830cec7955f34313f3138e50090304e52bd",
+        "size_in_bytes": 515
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "xorg-libxrender=0.9.10",
+  "sha256": "459af5a3dc23dc8e495733a3a83db3dcd27c7f17402cb635a29a3579c3567405",
+  "size": 24958,
+  "subdir": "osx-64",
+  "timestamp": 1614867150626,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/conda-forge/osx-64/xorg-libxrender-0.9.10-h0d85af4_1003.tar.bz2",
+  "version": "0.9.10"
+}

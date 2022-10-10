@@ -1,0 +1,60 @@
+{
+  "build": "he9d5cce_0",
+  "build_number": 0,
+  "channel": "https://conda.anaconda.org/anaconda/osx-64",
+  "constrains": [],
+  "depends": [
+    "libcxx >=12.0.0"
+  ],
+  "extracted_package_dir": "/Users/sergivela/opt/anaconda3/pkgs/lerc-3.0-he9d5cce_0",
+  "features": "",
+  "files": [
+    "include/Lerc_c_api.h",
+    "include/Lerc_types.h",
+    "lib/libLerc.dylib"
+  ],
+  "fn": "lerc-3.0-he9d5cce_0.tar.bz2",
+  "license": "Apache-2.0",
+  "license_family": "Apache",
+  "link": {
+    "source": "/Users/sergivela/opt/anaconda3/pkgs/lerc-3.0-he9d5cce_0",
+    "type": 1
+  },
+  "md5": "d9e7e12a2bc017897a1a866e972a04de",
+  "name": "lerc",
+  "package_tarball_full_path": "/Users/sergivela/opt/anaconda3/pkgs/lerc-3.0-he9d5cce_0.tar.bz2",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "include/Lerc_c_api.h",
+        "path_type": "hardlink",
+        "sha256": "c0f0a3e8a91dd4e9727bb363153096132b601338123847308cdd8bf683fc700b",
+        "sha256_in_prefix": "c0f0a3e8a91dd4e9727bb363153096132b601338123847308cdd8bf683fc700b",
+        "size_in_bytes": 11652
+      },
+      {
+        "_path": "include/Lerc_types.h",
+        "path_type": "hardlink",
+        "sha256": "2e2b19cb5d049f9bbebe2f3acd8be2ab920176cd1f48dea70dcc6c91e19b6249",
+        "sha256_in_prefix": "2e2b19cb5d049f9bbebe2f3acd8be2ab920176cd1f48dea70dcc6c91e19b6249",
+        "size_in_bytes": 939
+      },
+      {
+        "_path": "lib/libLerc.dylib",
+        "path_type": "hardlink",
+        "sha256": "49bb284f7d27504d3ff6c747094bca29b4ae8fc31a57735698e015623042e5de",
+        "sha256_in_prefix": "49bb284f7d27504d3ff6c747094bca29b4ae8fc31a57735698e015623042e5de",
+        "size_in_bytes": 596460
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "lerc=3.0",
+  "sha256": "1bc6775157a53351800f1cc3de85f88a219fb98a09ac9bc8b9f056e394278035",
+  "size": 203852,
+  "subdir": "osx-64",
+  "timestamp": 1635523161861,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/anaconda/osx-64/lerc-3.0-he9d5cce_0.tar.bz2",
+  "version": "3.0"
+}

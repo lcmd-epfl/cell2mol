@@ -1,0 +1,9 @@
+prefix=/Users/sergivela/Documents/Programes/cell2mol/env
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: py3cairo
+Description: Python 3 bindings for cairo
+Version: 1.20.1
+Requires: cairo
+Cflags: -I${includedir}/pycairo
