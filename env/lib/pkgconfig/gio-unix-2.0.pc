@@ -1,9 +1,0 @@
-prefix=/Users/sergivela/Documents/Programes/cell2mol/env
-libdir=${prefix}/lib
-includedir=${prefix}/include
-
-Name: GIO unix specific APIs
-Description: unix specific headers for glib I/O library
-Version: 2.70.2
-Requires: gobject-2.0, gio-2.0
-Cflags: -I${includedir}/gio-unix-2.0
