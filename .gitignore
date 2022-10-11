@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.coverage
+.mypy_cache
+.pytest_cache
+.ipynb_checkpoints/*
+
+# Distribution/packaging
+build/
+dist/
+*.egg-info/
+_build
+/docs/api
+bibtex.json
