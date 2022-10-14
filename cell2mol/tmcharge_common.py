@@ -442,8 +442,8 @@ class molecule(object):
     def charge(self, atcharge: np.ndarray, totcharge: int, rdkit_mol: list, smiles: list) -> None:
         self.atcharge = atcharge
         self.totcharge = totcharge
-        self.smiles_with_H = " "                # If "Complex", it is a list of ligand smiles
-        self.smiles = smiles                    # If "Complex", it is a list of ligand smiles 
+        self.smiles_with_H = " "                # If "Complex", it will be a list of ligand smiles
+        self.smiles = smiles                    # If "Complex", it will be a list of ligand smiles 
         self.rdkit_mol = rdkit_mol              # If "Complex", it is an empty list
 
         if self.type != "Complex":
@@ -535,7 +535,7 @@ class ligand(object):
     def charge(self, atcharge: list, totcharge: int, rdkit_mol: object, smiles: str) -> None:
         self.atcharge = atcharge
         self.totcharge = totcharge
-        self.smiles_with_H = " "                # Smiles of the ligand that includes any added H atom
+        self.smiles_with_H = " "                # Smiles of the ligand that includes any added H atom, created at "build_bonds" function
         self.smiles = smiles                    # Now Empty, created later as a smiles without any added H atom 
         self.rdkit_mol = rdkit_mol              # Rdkit mol object 
 
