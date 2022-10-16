@@ -1376,11 +1376,11 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
 
     if hapticity == False :
         
-        positions=[]
-        symbols=[]
-        connectivity=[]
-        
         for met in metalist:
+            
+            positions=[]
+            symbols=[]
+            connectivity=[]    
             
             cn =len(met.coordinating_atoms)
             connectivity= [[1, i] for i in range(2, cn+2)]
@@ -1399,7 +1399,11 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
                        
             ref_geom = np.array(shape_structure_references['{} Vertices'.format(cn)])
             posgeom_dev={}
-
+            
+            if debug >= 2 :
+                for p, s in zip(symbols, positions):
+                    print (p, s)
+                print("")
             for idx, rg in enumerate(ref_geom[:,0]):
                 shp_measure = geometry.get_shape_measure(rg, central_atom=1)
                 geom = ref_geom[:,3][idx]
