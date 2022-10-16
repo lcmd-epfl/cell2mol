@@ -13,6 +13,8 @@ from cell2mol.tmcharge_common import (getelementcount,getradii,getcentroid,find_
 # Imports Classes
 from cell2mol.tmcharge_common import atom, molecule, ligand, metal, group
 from cell2mol.elementdata import ElementData
+from cosymlib import Geometry
+from cosymlib.shape.tools import shape_structure_references
 
 elemdatabase = ElementData()
 
@@ -149,7 +151,11 @@ def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list
 
                 # Checks Hapticity
                 potential_hapticity = get_hapticity(ref)
-                if debug >= 2: print(f"Potential hapticity={potential_hapticity} for molecule {ref.formula}")
+                
+                # Check coordination geometry around metal
+                ref.metalist = get_coordination_geometry (ref.metalist, potential_hapticity, debug=1)
+
+                if debug >= 2:  print(f"Potential hapticity={potential_hapticity} for molecule {ref.formula}")
 
                 for lig in ref.ligandlist:
                     verify_connectivity(lig, ref, debug)
@@ -461,11 +467,17 @@ def splitcomplex(molecule: object, factor: float=1.3, metal_factor: float=1.0, d
             metalist.append(met)
 
             connec_atoms_label = ([])  # collects the labels of all atoms connected to this metal
+            connec_atoms_sites = ([])
             for jdx, at2 in enumerate(molecule.atoms):
                 if molecule.mconmat[idx, jdx] == 1:
                     connec_atoms_label.append(str(at2.label))
+                    connec_atoms_sites.append(at2.coord)
+
             met.coord_sphere = connec_atoms_label
             met.coord_sphere_ID = getelementcount(connec_atoms_label)
+
+            met.coordinating_atoms = connec_atoms_label
+            met.coordinating_atoms_sites = connec_atoms_sites
         else:
             mfreelabels.append(a.label)
             mfreepos.append(a.coord)
@@ -1312,6 +1324,9 @@ def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -
                     mol, mol.factor, mol.metal_factor
                 )
                 dummy = get_hapticity(mol)
+                
+                # Check coordination geometry around metal
+                mol.metalist = get_coordination_geometry (mol.metalist, dummy, debug=1)
 
         # Reassign Type of molecules and store information
         for mol in moleclist:
@@ -1352,6 +1367,55 @@ def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -
 
     return cell
 
+
+#######################################################
+def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) -> None:
+    # Get coordination geomery in case that there is no hapcitiy in TM complexes
+    # Find the cloest geometry using Shape measurment in cosymlib https://cosymlib.readthedocs.io/en/latest/
+
+
+    if hapticity == False :
+        
+        positions=[]
+        symbols=[]
+        connectivity=[]
+        
+        for met in metalist:
+            
+            cn =len(met.coordinating_atoms)
+            connectivity= [[1, i] for i in range(2, cn+2)]
+            
+            symbols.append(met.label)
+            positions.append(met.coord)
+
+            for a, a_site in zip(met.coordinating_atoms, met.coordinating_atoms_sites):
+                symbols.append(a)
+                positions.append(a_site)   
+            
+            geometry = Geometry(positions=positions, 
+                        symbols=symbols,
+                        name=met.refcode, 
+                        connectivity=connectivity)
+                       
+            ref_geom = np.array(shape_structure_references['{} Vertices'.format(cn)])
+            posgeom_dev={}
+
+            for idx, rg in enumerate(ref_geom[:,0]):
+                shp_measure = geometry.get_shape_measure(rg, central_atom=1)
+                geom = ref_geom[:,3][idx]
+                posgeom_dev[geom]=round(shp_measure, 3)
+
+            met.coordination (hapticity, posgeom_dev) 
+    else :
+        posgeom_dev = {}
+        for met in metalist:
+            met.coordination (hapticity, posgeom_dev) 
+    
+    if debug >= 2 :
+        for met in metalist:
+            print (met.coordination_number, met.hapticity, met.posgeom_dev, met.geometry, met.deviation)
+    
+    return metalist
 
 #######################################################
 def get_hapticity(molecule: object, debug: int=0) -> bool:
