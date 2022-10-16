@@ -168,3 +168,4 @@ dependencies:
   - zstd=1.5.1=ha95c52a_0
   - pip:
     - py3dmol==1.8.0
+    - cosymlib==0.10.7
