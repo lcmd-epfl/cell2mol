@@ -576,6 +576,7 @@ class group(object):
 class metal(object):
     def __init__(self, name: int, atlist: int, label: str, coord: list, radii: float) -> None:
         self.version = "V1.0"
+        self.refcode = ""  
         self.name = name  # creates as metal index, later modified
         self.atlist = atlist  # atom index list. Numbers refer to the original molecule from where the subroutine is launched
         self.label = label
@@ -586,6 +587,8 @@ class metal(object):
         self.poscharge = []
         self.coord_sphere = []
         self.coord_sphere_ID = []
+        self.coordinating_atoms = []
+        self.coordinating_atoms_sites = []
         self.occurrence = 0   # How many times the metal appears in a unit cell
 
         self.atom = atom(name, label, self.coord, self.radii)
@@ -605,6 +608,19 @@ class metal(object):
         self.mconnec = mconnec  # adjacencies matrix with only metal bonds
         self.totmconnec = int(np.sum(mconnec))
         self.atom.adjacencies(np.array(int(0)), int(mconnec), type="Metal")
+
+    def coordination (self, hapticity: bool, posgeom_dev: dict) -> None:
+        self.hapticity = hapticity
+        if self.hapticity == False :
+            self.coordination_number=len(self.coordinating_atoms)
+            self.posgeom_dev=posgeom_dev
+            self.geometry=min(posgeom_dev, key=posgeom_dev.get)
+            self.deviation=min(posgeom_dev.values())
+        else:
+            self.coordination_number=""
+            self.posgeom_dev={}
+            self.geometry=""
+            self.deviation=""
 
 ##############
 #### CELL ####
