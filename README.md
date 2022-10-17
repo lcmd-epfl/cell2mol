@@ -30,9 +30,9 @@ The code runs on pure python with minimal dependencies:
 
 For portability, we provide an exemplary conda environment in `environment.yml` which can be used to construct a conda environment with all necessary dependencies by running:
 
-`conda env create -f cell2mol.yml`
+`conda env create -f environment.yml`
 
-Afterwards, the created environment can be activated and the following steps should proceed smoothly.
+Afterwards, the created environment can be activated and the following steps should proceed smoothly. We also provide a `requirements.txt` file that should streamline virtual environment creation with pip, if desired.
 
 ## Install [↑](#install)
 
