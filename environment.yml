@@ -131,7 +131,6 @@ dependencies:
   - portaudio=19.6.0
   - prometheus_client=0.15.0
   - prompt-toolkit=3.0.31
-  - prompt_toolkit=3.0.31
   - psutil=5.9.2
   - pthread-stubs=0.4
   - ptyprocess=0.7.0
@@ -176,7 +175,6 @@ dependencies:
   - tomli=2.0.1
   - tornado=6.2
   - traitlets=5.4.0
-  - typing-extensions=4.4.0
   - typing_extensions=4.4.0
   - tzdata=2022e
   - unicodedata2=14.0.0
