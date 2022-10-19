@@ -1636,6 +1636,12 @@ def correct_smiles_ligand(lig: object):
     # Creates Molecule
     obj = rwlig.GetMol()
     smiles = Chem.MolToSmiles(obj)
+    
+    Chem.SanitizeMol(obj)
+    Chem.DetectBondStereochemistry(obj, -1)
+    Chem.AssignStereochemistry(obj, flagPossibleStereoCenters=True, force=True)
+    Chem.AssignAtomChiralTagsFromStructure(obj, -1)
+    
     return smiles, obj
 
 ###################
