@@ -8,6 +8,7 @@ import copy
 from typing import Tuple
 # Import modules
 from cell2mol.cell_reconstruct import (getmolecs,identify_frag_molec_H,split_complexes_reassign_type,fragments_reconstruct,get_reference_molecules)#, compare_moleclist_refmoleclist)
+from cell2mol.cell_reconstruct import get_reference_molecules_simple
 from cell2mol.formal_charge import (drive_get_poscharges,classify_mols,balance_charge,build_bonds,prepare_mols,prepare_unresolved)
 from cell2mol.missingH import check_missingH
 from cell2mol.tmcharge_common import Cell
@@ -22,7 +23,8 @@ def get_refmoleclist_and_check_missingH(cell: object, reflabels: list, fracs: li
     refpos = frac2cart_fromparam(fracs, cell.cellparam)
 
     # Get ref.molecules --> output: a valid list of ref.molecules
-    refmoleclist, covalent_factor, metal_factor, Warning = get_reference_molecules(reflabels, refpos, debug=debug)
+    # refmoleclist, covalent_factor, metal_factor, Warning = get_reference_molecules(reflabels, refpos, debug=debug)
+    refmoleclist, covalent_factor, metal_factor, Warning = get_reference_molecules_simple (reflabels, refpos, debug=1)
     cell.warning_list.append(Warning)
 
     # Check missing hydrogens in ref.molecules

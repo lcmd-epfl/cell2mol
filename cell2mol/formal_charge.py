@@ -361,7 +361,9 @@ def drive_get_poscharges(unique_species: list, debug: int=0) -> Tuple[list, bool
             if debug >= 1: print("    ---------------")
             if debug >= 1: print("    #### Metal ####")
             if debug >= 1: print("    ---------------")
-            if debug >= 1: print("          ", spec[1].label, spec[1].coord_sphere)
+            if debug >= 1: print("          ", spec[1].label, "coordination_sphere\t", spec[1].coord_sphere)
+            if debug >= 1: print("          ", spec[1].label, "coordinating_atoms\t", spec[1].coordinating_atoms)
+
 
         # Gets possible Charges for Ligands and Other
         if spec[0] == "Other" or spec[0] == "Ligand":
