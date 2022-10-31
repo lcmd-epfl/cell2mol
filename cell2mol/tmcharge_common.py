@@ -147,6 +147,201 @@ def getconec(labels: list, pos: list, factor: float, radii="default") -> Tuple[i
     connec = np.zeros((natoms))
     mconmat = np.zeros((natoms, natoms))
     mconnec = np.zeros((natoms))
+
+
+    covalent_factor_for_metal = {
+        "H": 1.30,
+        "D": 1.30,
+        "He": 1.30,
+        "Li": 1.30,  
+        "Be": 1.30,  
+        "B": 1.15,
+        "C": 1.15,
+        "N": 1.25,
+        "O": 1.25,
+        "F": 1.15,
+        "Ne": 1.30,
+        "Na": 1.30,  
+        "Mg": 1.30,  
+        "Al": 1.30,
+        "Si": 1.10,
+        "P": 1.25,   
+        "S": 1.25,
+        "Cl": 1.25,
+        "Ar": 1.30,
+        "K": 1.30,  
+        "Ca": 1.30,
+        "Sc": 1.30,
+        "Ti": 1.30,
+        "V": 1.30,
+        "Cr": 1.30,
+        "Mn": 1.30,
+        "Fe": 1.30,
+        "Co": 1.30,
+        "Ni": 1.30,
+        "Cu": 1.30,
+        "Zn": 1.30,
+        "Ga": 1.30,
+        "Ge": 1.30,
+        "As": 1.15,
+        "Se": 1.15,
+        "Br": 1.25,
+        "Kr": 1.30,
+        "Rb": 1.30,
+        "Sr": 1.30,
+        "Y": 1.30,
+        "Zr": 1.30,
+        "Nb": 1.30,
+        "Mo": 1.30,
+        "Tc": 1.30,
+        "Ru": 1.30,
+        "Rh": 1.30,
+        "Pd": 1.30,
+        "Ag": 1.30,
+        "Cd": 1.30,
+        "In": 1.30,
+        "Sn": 1.30,
+        "Sb": 1.15,  
+        "Te": 1.15,  
+        "I": 1.25,
+        "Xe": 1.30,
+        "Cs": 1.30,
+        "Ba": 1.30,
+        "La": 1.30,
+        "Ce": 1.30,
+        "Pr": 1.30,
+        "Nd": 1.30,
+        "Pm": 1.30,
+        "Sm": 1.30,
+        "Eu": 1.30,
+        "Gd": 1.30,
+        "Tb": 1.30,
+        "Dy": 1.30,
+        "Ho": 1.30,
+        "Er": 1.30,
+        "Tm": 1.30,
+        "Yb": 1.30,
+        "Lu": 1.30,
+        "Hf": 1.30,
+        "Ta": 1.30,
+        "W": 1.30,
+        "Re": 1.30,
+        "Os": 1.30,
+        "Ir": 1.30,
+        "Pt": 1.30,
+        "Au": 1.30,
+        "Hg": 1.30,
+        "Tl": 1.30,
+        "Pb": 1.30,
+        "Bi": 1.30,
+        "Po": 1.30,
+        "At": 1.30,
+        "Rn": 1.30,
+        "Fr": 1.30,
+        "Ra": 1.30,
+        "Ac": 1.30,
+        "Th": 1.30,
+        "Pa": 1.30,
+        "U": 1.30,
+        "Np": 1.30,
+        "Pu": 1.30,
+        "Am": 1.30,
+        "Cm": 1.30,
+        "Bk": 1.30,
+        "Cf": 1.30,
+        "Es": 1.30,
+        "Fm": 1.30,
+        "Md": 1.30,
+        "No": 1.30,
+        "Lr": 1.30,
+        "Rf": 1.30,
+        "Db": 1.30,
+        "Sg": 1.30,
+        "Bh": 1.30,
+        "Hs": 1.30,
+        "Mt": 1.30,
+    }
+
+
+    # Sometimes argument radii np.ndarry, or list
+    with warnings.catch_warnings():
+        warnings.simplefilter(action="ignore", category=FutureWarning)
+        if radii == "default":
+            radii = getradii(labels)
+
+    for i in range(0, natoms - 1):
+        for j in range(i, natoms):
+            if i != j:
+                # print(i,j)
+                a = np.array(pos[i])
+                b = np.array(pos[j])
+                dist = np.linalg.norm(a - b)
+                
+                if (
+                        elemdatabase.elementblock[labels[i]] != "d"
+                        and elemdatabase.elementblock[labels[i]] != "f"
+                        and elemdatabase.elementblock[labels[j]] != "d"
+                        and elemdatabase.elementblock[labels[j]] != "f"
+                    ):
+
+                        thres = (radii[i] + radii[j]) * factor
+
+                elif (
+                        elemdatabase.elementblock[labels[i]] == "d"
+                        or elemdatabase.elementblock[labels[i]] == "f"
+                        or elemdatabase.elementblock[labels[j]] == "d"
+                        or elemdatabase.elementblock[labels[j]] == "f"
+                    ):
+                        factor_i = covalent_factor_for_metal[labels[i]]
+                        factor_j = covalent_factor_for_metal[labels[j]]
+
+                        if factor_i < factor_j  :
+                            new_factor = factor_i
+                        
+                        elif factor_i == factor_j :
+                            new_factor = factor_i
+
+                        else : 
+                            new_factor = factor_j
+                        #print(factor_i, factor_j, new_factor, labels[i], labels[j])
+                        thres = (radii[i] + radii[j]) * new_factor
+
+                if dist <= clash:
+                    status = 0  # invalid molecule
+                    print("GETCONEC: Distance", dist, "smaller than clash for atoms", i, j)
+                elif dist <= thres:
+                    conmat[i, j] = 1
+                    conmat[j, i] = 1
+                    if (
+                        elemdatabase.elementblock[labels[i]] == "d"
+                        or elemdatabase.elementblock[labels[i]] == "f"
+                        or elemdatabase.elementblock[labels[j]] == "d"
+                        or elemdatabase.elementblock[labels[j]] == "f"
+                    ):
+                        mconmat[i, j] = 1
+                        mconmat[j, i] = 1
+
+    for i in range(0, natoms):
+        connec[i] = np.sum(conmat[i, :])
+        mconnec[i] = np.sum(mconmat[i, :])
+
+    conmat = conmat.astype(int)
+    mconmat = mconmat.astype(int)
+    connec = connec.astype(int)
+    mconnec = mconnec.astype(int)
+    # return status, np.array(conmat), np.array(connec), np.array(mconmat), np.array(mconnec)
+    return status, conmat, connec, mconmat, mconnec
+
+
+####################################
+def getconec_original(labels: list, pos: list, factor: float, radii="default") -> Tuple[int, list, list, list, list]:
+    status = 1  # good molecule, no clashes yet
+    clash = 0.3
+    natoms = len(labels)
+    conmat = np.zeros((natoms, natoms))
+    connec = np.zeros((natoms))
+    mconmat = np.zeros((natoms, natoms))
+    mconnec = np.zeros((natoms))
     # Sometimes argument radii np.ndarry, or list
     with warnings.catch_warnings():
         warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -186,7 +381,6 @@ def getconec(labels: list, pos: list, factor: float, radii="default") -> Tuple[i
     mconnec = mconnec.astype(int)
     # return status, np.array(conmat), np.array(connec), np.array(mconmat), np.array(mconnec)
     return status, conmat, connec, mconmat, mconnec
-
 
 def inv(perm: list) -> list:
     inverse = [0] * len(perm)
@@ -333,7 +527,7 @@ class atom(object):
     # Adjacency part is simultaneously to creating the ligand or molecule object
     ### Changed in V14
     def adjacencies(self, conmat: np.ndarray, mconmat: np.ndarray, type: str="Molecule") -> None:
-        self.adjacency = []
+        self.adjacency = []  
         self.metal_adjacency = []
 
         self.connec = np.sum(conmat)
@@ -552,8 +746,11 @@ class ligand(object):
         for i in range(0, self.natoms):
             self.connec[i] = np.sum(self.conmat[i, :])
 
+        # For ligand, mconmat is all zero np.ndarray --> not used, Can I remove? 
+        # so metal_adjacency in Class atom is also empty because mconmat doesn't contain metal-ligand connectivity
+        self.mconmat = np.zeros((self.natoms, self.natoms)).astype(int) 
+
         self.mconnec = mconnec
-        self.mconmat = np.zeros((self.natoms, self.natoms)).astype(int)
         self.totconnec = int(np.sum(self.connec))
         self.totmconnec = int(np.sum(self.mconnec))
         self.adjtypes = get_adjacency_types(self.labels, self.conmat)  # V14
