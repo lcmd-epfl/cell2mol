@@ -5,6 +5,7 @@ cell2mol: Unit Cell to Molecule Interpretation
 
 ## Contents
 * [About](#about-)
+* [Citation](#citation-)
 * [Install](#install-)
 * [Examples](#examples-)
 * [Errors](#errors-)
@@ -33,6 +34,14 @@ For portability, we provide an exemplary conda environment in `environment.yml` 
 `conda env create -f environment.yml`
 
 Afterwards, the created environment can be activated and the following steps should proceed smoothly. We also provide a `requirements.txt` file that should streamline virtual environment creation with pip, if desired.
+
+## Citation [↑](#citation)
+
+If you use cell2mol, please cite:
+
+```
+Vela, S., Laplaza, R., Cho, Y. et al. cell2mol: encoding chemistry to interpret crystallographic data. npj Comput Mater 8, 188 (2022). https://doi.org/10.1038/s41524-022-00874-9
+```
 
 ## Install [↑](#install)
 
