@@ -500,6 +500,21 @@ def get_poscharges(spec: list, debug: int=0) -> Tuple[list, bool]:
                 if debug >= 2: print(f"    POSCHARGE. poscharge added with smiles: {c.smiles}") 
 
     ##############################
+    #### Evaluates possible charges except if the ligand is a azide (N3-) ion
+    ##############################               
+    elif spec[0] == "Ligand" and spec[1].natoms == 3 and len(np.unique(spec[1].labels)) == 1 and "N" in np.unique(spec[1].labels):
+        poscharge = -1 
+        # metal-coordinating N charge +1
+        # The other two N atoms charge -1
+    ##############################
+    #### Evaluates possible charges except if the ligand is a triiodide (I3-) ion
+    ##############################               
+    elif spec[0] == "Ligand" and spec[1].natoms == 3 and len(np.unique(spec[1].labels)) == 1 and "I" in np.unique(spec[1].labels):
+        poscharge = -1 
+        # metal-coordinating I charge -1
+        # The other two I atoms charge 0
+
+    ##############################
     # If not a Nitrosyl ligand, choose among the charge_states for this protonation
     ##############################
     else:

@@ -167,7 +167,7 @@ def check_missingH(refmoleclist: list, debug: int=0):
     Warning = False
 
     # List of Metal Atoms for which O atoms might appear connected directly.
-    Exceptions_for_CoordWater = ["Re"]
+    Exceptions_for_CoordWater = ["Re", "V", "Mo", "W"]
 
     if debug >= 2: print("")
     if debug >= 2: print("##################")
