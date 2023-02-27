@@ -242,7 +242,7 @@ def test_check_cell_vs_data():
         "O",
     ]
     assert np.allclose(
-        cell.pos,
+        cell.atom_coord,
         np.array(
             [
                 [11.8345549, 8.3225561, 13.3768394],

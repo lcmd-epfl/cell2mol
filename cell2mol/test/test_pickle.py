@@ -38,14 +38,14 @@ def test_check_info_vs_pickle(refcode):
     print(result.cellvec)
     print(result.cellparam)
     print(result.labels)
-    print(result.pos)
+    print(result.atom_coord)
     print(result.warning_list)
 
     assert cell.refcode == result.refcode
     assert cell.cellvec == result.cellvec
     assert cell.cellparam == result.cellparam
     assert cell.labels == result.labels
-    assert np.allclose(cell.pos, result.pos)
+    assert np.allclose(cell.atom_coord, result.atom_coord)
     assert cell.warning_list == result.warning_list
     assert cell.warning_after_reconstruction == result.warning_after_reconstruction
 
