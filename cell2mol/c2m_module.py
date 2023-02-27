@@ -11,7 +11,7 @@ from cell2mol.cell_reconstruct import (getmolecs,identify_frag_molec_H,split_com
 from cell2mol.cell_reconstruct import get_reference_molecules_simple
 from cell2mol.formal_charge import (drive_get_poscharges,classify_mols,balance_charge,build_bonds,prepare_mols,prepare_unresolved)
 from cell2mol.missingH import check_missingH
-from cell2mol.tmcharge_common import Cell
+from cell2mol.tmcharge_common import cell
 from cell2mol.cellconversions import frac2cart_fromparam
 from cell2mol.readwrite import readinfo
 from typing import Tuple
@@ -55,7 +55,7 @@ def reconstruct(cell: object, reflabels: list, fracs: list, debug: int=0) -> obj
 
     # Get blocks in the unit cells constructing the adjacency matrix (A)
     if not any(cell.warning_list):
-        Warning, blocklist = getmolecs(cell.labels, cell.pos, covalent_factor, metal_factor, debug=debug)
+        Warning, blocklist = getmolecs(cell.labels, cell.atom_coord, covalent_factor, metal_factor, atlist=[], debug=debug)
         cell.warning_list.append(Warning)
 
     # Indentify blocks and Reconstruct Fragments
@@ -66,6 +66,7 @@ def reconstruct(cell: object, reflabels: list, fracs: list, debug: int=0) -> obj
         
     # Split Complexes and Reassign Type
     if not any(cell.warning_list):
+
         cell = split_complexes_reassign_type(cell, moleclist, debug=debug)
   
         if debug >= 2: 
@@ -225,12 +226,12 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, debug: i
 
         # Initialize cell object
         warning_list = []
-        cell = Cell(refcode, labels, pos, cellvec, cellparam, warning_list)
-        if debug >= 1: print("[Refcode]", cell.refcode)
+        newcell = cell(refcode, labels, pos, cellvec, cellparam, warning_list)
+        if debug >= 1: print("[Refcode]", newcell.refcode)
 
         # Cell Reconstruction
         if debug >= 1: print("===================================== step 1 : Cell reconstruction =====================================\n")
-        cell = reconstruct(cell, ref_labels, ref_fracs, debug=debug)
+        newcell = reconstruct(newcell, ref_labels, ref_fracs, debug=debug)
         tend = time.time()
         if debug >= 1: print(f"\nTotal execution time for Cell Reconstruction: {tend - tini:.2f} seconds")
 
@@ -238,12 +239,12 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, debug: i
         if debug >= 1: print("\n***Runing only Charge Assignment***")
         if debug >= 1: print("\nCell object loaded with pickle")
         cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(refcode))
-        cell = load_cell_reset_charges(cellpath)
+        newcell = load_cell_reset_charges(cellpath)
     else:
         if debug >= 1: print("Step number is incorrect. Only values 1, 2 or 3 are accepted")
         sys.exit(1)
 
-    if not any(cell.warning_after_reconstruction):
+    if not any(newcell.warning_after_reconstruction):
         if step == 1 or step == 3:
             if debug >= 1: print("Cell reconstruction successfully finished.\n")
         elif step == 2:
@@ -255,23 +256,23 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, debug: i
             # Charge Assignment
             tini_2 = time.time()
             if debug >= 1: print("===================================== step 2 : Charge Assignment =======================================\n")
-            cell = determine_charge(cell, debug=debug)
+            newcell = determine_charge(newcell, debug=debug)
             tend_2 = time.time()
             if debug >= 1: print(f"\nTotal execution time for Charge Assignment: {tend_2 - tini_2:.2f} seconds")
 
-            if not any(cell.warning_list):
+            if not any(newcell.warning_list):
                 if debug >= 1: print("Charge Assignment successfully finished.\n")
-                if debug >= 1: cell.print_charge_assignment()
-                if debug >= 1: cell.print_Warning()
+                if debug >= 1: newcell.print_charge_assignment()
+                if debug >= 1: newcell.print_Warning()
             else:
                 if debug >= 1: print("Charge Assignment failed.\n")
-                if debug >= 1: cell.print_Warning()
+                if debug >= 1: newcell.print_Warning()
     else:
         if step == 1 or step == 3:
             if debug >= 1: print("Cell reconstruction failed.\n")
         elif step == 2:
             if debug >= 1: print("Warnings in loaded Cell object\n")
-        if debug >= 1: cell.print_Warning()
+        if debug >= 1: newcell.print_Warning()
         if debug >= 1: print("Cannot proceed step 2 Charge Assignment")
 
-    return cell
+    return newcell

@@ -543,7 +543,7 @@ def correct_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2)
       
 
 #######################################################
-def getmolecs(labels: list, pos: list, factor: float=1.3, metal_factor: float=1.0, debug: int=0) -> Tuple[bool, list]:
+def getmolecs(labels: list, pos: list, factor: float=1.3, metal_factor: float=1.0, atlist: list=[], debug: int=0) -> Tuple[bool, list]:
     ##Simplified Version of the getmolecs
     ## Function that identifies connected groups of atoms from their positions and labels.
     #:return mlist. List of molecules saved as objects
@@ -606,7 +606,10 @@ def getmolecs(labels: list, pos: list, factor: float=1.3, metal_factor: float=1.
 
             for i in range(0, len(atomlistperm)):
                 if atomlistperm[i] == b + 1:
-                    fraglist.append(i)
+                    if len(atlist) == len(labels): 
+                        fraglist.append(atlist[i])
+                    else: 
+                        fraglist.append(i)
                     labelist.append(labels[i])
                     poslist.append(pos[i])
                     radiilist.append(radii[i])
@@ -1350,28 +1353,31 @@ def merge_fragments(fraglist: list, listofids: list, reflist: list, cellvec: lis
 
             reccoord = []
             reclabels = []
+            recatlist = [] ## atlist
+
             reccoord.extend(fraglist[listofids[keep]].coord)
             reclabels.extend(fraglist[listofids[keep]].labels)
+            recatlist.extend(fraglist[listofids[keep]].atlist)  ## atlist
 
             for kdx, mol in enumerate(tmol):
                 reclabels.extend(fraglist[listwithoutkeep[kdx]].labels)
+                recatlist.extend(fraglist[listwithoutkeep[kdx]].atlist)
                 if mol != (0, 0, 0):
                     # indicates that the molecule needs translation in direction defined by "tma"
-                    newcoord = translate(
-                        mol, fraglist[listwithoutkeep[kdx]].coord, cellvec
-                    )
+                    newcoord = translate(mol, fraglist[listwithoutkeep[kdx]].coord, cellvec)
                     if len(newcoord) != len(fraglist[listwithoutkeep[kdx]].coord):
                         print("error 1 in Reconstruct")
                     reccoord.extend(newcoord)
                 if mol == (0, 0, 0):
                     reccoord.extend(fraglist[listwithoutkeep[kdx]].coord)
 
-            Warning, reclist = getmolecs(reclabels, reccoord, factor, metal_factor)
+            Warning, reclist = getmolecs(reclabels, reccoord, factor, metal_factor, atlist=recatlist)
             if len(reclist) == 1:
                 status = checkchemistry(reclist[0], reflist, "Max")
                 break
     else:
         reclist = []
+
 
     return status, reclist
 
@@ -1591,7 +1597,16 @@ def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -
                         + str(mol.metalist.index(met))
                     )
 
+
+
+
     cell.moleclist = moleclist
+
+    coord = [None] * cell.natoms # Atom coordinate after cell reconstruction
+    for mol in cell.moleclist:
+        for z in zip(mol.atlist, mol.coord):
+            coord[z[0]] = z[1]
+    cell.coord = coord
 
     return cell
 
@@ -1605,7 +1620,7 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
     if hapticity == False :
         
         for met in metalist:
-            
+
             positions=[]
             symbols=[]
             connectivity=[]    
@@ -1635,17 +1650,16 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
             for idx, rg in enumerate(ref_geom[:,0]):
                 shp_measure = geometry.get_shape_measure(rg, central_atom=1)
                 geom = ref_geom[:,3][idx]
-                posgeom_dev[geom]=round(shp_measure, 3)
+                posgeom_dev[geom]=round(shp_measure, 3)      
 
             met.coordination (hapticity, posgeom_dev) 
 
-
-
-        if debug >= 1 :
-            for met in metalist:
+            if debug >= 1 :
+                print(met.label)
                 print (f"Coordination number : {met.coordination_number} {met.posgeom_dev}")
                 print(f"The most likely geometry : '{met.geometry}' with deviation value {met.deviation} (hapticity : {met.hapticity})")
-                print("")
+                print("")      
+
 
 
     else :

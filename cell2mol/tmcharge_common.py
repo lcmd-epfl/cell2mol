@@ -822,7 +822,7 @@ class metal(object):
 ##############
 #### CELL ####
 ##############
-class Cell(object):
+class cell(object):
     def __init__(self, refcode: str, labels: list, pos: list, cellvec: list, cellparam: list, warning_list: list) -> None:
 
         self.version = "V1.0"
@@ -831,8 +831,11 @@ class Cell(object):
         self.cellvec = cellvec
         self.cellparam = cellparam
 
-        self.labels = labels  # original_cell_labels
-        self.pos = pos  # original_cell_pos
+        self.labels = labels 
+        self.atom_coord = pos  # Atom cartesian coordinates from info file
+        
+        self.natoms = len(labels)
+        self.coord = [] 
 
         self.speclist = []
         self.refmoleclist = []
