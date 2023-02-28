@@ -1205,7 +1205,7 @@ def combine(tobeallocated: list, references: list, cellvec: list, threshold_tmat
                         available[m] = 0
 
                     if newmoleclist[0].natoms != mergedatoms:
-                        if debug >= 2: print("COMBINE WARNING: I sent",mergedatoms,"atoms but received a molecule with",newmoleclist[0].natoms
+                        if debug >= 2: print("COMBINE WARNING: I sent",mergedatoms,"atoms but received a molecule with",newmoleclist[0].natoms)
 
                     number = 0
                     newmolec = newmoleclist[0]
