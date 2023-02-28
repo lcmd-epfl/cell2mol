@@ -279,11 +279,7 @@ def metalcoordcheck(label: str, coordination: int, debug: int=0) -> Tuple[bool, 
     coordnum[80] = [2, 3, 4, 5]  # Hg
 
     if len(coordnum[atnum]) == 0:
-        print(
-            "Metalcoordcheck function: Atom with label",
-            label,
-            "has an empty list of possible coordination",
-        )
+        print("Metalcoordcheck function: Atom with label",label,"has an empty list of possible coordination")
     else:
         if any((coordination == c) for c in coordnum[atnum]):
             good = True
@@ -305,14 +301,7 @@ def metalcoordcheck(label: str, coordination: int, debug: int=0) -> Tuple[bool, 
             good = False
             increase = True
             decrease = False
-        else:
-            print(
-                "Metalcoordcheck function: Atom with label",
-                label,
-                "has strange coordination value:",
-                coordination,
-                coordnum[atnum],
-            )
+        else: print("Metalcoordcheck function: Atom with label",label,"has strange coordination value:",coordination,coordnum[atnum])
 
     return good, increase, decrease
 
@@ -1005,18 +994,12 @@ def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: fl
         STOP = False
         Last_Attempt = False
 
-        if niter > 1:
-            Frag2_toallocate += 1
-
-        if (
-            Frag2_toallocate > len(list2) - 1
-        ):  # Reaches the end of the second list. Restarts it and moves forward in the first list
+        if niter > 1: Frag2_toallocate += 1
+        if (Frag2_toallocate > len(list2) - 1):  # Reaches the end of the second list. Restarts it and moves forward in the first list
             Frag1_toallocate += 1
             Frag2_toallocate = 0
 
-        if (
-            Frag1_toallocate > len(list1) - 1
-        ):  # Reaches the end of the first list. Restarts both
+        if (Frag1_toallocate > len(list1) - 1):  # Reaches the end of the first list. Restarts both
             Frag1_toallocate = 0
             Frag2_toallocate = 0
 
@@ -1025,31 +1008,16 @@ def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: fl
                 Frag2_toallocate += 1
 
         if typ == "Heavy":
-            if (Frag1_toallocate >= len(list1) - 1) and (
-                Frag2_toallocate >= len(list2) - 2
-            ):
-                STOP = True
+            if (Frag1_toallocate >= len(list1) - 1) and (Frag2_toallocate >= len(list2) - 2):  STOP = True
         elif typ == "All":
-            if (Frag1_toallocate >= len(list1) - 1) and (
-                Frag2_toallocate >= len(list2) - 1
-            ):
-                STOP = True
+            if (Frag1_toallocate >= len(list1) - 1) and (Frag2_toallocate >= len(list2) - 1):  STOP = True
         #################
 
         #################
         #  This part handles sublist, keeplist1 and keeplist2. They are necessary to handle the results of the function "Combine", which is called later.
         #################
-        if debug >= 2:
-            print(" ")
-        if debug >= 2:
-            print(
-                "Fragments to allocate this iteration:",
-                Frag1_toallocate,
-                Frag2_toallocate,
-                "out of",
-                len(list1) - 1,
-                len(list2) - 1,
-            )
+        if debug >= 2: print(" ")
+        if debug >= 2: print("Fragments to allocate this iteration:",Frag1_toallocate,Frag2_toallocate,"out of",len(list1) - 1,len(list2) - 1)
 
         sublist = []
         keeplist1 = []
@@ -1081,45 +1049,15 @@ def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: fl
         #  This part evaluates that the fragments that are going to be combined, can form one of the reference molecules. The resulting number of atoms is used.
         #################
         if list1[Frag1_toallocate].natoms + list2[Frag2_toallocate].natoms > maxatoms:
-            if debug >= 2:
-                print(
-                    "SEQUENTIAL",
-                    typ,
-                    "SKIPPED",
-                    list1[Frag1_toallocate].natoms,
-                    "and",
-                    list2[Frag2_toallocate].natoms,
-                )
+            if debug >= 2: print("SEQUENTIAL",typ,"SKIPPED",list1[Frag1_toallocate].natoms,"and",list2[Frag2_toallocate].natoms
         else:
-            if debug >= 2:
-                print(
-                    "SEQUENTIAL",
-                    typ,
-                    "iteration",
-                    niter,
-                    "with",
-                    len(list1),
-                    "and",
-                    len(list2),
-                    "Remaining in each list",
-                )
-            if debug >= 2:
-                print(
-                    "SEQUENTIAL",
-                    typ,
-                    "sending",
-                    list1[Frag1_toallocate].labels,
-                    "and",
-                    list2[Frag2_toallocate].labels,
-                    "to combine",
-                )
+            if debug >= 2: print("SEQUENTIAL",typ,"iteration",niter,"with",len(list1),"and",len(list2),"Remaining in each list"
+            if debug >= 2: print("SEQUENTIAL",typ,"sending",list1[Frag1_toallocate].labels,"and",list2[Frag2_toallocate].labels,"to combine")
 
             #################
             #  Here, the function "combine" is called. It will try cell translations of one fragment, and check whether it eventually combines with the second fragment into either a bigger fragment or a molecule
             #################
-            goodlist, avglist, badlist = combine(
-                sublist, refmoleclist, cellvec, threshold_tmat, factor, metal_factor
-            )
+            goodlist, avglist, badlist = combine(sublist, refmoleclist, cellvec, threshold_tmat, factor, metal_factor)
 
             #################
             #  This part handles the results of combine
@@ -1260,22 +1198,14 @@ def combine(tobeallocated: list, references: list, cellvec: list, threshold_tmat
                     goodcombination = False
 
             if goodcombination:
-                found, newmoleclist = merge_fragments(
-                    tobeallocated, mergelist, references, cellvec, factor, metal_factor
-                )
+                found, newmoleclist = merge_fragments(tobeallocated, mergelist, references, cellvec, factor, metal_factor)
 
                 if found == 1:
                     for m in mergelist:
                         available[m] = 0
 
                     if newmoleclist[0].natoms != mergedatoms:
-                        if debug >= 2:
-                            print(
-                                "COMBINE WARNING: I sent",
-                                mergedatoms,
-                                "atoms but received a molecule with",
-                                newmoleclist[0].natoms,
-                            )
+                        if debug >= 2: print("COMBINE WARNING: I sent",mergedatoms,"atoms but received a molecule with",newmoleclist[0].natoms
 
                     number = 0
                     newmolec = newmoleclist[0]
@@ -1288,37 +1218,25 @@ def combine(tobeallocated: list, references: list, cellvec: list, threshold_tmat
                     #   - Molec or Complex
                     shit = 0
                     for ref in references:
-                        if (
-                            ref.elemcountvec == newmolec.elemcountvec
-                        ).all() and shit == 0:
+                        if (ref.elemcountvec == newmolec.elemcountvec).all() and shit == 0:
                             if (ref.adjtypes == newmolec.adjtypes).all():
                                 shit = 1
                                 newmolec.type = ref.type
                                 goodlist.append(newmolec)
-                                if debug >= 2:
-                                    print(
-                                        "COMBINE: Fragment",
-                                        newmolec.labels,
-                                        "added to goodlist",
-                                    )
+                                if debug >= 2: print("COMBINE: Fragment",newmolec.labels,"added to goodlist")
                     if shit == 0:
                         newmolec.type = "Rec. Fragment"
                         avglist.append(newmolec)
-                        if debug >= 2:
-                            print(
-                                "COMBINE: Fragment", newmolec.labels, "added to avglist"
-                            )
+                        if debug >= 2: print("COMBINE: Fragment", newmolec.labels, "added to avglist")
 
         else:
             for kdx, a in enumerate(available):
-                if a == 1:
-                    badlist.append(tobeallocated[kdx])
+                if a == 1: badlist.append(tobeallocated[kdx])
             break
 
         if idx == len(combinations) - 1:
             for kdx, a in enumerate(available):
-                if a == 1:
-                    badlist.append(tobeallocated[kdx])
+                if a == 1: badlist.append(tobeallocated[kdx])
             break
 
     return goodlist, avglist, badlist
@@ -1566,9 +1484,7 @@ def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -
         for mol in moleclist:
             mol.type = assigntype(mol, cell.refmoleclist)
             mol.refcode = cell.refcode
-            mol.name = str(
-                cell.refcode + "_" + mol.type + "_" + str(moleclist.index(mol))
-            )
+            mol.name = str(cell.refcode + "_" + mol.type + "_" + str(moleclist.index(mol)))
             if mol.type == "Complex":
                 for lig in mol.ligandlist:
                     lig.refcode = cell.refcode
@@ -1597,9 +1513,6 @@ def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -
                         + str(mol.metalist.index(met))
                     )
 
-
-
-
     cell.moleclist = moleclist
 
     coord = [None] * cell.natoms # Atom coordinate after cell reconstruction
@@ -1616,11 +1529,9 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
     # Get coordination geomery in case that there is no hapticity in TM complexes
     # Find the cloest geometry using Shape measurment in cosymlib https://cosymlib.readthedocs.io/en/latest/
 
-
     if hapticity == False :
         
         for met in metalist:
-
             positions=[]
             symbols=[]
             connectivity=[]    
@@ -1660,13 +1571,10 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
                 print(f"The most likely geometry : '{met.geometry}' with deviation value {met.deviation} (hapticity : {met.hapticity})")
                 print("")      
 
-
-
     else :
         posgeom_dev = {}
         for met in metalist:
             met.coordination (hapticity, posgeom_dev) 
-
     
     return metalist
 
@@ -1829,7 +1737,6 @@ def get_hapticity_ligand (lig: object, debug: int=0) -> bool:
                     lig.hapttype.append(typ)
     else:
         lig.hapticity = False
-
 
     return lig
 

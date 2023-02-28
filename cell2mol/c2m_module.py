@@ -274,5 +274,7 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, debug: i
             if debug >= 1: print("Warnings in loaded Cell object\n")
         if debug >= 1: newcell.print_Warning()
         if debug >= 1: print("Cannot proceed step 2 Charge Assignment")
+   
+    if not any(newcell.warning_list): newcell.arrange_cell_coord()
 
     return newcell
