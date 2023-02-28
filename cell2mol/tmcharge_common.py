@@ -845,6 +845,17 @@ class cell(object):
 
         self.charge_distribution_list = []
    
+    def arrange_cell_coord(self): 
+        ## Updates the cell coordinates preserving the original atom ordering
+        ## Do do so, it uses the variable atlist stored in each molecule
+        self.coord = np.zeros((self.natoms,3))
+        for mol in self.moleclist:
+            for z in zip(mol.atlist, mol.coord):
+                for i in range(0,3):
+                    self.coord[z[0]][i] = z[1][i]
+        self.coord = np.ndarray.tolist(self.coord)
+
+
     def data_for_postproc(self, molecules, indices, options):
         self.pp_molecules = molecules
         self.pp_indices = indices
