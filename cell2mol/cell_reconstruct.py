@@ -1049,7 +1049,7 @@ def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: fl
         #  This part evaluates that the fragments that are going to be combined, can form one of the reference molecules. The resulting number of atoms is used.
         #################
         if list1[Frag1_toallocate].natoms + list2[Frag2_toallocate].natoms > maxatoms:
-            if debug >= 2: print("SEQUENTIAL",typ,"SKIPPED",list1[Frag1_toallocate].natoms,"and",list2[Frag2_toallocate].natoms
+            if debug >= 2: print("SEQUENTIAL",typ,"SKIPPED",list1[Frag1_toallocate].natoms,"and",list2[Frag2_toallocate].natoms)
         else:
             if debug >= 2: print("SEQUENTIAL",typ,"iteration",niter,"with",len(list1),"and",len(list2),"Remaining in each list"
             if debug >= 2: print("SEQUENTIAL",typ,"sending",list1[Frag1_toallocate].labels,"and",list2[Frag2_toallocate].labels,"to combine")
