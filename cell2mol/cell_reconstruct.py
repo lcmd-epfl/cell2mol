@@ -1051,7 +1051,7 @@ def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: fl
         if list1[Frag1_toallocate].natoms + list2[Frag2_toallocate].natoms > maxatoms:
             if debug >= 2: print("SEQUENTIAL",typ,"SKIPPED",list1[Frag1_toallocate].natoms,"and",list2[Frag2_toallocate].natoms)
         else:
-            if debug >= 2: print("SEQUENTIAL",typ,"iteration",niter,"with",len(list1),"and",len(list2),"Remaining in each list"
+            if debug >= 2: print("SEQUENTIAL",typ,"iteration",niter,"with",len(list1),"and",len(list2),"Remaining in each list")
             if debug >= 2: print("SEQUENTIAL",typ,"sending",list1[Frag1_toallocate].labels,"and",list2[Frag2_toallocate].labels,"to combine")
 
             #################
