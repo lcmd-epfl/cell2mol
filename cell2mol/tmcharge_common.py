@@ -798,8 +798,8 @@ class metal(object):
     def charge(self, metal_charge: int) -> None:
         self.totcharge = metal_charge
 
-    def magnetism(self, spin):
-        self.spin = spin
+    # def magnetism(self, spin):
+    #     self.spin = spin
 
     def adjacencies(self, mconnec: np.ndarray) -> None:
         self.mconnec = mconnec  # adjacencies matrix with only metal bonds
@@ -866,7 +866,7 @@ class cell(object):
         print("[Ref.code] : {}".format(self.refcode))
         for unit in self.moleclist:
             if unit.type == "Complex":
-                print("\n{}, totcharge {}".format(unit.type, unit.totcharge))
+                print("\n{}, totcharge {}, spin multiplicity {}".format(unit.type, unit.totcharge, unit.spin))
                 for metal in unit.metalist:
                     print("\t Metal: {} charge {}".format(metal.label, metal.totcharge))
                 for ligand in unit.ligandlist:
