@@ -33,7 +33,10 @@ with open(pwd + "/" + gmolfile, "rb") as pickle_file:
          
         if mol.type == "Other":
             namexyz = mol.refcode+"_spec_"+str(idx)+".xyz"
-            writexyz(pwd, namexyz, mol.labels, mol.coord)
+            if hasattr(mol, "totcharge") and hasattr(mol, "spin"): 
+                writexyz(pwd, namexyz, mol.labels, mol.coord, mol.totcharge, mol.spin)
+            else :
+                writexyz(pwd, namexyz, mol.labels, mol.coord)
     
             namemol = mol.refcode+"_spec_"+str(idx)
             print_molecule(mol, namemol, "gmol", pwd)
