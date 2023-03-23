@@ -216,13 +216,17 @@ def load_cell_reset_charges (cellpath: str, debug: int=0) -> object:
 
 ##################################################################################
 def assign_spin (cell: object, debug: int=0) -> object:
-    if debug >= 1: print("\n[Assign spin multiplicity]")
+    if debug >= 1: 
+        print("#########################################")
+        print("Assigning spin multiplicity")
+        print("#########################################")    
 
     for mol in cell.moleclist:
         if mol.type == "Complex":
             if len(mol.metalist) == 1: # mono-metallic complexes
                 N = count_N(mol)
                 met = mol.metalist[0]
+                
                 # count valence electrons
                 elec = count_elec(met.label, met.totcharge)
                 
@@ -238,14 +242,16 @@ def assign_spin (cell: object, debug: int=0) -> object:
                 nitrosyl = count_nitrosyl(np.array(arr, dtype=object))
                 if debug >= 2: print(np.array(arr, dtype=object))
                 if debug >= 2: print(f"{nitrosyl=}")
-                # predict spin state
-                if debug >= 2: print("met.label, elec, met.coordinating_atoms, met.geometry, met.coordination_number, N, nitrosyl")
-                if debug >= 2: print(met.label, elec, met.coordinating_atoms, met.geometry, met.coordination_number, N, nitrosyl)
-                try:
+                
+                # predict spin state            
+                if met.hapticity == False:
                     spin = predict_ground_state_spin (met.label, elec, met.coordinating_atoms, met.geometry, met.coordination_number, N, nitrosyl)
-                    met.magnetism(spin)
                     mol.magnetism(spin)
-                except:
+                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
+                    if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
+                    if debug >= 1: print(f"met_OS={met.totcharge} valence_{elec=} {N=} {nitrosyl=}\n")
+
+                else:
                     if count_N(mol) % 2 == 0:
                         mol.magnetism(1) # spin multiplicity = 1 Singlet
                     else:
@@ -262,19 +268,28 @@ def assign_spin (cell: object, debug: int=0) -> object:
                         lig.magnetism(1) 
                     else:
                         lig.magnetism(2) 
+
         else: # mol.type == "Other" or "Ligand"
             if count_N(mol) % 2 == 0:
-                mol.magnetism(1) # spin multiplicity = 1 Singlet
+                mol.magnetism(1) 
             else:
-                mol.magnetism(2) # spin multiplicity = 2 Doublet
+                mol.magnetism(2) 
 
     if debug >= 1: 
         for mol in cell.moleclist:
-            print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
-            if mol.type == "Complex": 
+            if mol.type == "Complex":
+                print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
                 for lig in mol.ligandlist:
-                    print(f"{lig.formula=}, {lig.spin=}")
-            print("")
+                    if lig.natoms != 1:
+                        print(f"\t{lig.formula=}, {lig.spin=}")
+                    else :
+                        print(f"\t{lig.formula=}")
+            else :
+                if mol.natoms != 1:
+                    print(f"{mol.type=}, {mol.formula=}, {mol.spin=}") 
+                else :
+                    print(f"{mol.type=}, {mol.formula=}")
+
     return cell
 
 ##################################################################################

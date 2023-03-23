@@ -814,9 +814,9 @@ class metal(object):
             self.geometry=min(posgeom_dev, key=posgeom_dev.get)
             self.deviation=min(posgeom_dev.values())
         else:
-            self.coordination_number=""
-            self.posgeom_dev={}
-            self.geometry=""
+            self.coordination_number=len(self.coordinating_atoms)
+            self.posgeom_dev=posgeom_dev
+            self.geometry="haptic ligand(s) binding"
             self.deviation=""
 
 ##############

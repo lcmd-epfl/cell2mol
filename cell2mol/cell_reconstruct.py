@@ -503,7 +503,18 @@ def correct_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2)
                     print(f"Excluded {atom.label} from {metal.coordinating_atoms}")
     else :
         if debug >= 1 : 
-            print(f"Ligand hapticity is True {lig.hapttype} => Do not find metal-coordinating atoms")
+            print(f"Ligand hapticity is True {lig.hapttype}")
+            # print(f"Ligand hapticity is True {lig.hapttype} => Do not find metal-coordinating atoms")
+
+        idx_list = [index for index, value in enumerate(lig.mconnec) if value >= 1] 
+
+        for i in idx_list:
+            atom = lig.atoms[i] 
+            tgt, apos, dist = find_closest_metal(atom, metalist)
+            metal = metalist[tgt]
+
+            if debug >= 1 : 
+                print(">>> metal-coordinating atoms", atom.label, "\tMetal :", metal.label, metal.coordinating_atoms)#, metal.totmconnec, metal.mconnec, atom.adjacency, atom.mconnec, atom.coord)
 
         # Generate index list of metal-coordinating atoms    
         idx_list = [index for index, value in enumerate(lig.mconnec) if value >= 1] 
@@ -1566,7 +1577,7 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
             met.coordination (hapticity, posgeom_dev) 
 
             if debug >= 1 :
-                print(met.label)
+                print(f"Metal : {met.label}")
                 print (f"Coordination number : {met.coordination_number} {met.posgeom_dev}")
                 print(f"The most likely geometry : '{met.geometry}' with deviation value {met.deviation} (hapticity : {met.hapticity})")
                 print("")      
@@ -1575,7 +1586,12 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
         posgeom_dev = {}
         for met in metalist:
             met.coordination (hapticity, posgeom_dev) 
-    
+            
+            if debug >= 1 :
+                print(f"Metal : {met.label}")
+                print (f"Coordination number (not classical) : {met.coordination_number}")
+                print(f"The coordination geometry is not defined because of '{met.geometry}' (hapticity : {met.hapticity})")
+                print("")         
     return metalist
 
 #######################################################
