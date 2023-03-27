@@ -156,7 +156,7 @@ def getconec(labels: list, pos: list, factor: float, radii="default") -> Tuple[i
         "Li": 1.30,  
         "Be": 1.30,  
         "B": 1.15,
-        "C": 1.15,
+        "C": 1.30,
         "N": 1.25,
         "O": 1.25,
         "F": 1.15,
