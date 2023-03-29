@@ -1562,9 +1562,95 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
                         name=met.refcode, 
                         connectivity=connectivity)
                        
-            ref_geom = np.array(shape_structure_references['{} Vertices'.format(cn)])
+            # ref_geom = np.array(shape_structure_references['{} Vertices'.format(cn)])
             posgeom_dev={}
-            
+            shape_structure_references_simplified = {'2 Vertices': [['L-2', 1, 'Dinfh', 'Linear'],
+                                             ['vT-2', 2, 'C2v', 'Bent (V-shape, 109.47°)'],
+                                             ['vOC-2', 3, 'C2v', 'Bent (L-shape, 90°)']],
+
+                              '3 Vertices': [['TP-3', 1, 'D3h', 'Trigonal planar'],
+                                             ['mvOC-3', 4, 'C2v', 'T-shaped']],
+
+                              '4 Vertices': [['T-4', 2, 'Td', 'Tetrahedral'],
+                                             ['SP-4', 1, 'D4h', 'Square planar'],
+                                             ['SS-4', 3, 'C2v', 'Seesaw']],
+
+                              '5 Vertices': [['PP-5', 1, 'D5h', 'Pentagon'],
+                                             ['TBPY-5', 3, 'D3h', 'Trigonal bipyramidal'],
+                                             ['SPY-5', 4, 'C4v', 'Square pyramidal']],
+
+                              '6 Vertices': [['HP-6', 1, 'D6h', 'Hexagon'],
+                                             ['PPY-6', 2, 'C5v', 'Pentagonal pyramidal'],
+                                             ['OC-6', 3, 'Oh', 'Octahedral'],
+                                             ['TPR-6', 4, 'D3h', 'Trigonal prismatic']],
+
+                              '7 Vertices': [['HP-7', 1, 'D7h', 'Heptagon'],
+                                             ['HPY-7', 2, 'C6v', 'Hexagonal pyramidal'],
+                                             ['PBPY-7', 3, 'D5h', 'Pentagonal bipyramidal'],
+                                             ['CTPR-7', 5, 'C2v', 'Capped trigonal prismatic']],
+
+                              '8 Vertices': [['OP-8', 1, 'D8h', 'Octagon'],
+                                             ['HPY-8', 2, 'C7v', 'Heptagonal pyramidal'],
+                                             ['HBPY-8', 3, 'D6h', 'Hexagonal bipyramidal'],
+                                             ['CU-8', 4, 'Oh', 'Cube'],
+                                             ['SAPR-8', 5, 'D4d', 'Square antiprismatic'],
+                                             ['TDD-8', 6, 'D2d', 'Dodecahedral']],
+
+                              '9 Vertices': [['EP-9', 1, 'D9h', 'Enneagon'],
+                                             ['OPY-9', 2, 'C8v', 'Octagonal pyramid'],
+                                             ['HBPY-9', 3, 'D7h', 'Heptagonal bipyramid'],
+                                             ['JTC-9', 4, 'C3v', 'Johnson triangular cupola J3'],
+                                             ['JCCU-9', 5, 'C4v', 'Capped cube J8'],
+                                             ['CCU-9', 6, 'C4v', 'Spherical-relaxed capped cube'],
+                                             ['JCSAPR-9', 7, 'C4v', 'Capped square antiprism J10'],
+                                             ['CSAPR-9', 8, 'C4v', 'Spherical capped square antiprism'],
+                                             ['JTCTPR-9', 9, 'D3h', 'Tricapped trigonal prism J51'],
+                                             ['TCTPR-9', 10, 'D3h', 'Spherical tricapped trigonal prism'],
+                                             ['JTDIC-9', 11, 'C3v', 'Tridiminished icosahedron J63'],
+                                             ['HH-9', 12, 'C2v', 'Hula-hoop'],
+                                             ['MFF-9', 13, 'Cs', 'Muffin']],
+
+                              '10 Vertices': [['DP-10', 1, 'D10h', 'Decagon'],
+                                              ['EPY-10', 2, 'C9v', 'Enneagonal pyramid'],
+                                              ['OBPY-10', 3, 'D8h', 'Octagonal bipyramid'],
+                                              ['PPR-10', 4, 'D5h', 'Pentagonal prism'],
+                                              ['PAPR-10', 5, 'D5d', 'Pentagonal antiprism'],
+                                              ['JBCCU-10', 6, 'D4h', 'Bicapped cube J15'],
+                                              ['JBCSAPR-10', 7, 'D4d', 'Bicapped square antiprism J17'],
+                                              ['JMBIC-10', 8, 'C2v', 'Metabidiminished icosahedron J62'],
+                                              ['JATDI-10', 9, 'C3v', 'Augmented tridiminished icosahedron J64'],
+                                              ['JSPC-10', 10, 'C2v', 'Sphenocorona J87'],
+                                              ['SDD-10', 11, 'D2', 'Staggered Dodecahedron (2:6:2)'],
+                                              ['TD-10', 12, 'C2v', 'Tetradecahedron (2:6:2)'],
+                                              ['HD-10', 13, 'D4h', 'Hexadecahedron (2:6:2) or (1:4:4:1)']],
+                              '11 Vertices': [['HP-11', 1, 'D11h', 'Hendecagon'],
+                                              ['DPY-11', 2, 'C10v', 'Decagonal pyramid'],
+                                              ['EBPY-11', 3, 'D9h', 'Enneagonal bipyramid'],
+                                              ['JCPPR-11', 4, 'C5v', 'Capped pentagonal prism J9'],
+                                              ['JCPAPR-11', 5, 'C5v', 'Capped pentagonal antiprism J11'],
+                                              ['JAPPR-11', 6, 'C2v', 'Augmented pentagonal prism J52'],
+                                              ['JASPC-11', 7, 'Cs', 'Augmented sphenocorona J87']],
+                              '12 Vertices': [['DP-12', 1, 'D12h', 'Dodecagon'],
+                                              ['HPY-12', 2, 'C11v', 'Hendecagonal pyramid'],
+                                              ['DBPY-12', 3, 'D10h', 'Decagonal bipyramid'],
+                                              ['HPR-12', 4, 'D6h', 'Hexagonal prism'],
+                                              ['HAPR-12', 5, 'D6d', 'Hexagonal antiprism'],
+                                              ['TT-12', 6, 'Td', 'Truncated tetrahedron'],
+                                              ['COC-12', 7, 'Oh', 'Cuboctahedron'],
+                                              ['ACOC-12', 8, 'D3h', 'Anticuboctahedron J27'],
+                                              ['IC-12', 9, 'Ih', 'Icosahedron'],
+                                              ['JSC-12', 10, 'C4v', 'Johnson square cupola J4'],
+                                              ['JEPBPY-12', 11, 'D6h', 'Johnson elongated pentagonal bipyramid J16'],
+                                              ['JBAPPR-12', 12, 'C2v', 'Biaugmented pentagonal prism J53'],
+                                              ['JSPMC-12', 13, 'Cs', 'Sphenomegacorona J88']],
+                              '20 Vertices': [['DD-20', 1, 'Ih', 'Dodecahedron']],
+                              '24 Vertices': [['TCU-24', 1, 'Oh', 'Truncated cube'],
+                                              ['TOC-24', 2, 'Oh', 'Truncated octahedron']],
+                              '48 Vertices': [['TCOC-48', 1, 'Oh', 'Truncated cuboctahedron']],
+                              '60 Vertices': [['TRIC-60', 1, 'Ih', 'Truncated icosahedron (fullerene)']]}
+
+            ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)])
+
             if debug >= 2 :
                 for p, s in zip(symbols, positions):
                     print (p, s)
