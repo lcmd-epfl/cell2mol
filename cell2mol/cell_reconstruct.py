@@ -153,7 +153,7 @@ def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list
                 potential_hapticity = get_hapticity(ref)
                 
                 # Check coordination geometry around metal
-                ref.metalist = get_coordination_geometry (ref.metalist, potential_hapticity, debug=1)
+                ref.metalist = get_coordination_geometry (ref.metalist, ref.ligandlist, potential_hapticity, debug=1)
 
                 if debug >= 2:  print(f"Potential hapticity={potential_hapticity} for molecule {ref.formula}")
 
@@ -357,7 +357,7 @@ def get_reference_molecules_simple(labels: list, pos: list, debug: int=2) -> Tup
             potential_hapticity = get_hapticity(ref)
             
             # Check coordination geometry around metal
-            ref.metalist = get_coordination_geometry (ref.metalist, potential_hapticity, debug=1)
+            ref.metalist = get_coordination_geometry (ref.metalist, ref.ligandlist, potential_hapticity, debug=1)
 
             if debug >= 2:  print(f"Potential hapticity={potential_hapticity} for molecule {ref.formula}")
 
@@ -1489,7 +1489,7 @@ def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -
                 dummy = get_hapticity(mol)
                 
                 # Check coordination geometry around metal
-                mol.metalist = get_coordination_geometry (mol.metalist, dummy, debug=0)
+                mol.metalist = get_coordination_geometry (mol.metalist, mol.ligandlist, dummy, debug=0)
 
         # Reassign Type of molecules and store information
         for mol in moleclist:
@@ -1534,10 +1534,134 @@ def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -
 
     return cell
 
+#######################################################
+def get_centroid(arr: np.array) -> list:
+    # Get centroid of a set of coordinates
+    
+    length = arr.shape[0]
+    sum_x = np.sum(arr[:, 0])
+    sum_y = np.sum(arr[:, 1])
+    sum_z = np.sum(arr[:, 2])
+    centroid = np.around(np.array([sum_x/length, sum_y/length, sum_z/length]),7)
+    centroid = list(centroid)
+    
+    return centroid
 
 #######################################################
-def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) -> None:
-    # Get coordination geomery in case that there is no hapticity in TM complexes
+def shape_measure (positions: list, symbols: list, debug: int=0) -> dict:
+    # Get shape measure of a set of coordinates
+    
+    shape_structure_references_simplified = {'2 Vertices': [['L-2', 1, 'Dinfh', 'Linear'],
+                                            ['vT-2', 2, 'C2v', 'Bent (V-shape, 109.47°)'],
+                                            ['vOC-2', 3, 'C2v', 'Bent (L-shape, 90°)']],
+
+                            '3 Vertices': [['TP-3', 1, 'D3h', 'Trigonal planar'],
+                                            ['mvOC-3', 4, 'C2v', 'T-shaped']],
+
+                            '4 Vertices': [['T-4', 2, 'Td', 'Tetrahedral'],
+                                            ['SP-4', 1, 'D4h', 'Square planar'],
+                                            ['SS-4', 3, 'C2v', 'Seesaw']],
+
+                            '5 Vertices': [['PP-5', 1, 'D5h', 'Pentagon'],
+                                            ['TBPY-5', 3, 'D3h', 'Trigonal bipyramidal'],
+                                            ['SPY-5', 4, 'C4v', 'Square pyramidal']],
+
+                            '6 Vertices': [['HP-6', 1, 'D6h', 'Hexagon'],
+                                            ['PPY-6', 2, 'C5v', 'Pentagonal pyramidal'],
+                                            ['OC-6', 3, 'Oh', 'Octahedral'],
+                                            ['TPR-6', 4, 'D3h', 'Trigonal prismatic']],
+
+                            '7 Vertices': [['HP-7', 1, 'D7h', 'Heptagon'],
+                                            ['HPY-7', 2, 'C6v', 'Hexagonal pyramidal'],
+                                            ['PBPY-7', 3, 'D5h', 'Pentagonal bipyramidal'],
+                                            ['CTPR-7', 5, 'C2v', 'Capped trigonal prismatic']],
+
+                            '8 Vertices': [['OP-8', 1, 'D8h', 'Octagon'],
+                                            ['HPY-8', 2, 'C7v', 'Heptagonal pyramidal'],
+                                            ['HBPY-8', 3, 'D6h', 'Hexagonal bipyramidal'],
+                                            ['CU-8', 4, 'Oh', 'Cube'],
+                                            ['SAPR-8', 5, 'D4d', 'Square antiprismatic'],
+                                            ['TDD-8', 6, 'D2d', 'Dodecahedral']],
+
+                            '9 Vertices': [['EP-9', 1, 'D9h', 'Enneagon'],
+                                            ['OPY-9', 2, 'C8v', 'Octagonal pyramid'],
+                                            ['HBPY-9', 3, 'D7h', 'Heptagonal bipyramid'],
+                                            ['JTC-9', 4, 'C3v', 'Johnson triangular cupola J3'],
+                                            ['JCCU-9', 5, 'C4v', 'Capped cube J8'],
+                                            ['CCU-9', 6, 'C4v', 'Spherical-relaxed capped cube'],
+                                            ['JCSAPR-9', 7, 'C4v', 'Capped square antiprism J10'],
+                                            ['CSAPR-9', 8, 'C4v', 'Spherical capped square antiprism'],
+                                            ['JTCTPR-9', 9, 'D3h', 'Tricapped trigonal prism J51'],
+                                            ['TCTPR-9', 10, 'D3h', 'Spherical tricapped trigonal prism'],
+                                            ['JTDIC-9', 11, 'C3v', 'Tridiminished icosahedron J63'],
+                                            ['HH-9', 12, 'C2v', 'Hula-hoop'],
+                                            ['MFF-9', 13, 'Cs', 'Muffin']],
+
+                            '10 Vertices': [['DP-10', 1, 'D10h', 'Decagon'],
+                                            ['EPY-10', 2, 'C9v', 'Enneagonal pyramid'],
+                                            ['OBPY-10', 3, 'D8h', 'Octagonal bipyramid'],
+                                            ['PPR-10', 4, 'D5h', 'Pentagonal prism'],
+                                            ['PAPR-10', 5, 'D5d', 'Pentagonal antiprism'],
+                                            ['JBCCU-10', 6, 'D4h', 'Bicapped cube J15'],
+                                            ['JBCSAPR-10', 7, 'D4d', 'Bicapped square antiprism J17'],
+                                            ['JMBIC-10', 8, 'C2v', 'Metabidiminished icosahedron J62'],
+                                            ['JATDI-10', 9, 'C3v', 'Augmented tridiminished icosahedron J64'],
+                                            ['JSPC-10', 10, 'C2v', 'Sphenocorona J87'],
+                                            ['SDD-10', 11, 'D2', 'Staggered Dodecahedron (2:6:2)'],
+                                            ['TD-10', 12, 'C2v', 'Tetradecahedron (2:6:2)'],
+                                            ['HD-10', 13, 'D4h', 'Hexadecahedron (2:6:2) or (1:4:4:1)']],
+                            '11 Vertices': [['HP-11', 1, 'D11h', 'Hendecagon'],
+                                            ['DPY-11', 2, 'C10v', 'Decagonal pyramid'],
+                                            ['EBPY-11', 3, 'D9h', 'Enneagonal bipyramid'],
+                                            ['JCPPR-11', 4, 'C5v', 'Capped pentagonal prism J9'],
+                                            ['JCPAPR-11', 5, 'C5v', 'Capped pentagonal antiprism J11'],
+                                            ['JAPPR-11', 6, 'C2v', 'Augmented pentagonal prism J52'],
+                                            ['JASPC-11', 7, 'Cs', 'Augmented sphenocorona J87']],
+                            '12 Vertices': [['DP-12', 1, 'D12h', 'Dodecagon'],
+                                            ['HPY-12', 2, 'C11v', 'Hendecagonal pyramid'],
+                                            ['DBPY-12', 3, 'D10h', 'Decagonal bipyramid'],
+                                            ['HPR-12', 4, 'D6h', 'Hexagonal prism'],
+                                            ['HAPR-12', 5, 'D6d', 'Hexagonal antiprism'],
+                                            ['TT-12', 6, 'Td', 'Truncated tetrahedron'],
+                                            ['COC-12', 7, 'Oh', 'Cuboctahedron'],
+                                            ['ACOC-12', 8, 'D3h', 'Anticuboctahedron J27'],
+                                            ['IC-12', 9, 'Ih', 'Icosahedron'],
+                                            ['JSC-12', 10, 'C4v', 'Johnson square cupola J4'],
+                                            ['JEPBPY-12', 11, 'D6h', 'Johnson elongated pentagonal bipyramid J16'],
+                                            ['JBAPPR-12', 12, 'C2v', 'Biaugmented pentagonal prism J53'],
+                                            ['JSPMC-12', 13, 'Cs', 'Sphenomegacorona J88']],
+                            '20 Vertices': [['DD-20', 1, 'Ih', 'Dodecahedron']],
+                            '24 Vertices': [['TCU-24', 1, 'Oh', 'Truncated cube'],
+                                            ['TOC-24', 2, 'Oh', 'Truncated octahedron']],
+                            '48 Vertices': [['TCOC-48', 1, 'Oh', 'Truncated cuboctahedron']],
+                            '60 Vertices': [['TRIC-60', 1, 'Ih', 'Truncated icosahedron (fullerene)']]}
+
+    cn = len(symbols) - 1 # coordination number of metal center
+    connectivity= [[1, i] for i in range(2, cn+2)]
+    
+    geometry = Geometry(positions=positions, 
+                        symbols=symbols, 
+                        connectivity=connectivity)            
+    
+    # ref_geom = np.array(shape_structure_references['{} Vertices'.format(cn)])
+    ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)])
+    
+    posgeom_dev={}
+    if debug >= 2 :
+        for p, s in zip(symbols, positions):
+            print (p, s)
+        print("")
+    
+    for idx, rg in enumerate(ref_geom[:,0]):
+        shp_measure = geometry.get_shape_measure(rg, central_atom=1)
+        geom = ref_geom[:,3][idx]
+        posgeom_dev[geom]=round(shp_measure, 3)      
+    
+    return posgeom_dev
+
+#######################################################
+def get_coordination_geometry (metalist: object, ligandlist: object, hapticity: bool, debug: int=0) -> None:
+    # Get coordination geometry of metal center using cosymlib depending on hapticity of ligands
     # Find the cloest geometry using Shape measurment in cosymlib https://cosymlib.readthedocs.io/en/latest/
 
     if hapticity == False :
@@ -1545,11 +1669,6 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
         for met in metalist:
             positions=[]
             symbols=[]
-            connectivity=[]    
-            
-            cn =len(met.coordinating_atoms)
-            connectivity= [[1, i] for i in range(2, cn+2)]
-            
             symbols.append(met.label)
             positions.append(met.coord)
 
@@ -1557,110 +1676,8 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
                 symbols.append(a)
                 positions.append(a_site)   
             
-            geometry = Geometry(positions=positions, 
-                        symbols=symbols,
-                        name=met.refcode, 
-                        connectivity=connectivity)
-                       
-            # ref_geom = np.array(shape_structure_references['{} Vertices'.format(cn)])
-            posgeom_dev={}
-            shape_structure_references_simplified = {'2 Vertices': [['L-2', 1, 'Dinfh', 'Linear'],
-                                             ['vT-2', 2, 'C2v', 'Bent (V-shape, 109.47°)'],
-                                             ['vOC-2', 3, 'C2v', 'Bent (L-shape, 90°)']],
-
-                              '3 Vertices': [['TP-3', 1, 'D3h', 'Trigonal planar'],
-                                             ['mvOC-3', 4, 'C2v', 'T-shaped']],
-
-                              '4 Vertices': [['T-4', 2, 'Td', 'Tetrahedral'],
-                                             ['SP-4', 1, 'D4h', 'Square planar'],
-                                             ['SS-4', 3, 'C2v', 'Seesaw']],
-
-                              '5 Vertices': [['PP-5', 1, 'D5h', 'Pentagon'],
-                                             ['TBPY-5', 3, 'D3h', 'Trigonal bipyramidal'],
-                                             ['SPY-5', 4, 'C4v', 'Square pyramidal']],
-
-                              '6 Vertices': [['HP-6', 1, 'D6h', 'Hexagon'],
-                                             ['PPY-6', 2, 'C5v', 'Pentagonal pyramidal'],
-                                             ['OC-6', 3, 'Oh', 'Octahedral'],
-                                             ['TPR-6', 4, 'D3h', 'Trigonal prismatic']],
-
-                              '7 Vertices': [['HP-7', 1, 'D7h', 'Heptagon'],
-                                             ['HPY-7', 2, 'C6v', 'Hexagonal pyramidal'],
-                                             ['PBPY-7', 3, 'D5h', 'Pentagonal bipyramidal'],
-                                             ['CTPR-7', 5, 'C2v', 'Capped trigonal prismatic']],
-
-                              '8 Vertices': [['OP-8', 1, 'D8h', 'Octagon'],
-                                             ['HPY-8', 2, 'C7v', 'Heptagonal pyramidal'],
-                                             ['HBPY-8', 3, 'D6h', 'Hexagonal bipyramidal'],
-                                             ['CU-8', 4, 'Oh', 'Cube'],
-                                             ['SAPR-8', 5, 'D4d', 'Square antiprismatic'],
-                                             ['TDD-8', 6, 'D2d', 'Dodecahedral']],
-
-                              '9 Vertices': [['EP-9', 1, 'D9h', 'Enneagon'],
-                                             ['OPY-9', 2, 'C8v', 'Octagonal pyramid'],
-                                             ['HBPY-9', 3, 'D7h', 'Heptagonal bipyramid'],
-                                             ['JTC-9', 4, 'C3v', 'Johnson triangular cupola J3'],
-                                             ['JCCU-9', 5, 'C4v', 'Capped cube J8'],
-                                             ['CCU-9', 6, 'C4v', 'Spherical-relaxed capped cube'],
-                                             ['JCSAPR-9', 7, 'C4v', 'Capped square antiprism J10'],
-                                             ['CSAPR-9', 8, 'C4v', 'Spherical capped square antiprism'],
-                                             ['JTCTPR-9', 9, 'D3h', 'Tricapped trigonal prism J51'],
-                                             ['TCTPR-9', 10, 'D3h', 'Spherical tricapped trigonal prism'],
-                                             ['JTDIC-9', 11, 'C3v', 'Tridiminished icosahedron J63'],
-                                             ['HH-9', 12, 'C2v', 'Hula-hoop'],
-                                             ['MFF-9', 13, 'Cs', 'Muffin']],
-
-                              '10 Vertices': [['DP-10', 1, 'D10h', 'Decagon'],
-                                              ['EPY-10', 2, 'C9v', 'Enneagonal pyramid'],
-                                              ['OBPY-10', 3, 'D8h', 'Octagonal bipyramid'],
-                                              ['PPR-10', 4, 'D5h', 'Pentagonal prism'],
-                                              ['PAPR-10', 5, 'D5d', 'Pentagonal antiprism'],
-                                              ['JBCCU-10', 6, 'D4h', 'Bicapped cube J15'],
-                                              ['JBCSAPR-10', 7, 'D4d', 'Bicapped square antiprism J17'],
-                                              ['JMBIC-10', 8, 'C2v', 'Metabidiminished icosahedron J62'],
-                                              ['JATDI-10', 9, 'C3v', 'Augmented tridiminished icosahedron J64'],
-                                              ['JSPC-10', 10, 'C2v', 'Sphenocorona J87'],
-                                              ['SDD-10', 11, 'D2', 'Staggered Dodecahedron (2:6:2)'],
-                                              ['TD-10', 12, 'C2v', 'Tetradecahedron (2:6:2)'],
-                                              ['HD-10', 13, 'D4h', 'Hexadecahedron (2:6:2) or (1:4:4:1)']],
-                              '11 Vertices': [['HP-11', 1, 'D11h', 'Hendecagon'],
-                                              ['DPY-11', 2, 'C10v', 'Decagonal pyramid'],
-                                              ['EBPY-11', 3, 'D9h', 'Enneagonal bipyramid'],
-                                              ['JCPPR-11', 4, 'C5v', 'Capped pentagonal prism J9'],
-                                              ['JCPAPR-11', 5, 'C5v', 'Capped pentagonal antiprism J11'],
-                                              ['JAPPR-11', 6, 'C2v', 'Augmented pentagonal prism J52'],
-                                              ['JASPC-11', 7, 'Cs', 'Augmented sphenocorona J87']],
-                              '12 Vertices': [['DP-12', 1, 'D12h', 'Dodecagon'],
-                                              ['HPY-12', 2, 'C11v', 'Hendecagonal pyramid'],
-                                              ['DBPY-12', 3, 'D10h', 'Decagonal bipyramid'],
-                                              ['HPR-12', 4, 'D6h', 'Hexagonal prism'],
-                                              ['HAPR-12', 5, 'D6d', 'Hexagonal antiprism'],
-                                              ['TT-12', 6, 'Td', 'Truncated tetrahedron'],
-                                              ['COC-12', 7, 'Oh', 'Cuboctahedron'],
-                                              ['ACOC-12', 8, 'D3h', 'Anticuboctahedron J27'],
-                                              ['IC-12', 9, 'Ih', 'Icosahedron'],
-                                              ['JSC-12', 10, 'C4v', 'Johnson square cupola J4'],
-                                              ['JEPBPY-12', 11, 'D6h', 'Johnson elongated pentagonal bipyramid J16'],
-                                              ['JBAPPR-12', 12, 'C2v', 'Biaugmented pentagonal prism J53'],
-                                              ['JSPMC-12', 13, 'Cs', 'Sphenomegacorona J88']],
-                              '20 Vertices': [['DD-20', 1, 'Ih', 'Dodecahedron']],
-                              '24 Vertices': [['TCU-24', 1, 'Oh', 'Truncated cube'],
-                                              ['TOC-24', 2, 'Oh', 'Truncated octahedron']],
-                              '48 Vertices': [['TCOC-48', 1, 'Oh', 'Truncated cuboctahedron']],
-                              '60 Vertices': [['TRIC-60', 1, 'Ih', 'Truncated icosahedron (fullerene)']]}
-
-            ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)])
-
-            if debug >= 2 :
-                for p, s in zip(symbols, positions):
-                    print (p, s)
-                print("")
-            for idx, rg in enumerate(ref_geom[:,0]):
-                shp_measure = geometry.get_shape_measure(rg, central_atom=1)
-                geom = ref_geom[:,3][idx]
-                posgeom_dev[geom]=round(shp_measure, 3)      
-
-            met.coordination (hapticity, posgeom_dev) 
+            posgeom_dev = shape_measure(positions, symbols, debug=debug)
+            met.coordination (len(met.coordinating_atoms), hapticity, posgeom_dev) 
 
             if debug >= 1 :
                 print(f"Metal : {met.label}")
@@ -1669,15 +1686,60 @@ def get_coordination_geometry (metalist: object, hapticity: bool, debug: int=0) 
                 print("")      
 
     else :
-        posgeom_dev = {}
-        for met in metalist:
-            met.coordination (hapticity, posgeom_dev) 
+
+        if len(metalist) == 1 : # Only for mono-metallic complexes at this moment
+
+            met = metalist[0]
+            positions=[]
+            symbols=[]        
+            symbols.append(met.label)
+            positions.append(met.coord)
+
+            for lig in ligandlist:
+                if lig.hapticity :
+                    arr = []
+                    for atom in lig.atoms:
+                        if atom.mconnec >= 1 :
+                            arr.append(atom.coord)
+                    
+                    if len(arr) > 1 :
+                        arr = np.array(arr)
+                        symbols.append("centroid")
+                        positions.append(get_centroid(arr))                     
+                        if debug >= 1 : 
+                            print(f"centroid of {lig.hapttype}", get_centroid(arr))
+                else :
+                    for atom in lig.atoms:
+                        if atom.mconnec >= 1 :
+                            symbols.append(atom.label)
+                            positions.append(atom.coord) 
+                            if debug >= 1 : 
+                                print(atom.label, atom.coord)                 
             
+            posgeom_dev = shape_measure(positions, symbols, debug=debug)
+            
+            cn_haptic = len(symbols)-1
+            met.coordination (cn_haptic, hapticity, posgeom_dev)    
+
             if debug >= 1 :
                 print(f"Metal : {met.label}")
-                print (f"Coordination number (not classical) : {met.coordination_number}")
-                print(f"The coordination geometry is not defined because of '{met.geometry}' (hapticity : {met.hapticity})")
-                print("")         
+                print (f"Coordination number based on distance: {met.coordination_number}")
+                print (f"The number of coordinating points (including the mid point of haptic ligands) : {cn_haptic} {met.posgeom_dev}")
+                print(f"The most likely geometry : '{met.geometry}' with deviation value {met.deviation} (hapticity : {met.hapticity})")
+                print("") 
+
+        else : # For multi-metallic complexes with haptic ligands, the coordination geometry is not defined
+
+            posgeom_dev = {}
+            for met in metalist:
+                met.coordination (len(met.coordinating_atoms), hapticity, posgeom_dev) 
+                
+                if debug >= 1 :
+                    print(f"Metal : {met.label}")
+                    print (f"Coordination number (not classical) : {met.coordination_number}")
+                    print(f"The coordination geometry is not defined because of '{met.geometry}' (hapticity : {met.hapticity})")
+                    print("")         
+    
     return metalist
 
 #######################################################
@@ -1727,10 +1789,10 @@ def get_hapticity(molecule: object, debug: int=0) -> bool:
                     group_hapttype = ["h6-Benzene"]
                     has_hapticity = True
                 elif numC == 7:
-                    group_hapttype = ["h7-Cicloheptatrienyl"]
+                    group_hapttype = ["h7-Cycloheptatrienyl"]
                     has_hapticity = True
                 elif numC == 8:
-                    group_hapttype = ["h8-Ciclooctatetraenyl"]
+                    group_hapttype = ["h8-Cyclooctatetraenyl"]
                     has_hapticity = True
 
                 # Other less common types of haptic ligands
@@ -1811,10 +1873,10 @@ def get_hapticity_ligand (lig: object, debug: int=0) -> bool:
             group_hapttype = ["h6-Benzene"]
             has_hapticity = True
         elif numC == 7:
-            group_hapttype = ["h7-Cicloheptatrienyl"]
+            group_hapttype = ["h7-Cycloheptatrienyl"]
             has_hapticity = True
         elif numC == 8:
-            group_hapttype = ["h8-Ciclooctatetraenyl"]
+            group_hapttype = ["h8-Cyclooctatetraenyl"]
             has_hapticity = True
 
         # Other less common types of haptic ligands

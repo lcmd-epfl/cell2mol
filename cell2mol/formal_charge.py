@@ -616,7 +616,7 @@ def get_metal_poscharge(metal: object, molecule: object, debug: int=0) -> list:
     # 1st-row transition metals.
     at_charge[21] = [3]  # Sc
     at_charge[22] = [2, 3, 4]  # Ti
-    at_charge[23] = [1, 2, 3, 4]  # V
+    at_charge[23] = [1, 2, 3, 4, 5]  # V
     at_charge[24] = [0, 2, 3] # Cr ; including 5 leads to worse results
     at_charge[25] = [1, 2, 3]  # Mn
     at_charge[26] = [2, 3]  # Fe
@@ -627,23 +627,23 @@ def get_metal_poscharge(metal: object, molecule: object, debug: int=0) -> list:
     # 2nd-row transition metals.
     at_charge[39] = [3]  # Y
     at_charge[40] = [2, 3, 4]  # Zr
-    at_charge[41] = [5, 4, 3]  # Nb
-    at_charge[42] = [0, 2, 3, 4, 5, 6]  # Mo
-    at_charge[43] = [1, 2, 3, 4]  # Tc
-    at_charge[44] = [2, 3]  # Ru
+    at_charge[41] = [1, 3, 4, 5]  # Nb
+    at_charge[42] = [0, 2, 4, 5, 6]  # Mo
+    at_charge[43] = [1, 2, 3, 4, 5]  # Tc
+    at_charge[44] = [2, 3, 4]  # Ru
     at_charge[45] = [1, 2, 3]  # Rh
-    at_charge[46] = [2]  # Pd
+    at_charge[46] = [0, 2]  # Pd
     at_charge[47] = [1]  # Ag
     at_charge[48] = [2]  # Cd
     # 3rd-row transition metals.
     at_charge[57] = []  # La
     at_charge[72] = [4]  # Hf
-    at_charge[73] = [2, 3, 4]  # Ta
-    at_charge[74] = [0, 2, 3, 4, 5, 6]  # W
+    at_charge[73] = [2, 3, 4, 5]  # Ta
+    at_charge[74] = [0, 2, 4, 5, 6]  # W
     at_charge[75] = [1, 2, 3, 4, 5, 7]  # Re
-    at_charge[76] = [0, 2, 3, 4, 5]  # Os
+    at_charge[76] = [2, 3, 4, 5, 6]  # Os
     at_charge[77] = [1, 3]  # Ir
-    at_charge[78] = [2, 4]  # Pt
+    at_charge[78] = [0, 2, 4]  # Pt
     at_charge[79] = [1, 3]  # Au
     at_charge[80] = [2]  # Hg
 

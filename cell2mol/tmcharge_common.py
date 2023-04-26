@@ -165,7 +165,7 @@ def getconec(labels: list, pos: list, factor: float, radii="default") -> Tuple[i
         "Mg": 1.30,  
         "Al": 1.30,
         "Si": 1.10,
-        "P": 1.25,   
+        "P": 1.30,   
         "S": 1.25,
         "Cl": 1.25,
         "Ar": 1.30,
@@ -806,18 +806,24 @@ class metal(object):
         self.totmconnec = int(np.sum(mconnec))
         self.atom.adjacencies(np.array(int(0)), int(mconnec), type="Metal")
 
-    def coordination (self, hapticity: bool, posgeom_dev: dict) -> None:
+    def coordination (self, coordination_number: int, hapticity: bool, posgeom_dev: dict) -> None:
         self.hapticity = hapticity
         if self.hapticity == False :
-            self.coordination_number=len(self.coordinating_atoms)
+            self.coordination_number=coordination_number
             self.posgeom_dev=posgeom_dev
             self.geometry=min(posgeom_dev, key=posgeom_dev.get)
             self.deviation=min(posgeom_dev.values())
         else:
-            self.coordination_number=len(self.coordinating_atoms)
-            self.posgeom_dev=posgeom_dev
-            self.geometry="haptic ligand(s) binding"
-            self.deviation=""
+            if len(posgeom_dev) >= 1 :
+                self.coordination_number=coordination_number
+                self.posgeom_dev=posgeom_dev
+                self.geometry=min(posgeom_dev, key=posgeom_dev.get)
+                self.deviation=min(posgeom_dev.values())
+            else:    
+                self.coordination_number=coordination_number
+                self.posgeom_dev=posgeom_dev               
+                self.geometry="haptic ligand(s) binding"
+                self.deviation=""
 
 ##############
 #### CELL ####
