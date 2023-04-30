@@ -8,7 +8,7 @@ from typing import Tuple
 from collections import defaultdict
 
 from cell2mol.cellconversions import frac2cart_fromparam, cart2frac, translate
-from cell2mol.tmcharge_common import (getelementcount,getradii,getcentroid,find_groups_within_ligand,find_closest_metal,checkchemistry,getconec,getblocks,inv,extract_from_matrix)
+from cell2mol.tmcharge_common import (getelementcount,getradii,getcentroid,find_groups_within_ligand,find_closest_metal,checkchemistry,getconec,getblocks,inv,extract_from_matrix,get_thres_from_two_atoms)
 from cell2mol.missingH import getangle
 # Imports Classes
 from cell2mol.tmcharge_common import atom, molecule, ligand, metal, group
@@ -151,7 +151,7 @@ def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list
 
                 # Checks Hapticity
                 potential_hapticity = get_hapticity(ref)
-                
+
                 # Check coordination geometry around metal
                 ref.metalist = get_coordination_geometry (ref.metalist, ref.ligandlist, potential_hapticity, debug=1)
 
@@ -355,7 +355,7 @@ def get_reference_molecules_simple(labels: list, pos: list, debug: int=2) -> Tup
             
             # Checks Hapticity
             potential_hapticity = get_hapticity(ref)
-            
+
             # Check coordination geometry around metal
             ref.metalist = get_coordination_geometry (ref.metalist, ref.ligandlist, potential_hapticity, debug=1)
 
@@ -370,162 +370,150 @@ def get_reference_molecules_simple(labels: list, pos: list, debug: int=2) -> Tup
     ### RIGHT NOW, we ignore the warning because if there is really a problem, the program will fail later.
     return listofreferences, covalent_factor, metal_factor, False
 
+#######################################################
+def reset_adjacencies_lig_metal (lig: object, metal: object, i: int, debug: int=2) -> object :    
 
-##############################################
-def correct_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -> object :
+    lig.mconnec[i] = 0
+    lig.adjacencies(lig.conmat, lig.mconnec)
+    metal.adjacencies(np.array([x - 1 for x in metal.mconnec]))
+
+    wrong = [index for index, value in enumerate(metal.coordinating_atoms_sites) if value == lig.coord[i]][0]
     
     if debug >= 1 : 
-        print(f"{lig.formula=}")
-        # print(f"{lig.labels}")
-        # print(f"{lig.mconnec}")
+        print("Wrong : ", metal.coordinating_atoms[wrong], metal.coordinating_atoms_sites[wrong])
 
-    if lig.hapticity == False :
-        # Generate index list of metal-coordinating atoms    
-        idx_list = [index for index, value in enumerate(lig.mconnec) if value >= 1] 
+    del metal.coordinating_atoms[wrong]
+    del metal.coordinating_atoms_sites[wrong]
 
-        for i in idx_list:
-            atom = lig.atoms[i] 
-            tgt, apos, dist = find_closest_metal(atom, metalist)
-            metal = metalist[tgt]
+    return lig, metal
 
-            if debug >= 1 : 
-                print(">>> metal-coordinating atoms", atom.label, "\tMetal :", metal.label, metal.coordinating_atoms)#, metal.totmconnec, metal.mconnec, atom.adjacency, atom.mconnec, atom.coord)
-            
-            if atom.mconnec >= 1 :
-                neighbors_coordination = []
-                
-                for j in atom.adjacency:
-                    neighbor = lig.atoms[j]
-                    if debug >= 2 : print(f"{atom.label} connected to {neighbor.label}") #{neighbor.adjacency} {neighbor.mconnec} {neighbor.coord}")      
-                    neighbors_coordination.append(neighbor.mconnec)
+#######################################################
+def correct_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -> object :
 
-                if sum(neighbors_coordination) > 1 :
-                    if debug >= 1 : 
-                        print(f"[Check] This coordinating atom {atom.label} connected to more than one coordinating atoms")
+    # Generate index list of metal-coordinating atoms    
+    idx_list = [index for index, value in enumerate(lig.mconnec) if value >= 1] 
+    if debug >= 2 : print([lig.labels[i] for i in idx_list])
 
-                        nb_idx_list = [index for index,value in enumerate(neighbors_coordination) if value == 1]
-                        for nb_idx in nb_idx_list :
-                            nb = lig.atoms[atom.adjacency[nb_idx]]
-                            print(f"        This coordinating atom {atom.label} connected to other coordinating atom {nb.label}") #{nb.adjacency} {nb.mconnec} {nb.coord}")
- 
-                    if debug >= 1 : 
-                        print("Wrong metal-coordination assignment for", lig.labels[i]) #lig.mconnec[i], lig.atoms[i].mconnec)  
-                    lig.mconnec[i] = 0
-                    lig.adjacencies(lig.conmat, lig.mconnec)
-                    metal.adjacencies(np.array([x - 1 for x in metal.mconnec]))
+    remove = []
 
-                    wrong = [index for index, value in enumerate(metal.coordinating_atoms_sites) if value == lig.coord[i]][0]
-                    if debug >= 1 : 
-                        print("Wrong : ", metal.coordinating_atoms[wrong], metal.coordinating_atoms_sites[wrong])
+    for i in idx_list:
+        atom = lig.atoms[i] 
+        tgt, apos, dist = find_closest_metal(atom, metalist)
+        metal = metalist[tgt]
+        thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
 
-                    del metal.coordinating_atoms[wrong]
-                    del metal.coordinating_atoms_sites[wrong]
-                    
-                    if debug >= 1 :
-                        print("After correction : ", metal.coordinating_atoms, metal.totmconnec, metal.mconnec) 
-                    
-                elif sum(neighbors_coordination) == 1 : # e.g. "S" atom in refcode YOBCUO, PORNOC
-                        
-                    nb_idx = [index for index,value in enumerate(neighbors_coordination) if value == 1][0]
-                    nb = lig.atoms[atom.adjacency[nb_idx]]
-                    
-                    if debug >= 1 : 
-                        print(f"[Check] This coordinating atom {atom.label} connected to another coordinating atom {nb.label}") #{nb.adjacency} {nb.mconnec} {nb.coord}")
-                    
-                    if (atom.label == "H" and nb.label in ["B", "O", "N"]) :
-                        if debug >= 1 : print("Wrong metal-coordination assignment for", lig.labels[i]) #lig.mconnec[i], lig.atoms[i].mconnec)  
-                        
-                        lig.mconnec[i] = 0
-                        lig.adjacencies(lig.conmat, lig.mconnec)
-                        metal.adjacencies(np.array([x - 1 for x in metal.mconnec]))
+        if debug >= 1 : 
+            print(">>> metal-coordinating atoms", atom.label, "\tMetal :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
+        
+        neighbors_coordination = []  
+        for j in atom.adjacency:
+            neighbor = lig.atoms[j]
+            neighbors_coordination.append(neighbor.mconnec)
+            if debug >= 2 : print(f"{atom.label} connected to {neighbor.label}") #{neighbor.adjacency} {neighbor.mconnec} {neighbor.coord}")      
 
-                        wrong = [index for index, value in enumerate(metal.coordinating_atoms_sites) if value == lig.coord[i]][0]
-                        if debug >= 1 : 
-                            print("Wrong : ", metal.coordinating_atoms[wrong], metal.coordinating_atoms_sites[wrong])
-
-                        del metal.coordinating_atoms[wrong]
-                        del metal.coordinating_atoms_sites[wrong]
-                        
-                        if debug >= 1 :
-                            print("After correction : ", metal.coordinating_atoms, metal.totmconnec, metal.mconnec) 
-
-                    elif atom.label in ["B", "O", "N"] and nb.label == "H" :
-                        
-                        if debug >= 1 : 
-                            print("Wrong metal-coordination assignment for neighboring", nb.label) #lig.mconnec[i], lig.atoms[i].mconnec)  
-
-                        lig.mconnec[atom.adjacency[nb_idx]] = 0
-                        lig.adjacencies(lig.conmat, lig.mconnec)                        
-                        metal.adjacencies(np.array([x - 1 for x in metal.mconnec]))
-
-                        wrong = [index for index, value in enumerate(metal.coordinating_atoms_sites) if value == lig.coord[atom.adjacency[nb_idx]]][0]
-                        if debug >= 1 : 
-                            print("Wrong : ", metal.coordinating_atoms[wrong], metal.coordinating_atoms_sites[wrong])
-
-                        del metal.coordinating_atoms[wrong]
-                        del metal.coordinating_atoms_sites[wrong]
-                        
-                        if debug >= 1 :
-                            print("After correction : ", metal.coordinating_atoms, metal.totmconnec, metal.mconnec) 
-
-                    else :
-                        tgt, apos, dist = find_closest_metal(atom, metalist)
-                        metal = metalist[tgt]
-                        
-                        vector1 = np.subtract(np.array(atom.coord), np.array(nb.coord))
-                        vector2 = np.subtract(np.array(atom.coord), np.array(metal.coord))
-                        
-                        angle = np.degrees(getangle(vector1, vector2))
-                        if debug >= 1 : 
-                            print(f"{metal.label}-{atom.label}-{nb.label} angle {round(angle,2)}")
-                        
-                        if angle < 50 :
-                            if debug >= 1 : 
-                                print("Wrong metal-coordination assignment for", lig.labels[i]) #lig.mconnec[i], lig.atoms[i].mconnec)  
-                            lig.mconnec[i] = 0
-                            lig.adjacencies(lig.conmat, lig.mconnec)
-                            metal.adjacencies(np.array([x - 1 for x in metal.mconnec]))
-
-                            wrong = [index for index, value in enumerate(metal.coordinating_atoms_sites) if value == lig.coord[i]][0]
-                            if debug >= 1 : 
-                                print("Wrong : ", metal.coordinating_atoms[wrong], metal.coordinating_atoms_sites[wrong])
-
-                            del metal.coordinating_atoms[wrong]
-                            del metal.coordinating_atoms_sites[wrong]
-                            
-                            if debug >= 1 :
-                                print("After correction : ", metal.coordinating_atoms, metal.totmconnec, metal.mconnec) 
-                                        
+        if sum(neighbors_coordination) > 1 :
+            if lig.hapticity == True:
+                if "h2-Benzene" in lig.hapttype and atom.label == "C" :
+                    remove.append(i)
+                    if debug >= 1 : print("Wrong metal-coordination assignment for", lig.labels[i]) 
                 else :
                     pass
             else :
                 if debug >= 1 : 
-                    print(f"Excluded {atom.label} from {metal.coordinating_atoms}")
+                    print(f"[Check] This metal-coordinating atom {atom.label} connected to more than one metal-coordinating atoms")
+                    nb_idx_list = [index for index,value in enumerate(neighbors_coordination) if value == 1]
+                    for nb_idx in nb_idx_list :
+                        nb = lig.atoms[atom.adjacency[nb_idx]]
+                        print(f"        This metal-coordinating atom {atom.label} connected to other metal-coordinating atom {nb.label}") 
+                remove.append(i)
+                if debug >= 1 : print("Wrong metal-coordination assignment for", lig.labels[i]) 
+        
+        elif sum(neighbors_coordination) == 1 : # e.g. "S" atom in refcode YOBCUO, PORNOC                                         
+            nb_idx = [index for index,value in enumerate(neighbors_coordination) if value == 1][0]
+            nb = lig.atoms[atom.adjacency[nb_idx]]
+            
+            if ("h2-Benzene" in lig.hapttype and atom.label == "C" and nb.label == "C") :
+                if debug >= 2 : print("C atom from haptic ligand 'h2-Benzene', 'h2-Butadiene', 'h2-ethylene'")            
+            elif (atom.label == "H" and nb.label in ["B", "O", "N", "C"]) :
+                if debug >= 1 : print("Wrong metal-coordination assignment for", lig.labels[i]) 
+                remove.append(i)
+            elif (atom.label in ["B", "O", "N", "C"] and nb.label == "H") :
+                if debug >= 1 : print("Wrong metal-coordination assignment for", lig.labels[atom.adjacency[nb_idx]]) 
+                remove.append(atom.adjacency[nb_idx])
+            else : # Check angle between metal-coordinating atoms               
+                tgt, apos, dist = find_closest_metal(atom, metalist)
+                metal = metalist[tgt]
+                vector1 = np.subtract(np.array(atom.coord), np.array(nb.coord))
+                vector2 = np.subtract(np.array(atom.coord), np.array(metal.coord))                        
+                angle = np.degrees(getangle(vector1, vector2))
+                
+                if debug >= 1 : 
+                    print(f"[Check] This metal-coordinating atom {atom.label} connected to another metal-coordinating atom {nb.label}") 
+
+                if debug >= 1 : print(f"{metal.label}-{atom.label}-{nb.label} angle {round(angle,2)}")
+                
+                if angle < 55 :
+                    remove.append(i)
+                    if debug >= 1 : print("Wrong metal-coordination assignment for", lig.labels[i]) 
+                    
+                else :
+                    pass                                     
+        else :
+            pass
+    
+    
+    if len(remove)  > 0 :
+        if debug >= 1 : print(f"{remove=}")
+        wrong = True
+        for wrong_idx in remove :
+            lig, metal = reset_adjacencies_lig_metal(lig, metal, wrong_idx, debug=debug)
+        if debug >= 1 : print("After correction : ", metal.coordinating_atoms) 
     else :
-        if debug >= 1 : 
-            print(f"Ligand hapticity is True {lig.hapttype}")
+        wrong = False
+    
+    return lig, metalist, wrong
+    
+##############################################
+def check_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -> object :
+    
+    if debug >= 1 : print(f"{lig.formula=}") #{lig.hapticity=} {lig.hapttype=}")
+    
+    if lig.hapticity == False :
+        lig, metalist, wrong = correct_metal_coordinating_atoms(lig, metalist, debug=debug)
+
+    elif lig.hapticity == True and "h2-Benzene" in lig.hapttype :
+        if debug >= 1 : print(f"Ligand hapticity is True {lig.hapttype}")   
+
+        lig, metalist, wrong = correct_metal_coordinating_atoms(lig, metalist, debug=debug)
+        if wrong :  
+            lig.grouplist=[]
+            lig.hapttype=[]
+            lig.hapticity=False
+            lig = get_hapticity_ligand(lig, debug=debug)
+
+    elif lig.hapticity == True and "h3-Allyl" in lig.hapttype :
+        if debug >= 1 : print(f"Ligand hapticity is True {lig.hapttype}")
+        
+        lig, metalist, wrong = correct_metal_coordinating_atoms(lig, metalist, debug=debug)  
+        if wrong :
+            lig.grouplist=[]
+            lig.hapttype=[]
+            lig.hapticity=False          
+            lig = get_hapticity_ligand(lig, debug=debug)
+    else :
+        if debug >= 1 : print(f"Ligand hapticity is True {lig.hapttype}")
             # print(f"Ligand hapticity is True {lig.hapttype} => Do not find metal-coordinating atoms")
 
         idx_list = [index for index, value in enumerate(lig.mconnec) if value >= 1] 
-
-        for i in idx_list:
-            atom = lig.atoms[i] 
-            tgt, apos, dist = find_closest_metal(atom, metalist)
-            metal = metalist[tgt]
-
-            if debug >= 1 : 
-                print(">>> metal-coordinating atoms", atom.label, "\tMetal :", metal.label, metal.coordinating_atoms)#, metal.totmconnec, metal.mconnec, atom.adjacency, atom.mconnec, atom.coord)
-
+        
         # Generate index list of metal-coordinating atoms    
-        idx_list = [index for index, value in enumerate(lig.mconnec) if value >= 1] 
-
         for i in idx_list:
             atom = lig.atoms[i] 
             tgt, apos, dist = find_closest_metal(atom, metalist)
             metal = metalist[tgt]
-
-            if debug >= 2 : 
-                print(">>> coordination sphere", atom.label, "\tMetal :", metal.label, metal.coordinating_atoms) #, metal.totmconnec, metal.mconnec) #, atom.adjacency, atom.mconnec, atom.coord)
+            thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
+            if debug >= 1 : 
+                print(">>> metal-coordinating atoms", atom.label, "\tdistance :", round(dist, 3), "\tthres :", thres, "\tMetal :", metal.label, metal.coordinating_atoms)#, metal.totmconnec, metal.mconnec, atom.adjacency, atom.mconnec, atom.coord)
 
     if debug >= 2  :
         print("###### met in metalist ######")
@@ -538,9 +526,18 @@ def correct_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2)
             print(f"{met.coordinating_atoms_sites=}")    
     if debug >= 1 :
         print("")
-    return lig, metalist
 
-      
+    # Sets Ligand hapticity
+    if any(g.hapticity == True for g in lig.grouplist):
+        lig.hapticity = True
+        for g in lig.grouplist:
+            for typ in g.hapttype:
+                if typ not in lig.hapttype:
+                    lig.hapttype.append(typ)
+    else:
+        lig.hapticity = False
+
+    return lig, metalist
 
 #######################################################
 def getmolecs(labels: list, pos: list, factor: float=1.3, metal_factor: float=1.0, atlist: list=[], debug: int=0) -> Tuple[bool, list]:
@@ -761,7 +758,9 @@ def splitcomplex(molecule: object, factor: float=1.3, metal_factor: float=1.0, d
             lig.information(factor, metal_factor)  # Creates Information about the construction
             lig.adjacencies(tmp_conmat, tmp_mconnec)  # Creates the Adjacency Information
             lig = get_hapticity_ligand(lig)
-            lig, metalist = correct_metal_coordinating_atoms (lig, metalist, debug) # Correct metal-coordinating atoms if there is an error
+
+            # Check metal-coordinating atoms and make correction if there is an error
+            lig, metalist = check_metal_coordinating_atoms (lig, metalist, debug) 
 
             for a in matoms:  # only adds metal atoms that are connected to the ligand
                 found = False 
@@ -772,7 +771,6 @@ def splitcomplex(molecule: object, factor: float=1.3, metal_factor: float=1.0, d
             ligandlist.append(lig)  # Appends it to the final list of ligand   
 
     return ligandlist, metalist
-
 
 #######################################################
 def additem(item, vector):
@@ -1487,7 +1485,7 @@ def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -
                     mol, mol.factor, mol.metal_factor
                 )
                 dummy = get_hapticity(mol)
-                
+
                 # Check coordination geometry around metal
                 mol.metalist = get_coordination_geometry (mol.metalist, mol.ligandlist, dummy, debug=0)
 
@@ -1680,7 +1678,7 @@ def get_coordination_geometry (metalist: object, ligandlist: object, hapticity: 
             met.coordination (len(met.coordinating_atoms), hapticity, posgeom_dev) 
 
             if debug >= 1 :
-                print(f"Metal : {met.label}")
+                print(f"Metal : {met.label} {met.coordinating_atoms}")
                 print (f"Coordination number : {met.coordination_number} {met.posgeom_dev}")
                 print(f"The most likely geometry : '{met.geometry}' with deviation value {met.deviation} (hapticity : {met.hapticity})")
                 print("")      
@@ -1690,6 +1688,7 @@ def get_coordination_geometry (metalist: object, ligandlist: object, hapticity: 
         if len(metalist) == 1 : # Only for mono-metallic complexes at this moment
 
             met = metalist[0]
+        # for met in metalist:
             positions=[]
             symbols=[]        
             symbols.append(met.label)
@@ -1722,7 +1721,7 @@ def get_coordination_geometry (metalist: object, ligandlist: object, hapticity: 
             met.coordination (cn_haptic, hapticity, posgeom_dev)    
 
             if debug >= 1 :
-                print(f"Metal : {met.label}")
+                print(f"Metal : {met.label} {met.coordinating_atoms}")
                 print (f"Coordination number based on distance: {met.coordination_number}")
                 print (f"The number of coordinating points (including the mid point of haptic ligands) : {cn_haptic} {met.posgeom_dev}")
                 print(f"The most likely geometry : '{met.geometry}' with deviation value {met.deviation} (hapticity : {met.hapticity})")
@@ -1735,7 +1734,7 @@ def get_coordination_geometry (metalist: object, ligandlist: object, hapticity: 
                 met.coordination (len(met.coordinating_atoms), hapticity, posgeom_dev) 
                 
                 if debug >= 1 :
-                    print(f"Metal : {met.label}")
+                    print(f"Metal : {met.label} {met.coordinating_atoms}")
                     print (f"Coordination number (not classical) : {met.coordination_number}")
                     print(f"The coordination geometry is not defined because of '{met.geometry}' (hapticity : {met.hapticity})")
                     print("")         
