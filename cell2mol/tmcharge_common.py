@@ -137,6 +137,169 @@ def extract_from_matrix(entrylist: list, old_array: np.ndarray, dimension: int=2
 
     return new_array
 
+################################
+covalent_factor_for_metal = {
+    "H": 1.30,
+    "D": 1.30,
+    "He": 1.30,
+    "Li": 1.30,  
+    "Be": 1.30,  
+    "B": 1.15,
+    "C": 1.30,
+    "N": 1.25,
+    "O": 1.25,
+    "F": 1.15,
+    "Ne": 1.30,
+    "Na": 1.30,  
+    "Mg": 1.30,  
+    "Al": 1.30,
+    "Si": 1.10,
+    "P": 1.30,   
+    "S": 1.25,
+    "Cl": 1.25,
+    "Ar": 1.30,
+    "K": 1.30,  
+    "Ca": 1.30,
+    "Sc": 1.30,
+    "Ti": 1.30,
+    "V": 1.30,
+    "Cr": 1.30,
+    "Mn": 1.30,
+    "Fe": 1.30,
+    "Co": 1.30,
+    "Ni": 1.30,
+    "Cu": 1.30,
+    "Zn": 1.30,
+    "Ga": 1.30,
+    "Ge": 1.30,
+    "As": 1.15,
+    "Se": 1.15,
+    "Br": 1.25,
+    "Kr": 1.30,
+    "Rb": 1.30,
+    "Sr": 1.30,
+    "Y": 1.30,
+    "Zr": 1.30,
+    "Nb": 1.30,
+    "Mo": 1.30,
+    "Tc": 1.30,
+    "Ru": 1.30,
+    "Rh": 1.30,
+    "Pd": 1.30,
+    "Ag": 1.30,
+    "Cd": 1.30,
+    "In": 1.30,
+    "Sn": 1.30,
+    "Sb": 1.15,  
+    "Te": 1.15,  
+    "I": 1.25,
+    "Xe": 1.30,
+    "Cs": 1.30,
+    "Ba": 1.30,
+    "La": 1.30,
+    "Ce": 1.30,
+    "Pr": 1.30,
+    "Nd": 1.30,
+    "Pm": 1.30,
+    "Sm": 1.30,
+    "Eu": 1.30,
+    "Gd": 1.30,
+    "Tb": 1.30,
+    "Dy": 1.30,
+    "Ho": 1.30,
+    "Er": 1.30,
+    "Tm": 1.30,
+    "Yb": 1.30,
+    "Lu": 1.30,
+    "Hf": 1.30,
+    "Ta": 1.30,
+    "W": 1.30,
+    "Re": 1.30,
+    "Os": 1.30,
+    "Ir": 1.30,
+    "Pt": 1.30,
+    "Au": 1.30,
+    "Hg": 1.30,
+    "Tl": 1.30,
+    "Pb": 1.30,
+    "Bi": 1.30,
+    "Po": 1.30,
+    "At": 1.30,
+    "Rn": 1.30,
+    "Fr": 1.30,
+    "Ra": 1.30,
+    "Ac": 1.30,
+    "Th": 1.30,
+    "Pa": 1.30,
+    "U": 1.30,
+    "Np": 1.30,
+    "Pu": 1.30,
+    "Am": 1.30,
+    "Cm": 1.30,
+    "Bk": 1.30,
+    "Cf": 1.30,
+    "Es": 1.30,
+    "Fm": 1.30,
+    "Md": 1.30,
+    "No": 1.30,
+    "Lr": 1.30,
+    "Rf": 1.30,
+    "Db": 1.30,
+    "Sg": 1.30,
+    "Bh": 1.30,
+    "Hs": 1.30,
+    "Mt": 1.30,
+}
+
+def get_thres_from_two_atoms(label_i, label_j, factor=1.3, debug=0): 
+   
+    radii_i = elemdatabase.CovalentRadius2[label_i]
+    radii_j = elemdatabase.CovalentRadius2[label_j]
+
+    if (
+            elemdatabase.elementblock[label_i] != "d"
+            and elemdatabase.elementblock[label_i] != "f"
+            and elemdatabase.elementblock[label_j] != "d"
+            and elemdatabase.elementblock[label_j] != "f"
+        ):
+
+            thres = (radii_i + radii_j) * factor
+            thres = round(thres, 3)
+
+            if debug >=2 :
+                print(f"{label_i} : {radii_i}, {label_j} : {radii_j}, {factor}, {thres=}")
+    elif (
+            elemdatabase.elementblock[label_i] == "d"
+            and elemdatabase.elementblock[label_i] == "f"
+            and elemdatabase.elementblock[label_j] == "d"
+            and elemdatabase.elementblock[label_j] == "f"
+        ):
+            factor_i = covalent_factor_for_metal[label_i]
+            factor_j = covalent_factor_for_metal[label_j]
+
+            if factor_i < factor_j  :
+                new_factor = factor_i
+            
+            elif factor_i == factor_j :
+                new_factor = factor_i
+
+            else : 
+                new_factor = factor_j
+
+            thres = (radii_i + radii_j) * new_factor
+            thres = round(thres, 3)
+
+            if debug >=2 :
+                print(f"{label_i} : {radii_i} ({factor_i}), {label_j} : {radii_j} ({factor_j}), {new_factor=}, {thres=}")
+    else :
+
+        thres = (radii_i + radii_j) * factor
+        thres = round(thres, 3)
+
+        if debug >=2 :
+            print(f"{label_i} : {radii_i}, {label_j} : {radii_j}, {factor}, {thres=}")   
+    
+    return thres
 
 ####################################
 def getconec(labels: list, pos: list, factor: float, radii="default") -> Tuple[int, list, list, list, list]:
