@@ -448,6 +448,14 @@ def getconec(labels: list, pos: list, factor: float, radii="default") -> Tuple[i
                     ):
 
                         thres = (radii[i] + radii[j]) * factor
+                        
+                elif (
+                        (elemdatabase.elementblock[labels[i]] == "d" or elemdatabase.elementblock[labels[i]] == "f" )
+                        and 
+                        (elemdatabase.elementblock[labels[j]] == "d" or elemdatabase.elementblock[labels[j]] == "f" )
+                    ):
+                        thres = (radii[i] + radii[j]) * 1.1  # factor for metal-metal bond. Temporary 1.1
+                        #print(labels[i], labels[j], radii[i] , radii[j], dist, thres)
 
                 elif (
                         elemdatabase.elementblock[labels[i]] == "d"
