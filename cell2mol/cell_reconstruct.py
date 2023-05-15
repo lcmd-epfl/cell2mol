@@ -153,7 +153,7 @@ def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list
                 potential_hapticity = get_hapticity(ref)
 
                 # Check coordination geometry around metal
-                ref.metalist = get_coordination_geometry (ref.metalist, ref.ligandlist, potential_hapticity, debug=1)
+                ref = get_coordination_geometry (ref, debug=1)
 
                 if debug >= 2:  print(f"Potential hapticity={potential_hapticity} for molecule {ref.formula}")
 
@@ -305,9 +305,6 @@ def metalcoordcheck(label: str, coordination: int, debug: int=0) -> Tuple[bool, 
 
     return good, increase, decrease
 
-
-
-
 #######################################################
 def get_reference_molecules_simple(labels: list, pos: list, debug: int=2) -> Tuple[list, float, float, bool]:
 
@@ -351,13 +348,12 @@ def get_reference_molecules_simple(labels: list, pos: list, debug: int=2) -> Tup
                     print(f"{met.label=}\t{met.mconnec=}\t{met.totmconnec=}")
                     print(f"{met.coord_sphere=}")
                     print(f"{met.coordinating_atoms=}")
- 
             
             # Checks Hapticity
             potential_hapticity = get_hapticity(ref)
 
             # Check coordination geometry around metal
-            ref.metalist = get_coordination_geometry (ref.metalist, ref.ligandlist, potential_hapticity, debug=1)
+            ref = get_coordination_geometry (ref, debug=1)
 
             if debug >= 2:  print(f"Potential hapticity={potential_hapticity} for molecule {ref.formula}")
 
@@ -371,149 +367,67 @@ def get_reference_molecules_simple(labels: list, pos: list, debug: int=2) -> Tup
     return listofreferences, covalent_factor, metal_factor, False
 
 #######################################################
-def reset_adjacencies_lig_metal (lig: object, metal: object, i: int, debug: int=2) -> object :    
+def reset_adjacencies_lig_metalist (lig: object, metalist: list, i: int, debug: int=0) -> object :    
 
     lig.mconnec[i] = 0
     lig.adjacencies(lig.conmat, lig.mconnec)
+    
+    atom = lig.atoms[i] 
+    tgt, apos, dist = find_closest_metal(atom, metalist)
+    metal = metalist[tgt]
     metal.adjacencies(np.array([x - 1 for x in metal.mconnec]))
 
     wrong = [index for index, value in enumerate(metal.coordinating_atoms_sites) if value == lig.coord[i]][0]
-    
-    if debug >= 1 : 
-        print("Wrong : ", metal.coordinating_atoms[wrong], metal.coordinating_atoms_sites[wrong])
 
+    if debug >= 2 : 
+        print("!!! Wrong : ", i, metal.coordinating_atoms[wrong], "distance", get_dist(metal.coordinating_atoms_sites[wrong], metal.coord)) #metal.coordinating_atoms_sites[wrong])
+           
     del metal.coordinating_atoms[wrong]
     del metal.coordinating_atoms_sites[wrong]
 
-    return lig, metal
+    return lig, metalist
 
 #######################################################
-def correct_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -> object :
+def get_dist (atom1_pos: list, atom2_pos: list) -> float :
+    dist = np.linalg.norm(np.array(atom1_pos) - np.array(atom2_pos))
+    return round(dist, 3)
 
-    # Generate index list of metal-coordinating atoms    
-    idx_list = [index for index, value in enumerate(lig.mconnec) if value >= 1] 
-    if debug >= 2 : print([lig.labels[i] for i in idx_list])
+#######################################################
+def check_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -> list : 
 
     remove = []
 
+    for g in lig.grouplist :
+        list_of_coord_atoms = [lig.atoms[g_idx].label for g_idx in g.atlist]      
+        if debug >= 1 : print(f"{lig.formula=} {g.atlist=} {list_of_coord_atoms=} {g.hapttype=} {g.hapticity=}")
+
+        if g.hapticity :
+            remove = coordination_correction_for_haptic (lig, g, metalist, remove, debug)
+        else :
+            remove = coordination_correction (lig, g, metalist, remove, debug)
+
+    if len(remove)  > 0 : 
+        if debug >= 1 : print(f"{remove=}", [lig.atoms[rm].label for rm in remove])
+        for wrong_idx in remove :
+            lig, metalist = reset_adjacencies_lig_metalist(lig, metalist, wrong_idx, debug=debug)
+
+        lig.grouplist=[]
+        lig.hapttype=[]
+        lig.hapticity=False
+        lig = get_hapticity_ligand(lig, debug=debug)
+
+
+    idx_list = [index for index, value in enumerate(lig.mconnec) if value >= 1] 
+    
+    # Generate index list of metal-coordinating atoms    
     for i in idx_list:
         atom = lig.atoms[i] 
+        # print(f"{atom.mconnec=}")
         tgt, apos, dist = find_closest_metal(atom, metalist)
         metal = metalist[tgt]
         thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
-
         if debug >= 1 : 
-            print(">>> metal-coordinating atoms", atom.label, "\tMetal :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
-        
-        neighbors_coordination = []  
-        for j in atom.adjacency:
-            neighbor = lig.atoms[j]
-            neighbors_coordination.append(neighbor.mconnec)
-            if debug >= 2 : print(f"{atom.label} connected to {neighbor.label}") #{neighbor.adjacency} {neighbor.mconnec} {neighbor.coord}")      
-
-        if sum(neighbors_coordination) > 1 :
-            if lig.hapticity == True:
-                if "h2-Benzene" in lig.hapttype and atom.label == "C" :
-                    remove.append(i)
-                    if debug >= 1 : print("Wrong metal-coordination assignment for", lig.labels[i]) 
-                else :
-                    pass
-            else :
-                if debug >= 1 : 
-                    print(f"[Check] This metal-coordinating atom {atom.label} connected to more than one metal-coordinating atoms")
-                    nb_idx_list = [index for index,value in enumerate(neighbors_coordination) if value == 1]
-                    for nb_idx in nb_idx_list :
-                        nb = lig.atoms[atom.adjacency[nb_idx]]
-                        print(f"        This metal-coordinating atom {atom.label} connected to other metal-coordinating atom {nb.label}") 
-                remove.append(i)
-                if debug >= 1 : print("Wrong metal-coordination assignment for", lig.labels[i]) 
-        
-        elif sum(neighbors_coordination) == 1 : # e.g. "S" atom in refcode YOBCUO, PORNOC                                         
-            nb_idx = [index for index,value in enumerate(neighbors_coordination) if value == 1][0]
-            nb = lig.atoms[atom.adjacency[nb_idx]]
-            
-            if ("h2-Benzene" in lig.hapttype and atom.label == "C" and nb.label == "C") :
-                if debug >= 2 : print("C atom from haptic ligand 'h2-Benzene', 'h2-Butadiene', 'h2-ethylene'")            
-            elif (atom.label == "H" and nb.label in ["B", "O", "N", "C"]) :
-                if debug >= 1 : print("Wrong metal-coordination assignment for", lig.labels[i]) 
-                remove.append(i)
-            elif (atom.label in ["B", "O", "N", "C"] and nb.label == "H") :
-                if debug >= 1 : print("Wrong metal-coordination assignment for", lig.labels[atom.adjacency[nb_idx]]) 
-                remove.append(atom.adjacency[nb_idx])
-            else : # Check angle between metal-coordinating atoms               
-                tgt, apos, dist = find_closest_metal(atom, metalist)
-                metal = metalist[tgt]
-                vector1 = np.subtract(np.array(atom.coord), np.array(nb.coord))
-                vector2 = np.subtract(np.array(atom.coord), np.array(metal.coord))                        
-                angle = np.degrees(getangle(vector1, vector2))
-                
-                if debug >= 1 : 
-                    print(f"[Check] This metal-coordinating atom {atom.label} connected to another metal-coordinating atom {nb.label}") 
-
-                if debug >= 1 : print(f"{metal.label}-{atom.label}-{nb.label} angle {round(angle,2)}")
-                
-                if angle < 55 :
-                    remove.append(i)
-                    if debug >= 1 : print("Wrong metal-coordination assignment for", lig.labels[i]) 
-                    
-                else :
-                    pass                                     
-        else :
-            pass
-    
-    
-    if len(remove)  > 0 :
-        if debug >= 1 : print(f"{remove=}")
-        wrong = True
-        for wrong_idx in remove :
-            lig, metal = reset_adjacencies_lig_metal(lig, metal, wrong_idx, debug=debug)
-        if debug >= 1 : print("After correction : ", metal.coordinating_atoms) 
-    else :
-        wrong = False
-    
-    return lig, metalist, wrong
-    
-##############################################
-def check_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -> object :
-    
-    if debug >= 1 : print(f"{lig.formula=}") #{lig.hapticity=} {lig.hapttype=}")
-    
-    if lig.hapticity == False :
-        lig, metalist, wrong = correct_metal_coordinating_atoms(lig, metalist, debug=debug)
-
-    elif lig.hapticity == True and "h2-Benzene" in lig.hapttype :
-        if debug >= 1 : print(f"Ligand hapticity is True {lig.hapttype}")   
-
-        lig, metalist, wrong = correct_metal_coordinating_atoms(lig, metalist, debug=debug)
-        if wrong :  
-            lig.grouplist=[]
-            lig.hapttype=[]
-            lig.hapticity=False
-            lig = get_hapticity_ligand(lig, debug=debug)
-
-    elif lig.hapticity == True and "h3-Allyl" in lig.hapttype :
-        if debug >= 1 : print(f"Ligand hapticity is True {lig.hapttype}")
-        
-        lig, metalist, wrong = correct_metal_coordinating_atoms(lig, metalist, debug=debug)  
-        if wrong :
-            lig.grouplist=[]
-            lig.hapttype=[]
-            lig.hapticity=False          
-            lig = get_hapticity_ligand(lig, debug=debug)
-    else :
-        if debug >= 1 : print(f"Ligand hapticity is True {lig.hapttype}")
-            # print(f"Ligand hapticity is True {lig.hapttype} => Do not find metal-coordinating atoms")
-
-        idx_list = [index for index, value in enumerate(lig.mconnec) if value >= 1] 
-        
-        # Generate index list of metal-coordinating atoms    
-        for i in idx_list:
-            atom = lig.atoms[i] 
-            tgt, apos, dist = find_closest_metal(atom, metalist)
-            metal = metalist[tgt]
-            thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
-            if debug >= 1 : 
-                print(">>> metal-coordinating atoms", atom.label, "\tdistance :", round(dist, 3), "\tthres :", thres, "\tMetal :", metal.label, metal.coordinating_atoms)#, metal.totmconnec, metal.mconnec, atom.adjacency, atom.mconnec, atom.coord)
+            print(">>> metal-coordinating atoms", atom.label, "\tdistance :", round(dist, 3), "\tthres :", thres, f"\tMetal {tgt} :", metal.label, metal.coordinating_atoms)#, metal.totmconnec, metal.mconnec, atom.adjacency, atom.mconnec, atom.coord)
 
     if debug >= 2  :
         print("###### met in metalist ######")
@@ -523,7 +437,8 @@ def check_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -
             print(f"{met.coord_sphere=}")
             print(f"{met.coord_sphere_ID=}")
             print(f"{met.coordinating_atoms=}")
-            print(f"{met.coordinating_atoms_sites=}")    
+            print(f"{met.coordinating_atoms_sites=}")
+
     if debug >= 1 :
         print("")
 
@@ -537,7 +452,156 @@ def check_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -
     else:
         lig.hapticity = False
 
-    return lig, metalist
+    return lig, metalist, remove
+
+############################################ 
+def coordination_correction (lig, g, metalist, remove, debug=2) -> list:
+    
+    # Generate index list of metal-coordinating atoms    
+    idx_list = [g_idx for g_idx in g.atlist] 
+    if debug >= 2 : print([lig.labels[i] for i in idx_list])
+    
+    # i is the index of the atom in the ligand object
+    for i in idx_list:
+        atom = lig.atoms[i] 
+        tgt, apos, dist = find_closest_metal(atom, metalist)
+        metal = metalist[tgt]
+        thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
+
+        if debug >= 1 : 
+            print(f"\tAtom {i} :", atom.label, f"\tMetal {tgt} :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
+        
+        neighbors_totmconnec = []  
+        for j in atom.adjacency:
+            neighbor = lig.atoms[j]
+            neighbors_totmconnec.append(neighbor.mconnec)
+            if debug >= 2 : print(f"\t\t{atom.label} connected to {neighbor.label}") #{neighbor.adjacency} {neighbor.mconnec} {neighbor.coord}")      
+
+        if sum(neighbors_totmconnec) >= 2 :
+            if debug >= 1 : 
+                print(f"\t[Check] This metal-coordinating atom {atom.label} connected to more than one metal-coordinating atoms")
+                nb_idx_list = [index for index, value in enumerate(neighbors_totmconnec) if value >= 1]
+                for nb_idx in nb_idx_list :
+                    nb = lig.atoms[atom.adjacency[nb_idx]]
+                    print(f"\tThis metal-coordinating atom {atom.label} connected to other metal-coordinating atom {nb.label}") 
+            remove.append(i)
+            if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", i, atom.label , get_dist(atom.coord, metal.coord))
+        
+        elif sum(neighbors_totmconnec) == 1 : # e.g. "S" atom in refcode YOBCUO, PORNOC                                         
+            nb_idx = [index for index, value in enumerate(neighbors_totmconnec) if value == 1][0]
+            nb = lig.atoms[atom.adjacency[nb_idx]]
+
+            if (atom.label == "H" and nb.label in ["B", "O", "N", "C"]) :
+                if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", i, atom.label , get_dist(atom.coord, metal.coord))
+                remove.append(i)
+            elif (atom.label in ["B", "O", "N", "C"] and neighbor.label == "H") :
+                if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", atom.adjacency[nb_idx], nb.label, get_dist(nb.coord, metal.coord))
+                remove.append(atom.adjacency[nb_idx])
+            else : # Check angle between metal-coordinating atoms               
+                tgt, apos, dist = find_closest_metal(atom, metalist)
+                metal = metalist[tgt]
+                vector1 = np.subtract(np.array(atom.coord), np.array(nb.coord))
+                vector2 = np.subtract(np.array(atom.coord), np.array(metal.coord))                        
+                angle = np.degrees(getangle(vector1, vector2))
+                
+                if debug >= 1 : 
+                    print(f"\t[Check] This metal-coordinating atom {atom.label} connected to another metal-coordinating atom {nb.label}") 
+
+                if debug >= 1 : print(f"\t{metal.label}-{atom.label}-{nb.label} angle {round(angle,2)}")
+                
+                if angle < 55 :
+                    if debug >= 1 : print("\t!!! Wrong metal-coordination assignment for Atom", i, atom.label, get_dist(atom.coord, metal.coord))
+                    remove.append(i)
+                    
+                else :
+                    pass                                     
+        else :
+            pass
+    
+    return remove
+
+############################################
+def coordination_correction_for_haptic (lig, g, metalist, remove, debug=2) -> list:
+
+    list_of_coord_atoms = [lig.atoms[g_idx].label for g_idx in g.atlist]
+    numC = list_of_coord_atoms.count("C")
+    numH = list_of_coord_atoms.count("H")
+    num_others = len(list_of_coord_atoms) - numC  
+    if debug >= 2 :print(f"{list_of_coord_atoms=}, {numC=}, {num_others=}")
+
+    if "h2-Benzene" in g.hapttype :
+        if numC == 2 and num_others == 0 :
+            if debug >=2 : print(f"\tPass for {g.hapttype=}")
+            pass
+        elif numC == 2 and numH > 0 :
+            for g_idx in g.atlist:
+                if lig.atoms[g_idx].label == "H" :
+                    if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", g_idx, lig.atoms[g_idx].label)
+                    remove.append(g_idx)            
+        else:
+            if debug >=1 : print(f"\t[Check] haptic ligand coordination")
+            # g_idx is the index of the atom in the ligand object (stored in g.atlist)) 
+            for g_idx in g.atlist:
+                atom = lig.atoms[g_idx] 
+                tgt, apos, dist = find_closest_metal(atom, metalist)
+                metal = metalist[tgt]
+                thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
+                if debug >= 1 : 
+                    print(f"\tAtom {g_idx} :", atom.label, f"\tMetal {tgt} :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
+                neighbors_totmconnec = []
+                for j in atom.adjacency:
+                    neighbor = lig.atoms[j]
+                    neighbors_totmconnec.append(neighbor.mconnec)
+                # print(g_idx, atom.label,  atom.coord, atom.adjacency, atom.mconnec, sum(neighbors_totmconnec))
+                if sum(neighbors_totmconnec) >= 2 : # e.g. NEBDAA
+                    if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", g_idx, atom.label)
+                    if debug >=2 :
+                        print("\t!!! Wrong metal-coordination assignment for", g_idx, atom.label,  atom.coord, sum(neighbors_totmconnec), "metal-ligand atom distance:", get_dist(atom.coord, metal.coord))
+                    remove.append(g_idx)
+                else :
+                    pass    
+
+    elif "h3-Allyl" in g.hapttype :
+        if numC == 3 and num_others == 0 :
+            if debug >=2 : print(f"\tPass for {g.hapttype=}")
+            pass
+        elif numC == 3 and numH > 0 : # e.g. COKMUK10
+            for g_idx in g.atlist:
+                if lig.atoms[g_idx].label == "H" :
+                    if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", g_idx, lig.atoms[g_idx].label)
+                    remove.append(g_idx)            
+        else:
+            if debug >=1 : print(f"\t[Check] haptic ligand coordination")
+            # g_idx is the index of the atom in the ligand object (stored in g.atlist)) 
+            for g_idx in g.atlist:
+                atom = lig.atoms[g_idx] 
+                tgt, apos, dist = find_closest_metal(atom, metalist)
+                metal = metalist[tgt]
+                thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
+                if debug >= 1 : 
+                    print(f"\tAtom {g_idx} :", atom.label, f"\tMetal {tgt} :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
+                neighbors_totmconnec = []
+                for j in atom.adjacency:
+                    neighbor = lig.atoms[j]
+                    neighbors_totmconnec.append(neighbor.mconnec)
+                # print(g_idx, atom.label,  atom.coord, atom.adjacency, atom.mconnec, sum(neighbors_totmconnec))
+                if sum(neighbors_totmconnec) >= 2 : # e.g. NEBDAA
+                    if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", g_idx, atom.label)
+                    if debug >=2 :
+                        print("\t!!! Wrong metal-coordination assignment for", g_idx, atom.label,  atom.coord, sum(neighbors_totmconnec), "metal-ligand atom distance:", get_dist(atom.coord, metal.coord))
+                    remove.append(g_idx)
+                else :
+                    pass        
+    else :
+        if numH > 0 :
+            for g_idx in g.atlist:
+                if lig.atoms[g_idx].label == "H" :
+                    if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", g_idx, lig.atoms[g_idx].label)
+                    remove.append(g_idx)            
+        else :
+            if debug >=2 : print(f"Pass for {g.hapttype=}")
+
+    return remove
 
 #######################################################
 def getmolecs(labels: list, pos: list, factor: float=1.3, metal_factor: float=1.0, atlist: list=[], debug: int=0) -> Tuple[bool, list]:
@@ -760,14 +824,22 @@ def splitcomplex(molecule: object, factor: float=1.3, metal_factor: float=1.0, d
             lig = get_hapticity_ligand(lig)
 
             # Check metal-coordinating atoms and make correction if there is an error
-            lig, metalist = check_metal_coordinating_atoms (lig, metalist, debug) 
-
+            lig, metalist, remove = check_metal_coordinating_atoms (lig, metalist, debug) 
+            
+            if debug >= 2 :
+                if len(remove) > 0 : 
+                    print(f"{lig.formula=} {remove=}")
+                    for idx, ligat in enumerate(lig.atoms):
+                        if idx in remove :
+                            print(f"{idx=} {lig.atlist[idx]=} {ligat.label=} {ligat.coord=}")            
+            
             for a in matoms:  # only adds metal atoms that are connected to the ligand
-                found = False 
+                found = False # This is to avoid adding the same metal atom twice
                 for idx, ligat in enumerate(lig.atoms):
                     if lig.atlist[idx] in a.adjacency and not found:
                         lig.metalatoms.append(a)  # Saves Metal-Atom Information to the Ligand Object
                         found = True
+
             ligandlist.append(lig)  # Appends it to the final list of ligand   
 
     return ligandlist, metalist
@@ -1487,7 +1559,7 @@ def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -
                 dummy = get_hapticity(mol)
 
                 # Check coordination geometry around metal
-                mol.metalist = get_coordination_geometry (mol.metalist, mol.ligandlist, dummy, debug=0)
+                mol = get_coordination_geometry(mol, debug=0)
 
         # Reassign Type of molecules and store information
         for mol in moleclist:
@@ -1658,88 +1730,64 @@ def shape_measure (positions: list, symbols: list, debug: int=0) -> dict:
     return posgeom_dev
 
 #######################################################
-def get_coordination_geometry (metalist: object, ligandlist: object, hapticity: bool, debug: int=0) -> None:
-    # Get coordination geometry of metal center using cosymlib depending on hapticity of ligands
-    # Find the cloest geometry using Shape measurment in cosymlib https://cosymlib.readthedocs.io/en/latest/
+def check_hapticity_hapttype (atoms_list: list, g: list) -> Tuple[bool, list]:
+    # Check if the list of atoms in a given group has hapticity and return its hapticity and the haptic type
 
-    if hapticity == False :
-        
-        for met in metalist:
-            positions=[]
-            symbols=[]
-            symbols.append(met.label)
-            positions.append(met.coord)
+    has_hapticity = False
+    group_hapttype = []
 
-            for a, a_site in zip(met.coordinating_atoms, met.coordinating_atoms_sites):
-                symbols.append(a)
-                positions.append(a_site)   
-            
-            posgeom_dev = shape_measure(positions, symbols, debug=debug)
-            met.coordination (len(met.coordinating_atoms), hapticity, posgeom_dev) 
+    list_of_coord_atoms = []
+    for idx, a in enumerate(atoms_list):
+        if idx in g and a.mconnec > 0:
+            list_of_coord_atoms.append(a.label)
 
-            if debug >= 1 :
-                print(f"Metal : {met.label} {met.coordinating_atoms}")
-                print (f"Coordination number : {met.coordination_number} {met.posgeom_dev}")
-                print(f"The most likely geometry : '{met.geometry}' with deviation value {met.deviation} (hapticity : {met.hapticity})")
-                print("")      
+    numC = list_of_coord_atoms.count("C")  # Carbon is the most common connected atom in ligands with hapticity
+    numAs = list_of_coord_atoms.count("As")  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
+    numP = list_of_coord_atoms.count("P")  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
+    numO = list_of_coord_atoms.count("O")  # For h4-Enone
+    numN = list_of_coord_atoms.count("N")
 
-    else :
+    # print(f"{g=} {list_of_coord_atoms=} {numC=} {numAs=} {numP=} {numO=} {numN=}")
 
-        if len(metalist) == 1 : # Only for mono-metallic complexes at this moment
+    ## Carbon-based Haptic Ligands
+    if numC == 2:
+        group_hapttype = ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]
+        has_hapticity = True
+    # elif numC == 2 and numN == 2 : # 2,2′-bipyridine
 
-            met = metalist[0]
-        # for met in metalist:
-            positions=[]
-            symbols=[]        
-            symbols.append(met.label)
-            positions.append(met.coord)
+    elif numC == 3 and numO == 0:
+        group_hapttype = ["h3-Allyl", "h3-Cp"]
+        has_hapticity = True
+    elif numC == 3 and numO == 1:
+        group_hapttype = ["h4-Enone"]
+        has_hapticity = True
+    elif numC == 4:
+        group_hapttype = ["h4-Butadiene", "h4-Benzene"]
+        has_hapticity = True
+    elif numC == 5:
+        group_hapttype = ["h5-Cp"]
+        has_hapticity = True
+    elif numC == 6:
+        group_hapttype = ["h6-Benzene"]
+        has_hapticity = True
+    elif numC == 7:
+        group_hapttype = ["h7-Cycloheptatrienyl"]
+        has_hapticity = True
+    elif numC == 8:
+        group_hapttype = ["h8-Cyclooctatetraenyl"]
+        has_hapticity = True
 
-            for lig in ligandlist:
-                if lig.hapticity :
-                    arr = []
-                    for atom in lig.atoms:
-                        if atom.mconnec >= 1 :
-                            arr.append(atom.coord)
-                    
-                    if len(arr) > 1 :
-                        arr = np.array(arr)
-                        symbols.append("centroid")
-                        positions.append(get_centroid(arr))                     
-                        if debug >= 1 : 
-                            print(f"centroid of {lig.hapttype}", get_centroid(arr))
-                else :
-                    for atom in lig.atoms:
-                        if atom.mconnec >= 1 :
-                            symbols.append(atom.label)
-                            positions.append(atom.coord) 
-                            if debug >= 1 : 
-                                print(atom.label, atom.coord)                 
-            
-            posgeom_dev = shape_measure(positions, symbols, debug=debug)
-            
-            cn_haptic = len(symbols)-1
-            met.coordination (cn_haptic, hapticity, posgeom_dev)    
+        has_hapticity = True
 
-            if debug >= 1 :
-                print(f"Metal : {met.label} {met.coordinating_atoms}")
-                print (f"Coordination number based on distance: {met.coordination_number}")
-                print (f"The number of coordinating points (including the mid point of haptic ligands) : {cn_haptic} {met.posgeom_dev}")
-                print(f"The most likely geometry : '{met.geometry}' with deviation value {met.deviation} (hapticity : {met.hapticity})")
-                print("") 
+    # Other less common types of haptic ligands
+    elif numC == 0 and numAs == 5:
+        group_hapttype = ["h5-AsCp"]
+        has_hapticity = True
+    elif numC == 0 and numP == 5:
+        group_hapttype = ["h5-Pentaphosphole"]
+        has_hapticity = True
 
-        else : # For multi-metallic complexes with haptic ligands, the coordination geometry is not defined
-
-            posgeom_dev = {}
-            for met in metalist:
-                met.coordination (len(met.coordinating_atoms), hapticity, posgeom_dev) 
-                
-                if debug >= 1 :
-                    print(f"Metal : {met.label} {met.coordinating_atoms}")
-                    print (f"Coordination number (not classical) : {met.coordination_number}")
-                    print(f"The coordination geometry is not defined because of '{met.geometry}' (hapticity : {met.hapticity})")
-                    print("")         
-    
-    return metalist
+    return has_hapticity, group_hapttype
 
 #######################################################
 def get_hapticity(molecule: object, debug: int=0) -> bool:
@@ -1756,51 +1804,8 @@ def get_hapticity(molecule: object, debug: int=0) -> bool:
             groups = find_groups_within_ligand(lig)
 
             for g in groups:
-                has_hapticity = False
-                group_hapttype = []
-
-                list_of_coord_atoms = []
-                for idx, a in enumerate(lig.atoms):
-                    if idx in g and a.mconnec > 0:
-                        list_of_coord_atoms.append(a.label)
-
-                numC = list_of_coord_atoms.count("C")  # Carbon is the most common connected atom in ligands with hapticity
-                numAs = list_of_coord_atoms.count("As")  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
-                numP = list_of_coord_atoms.count("P")  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
-                numO = list_of_coord_atoms.count("O")  # For h4-Enone
-                ## Carbon-based Haptic Ligands
-                if numC == 2:
-                    group_hapttype = ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]
-                    has_hapticity = True
-                elif numC == 3 and numO == 0:
-                    group_hapttype = ["h3-Allyl", "h3-Cp"]
-                    has_hapticity = True
-                elif numC == 3 and numO == 1:
-                    group_hapttype = ["h4-Enone"]
-                    has_hapticity = True
-                elif numC == 4:
-                    group_hapttype = ["h4-Butadiene", "h4-Benzene"]
-                    has_hapticity = True
-                elif numC == 5:
-                    group_hapttype = ["h5-Cp"]
-                    has_hapticity = True
-                elif numC == 6:
-                    group_hapttype = ["h6-Benzene"]
-                    has_hapticity = True
-                elif numC == 7:
-                    group_hapttype = ["h7-Cycloheptatrienyl"]
-                    has_hapticity = True
-                elif numC == 8:
-                    group_hapttype = ["h8-Cyclooctatetraenyl"]
-                    has_hapticity = True
-
-                # Other less common types of haptic ligands
-                elif numC == 0 and numAs == 5:
-                    group_hapttype = ["h5-AsCp"]
-                    has_hapticity = True
-                elif numC == 0 and numP == 5:
-                    group_hapttype = ["h5-Pentaphosphole"]
-                    has_hapticity = True
+                # Check if the list of atoms in a given group has hapticity and return its hapticity and the haptic type
+                has_hapticity, group_hapttype = check_hapticity_hapttype(lig.atoms, g)
 
                 # Creates Group
                 newgroup = group(g, has_hapticity, group_hapttype)
@@ -1840,51 +1845,8 @@ def get_hapticity_ligand (lig: object, debug: int=0) -> bool:
     groups = find_groups_within_ligand(lig)
 
     for g in groups:
-        has_hapticity = False
-        group_hapttype = []
-
-        list_of_coord_atoms = []
-        for idx, a in enumerate(lig.atoms):
-            if idx in g and a.mconnec > 0:
-                list_of_coord_atoms.append(a.label)
-
-        numC = list_of_coord_atoms.count("C")  # Carbon is the most common connected atom in ligands with hapticity
-        numAs = list_of_coord_atoms.count("As")  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
-        numP = list_of_coord_atoms.count("P")  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
-        numO = list_of_coord_atoms.count("O")  # For h4-Enone
-        ## Carbon-based Haptic Ligands
-        if numC == 2:
-            group_hapttype = ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]
-            has_hapticity = True
-        elif numC == 3 and numO == 0:
-            group_hapttype = ["h3-Allyl", "h3-Cp"]
-            has_hapticity = True
-        elif numC == 3 and numO == 1:
-            group_hapttype = ["h4-Enone"]
-            has_hapticity = True
-        elif numC == 4:
-            group_hapttype = ["h4-Butadiene", "h4-Benzene"]
-            has_hapticity = True
-        elif numC == 5:
-            group_hapttype = ["h5-Cp"]
-            has_hapticity = True
-        elif numC == 6:
-            group_hapttype = ["h6-Benzene"]
-            has_hapticity = True
-        elif numC == 7:
-            group_hapttype = ["h7-Cycloheptatrienyl"]
-            has_hapticity = True
-        elif numC == 8:
-            group_hapttype = ["h8-Cyclooctatetraenyl"]
-            has_hapticity = True
-
-        # Other less common types of haptic ligands
-        elif numC == 0 and numAs == 5:
-            group_hapttype = ["h5-AsCp"]
-            has_hapticity = True
-        elif numC == 0 and numP == 5:
-            group_hapttype = ["h5-Pentaphosphole"]
-            has_hapticity = True
+        # Check if the list of atoms in a given group has hapticity and return its hapticity and the haptic type
+        has_hapticity, group_hapttype = check_hapticity_hapttype(lig.atoms, g)
 
         # Creates Group
         newgroup = group(g, has_hapticity, group_hapttype)
@@ -1903,4 +1865,189 @@ def get_hapticity_ligand (lig: object, debug: int=0) -> bool:
 
     return lig
 
+#######################################################
+def find_groups_within_atoms_list (atoms_list: list) -> list:
+
+    debug = 0
+    labels = [ atom.label for atom in atoms_list ]
+    pos = [ atom.coord for atom in atoms_list ]
+    factor = 1.3
+    radii = getradii(labels)
+
+    status, conmat, connec, mconmat, mconnec = getconec(labels, pos, factor, radii)
+
+    if debug >= 2 :
+        print(f"{status=}")
+        print(f"{conmat=}")
+        print(f"{connec=}")
+        print(f"{mconmat=}")
+        print(f"{mconnec=}")
+
+    connected_atoms = []
+    unconnected_atoms = []
+    cutmolec = []
+
+    for idx, a in enumerate(atoms_list):
+        if a.mconnec >= 1:
+            connected_atoms.append(idx)
+            cutmolec.append([a.label, idx])
+        elif a.mconnec == 0:
+            unconnected_atoms.append(idx)
+
+    rowless = np.delete(conmat, unconnected_atoms, 0)
+    columnless = np.delete(rowless, unconnected_atoms, axis=1)
+
+    if debug >= 1:
+        print(f"FIND GROUPS: connected are: {connected_atoms}")
+    if debug >= 1:
+        print(f"FIND GROUPS: unconnected are: {unconnected_atoms}")
+
+    # Regenerates the truncated lig.connec
+    connec_list = []
+    for idx, c in enumerate(connec):
+        if idx in connected_atoms:
+            connec_list.append(connec[idx])
+
+    # # Does the
+    degree = np.diag(connec_list)
+    lap = columnless - degree
+
+    # Copied from split_complex
+    graph = csr_matrix(lap)
+    perm = reverse_cuthill_mckee(graph)
+    gp1 = graph[perm, :]
+    gp2 = gp1[:, perm]
+    dense = gp2.toarray()
+
+    startlist, endlist = getblocks(dense)
+    ngroups = len(startlist)
+
+    atomlist = np.zeros((len(dense)))
+    for b in range(0, ngroups):
+        for i in range(0, len(dense)):
+            if (i >= startlist[b]) and (i <= endlist[b]):
+                atomlist[i] = b + 1
+    invperm = inv(perm)
+    atomlistperm = [int(atomlist[i]) for i in invperm]
+
+    if debug >= 1:
+        print(f"FIND GROUPS: the {ngroups} groups start at: {startlist}")
+
+    groups = []
+    for b in range(0, ngroups):
+        final_list = []
+        for i in range(0, len(atomlistperm)):
+            if atomlistperm[i] == b + 1:
+                final_list.append(cutmolec[i][1])
+        groups.append(final_list)
+
+    if debug >= 1:
+        print(f"FIND GROUPS finds {ngroups} as {groups}")
+
+    return groups
+
+#######################################################
+def get_hapticity_within_atoms_list (atoms_list: list) -> bool:
+    # This function evaluates whether a ligand has hapticity and, if so, detects which type of hapticity
+
+    group_list = []
+    group_atoms_list = []
+    hapttype = []
+    groups = find_groups_within_atoms_list(atoms_list)
+
+
+    for g in groups:
+        # Check if the list of atom objects in a given group has hapticity and return its hapticity and the haptic type
+        has_hapticity, group_hapttype = check_hapticity_hapttype (atoms_list, g)
+
+        # Creates Group
+        newgroup = group(g, has_hapticity, group_hapttype)
+        group_list.append(newgroup)
+        group_atoms_list.append([atoms_list[idx]  for idx in g])
+
+
+    # Sets hapticity
+    if any(g.hapticity == True for g in group_list):
+        hapticity = True
+        for g in group_list:
+            for typ in g.hapttype:
+                if typ not in hapttype:
+                    hapttype.append(typ)
+    else:
+        hapticity = False
+
+    return hapticity, hapttype, group_list, group_atoms_list
+
+#######################################################
+def get_coordination_geometry (mol: object, debug: int=0) -> object:
+
+    for met in mol.metalist:
+        coord_list = []
+        for a, a_site in zip(met.coordinating_atoms, met.coordinating_atoms_sites):
+            for atom in mol.atoms:
+                if (atom.label == a ) and (atom.coord == a_site):
+                    coord_list.append(atom)
+        met.coordinating_atlist = coord_list
+
+        positions=[]
+        symbols=[]
+        symbols.append(met.label)
+        positions.append(met.coord)
+        if debug >= 2 : print(f"{met.label=} {met.coord=} {met.coordinating_atlist=}")
+
+        # atoms_list = [ mol.atoms[i] for i in met.coordinating_atlist ]
+        hapticity, hapttype, group_list, group_atoms_list = get_hapticity_within_atoms_list(met.coordinating_atlist)
+
+        if hapticity == False :
+            for a, a_site in zip(met.coordinating_atoms, met.coordinating_atoms_sites):
+                symbols.append(a)
+                positions.append(a_site)
+
+            posgeom_dev = shape_measure(positions, symbols, debug=debug)
+            met.coordination (len(met.coordinating_atlist), hapticity, hapttype, posgeom_dev)
+            met.group_list = group_list
+            met.group_atoms_list = group_atoms_list
+
+            if debug >= 1 :
+                print(f"Molecule : {mol.formula}")
+                print(f"Metal : {met.label} {met.coordinating_atoms}")
+                print (f"Coordination number : {met.coordination_number} {met.posgeom_dev}")
+                print(f"The most likely geometry : '{met.geometry}' with deviation value {met.deviation} (hapticity : {met.hapticity})")
+                print("")
+
+        else :
+            for g, g_atoms in zip(group_list, group_atoms_list):
+                if g.hapticity :
+                    arr=[]
+                    for a in g_atoms:
+                        if debug >= 2 : print("\t", a.index, a.label, a.coord, a.adjacency, a.metal_adjacency, a.connec, a.mconnec)
+                        arr.append(a.coord)
+                    if len(arr) > 1 :
+                        arr = np.array(arr)
+                        symbols.append(str(g.hapttype))
+                        positions.append(get_centroid(arr))
+                        if debug >= 2 : print(f"centroid of {g.hapttype=}", get_centroid(arr))
+                else :
+                    for a in g_atoms:
+                        symbols.append(a.label)
+                        positions.append(a.coord)
+                        if debug >= 2 : print(a.label, a.coord)
+
+            posgeom_dev = shape_measure(positions, symbols, debug=debug)
+
+            cn_haptic = len(symbols)-1
+            met.coordination (cn_haptic, hapticity, hapttype, posgeom_dev)
+            met.group_list = group_list
+            met.group_atoms_list = group_atoms_list
+
+            if debug >= 1 :
+                print(f"Molecule : {mol.formula}")
+                print(f"Metal : {met.label} {met.coordinating_atoms}")
+                print (f"Coordination number based on distance: {met.coordination_number}")
+                print (f"The number of coordinating points (including the mid point of haptic ligands) : {cn_haptic} {met.posgeom_dev}")
+                print(f"The most likely geometry : '{met.geometry}' with deviation value {met.deviation} (hapticity : {met.hapticity})")
+                print(f"The hapticity of ligands : {met.hapttype}")
+                print("")
+
+    return mol
 ################ END

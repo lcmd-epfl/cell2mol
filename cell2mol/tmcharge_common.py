@@ -958,6 +958,9 @@ class metal(object):
         self.coordinating_atoms = []
         self.coordinating_atoms_sites = []
         self.occurrence = 0   # How many times the metal appears in a unit cell
+        self.coordinating_atlist = []
+        self.group_list = []
+        self.group_atoms_list = []
 
         self.atom = atom(name, label, self.coord, self.radii)
 
@@ -977,24 +980,18 @@ class metal(object):
         self.totmconnec = int(np.sum(mconnec))
         self.atom.adjacencies(np.array(int(0)), int(mconnec), type="Metal")
 
-    def coordination (self, coordination_number: int, hapticity: bool, posgeom_dev: dict) -> None:
+    def coordination (self, coordination_number: int, hapticity: bool, hapttype: list, posgeom_dev: dict) -> None:
         self.hapticity = hapticity
-        if self.hapticity == False :
-            self.coordination_number=coordination_number
-            self.posgeom_dev=posgeom_dev
+        self.hapttype = hapttype
+        self.coordination_number=coordination_number
+        self.posgeom_dev=posgeom_dev
+        if len(posgeom_dev) == 0:
+            self.geometry = "Undefined"
+            self.deviation = "Undefined"
+        else:
             self.geometry=min(posgeom_dev, key=posgeom_dev.get)
             self.deviation=min(posgeom_dev.values())
-        else:
-            if len(posgeom_dev) >= 1 :
-                self.coordination_number=coordination_number
-                self.posgeom_dev=posgeom_dev
-                self.geometry=min(posgeom_dev, key=posgeom_dev.get)
-                self.deviation=min(posgeom_dev.values())
-            else:    
-                self.coordination_number=coordination_number
-                self.posgeom_dev=posgeom_dev               
-                self.geometry="haptic ligand(s) binding"
-                self.deviation=""
+
 
 ##############
 #### CELL ####
