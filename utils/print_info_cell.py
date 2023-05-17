@@ -2,7 +2,7 @@ import pickle
 import sys
 import os
 
-from cell2mol.tmcharge_common import Cell, atom, molecule, ligand, metal
+from cell2mol.tmcharge_common import cell, atom, molecule, ligand, metal
 from cell2mol.readwrite import writexyz, print_molecule
 
 pwd = os.getcwd()
@@ -20,7 +20,7 @@ if cellfile.endswith(".gmol"):
             print("Please load a cell object. Stopping")
             exit()
         
-        print("Cell Warning List", cell.warning_list)
+        print("cell Warning List", cell.warning_list)
         print("")
         print("#### PRINTING MOLS ####")
         for mol in cell.moleclist:
