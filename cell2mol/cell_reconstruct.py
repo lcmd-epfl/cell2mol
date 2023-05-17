@@ -432,7 +432,7 @@ def check_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -
 
     if len(remove) == temp_c :
         if debug >= 1 : print(f"{remove=}", [lig.atoms[rm].label for rm in remove], temp_c)
-        if debug >= 1 : print(f"!!! Metal-coordinating atoms in {lig.formula} are wrong, but can't not be excluded!!!") # It should be assgined as Others 
+        if debug >= 1 : print(f"!!! Metal-coordinating atoms in {lig.formula} are wrong, but can't not be excluded!!!") # It should be assgined as Others e.g. SAXTOB, VIKYOE
     elif len(remove)  > 0 : 
         if debug >= 1 : print(f"{remove=}", [lig.atoms[rm].label for rm in remove])
         for wrong_idx in remove :
