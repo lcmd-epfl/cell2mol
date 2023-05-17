@@ -396,18 +396,20 @@ def get_dist (atom1_pos: list, atom2_pos: list) -> float :
 def check_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -> list : 
 
     # First check if the metal-coordinating atoms in haptic ligands are correct or not
-    remove = []
+    if debug >= 2 : print("Checking metal-coordinating atoms in haptic groups in the ligand")
+    
+    remove_h = []
     for g in lig.grouplist :
         if g.hapticity == True :
             list_of_coord_atoms = [lig.atoms[g_idx].label for g_idx in g.atlist]      
             if debug >= 1 : print(f"{lig.formula=} {g.atlist=} {list_of_coord_atoms=} {g.hapttype=} {g.hapticity=}")
-            remove = coordination_correction_for_haptic (lig, g, metalist, remove, debug)
+            remove_h = coordination_correction_for_haptic (lig, g, metalist, remove_h, debug)
         else :
             pass
-
-    if len(remove)  > 0 : 
-        if debug >= 1 : print(f"{remove=}", [lig.atoms[rm].label for rm in remove])
-        for wrong_idx in remove :
+    
+    if len(remove_h)  > 0 : 
+        if debug >= 1 : print(f"{remove_h=}", [lig.atoms[rm].label for rm in remove_h])
+        for wrong_idx in remove_h :
             lig, metalist = reset_adjacencies_lig_metalist(lig, metalist, wrong_idx, debug=debug)
 
         lig.grouplist=[]
@@ -415,35 +417,32 @@ def check_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -
         lig.hapticity=False
         lig = get_hapticity_ligand(lig, debug=debug)
         
-        if debug >= 1 : print(f"Coordination correction once again for {lig.formula} {lig.hapticity=}")
-        remove = [] # reset remove list
-        for g in lig.grouplist :
-            list_of_coord_atoms = [lig.atoms[g_idx].label for g_idx in g.atlist]      
-            if debug >= 1 : print(f"{lig.formula=} {g.atlist=} {list_of_coord_atoms=} {g.hapttype=} {g.hapticity=}")
-            if g.hapticity :
-                remove = coordination_correction_for_haptic (lig, g, metalist, remove, debug)
-            else :
-                remove = coordination_correction (lig, g, metalist, remove, debug)
+    if debug >= 2 : print("Checking metal-coordinating atoms in all groups in the ligand")
+    
+    temp_c = sum([len(g.atlist) for g in lig.grouplist])
+    remove = [] 
+    for g in lig.grouplist :
 
-    else : 
-        # No wrong coordination atoms found in haptic ligands remove = [] (still empty)
-        # Check if the metal-coordinating atoms in non-haptic ligands are correct or not
-        for g in lig.grouplist :
-            if g.hapticity == False :
-                list_of_coord_atoms = [lig.atoms[g_idx].label for g_idx in g.atlist]      
-                if debug >= 1 : print(f"{lig.formula=} {g.atlist=} {list_of_coord_atoms=} {g.hapttype=} {g.hapticity=}")
-                remove = coordination_correction (lig, g, metalist, remove, debug)
+        list_of_coord_atoms = [lig.atoms[g_idx].label for g_idx in g.atlist]      
+        if debug >= 1 : print(f"{lig.formula=} {g.atlist=} {list_of_coord_atoms=} {g.hapttype=} {g.hapticity=}")
+        if g.hapticity :
+            remove = coordination_correction_for_haptic (lig, g, metalist, remove, debug)
+        else :
+            remove = coordination_correction (lig, g, metalist, remove, debug)
 
-    if len(remove)  > 0 : 
+    if len(remove) == temp_c :
+        if debug >= 1 : print(f"{remove=}", [lig.atoms[rm].label for rm in remove], temp_c)
+        if debug >= 1 : print(f"!!! Metal-coordinating atoms in {lig.formula} are wrong, but can't not be excluded!!!") # It should be assgined as Others 
+    elif len(remove)  > 0 : 
         if debug >= 1 : print(f"{remove=}", [lig.atoms[rm].label for rm in remove])
         for wrong_idx in remove :
             lig, metalist = reset_adjacencies_lig_metalist(lig, metalist, wrong_idx, debug=debug)
-
         lig.grouplist=[]
         lig.hapttype=[]
         lig.hapticity=False
         lig = get_hapticity_ligand(lig, debug=debug)
-
+    else :
+        pass
 
     idx_list = [index for index, value in enumerate(lig.mconnec) if value >= 1] 
     
@@ -503,11 +502,16 @@ def coordination_correction (lig, g, metalist, remove, debug=1) -> list:
         if sum(neighbors_totmconnec) >= 2 :
             if debug >= 2 : print(f"\t[Check] This metal-coordinating atom {atom.label} connected to more than one metal-coordinating atoms")               
             nb_idx_list = [index for index, value in enumerate(neighbors_totmconnec) if value >= 1]
+            nb_label = []
             for nb_idx in nb_idx_list :
                 nb = lig.atoms[atom.adjacency[nb_idx]]
+                nb_label.append(nb.label)
                 if debug >= 1 : print(f"\tThis metal-coordinating atom {atom.label} connected to other metal-coordinating atom {nb.label}") 
-            remove.append(g_idx)
-            if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", g_idx, atom.label , get_dist(atom.coord, metal.coord), "due to neighboring atoms")
+            if set(nb_label) == set(["H"]) :
+                pass
+            else :
+                remove.append(g_idx)
+                if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", g_idx, atom.label , get_dist(atom.coord, metal.coord), "due to neighboring atoms")
         
         elif sum(neighbors_totmconnec) == 1 : # e.g. "S" atom in refcode YOBCUO, PORNOC                                         
             nb_idx = [index for index, value in enumerate(neighbors_totmconnec) if value == 1][0]
