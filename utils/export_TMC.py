@@ -2,7 +2,7 @@ import pickle
 import sys
 import os
 
-from cell2mol.tmcharge_common import Cell, atom, molecule, ligand, metal
+from cell2mol.tmcharge_common import cell, atom, molecule, ligand, metal
 from cell2mol.readwrite import writexyz, print_molecule
 
 pwd = os.getcwd()
