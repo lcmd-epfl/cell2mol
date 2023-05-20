@@ -422,14 +422,19 @@ def check_metal_coordinating_atoms (lig: object, metalist: list, debug: int=2) -
     temp_c = sum([len(g.atlist) for g in lig.grouplist])
     remove = [] 
     for g in lig.grouplist :
-
         list_of_coord_atoms = [lig.atoms[g_idx].label for g_idx in g.atlist]      
         if debug >= 1 : print(f"{lig.formula=} {g.atlist=} {list_of_coord_atoms=} {g.hapttype=} {g.hapticity=}")
-        if g.hapticity :
-            remove = coordination_correction_for_haptic (lig, g, metalist, remove, debug)
+        if len(remove_h)  > 0 : 
+            if g.hapticity :
+                remove = coordination_correction_for_haptic (lig, g, metalist, remove, debug)
+            else :
+                remove = coordination_correction (lig, g, metalist, remove, debug)
         else :
-            remove = coordination_correction (lig, g, metalist, remove, debug)
-
+            if g.hapticity :
+                pass
+            else :
+                remove = coordination_correction (lig, g, metalist, remove, debug)
+                
     if len(remove) == temp_c :
         if debug >= 1 : print(f"{remove=}", [lig.atoms[rm].label for rm in remove], temp_c)
         if debug >= 1 : print(f"!!! Metal-coordinating atoms in {lig.formula} are wrong, but can't not be excluded!!!") # It should be assgined as Others e.g. SAXTOB, VIKYOE
@@ -521,7 +526,7 @@ def coordination_correction (lig, g, metalist, remove, debug=1) -> list:
             if (atom.label == "H" and nb.label in ["B", "O", "N", "C"]) :
                 if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", g_idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
                 remove.append(g_idx)
-            elif (atom.label in ["B", "O", "N", "C"] and neighbor.label == "H") :
+            elif (atom.label in ["B", "O", "N", "C"] and nb.label == "H") :
                 if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", atom.adjacency[nb_idx], nb.label, get_dist(nb.coord, metal.coord), "due to H")
                 remove.append(atom.adjacency[nb_idx])
             else : # Check angle between metal-coordinating atoms               
