@@ -2,6 +2,7 @@ cell2mol: Unit Cell to Molecule Interpretation
 ==============================================
 
 ![cell2mol logo](./images/cell2mol_logo.png)
+[![DOI](https://zenodo.org/badge/446780142.svg)](https://zenodo.org/doi/10.5281/zenodo.10204037)
 
 ## Contents
 * [About](#about-)
