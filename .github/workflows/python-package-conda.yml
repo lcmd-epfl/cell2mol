@@ -20,7 +20,9 @@ jobs:
         echo $CONDA/bin >> $GITHUB_PATH
     - name: Install dependencies
       run: |
-        conda env update --file environment.yml --name base python=3.9
+        conda create --name cell2mol python=3.9
+        conda env update --file environment.yml --name cell2mol
+        conda activate cell2mol
     - name: Lint with flake8
       run: |
         conda install flake8
