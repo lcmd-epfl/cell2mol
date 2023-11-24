@@ -22,7 +22,7 @@ jobs:
       run: |
         conda create --name cell2mol python=3.9
         conda env update --file environment.yml --name cell2mol
-        conda activate cell2mol
+        activate cell2mol
     - name: Lint with flake8
       run: |
         conda install flake8
