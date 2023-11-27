@@ -26,6 +26,8 @@ jobs:
         source activate cell2mol
     - name: Lint with flake8
       run: |
+        source activate cell2mol
+        conda list
         conda install flake8
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
