@@ -15,14 +15,14 @@ jobs:
     - name: Set up Python 3.9
       uses: actions/setup-python@v2
       with:
-        python-version: 3.9
+        python-version: 3.9.9
     - name: Add conda to system path
       run: |
         # $CONDA is an environment variable pointing to the root of the miniconda directory
         echo $CONDA/bin >> $GITHUB_PATH
     - name: Install dependencies
       run: |
-        conda env create -n cell2mol --file environment.yml python=3.9
+        conda env create -n cell2mol --file environment.yml
         source activate cell2mol
     - name: Lint with flake8
       run: |
