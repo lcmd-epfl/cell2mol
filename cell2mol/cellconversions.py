@@ -4,6 +4,16 @@ import numpy as np
 
 #######################################################
 def frac2cart_fromcellvec(frac_coord, cellvec):
+    """ Convert fractional coordinates to cartesian coordinates
+    
+    Args:
+        frac_coord (list): list of fractional coordinates
+        cellvec (list): list of cell vectors
+        
+    Returns:
+        cartesian (list): list of cartesian coordinates
+    """
+
     cartesian = []
     for idx, frac in enumerate(frac_coord):
         xcar = (
@@ -21,6 +31,15 @@ def frac2cart_fromcellvec(frac_coord, cellvec):
 
 #######################################################
 def frac2cart_fromparam(frac_coord, cellparam):
+    """ Convert fractional coordinates to cartesian coordinates
+    
+    Args:
+        frac_coord (list): list of fractional coordinates
+        cellparam (list): list of cell parameters
+        
+    Returns:
+        cartesian (list): list of cartesian coordinates
+    """
 
     a = cellparam[0]
     b = cellparam[1]
@@ -64,6 +83,13 @@ def frac2cart_fromparam(frac_coord, cellparam):
 
 #######################################################
 def det3(mat):
+    """ Calculate the determinant of a 3x3 matrix
+    
+    Args:   
+        mat (list): list of 3x3 matrix
+    Returns:
+        determinant (float): determinant of the matrix
+    """    
     return (
         (mat[0][0] * mat[1][1] * mat[2][2])
         + (mat[0][1] * mat[1][2] * mat[2][0])
@@ -76,6 +102,15 @@ def det3(mat):
 
 #######################################################
 def cart2frac(cartCoords, cellvec):
+    """ Convert cartesian coordinates to fractional coordinates
+    
+    Args:
+        cartCoords (list): list of cartesian coordinates
+        cellvec (list): list of cell vectors
+    Returns:
+        fracCoords (list): list of fractional coordinates        
+    """
+    
     latCnt = [x[:] for x in [[None] * 3] * 3]
     for a in range(3):
         for b in range(3):
@@ -118,6 +153,15 @@ def cart2frac(cartCoords, cellvec):
 
 #######################################################
 def translate(vector, coords, cellvec):
+    """ Translate coordinates by a vector
+    Args:
+        vector (list): list of vector components
+        coords (list): list of coordinates
+        cellvec (list): list of cell vectors
+    Returns:
+        newcoord (list): list of translated coordinates
+    """
+
     newcoord = []
     for idx, coord in enumerate(coords):
         newx = (
@@ -139,4 +183,5 @@ def translate(vector, coords, cellvec):
             + vector[2] * cellvec[2][2]
         )
         newcoord.append([float(newx), float(newy), float(newz)])
+    
     return newcoord

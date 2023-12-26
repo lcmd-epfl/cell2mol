@@ -15,12 +15,24 @@ from cell2mol.missingH import check_missingH
 from cell2mol.tmcharge_common import cell
 from cell2mol.cellconversions import frac2cart_fromparam
 from cell2mol.readwrite import readinfo
-from cell2mol.spin import count_N, count_elec, predict_ground_state_spin, count_nitrosyl
+from cell2mol.spin import count_N, count_d_elec, assign_ground_state_spin_empirical, count_nitrosyl, calcualte_relative_metal_radius, calcualte_relative_metal_radius_haptic_complexes, generate_feature_vector
 from typing import Tuple
-
+import sklearn
+from cell2mol import __file__
 
 ##################################################################################
 def get_refmoleclist_and_check_missingH(cell: object, reflabels: list, fracs: list, debug: int=0) -> Tuple[object, float, float]:
+    """Get a list of ref.molecules and check missing hydrogens in ref.molecules
+    
+    Args:
+        cell (object): cell object
+        reflabels (list): list of reference labels
+        fracs (list): list of fractional coordinates
+        debug (int, optional): debug level. Defaults to 0.
+
+    Returns:
+        Tuple[object, float, float]: cell object, covalent_factor, metal_factor        
+    """
 
     refpos = frac2cart_fromparam(fracs, cell.cellparam)
 
@@ -98,6 +110,7 @@ def reconstruct(cell: object, reflabels: list, fracs: list, debug: int=0) -> obj
 
 ##################################################################################
 def determine_charge(cell: object, debug: int=0) -> object:
+
 
     # Indentify unique chemical species
     molec_indices, ligand_indices, unique_indices, unique_species = classify_mols(cell.moleclist, debug=debug)
@@ -216,19 +229,32 @@ def load_cell_reset_charges (cellpath: str, debug: int=0) -> object:
 
 ##################################################################################
 def assign_spin (cell: object, debug: int=0) -> object:
+    """Assign spin multiplicity to molecules in the cell object
+    
+    Args:
+        cell (object): cell object
+        debug (int, optional): debug level. Defaults to 0.
+    Returns:
+        object: cell object with spin multiplicity assigned
+    """
+    
     if debug >= 1: 
         print("#########################################")
         print("Assigning spin multiplicity")
         print("#########################################")    
 
     for mol in cell.moleclist:
+        N = count_N(mol)
         if mol.type == "Complex":
             if len(mol.metalist) == 1: # mono-metallic complexes
                 N = count_N(mol)
                 met = mol.metalist[0]
                 
                 # count valence electrons
-                elec = count_elec(met.label, met.totcharge)
+                d_elec = count_d_elec(met.label, met.totcharge)
+
+                # calculate relative metal radius
+                rel = calcualte_relative_metal_radius(met)
                 
                 # Count nitrosyl ligands               
                 arr = []
@@ -243,19 +269,45 @@ def assign_spin (cell: object, debug: int=0) -> object:
                 if debug >= 2: print(np.array(arr, dtype=object))
                 if debug >= 2: print(f"{nitrosyl=}")
                 
-                # predict spin state            
-                if met.hapticity == False:
-                    spin = predict_ground_state_spin (met.label, elec, met.coordinating_atoms, met.geometry, met.coordination_number, N, nitrosyl)
-                    mol.magnetism(spin)
-                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
-                    if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
-                    if debug >= 1: print(f"met_OS={met.totcharge} valence_{elec=} {N=} {nitrosyl=}\n")
+                if met.hapticity == False: # coordination complexes
+                    # Assign spin multiplicity of metal based on empirical rules
+                    met.relative_radius(rel, rel, rel)
+                    spin, rule, threshold  = assign_ground_state_spin_empirical(d_elec, met.totcharge, met.geometry, met.label, met.coordination_number, rel, N)
+                    # spin = predict_ground_state_spin_v1 (met.label, elec, met.coordinating_atoms, met.geometry, met.coordination_number, N, nitrosyl)
 
-                else:
+                    # Predict spin multiplicity of metal based on Random forest model
+                    feature = generate_feature_vector (met)
+                    print(feature)
+                    path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), "TM-GSspin_RandomForest.pkl")
+                    #print(path_rf)
+                    rf = pickle.load(open(path_rf, 'rb'))
+                    predictions = rf.predict(feature)
+                    spin_rf = predictions[0]
+                    #if debug >= 1: print(f"{spin=} {spin_rf=}")
+                    mol.ml_prediction(spin_rf)
+
+                    if spin == 0 : # unknown spin state
+                        mol.magnetism(1)    
+                    else:
+                        mol.magnetism(spin)
+
+                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=} {mol.spin_rf=}")
+                    if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
+                    if debug >= 1: print(f"met_OS={met.totcharge} {d_elec=} {N=} {nitrosyl=} {met.rel=}\n")
+
+                else: # hapticity == True 
+                    rel_g, rel_c = calcualte_relative_metal_radius_haptic_complexes(met)
+                    #if debug >= 1: print(f"{rel_g=} {rel_c=}")
+                    met.relative_radius(rel, rel_g, rel_c)
+                    
                     if count_N(mol) % 2 == 0:
                         mol.magnetism(1) # spin multiplicity = 1 Singlet
                     else:
                         mol.magnetism(2) # spin multiplicity = 2 Doublet
+
+                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
+                    if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
+                    if debug >= 1: print(f"met_OS={met.totcharge} {d_elec=} {N=} {nitrosyl=} {met.rel=} {met.rel_g=} {met.rel_c=}\n")
 
             else : # Bi- & Poly-metallic complexes
                 if count_N(mol) % 2 == 0:

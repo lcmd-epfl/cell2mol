@@ -816,8 +816,11 @@ class molecule(object):
                 a.atom_charge(self.atcharge[idx])
 
     # Spin State Variables
-    def magnetism(self, spin):
+    def magnetism(self, spin: int) -> None:
         self.spin = spin
+
+    def ml_prediction(self, spin_rf: int) -> None:
+        self.spin_rf = spin_rf
 
     # Connectivity = Adjacency Matrix. Potentially expandable to Include Bond Types
     def adjacencies(self, conmat: np.ndarray, mconmat: np.ndarray) -> None:
@@ -908,7 +911,7 @@ class ligand(object):
             a.atom_charge(int(self.atcharge[idx]))
 
     # Spin State Variables
-    def magnetism(self, spin):
+    def magnetism(self, spin: int) -> None:
         self.spin = spin
 
     def adjacencies(self, conmat: np.ndarray, mconnec: np.ndarray) -> None:
@@ -992,6 +995,11 @@ class metal(object):
             self.geometry=min(posgeom_dev, key=posgeom_dev.get)
             self.deviation=min(posgeom_dev.values())
 
+    def relative_radius(self, rel: float, rel_g: float, rel_c: float) -> None:
+        self.rel = rel
+        self.rel_g = rel_g 
+        self.rel_c = rel_c
+        
 
 ##############
 #### CELL ####

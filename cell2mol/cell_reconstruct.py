@@ -20,6 +20,16 @@ elemdatabase = ElementData()
 
 #######################################################
 def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> None:
+    """Verifies the connectivity of a ligand. It is used to correct the connectivity of the ligand, if needed.
+    
+    Args:
+        ligand (object): ligand object
+        molecule (object): molecule object
+        debug (int, optional): debug level. Defaults to 0.
+    
+    Returns:
+        None
+    """
 
     metalist = molecule.metalist.copy()
 
@@ -66,6 +76,12 @@ def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> Non
 
 #######################################################
 def get_reference_molecules(labels: list, pos: list, debug: int=0) -> Tuple[list, float, float, bool]:
+    """Function that retrieves the reference molecules from the information in the .cif file
+    Molecules are extracted from the adjacency matrix, and the results are evaluated. How? Well, the adjacency matrix is constructed using a covalent factor.
+    
+    """
+
+
     ## Retrieves the reference molecules from the information in the .cif file
     # Molecules are extracted from the adjacency matrix, and the results are evaluated. How? Well, the adjacency matrix is constructed using a covalent factor.
     # This factor is taken as 1.3, but it can occasionally be too small or too large. If it is too small, it results on some atoms being detached from their molecule.

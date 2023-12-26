@@ -4,6 +4,14 @@ import argparse
 
 
 def parsing_arguments():
+    """Parses the arguments of the command line.
+    
+    Returns:
+        filename (str): filename of the input file
+        step (int): step of the program to be executed
+        verbose (bool): verbose flag
+        quiet (bool): quiet flag
+    """
     parser = argparse.ArgumentParser(
         prog="cell2mol", description="Interprets the crystallography file (.cif) of a molecular crystal, and stores the information in a python cell object"
     )
