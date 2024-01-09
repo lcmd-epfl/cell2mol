@@ -10,6 +10,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - uses: actions/setup-node@v2
+      with:
+        node-version: '16'  
     - name: Set up Python 3.9
       uses: actions/setup-python@v2
       with:
@@ -19,10 +22,8 @@ jobs:
         # $CONDA is an environment variable pointing to the root of the miniconda directory
         echo $CONDA/bin >> $GITHUB_PATH
     - name: Install dependencies
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
       run: |
+        using: 'node20'
         conda env update --file environment.yml --name base
     - name: Lint with flake8
       run: |
