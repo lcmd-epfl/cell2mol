@@ -23,7 +23,6 @@ jobs:
         echo $CONDA/bin >> $GITHUB_PATH
     - name: Install dependencies
       run: |
-        using: 'node20'
         conda env update --file environment.yml --name base
     - name: Lint with flake8
       run: |
