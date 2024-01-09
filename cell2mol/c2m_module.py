@@ -293,7 +293,7 @@ def assign_spin (cell: object, debug: int=0) -> object:
                         else:
                             lig.magnetism(2) 
 
-                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=} {spin_rf=}")
+                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
                     if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.hapttype=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
                 
                 #elif (period == 5 or period == 6 ) and (d_elec in [2, 3] and met.hapticity == False) :
