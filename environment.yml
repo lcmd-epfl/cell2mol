@@ -4,6 +4,7 @@ channels:
   - anaconda
   - defaults
 dependencies:
+  - libmambapy=1.5.3
   - argon2-cffi=21.3.0
   - argon2-cffi-bindings=21.2.0
   - asttokens=2.0.5
