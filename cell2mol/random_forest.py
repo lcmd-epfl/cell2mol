@@ -20,7 +20,9 @@ from cell2mol.spin import make_geom_list
 
 dataframe=argv[1]
 metal = argv[2]
-mode = argv[3]
+#mode = argv[3]
+prop = argv[3]
+
 
 print("Sklearn version:", sklearn.__version__)
 
@@ -47,12 +49,21 @@ print("the length of", metal,  len(df))
 
 #exit()
 
-prop = "spin_multiplicity"
+#prop = "spin_multiplicity"
 
-# extract = ["elem_nr", "m_ox", "d_elec"] # F_TM
-# extract = ["CN", "geom_nr", "rel_m"] # F_CE
-extract = ["elem_nr", "m_ox", "d_elec", "CN", "geom_nr", "rel_m"] # F_TM+CE
+#prop = "m_ox"
 
+if prop == "spin_multiplicity" or prop == "spin" or prop == "s" :
+    # extract = ["elem_nr", "m_ox", "d_elec"] # F_TM 
+    # extract = ["CN", "geom_nr", "rel_m"] # F_CE
+    #extract = ["elem_nr", "m_ox", "d_elec", "CN", "geom_nr", "rel_m"] # F_TM+CE
+    extract = ["elem_nr", "m_ox", "d_elec", "CN", "geom_nr", "rel_m", "hapticity"] # F_TM+CE+hapticity
+elif prop == "m_ox":
+    extract = ["elem_nr", "CN", "geom_nr", "rel_m", "hapticity"] 
+else :
+    print("No such property in the database")
+    exit()
+    
 
 Nfix=list(df["refcode"])
 print("the number of complexes :", len(Nfix))
@@ -146,19 +157,21 @@ for rep, (idx_tr, idx_te) in enumerate(skf.split(X, Y)):
         print(f"\n Incorrect predictions for replica {rep}:")
     for idx, sys in enumerate(is_correct):
         if not sys and print_incorrect:
+            m_ox = df[ df.refcode == l_te[idx] ]["m_ox"].item()
+            metal_elem = df[ df.refcode == l_te[idx] ]["metal"].item()
             print(
-                f"System {l_te[idx]} has prediction {predictions[idx]} with probability {np.max(prediction_probs[idx])} and reference {y_te[idx]}"
+                f"System {l_te[idx]} has prediction {predictions[idx]} with probability {np.max(prediction_probs[idx])} and reference {y_te[idx]} metal {metal_elem} m_ox {m_ox}"
             )
 
 print("\n \n Summary of replica results:")
-print(f"Training mean accuracy was {np.mean(acc_train)} with STD {np.std(acc_train)}")
-print(f"Test mean accuracy was {np.mean(acc_test)} with STD {np.std(acc_test)}")
-print(f"Training mean f1_score_micro was {np.mean(f1_train_micro)} with STD {np.std(f1_train_micro)}")
-print(f"Test mean f1_score_micro was {np.mean(f1_test_micro)} with STD {np.std(f1_test_micro)}")
-print(f"Training mean f1_score_macro was {np.mean(f1_train_macro)} with STD {np.std(f1_train_macro)}")
-print(f"Test mean f1_score_macro was {np.mean(f1_test_macro)} with STD {np.std(f1_test_macro)}")
-print(f"Training mean f1_score_weighted was {np.mean(f1_train_weighted)} with STD {np.std(f1_train_weighted)}")
-print(f"Test mean f1_score_weighted was {np.mean(f1_test_weighted)} with STD {np.std(f1_test_weighted)}")
+print(f"Training mean accuracy was {round(np.mean(acc_train),3)} with STD {round(np.std(acc_train),3)}")
+print(f"Test mean accuracy was {round(np.mean(acc_test),3)} with STD {round(np.std(acc_test),3)}")
+print(f"Training mean f1_score_micro was {round(np.mean(f1_train_micro),3)} with STD {round(np.std(f1_train_micro),3)}")
+print(f"Test mean f1_score_micro was {round(np.mean(f1_test_micro),3)} with STD {round(np.std(f1_test_micro),3)}")
+print(f"Training mean f1_score_macro was {round(np.mean(f1_train_macro),3)} with STD {round(np.std(f1_train_macro),3)}")
+print(f"Test mean f1_score_macro was {round(np.mean(f1_test_macro),3)} with STD {round(np.std(f1_test_macro),3)}")
+print(f"Training mean f1_score_weighted was {round(np.mean(f1_train_weighted),3)} with STD {round(np.std(f1_train_weighted),3)}")
+print(f"Test mean f1_score_weighted was {round(np.mean(f1_test_weighted),3)} with STD {round(np.std(f1_test_weighted),3)}")
 
 try:
     assert len(maxprob) == len(l_oos)
@@ -170,7 +183,7 @@ dat = np.column_stack((l_oos, maxprob))
 np.savetxt(metal + "_maxprob_{}.txt".format(mode), dat, delimiter=" ", fmt="%s")
 
 # We train a model on all available data and save it
-filename = "{}_{}.pkl".format(metal, mode)
+filename = "{}_{}_{}.pkl".format(metal, prop, len(df))
 learner = learner = rf_random.best_estimator_.fit(X, Y)
 pickle.dump(learner, open(filename, "wb"))
 print("feature importance", learner.feature_importances_)
