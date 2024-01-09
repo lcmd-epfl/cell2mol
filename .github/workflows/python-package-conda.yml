@@ -10,6 +10,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '16'  
     - name: Set up Python 3.9
       uses: actions/setup-python@v2
       with:
@@ -30,7 +33,7 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Install cell2mol
       run: |
-        python setup.py install
+        pip install .
     - name: Test with pytest
       run: |
         conda install pytest
