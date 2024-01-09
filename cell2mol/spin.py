@@ -232,7 +232,7 @@ def get_centroid(arr: np.array) -> list:
     return centroid
 
 ################################
-def calcualte_relative_metal_radius_haptic_complexes (metal):
+def calcualte_relative_metal_radius_haptic_complexes (metal, debug=0):
     
     diff_list_g = []
     diff_list_c = []
@@ -264,13 +264,13 @@ def calcualte_relative_metal_radius_haptic_complexes (metal):
     average_c = round(np.average(diff_list_c), 3)
     rel_c = round(average_c/elemdatabase.CovalentRadius3[metal.label], 3)
 
-    print(f"{len(metal.group_list)=}, {diff_list_g}, {average_g=}, {rel_g=}, {metal.label}, {elemdatabase.CovalentRadius3[metal.label]}")
-    print(f"{len(metal.group_list)=}, {diff_list_c}, {average_c=}, {rel_c=}, {metal.label}, {elemdatabase.CovalentRadius3[metal.label]}")
+    if debug >=2 : print(f"{len(metal.group_list)=}, {diff_list_g}, {average_g=}, {rel_g=}, {metal.label}, {elemdatabase.CovalentRadius3[metal.label]}")
+    if debug >=2 : print(f"{len(metal.group_list)=}, {diff_list_c}, {average_c=}, {rel_c=}, {metal.label}, {elemdatabase.CovalentRadius3[metal.label]}")
 
     return rel_g, rel_c
 
 ################################
-def calcualte_relative_metal_radius (metal):
+def calcualte_relative_metal_radius (metal, debug=0):
     """ Calculate relative metal radius for a given transition metal coordination complex
     Args:
         metal (obj): metal atom object
@@ -287,7 +287,7 @@ def calcualte_relative_metal_radius (metal):
     average = round(np.average(diff_list), 3)    
     rel = round(average/elemdatabase.CovalentRadius3[metal.label], 3)
     
-    print(f"{metal.coordinating_atoms}, {diff_list}, {average=}, {rel=}, {metal.label}, {elemdatabase.CovalentRadius3[metal.label]}")
+    if debug >=2 : print(f"{metal.coordinating_atoms}, {diff_list}, {average=}, {rel=}, {metal.label}, {elemdatabase.CovalentRadius3[metal.label]}")
     
     return rel
 
@@ -304,9 +304,17 @@ def generate_feature_vector (metal):
     d_elec = count_d_elec (metal.label, m_ox)
     CN = metal.coordination_number
     geom_nr = make_geom_list()[metal.geometry]
-    rel = calcualte_relative_metal_radius (metal)
-    
-    feature = np.array([[elem_nr, m_ox, d_elec, CN, geom_nr, rel]])
+
+    if metal.hapticity == False :
+        rel = calcualte_relative_metal_radius (metal)
+        hapticity = 0
+    else :
+        dummy, rel = calcualte_relative_metal_radius_haptic_complexes (metal)
+        hapticity = 1
+
+    print(f"{elem_nr=} {m_ox=} {d_elec=} {rel=} {hapticity=}\n")
+
+    feature = np.array([[elem_nr, m_ox, d_elec, CN, geom_nr, rel, hapticity]])
     
     return feature
 
@@ -348,7 +356,7 @@ def get_posspin_v2 (d_elec: int, m_ox: int, geometry: str, metal: str) -> list:
                 elif metal == "Ni" and m_ox == 3:
                     posspin = ["LS"]
                 else :
-                    posspin = ["LS", "HS"]
+                    posspin = ["LS", "IS"]
     return posspin
 
 ################################
