@@ -19,9 +19,10 @@ from cell2mol.spin import count_N, count_d_elec, assign_ground_state_spin_empiri
 from typing import Tuple
 import sklearn
 from cell2mol import __file__
+
+from cell2mol.other import handle_error
+
 from cell2mol.elementdata import ElementData
-
-
 elemdatabase = ElementData()
 
 ##################################################################################
@@ -472,40 +473,48 @@ def assign_spin_old (cell: object, debug: int=0) -> object:
 ##################################################################################
 ################################## MAIN ##########################################
 ##################################################################################
-def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, debug: int=1) -> object:
-
+def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, cellpath: str=None, debug: int=1) -> object:
+    ## Step == 1: Only Cell Reconstruction
+    ## Step == 2: Only Charge Assignment (cell reconstruction must have been run before)
+    ## Step == 3: Both Cell Reconstruction and Charge Assignment (cell reconstruction must have been run before)
+    
     if step == 1 or step == 3:
 
         tini = time.time()
 
-        # Read reference molecules from info file
+        # Reads reference molecules from info file, as well as labels and coordinates
         labels, pos, ref_labels, ref_fracs, cellvec, cellparam = readinfo(infopath)
 
-        # Initialize cell object
-        warning_list = []
+        # Initiates cell
         newcell = cell(refcode, labels, pos, cellvec, cellparam, warning_list)
-        if debug >= 1: print("[Refcode]", newcell.refcode)
 
+        # Loads the reference molecules and checks_missing_H
+        newcell.get_references_molecules(ref_labels, ref_fracs, debug=debug)      ## Evaluates boolean variable self.has_isolated_H. If true, indicates a problem with the cif
+        if newcell.has_isolated_H: handle_error(1)
+        newcell.check_missing_H(debug=debug)                                      ## Evaluates boolean variable self.has_missing_H. If true, indicates a problem with the cif
+        if newcell.has_missing_H:  handle_error(2)
+  
         # Cell Reconstruction
-        if debug >= 1: print("===================================== step 1 : Cell reconstruction =====================================\n")
-        newcell = reconstruct(newcell, ref_labels, ref_fracs, debug=debug)
+        newcell.reconstruct(debug=debug)
+        if newcell.is_fragmented:  handle_error(3)
+
         tend = time.time()
-        if debug >= 1: print(f"\nTotal execution time for Cell Reconstruction: {tend - tini:.2f} seconds")
+        if debug >= 1: print(f"\nCell Reconstruction Finished Normally. Total execution time: {tend - tini:.2f} seconds")
 
     elif step == 2:
+        from cell2mol.readwrite import load_binary
         if debug >= 1: print("\n***Runing only Charge Assignment***")
+        if cellpath is None: cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(refcode))
+        newcell = load_binary(cellpath)
         if debug >= 1: print("\nCell object loaded with pickle")
-        cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(refcode))
-        newcell = load_cell_reset_charges(cellpath)
+        newcell.reset_charges() 
+        ### newcell = load_cell_reset_charges(cellpath)       --- Split into load_binary and newcell.reset_charges
+
     else:
         if debug >= 1: print("Step number is incorrect. Only values 1, 2 or 3 are accepted")
         sys.exit(1)
 
-    if not any(newcell.warning_after_reconstruction):
-        if step == 1 or step == 3:
-            if debug >= 1: print("Cell reconstruction successfully finished.\n")
-        elif step == 2:
-            if debug >= 1: print("No Warnings in loaded Cell object in cell reconstruction \n")
+    if not newcell.has_missing_H and not newcell.has_isolated_H and not newcell.is_fragmented:
 
         if step == 1:
             pass
