@@ -3,6 +3,22 @@
 import numpy as np
 import pickle
 
+#######################
+def save_binary(variable, pathfile, backup: bool=False):
+    try:
+        file = open(pathfile,'wb')
+        pickle.dump(variable,file)
+        file.close()
+    except Exception as exc:
+        print("Error Saving Binary for pathfile:", pathfile)
+        print(exc)
+
+#######################
+def load_binary(pathfile):
+    with open(pathfile, "rb") as pickle_file:
+        binary = pickle.load(pickle_file)
+    return binary            
+
 ##############
 def readxyz(file):
     labels = []
@@ -22,6 +38,12 @@ def readxyz(file):
 
     return labels, pos
 
+################################
+def printxyz(labels, pos):
+    print(len(labels))
+    print("")
+    for idx, l in enumerate(labels):
+        print("%s  %.6f  %.6f  %.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]))
 
 ##############
 def writexyz(fdir, fname, labels, pos, charge: int=0, spin: int=1):
@@ -46,7 +68,6 @@ def search_string_in_file(file_name, string_to_search):
                 list_of_results.append((line_number))
 
     return list_of_results
-
 
 ##############
 def readinfo(filepath):
@@ -121,7 +142,6 @@ def readinfo(filepath):
 
     return labels, pos, lfracs, fracs, cellvec, cellparam
 
-
 ##############
 def readcif(filepath):
 
@@ -179,7 +199,6 @@ def readcif(filepath):
 
     return journal, chemname, labels, radii
 
-
 ###########
 def print_molecule(mol, name, ext, folder):
     filename = str(folder) + "/" + str(name) + "." + str(ext)
@@ -227,7 +246,6 @@ def print_molecule(mol, name, ext, folder):
 
     else:
         print(ext, "not found as a valid print extension in print_molecule")
-
 
 #############
 def savemolecules(moleclist, output_dir, print_types, option_print_repeated=True):
@@ -281,7 +299,6 @@ def savemolecules(moleclist, output_dir, print_types, option_print_repeated=True
             if hasattr(mol, "object"):
                 if print_mol:
                     print_molecule(mol, mol.name, "mol", output_dir)
-
 
 ###########
 def print_unit_cell(cell, output_dir):

@@ -87,6 +87,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     ######################
     print(f"running cell2mol with debug={debug}")
 
+## def __init__(self, refcode: str, labels: list, pos: list, cellvec: list, cellparam: list, warning_list: list) -> None:
     cell = cell2mol(infopath, refcode, output_dir, step, debug)
     print_types = "gmol"
     save_cell(cell, print_types, output_dir, debug=debug)
