@@ -1,0 +1,849 @@
+running cell2mol with debug=2
+[Refcode] BACZUB
+===================================== step 1 : Cell reconstruction =====================================
+
+
+GETREFS: sending listofreferences with 1.3 1.0
+lig.formula='H5-C5' g.atlist=[0, 2, 4, 6, 8] list_of_coord_atoms=['C', 'C', 'C', 'C', 'C'] g.hapttype=['h5-Cp'] g.hapticity=True
+	Atom 0 : C 	Metal 1 : Fe 	distance : 2.065 	thres : 2.665
+	Atom 2 : C 	Metal 1 : Fe 	distance : 2.062 	thres : 2.665
+	Atom 4 : C 	Metal 1 : Fe 	distance : 2.045 	thres : 2.665
+	Atom 6 : C 	Metal 1 : Fe 	distance : 2.084 	thres : 2.665
+	Atom 8 : C 	Metal 1 : Fe 	distance : 2.104 	thres : 2.665
+ratio_list=[0.775, 0.774, 0.767, 0.782, 0.79] std_dev=0.008
+lig.formula='H5-C5' g.atlist=[0, 2, 4, 6, 8] list_of_coord_atoms=['C', 'C', 'C', 'C', 'C'] g.hapttype=['h5-Cp'] g.hapticity=True
+>>> metal-coordinating atoms C 	distance : 2.065 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.062 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.045 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.084 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.104 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+
+lig.formula='H4-C5' g.atlist=[0, 1, 3, 5, 7] list_of_coord_atoms=['C', 'C', 'C', 'C', 'C'] g.hapttype=['h5-Cp'] g.hapticity=True
+	Atom 0 : C 	Metal 0 : Hg 	distance : 2.042 	thres : 2.665
+	Atom 1 : C 	Metal 1 : Fe 	distance : 2.051 	thres : 2.665
+	Atom 3 : C 	Metal 1 : Fe 	distance : 2.081 	thres : 2.665
+	Atom 5 : C 	Metal 1 : Fe 	distance : 2.068 	thres : 2.665
+	Atom 7 : C 	Metal 1 : Fe 	distance : 2.077 	thres : 2.665
+ratio_list=[0.766, 0.77, 0.781, 0.776, 0.779] std_dev=0.006
+lig.formula='H4-C5' g.atlist=[0, 1, 3, 5, 7] list_of_coord_atoms=['C', 'C', 'C', 'C', 'C'] g.hapttype=['h5-Cp'] g.hapticity=True
+>>> metal-coordinating atoms C 	distance : 2.042 	thres : 2.665 	Metal 0 : Hg ['Cl', 'C']
+>>> metal-coordinating atoms C 	distance : 2.051 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.081 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.068 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.077 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+
+lig.formula='Cl' g.atlist=[0] list_of_coord_atoms=['Cl'] g.hapttype=[] g.hapticity=False
+	Atom 0 : Cl 	Metal 0 : Hg 	distance : 2.298 	thres : 3.042
+>>> metal-coordinating atoms Cl 	distance : 2.298 	thres : 3.042 	Metal 0 : Hg ['Cl', 'C']
+
+###### met in ref.metalist ######
+met.label='Hg'	met.mconnec=array([2])	met.totmconnec=2
+met.coord_sphere=['Cl', 'C']
+met.coordinating_atoms=['Cl', 'C']
+met.label='Fe'	met.mconnec=array([10])	met.totmconnec=10
+met.coord_sphere=['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+met.coordinating_atoms=['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+Molecule : H9-C10-Cl-Fe-Hg
+Metal : Hg	Coordinating atoms : ['Cl', 'C']
+Coordination number : 2 {'Linear': 0.12, 'Bent (V-shape, 109.47°)': 13.912, 'Bent (L-shape, 90°)': 24.491}
+The most likely geometry : 'Linear' with deviation value 0.12 (hapticity : False)
+
+Molecule : H9-C10-Cl-Fe-Hg
+Metal : Fe	Coordinating atoms : ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+The number of coordinating points (including the mid point of haptic ligands) : 2 {'Linear': 0.007, 'Bent (V-shape, 109.47°)': 13.717, 'Bent (L-shape, 90°)': 24.293}
+The most likely geometry : 'Linear' with deviation value 0.007 (hapticity : True)
+The type of hapticity : ['h5-Cp']
+
+Potential hapticity=True for molecule H9-C10-Cl-Fe-Hg
+Verifying Connectivity for Lig in Ref molec 10, H5-C5, 5 1
+Verifying Connectivity for Lig in Ref molec 9, H4-C5, 6 2
+Verifying Connectivity for Lig in Ref molec 1, Cl, 1 1
+lig.formula='H5-C5' g.atlist=[0, 2, 4, 6, 8] list_of_coord_atoms=['C', 'C', 'C', 'C', 'C'] g.hapttype=['h5-Cp'] g.hapticity=True
+	Atom 0 : C 	Metal 1 : Fe 	distance : 2.065 	thres : 2.665
+	Atom 2 : C 	Metal 1 : Fe 	distance : 2.062 	thres : 2.665
+	Atom 4 : C 	Metal 1 : Fe 	distance : 2.045 	thres : 2.665
+	Atom 6 : C 	Metal 1 : Fe 	distance : 2.084 	thres : 2.665
+	Atom 8 : C 	Metal 1 : Fe 	distance : 2.104 	thres : 2.665
+ratio_list=[0.775, 0.774, 0.767, 0.782, 0.79] std_dev=0.008
+lig.formula='H5-C5' g.atlist=[0, 2, 4, 6, 8] list_of_coord_atoms=['C', 'C', 'C', 'C', 'C'] g.hapttype=['h5-Cp'] g.hapticity=True
+>>> metal-coordinating atoms C 	distance : 2.065 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.062 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.045 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.084 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.104 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+
+lig.formula='H4-C5' g.atlist=[0, 1, 3, 5, 7] list_of_coord_atoms=['C', 'C', 'C', 'C', 'C'] g.hapttype=['h5-Cp'] g.hapticity=True
+	Atom 0 : C 	Metal 0 : Hg 	distance : 2.042 	thres : 2.665
+	Atom 1 : C 	Metal 1 : Fe 	distance : 2.051 	thres : 2.665
+	Atom 3 : C 	Metal 1 : Fe 	distance : 2.081 	thres : 2.665
+	Atom 5 : C 	Metal 1 : Fe 	distance : 2.068 	thres : 2.665
+	Atom 7 : C 	Metal 1 : Fe 	distance : 2.077 	thres : 2.665
+ratio_list=[0.766, 0.77, 0.781, 0.776, 0.779] std_dev=0.006
+lig.formula='H4-C5' g.atlist=[0, 1, 3, 5, 7] list_of_coord_atoms=['C', 'C', 'C', 'C', 'C'] g.hapttype=['h5-Cp'] g.hapticity=True
+>>> metal-coordinating atoms C 	distance : 2.042 	thres : 2.665 	Metal 0 : Hg ['Cl', 'C']
+>>> metal-coordinating atoms C 	distance : 2.051 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.081 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.068 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+>>> metal-coordinating atoms C 	distance : 2.077 	thres : 2.665 	Metal 1 : Fe ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+
+lig.formula='Cl' g.atlist=[0] list_of_coord_atoms=['Cl'] g.hapttype=[] g.hapticity=False
+	Atom 0 : Cl 	Metal 0 : Hg 	distance : 2.298 	thres : 3.042
+>>> metal-coordinating atoms Cl 	distance : 2.298 	thres : 3.042 	Metal 0 : Hg ['Cl', 'C']
+
+###### met in ref.metalist ######
+met.label='Hg'	met.mconnec=array([2])	met.totmconnec=2
+met.coord_sphere=['Cl', 'C']
+met.coordinating_atoms=['Cl', 'C']
+met.label='Fe'	met.mconnec=array([10])	met.totmconnec=10
+met.coord_sphere=['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+met.coordinating_atoms=['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+Molecule : H9-C10-Cl-Fe-Hg
+Metal : Hg	Coordinating atoms : ['Cl', 'C']
+Coordination number : 2 {'Linear': 0.12, 'Bent (V-shape, 109.47°)': 13.912, 'Bent (L-shape, 90°)': 24.491}
+The most likely geometry : 'Linear' with deviation value 0.12 (hapticity : False)
+
+Molecule : H9-C10-Cl-Fe-Hg
+Metal : Fe	Coordinating atoms : ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+The number of coordinating points (including the mid point of haptic ligands) : 2 {'Linear': 0.007, 'Bent (V-shape, 109.47°)': 13.717, 'Bent (L-shape, 90°)': 24.293}
+The most likely geometry : 'Linear' with deviation value 0.007 (hapticity : True)
+The type of hapticity : ['h5-Cp']
+
+Potential hapticity=True for molecule H9-C10-Cl-Fe-Hg
+Verifying Connectivity for Lig in Ref molec 10, H5-C5, 5 1
+Verifying Connectivity for Lig in Ref molec 9, H4-C5, 6 2
+Verifying Connectivity for Lig in Ref molec 1, Cl, 1 1
+lig.formula='Cl' g.atlist=[0] list_of_coord_atoms=['Cl'] g.hapttype=[] g.hapticity=False
+	Atom 0 : Cl 	Metal 1 : Hg 	distance : 2.401 	thres : 3.042
+>>> metal-coordinating atoms Cl 	distance : 2.401 	thres : 3.042 	Metal 1 : Hg ['Cl', 'Cl', 'Cl', 'Cl']
+
+lig.formula='Cl' g.atlist=[0] list_of_coord_atoms=['Cl'] g.hapttype=[] g.hapticity=False
+	Atom 0 : Cl 	Metal 1 : Hg 	distance : 2.348 	thres : 3.042
+>>> metal-coordinating atoms Cl 	distance : 2.348 	thres : 3.042 	Metal 1 : Hg ['Cl', 'Cl', 'Cl', 'Cl']
+
+lig.formula='Cl' g.atlist=[0] list_of_coord_atoms=['Cl'] g.hapttype=[] g.hapticity=False
+	Atom 0 : Cl 	Metal 1 : Hg 	distance : 2.539 	thres : 3.042
+>>> metal-coordinating atoms Cl 	distance : 2.539 	thres : 3.042 	Metal 1 : Hg ['Cl', 'Cl', 'Cl', 'Cl']
+
+lig.formula='Cl' g.atlist=[0] list_of_coord_atoms=['Cl'] g.hapttype=[] g.hapticity=False
+	Atom 0 : Cl 	Metal 0 : Hg 	distance : 2.401 	thres : 3.042
+>>> metal-coordinating atoms Cl 	distance : 2.401 	thres : 3.042 	Metal 0 : Hg ['Cl', 'Cl', 'Cl', 'Cl']
+
+lig.formula='Cl' g.atlist=[0] list_of_coord_atoms=['Cl'] g.hapttype=[] g.hapticity=False
+	Atom 0 : Cl 	Metal 0 : Hg 	distance : 2.348 	thres : 3.042
+>>> metal-coordinating atoms Cl 	distance : 2.348 	thres : 3.042 	Metal 0 : Hg ['Cl', 'Cl', 'Cl', 'Cl']
+
+lig.formula='Cl' g.atlist=[0] list_of_coord_atoms=['Cl'] g.hapttype=[] g.hapticity=False
+	Atom 0 : Cl 	Metal 0 : Hg 	distance : 2.539 	thres : 3.042
+>>> metal-coordinating atoms Cl 	distance : 2.539 	thres : 3.042 	Metal 0 : Hg ['Cl', 'Cl', 'Cl', 'Cl']
+
+###### met in ref.metalist ######
+met.label='Hg'	met.mconnec=array([4])	met.totmconnec=4
+met.coord_sphere=['Cl', 'Cl', 'Cl', 'Cl']
+met.coordinating_atoms=['Cl', 'Cl', 'Cl', 'Cl']
+met.label='Hg'	met.mconnec=array([4])	met.totmconnec=4
+met.coord_sphere=['Cl', 'Cl', 'Cl', 'Cl']
+met.coordinating_atoms=['Cl', 'Cl', 'Cl', 'Cl']
+Molecule : Cl6-Hg2
+Metal : Hg	Coordinating atoms : ['Cl', 'Cl', 'Cl', 'Cl']
+Coordination number : 4 {'Tetrahedral': 1.839, 'Square planar': 29.907, 'Seesaw': 7.15}
+The most likely geometry : 'Tetrahedral' with deviation value 1.839 (hapticity : False)
+
+Molecule : Cl6-Hg2
+Metal : Hg	Coordinating atoms : ['Cl', 'Cl', 'Cl', 'Cl']
+Coordination number : 4 {'Tetrahedral': 1.839, 'Square planar': 29.907, 'Seesaw': 7.15}
+The most likely geometry : 'Tetrahedral' with deviation value 1.839 (hapticity : False)
+
+Potential hapticity=False for molecule Cl6-Hg2
+Verifying Connectivity for Lig in Ref molec 1, Cl, 1 1
+Verifying Connectivity for Lig in Ref molec 1, Cl, 1 1
+Verifying Connectivity for Lig in Ref molec 1, Cl, 2 2
+Verifying Connectivity for Lig in Ref molec 1, Cl, 1 1
+Verifying Connectivity for Lig in Ref molec 1, Cl, 1 1
+Verifying Connectivity for Lig in Ref molec 1, Cl, 2 2
+valid_list_of_references=True Warning=False
+
+##################
+Checking Missing H
+##################
+Not a Single Molecule has Missing H atoms (apparently)
+H9-C10-Cl-Fe-Hg found as reference
+H9-C10-Cl-Fe-Hg found as reference
+Cl6-Hg2 found as reference
+12 Blocks sorted for reconstruction as (Molec, Frag, H): 0 8 4
+With a total of 52 atoms
+
+##############################################
+8 molecules submitted to SEQUENTIAL with Heavy
+##############################################
+Entered sequential with 8 fragments to reconstruct
+Found 8 and 0 Heavy and Hydrogen fragments, respectively
+ 
+Fragments to allocate this iteration: 0 1 out of 7 7
+SEQUENTIAL Heavy iteration 1 with 8 and 8 Remaining in each list
+SEQUENTIAL Heavy sending ['Hg', 'Cl'] and ['Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] to combine
+ 
+Fragments to allocate this iteration: 0 2 out of 7 7
+SEQUENTIAL Heavy iteration 2 with 8 and 8 Remaining in each list
+SEQUENTIAL Heavy sending ['Hg', 'Cl'] and ['Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] to combine
+ 
+Fragments to allocate this iteration: 0 3 out of 7 7
+SEQUENTIAL Heavy iteration 3 with 8 and 8 Remaining in each list
+SEQUENTIAL Heavy sending ['Hg', 'Cl'] and ['Hg', 'Cl', 'Cl', 'Cl'] to combine
+ 
+Fragments to allocate this iteration: 0 4 out of 7 7
+SEQUENTIAL Heavy iteration 4 with 8 and 8 Remaining in each list
+SEQUENTIAL Heavy sending ['Hg', 'Cl'] and ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H'] to combine
+ 
+Fragments to allocate this iteration: 0 1 out of 6 6
+SEQUENTIAL Heavy iteration 5 with 7 and 7 Remaining in each list
+SEQUENTIAL Heavy sending ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl'] and ['Hg', 'Cl', 'Cl', 'Cl'] to combine
+ 
+Fragments to allocate this iteration: 0 2 out of 6 6
+SEQUENTIAL Heavy iteration 6 with 7 and 7 Remaining in each list
+SEQUENTIAL Heavy sending ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl'] and ['Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] to combine
+ 
+Fragments to allocate this iteration: 0 3 out of 6 6
+SEQUENTIAL Heavy iteration 7 with 7 and 7 Remaining in each list
+SEQUENTIAL Heavy sending ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl'] and ['Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] to combine
+ 
+Fragments to allocate this iteration: 0 1 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 9
+ 
+Fragments to allocate this iteration: 0 2 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 4
+ 
+Fragments to allocate this iteration: 0 3 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 9
+ 
+Fragments to allocate this iteration: 0 4 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 4
+ 
+Fragments to allocate this iteration: 0 5 out of 5 5
+SEQUENTIAL Heavy iteration 12 with 6 and 6 Remaining in each list
+SEQUENTIAL Heavy sending ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] and ['Hg', 'Cl'] to combine
+ 
+Fragments to allocate this iteration: 1 0 out of 5 5
+SEQUENTIAL Heavy iteration 13 with 6 and 6 Remaining in each list
+SEQUENTIAL Heavy sending ['Hg', 'Cl'] and ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] to combine
+ 
+Fragments to allocate this iteration: 1 2 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 9
+ 
+Fragments to allocate this iteration: 1 3 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 4
+ 
+Fragments to allocate this iteration: 1 4 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 9
+ 
+Fragments to allocate this iteration: 1 5 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 4
+ 
+Fragments to allocate this iteration: 2 0 out of 5 5
+SEQUENTIAL Heavy iteration 18 with 6 and 6 Remaining in each list
+SEQUENTIAL Heavy sending ['Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] and ['Hg', 'Cl'] to combine
+ 
+Fragments to allocate this iteration: 2 1 out of 5 5
+SEQUENTIAL Heavy iteration 19 with 6 and 6 Remaining in each list
+SEQUENTIAL Heavy sending ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] and ['Hg', 'Cl'] to combine
+ 
+Fragments to allocate this iteration: 2 3 out of 5 5
+SEQUENTIAL Heavy iteration 20 with 6 and 6 Remaining in each list
+SEQUENTIAL Heavy sending ['Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] and ['Hg', 'Cl', 'Cl', 'Cl'] to combine
+ 
+Fragments to allocate this iteration: 2 4 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 9
+ 
+Fragments to allocate this iteration: 2 5 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 4
+ 
+Fragments to allocate this iteration: 3 0 out of 5 5
+SEQUENTIAL Heavy iteration 23 with 6 and 6 Remaining in each list
+SEQUENTIAL Heavy sending ['Hg', 'Cl'] and ['Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] to combine
+ 
+Fragments to allocate this iteration: 3 1 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 9
+ 
+Fragments to allocate this iteration: 3 2 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 4
+ 
+Fragments to allocate this iteration: 3 4 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 9
+ 
+Fragments to allocate this iteration: 3 5 out of 5 5
+SEQUENTIAL Heavy SKIPPED 20 and 4
+ 
+Fragments to allocate this iteration: 4 0 out of 5 5
+SEQUENTIAL Heavy iteration 28 with 6 and 6 Remaining in each list
+SEQUENTIAL Heavy sending ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H'] and ['Hg', 'Cl'] to combine
+ 
+Fragments to allocate this iteration: 0 1 out of 4 4
+SEQUENTIAL Heavy iteration 29 with 5 and 5 Remaining in each list
+SEQUENTIAL Heavy sending ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl'] and ['Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] to combine
+ 
+Fragments to allocate this iteration: 0 1 out of 3 3
+SEQUENTIAL Heavy SKIPPED 20 and 4
+ 
+Fragments to allocate this iteration: 0 2 out of 3 3
+SEQUENTIAL Heavy SKIPPED 20 and 20
+ 
+Fragments to allocate this iteration: 0 3 out of 3 3
+SEQUENTIAL Heavy SKIPPED 20 and 4
+ 
+Fragments to allocate this iteration: 1 0 out of 3 3
+SEQUENTIAL Heavy SKIPPED 4 and 20
+ 
+Fragments to allocate this iteration: 1 2 out of 3 3
+SEQUENTIAL Heavy SKIPPED 4 and 20
+ 
+Fragments to allocate this iteration: 1 3 out of 3 3
+SEQUENTIAL Heavy iteration 35 with 4 and 4 Remaining in each list
+SEQUENTIAL Heavy sending ['Hg', 'Cl', 'Cl', 'Cl'] and ['Hg', 'Cl', 'Cl', 'Cl'] to combine
+SEQUENTIAL: Molecules found so far:
+0 8 ['Hg', 'Cl', 'Cl', 'Cl', 'Hg', 'Cl', 'Cl', 'Cl']
+ 
+Fragments to allocate this iteration: 0 1 out of 1 1
+SEQUENTIAL Heavy SKIPPED 20 and 20
+ 
+Fragments to allocate this iteration: 1 0 out of 1 1
+SEQUENTIAL Heavy SKIPPED 20 and 20
+ Increased Threshold_tmat. Now: 0.6000000000000001
+ Maxsize of the translation matrix is= 8
+ 
+Fragments to allocate this iteration: 0 1 out of 1 1
+SEQUENTIAL Heavy SKIPPED 20 and 20
+ 
+Fragments to allocate this iteration: 1 0 out of 1 1
+SEQUENTIAL Heavy SKIPPED 20 and 20
+ Increased Threshold_tmat. Now: 0.8
+ Maxsize of the translation matrix is= 18
+ 
+Fragments to allocate this iteration: 0 1 out of 1 1
+SEQUENTIAL Heavy SKIPPED 20 and 20
+ 
+Fragments to allocate this iteration: 1 0 out of 1 1
+SEQUENTIAL Heavy SKIPPED 20 and 20
+Launching Last Attempt
+Trying Full Tmatrix for all Items in list
+ 
+Fragments to allocate this iteration: 0 1 out of 1 1
+SEQUENTIAL Heavy SKIPPED 20 and 20
+ 
+Fragments to allocate this iteration: 1 0 out of 1 1
+SEQUENTIAL Heavy SKIPPED 20 and 20
+Sequential: list1 end: ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H']
+Sequential: list1 end: ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H']
+1 molecules and 2 fragments out of SEQUENTIAL with Heavy
+ 
+Molec reconstructed after Heavy 8 Cl6-Hg2 Complex
+Remaining after Heavy 20 H7-C10-Cl-Fe-Hg Rec. Fragment
+Remaining after Heavy 20 H7-C10-Cl-Fe-Hg Rec. Fragment
+ 
+
+##############################################
+6 molecules submitted to sequential with All
+##############################################
+Entered sequential with 6 fragments to reconstruct
+Found 2 and 4 Heavy and Hydrogen fragments, respectively
+ 
+Fragments to allocate this iteration: 0 0 out of 1 3
+SEQUENTIAL All iteration 1 with 2 and 4 Remaining in each list
+SEQUENTIAL All sending ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] and ['H'] to combine
+ 
+Fragments to allocate this iteration: 0 1 out of 1 2
+SEQUENTIAL All iteration 2 with 2 and 3 Remaining in each list
+SEQUENTIAL All sending ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H', 'H'] and ['H'] to combine
+SEQUENTIAL: Molecules found so far:
+0 22 ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H', 'H', 'H']
+ 
+Fragments to allocate this iteration: 0 1 out of 0 1
+SEQUENTIAL All iteration 3 with 1 and 2 Remaining in each list
+SEQUENTIAL All sending ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H'] and ['H'] to combine
+ Increased Threshold_tmat. Now: 0.6000000000000001
+ Maxsize of the translation matrix is= 12
+ 
+Fragments to allocate this iteration: 0 0 out of 0 0
+SEQUENTIAL All iteration 1 with 1 and 1 Remaining in each list
+SEQUENTIAL All sending ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H', 'H'] and ['H'] to combine
+SEQUENTIAL: Molecules found so far:
+0 22 ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H', 'H', 'H']
+1 22 ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'Hg', 'Cl', 'Fe', 'C', 'H', 'C', 'C', 'C', 'H', 'C', 'H', 'H', 'H']
+FINISHED succesfully
+NO remaining Molecules after Hydrogen reconstruction
+ 
+Molecule Types assigned. These are:
+Cl6-Hg2 Complex
+H9-C10-Cl-Fe-Hg Complex
+H9-C10-Cl-Fe-Hg Complex
+
+Total execution time for Cell Reconstruction: 1.03 seconds
+Cell reconstruction successfully finished.
+
+===================================== step 2 : Charge Assignment =======================================
+
+New ligand found with: formula Cl and totmconnec=1, and added in position 0
+Ligand 1 is the same than 0 in typelist
+New ligand found with: formula Cl and totmconnec=2, and added in position 1
+Ligand 3 is the same than 0 in typelist
+Ligand 4 is the same than 0 in typelist
+Ligand 5 is the same than 1 in typelist
+New Metal Center found with: labels Hg and added in position 2
+Metal 1 is the same than 0 in typelist
+New ligand found with: formula H4-C5 and totmconnec=6, and added in position 3
+New ligand found with: formula H5-C5 and totmconnec=5, and added in position 4
+Ligand 2 is the same than 0 in typelist
+New Metal Center found with: labels Hg and added in position 5
+New Metal Center found with: labels Fe and added in position 6
+Ligand 0 is the same than 2 in typelist
+Ligand 1 is the same than 3 in typelist
+Ligand 2 is the same than 0 in typelist
+Metal 0 is the same than 1 in typelist
+Metal 1 is the same than 2 in typelist
+CLASSIFY: molec_indices [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2]
+CLASSIFY: ligand_indices [0, 1, 2, 3, 4, 5, 0, 1, 0, 1, 2, 0, 1, 0, 1, 2, 0, 1]
+CLASSIFY: unique_indices [0, 0, 1, 0, 0, 1, 2, 2, 3, 4, 0, 5, 6, 3, 4, 0, 5, 6]
+CLASSIFY: specie 0 appears 6 times, with type: Ligand
+CLASSIFY: specie 1 appears 2 times, with type: Ligand
+CLASSIFY: specie 2 appears 2 times, with type: Metal
+CLASSIFY: specie 3 appears 2 times, with type: Ligand
+CLASSIFY: specie 4 appears 2 times, with type: Ligand
+CLASSIFY: specie 5 appears 2 times, with type: Metal
+CLASSIFY: specie 6 appears 2 times, with type: Metal
+7 Species (Ligand or Molecules) to Characterize
+
+    ---------------
+    #### Ligand ####
+    ---------------
+           1 Cl 1
+        DEFINE_SITES: evaluating non-haptic group with index 0 and label Cl
+        DEFINE_SITES: Added H to atom 0 with: a.mconnec=1 and label=Cl
+        DEFINE_SITES: evaluating non-haptic group with index 0 and label Cl
+    POSCHARGE: received 1 protonations for this specie
+ 
+    POSCHARGE: doing PROTONATION with added atoms: 1
+    POSCHARGE will try charges [0, -1, 1, -2, 2]
+    POSCHARGE: charge 0 with smiles [H]Cl
+    POSCHARGE: charge -1 with smiles [H]Cl
+    POSCHARGE: charge 1 with smiles [H]Cl
+    POSCHARGE: charge -2 with smiles [H]Cl
+    POSCHARGE: charge 2 with smiles [H]Cl
+    NEW SELECT FUNCTION: uncorr_total: [0, 0, 0, 0, 0]
+    NEW SELECT FUNCTION: uncorr_abs_total: [0, 0, 0, 0, 0]
+    NEW SELECT FUNCTION: uncorr_abs_atcharge: [0, 0, 0, 0, 0]
+    NEW SELECT FUNCTION: uncorr_zwitt: [False, False, False, False, False]
+    NEW SELECT FUNCTION: coincide: [True, False, False, False, False]
+    NEW SELECT FUNCTION: listofmintot: [0, 1, 2, 3, 4]
+    NEW SELECT FUNCTION: listofminabs: [0, 1, 2, 3, 4]
+    NEW SELECT FUNCTION: tmplist: [0], including:
+    NEW SELECT FUNCTION: Corr_charge=-1
+    NEW SELECT FUNCTION: Smiles=[H]Cl
+    NEW SELECT FUNCTION: found corr_charges=[-1]
+    NEW SELECT FUNCTION: doing tgt_charge=-1
+    NEW SELECT FUNCTION: charge_state added
+    NEW SELECT FUNCTION: Case 1, only one entry for -1 in tmplist
+    POSCHARGE. poscharge added with corrected charge: -1 and uncorrected: 0
+    POSCHARGE. poscharge added with smiles: [H]Cl
+Charge state and protonation received for molecule 1
+
+    ---------------
+    #### Ligand ####
+    ---------------
+           1 Cl 2
+        DEFINE_SITES: evaluating non-haptic group with index 0 and label Cl
+        DEFINE_SITES: Added H to atom 0 with: a.mconnec=2 and label=Cl
+        DEFINE_SITES: evaluating non-haptic group with index 0 and label Cl
+    POSCHARGE: received 1 protonations for this specie
+ 
+    POSCHARGE: doing PROTONATION with added atoms: 1
+    POSCHARGE will try charges [0, -1, 1, -2, 2]
+    POSCHARGE: charge 0 with smiles [H]Cl
+    POSCHARGE: charge -1 with smiles [H]Cl
+    POSCHARGE: charge 1 with smiles [H]Cl
+    POSCHARGE: charge -2 with smiles [H]Cl
+    POSCHARGE: charge 2 with smiles [H]Cl
+    NEW SELECT FUNCTION: uncorr_total: [0, 0, 0, 0, 0]
+    NEW SELECT FUNCTION: uncorr_abs_total: [0, 0, 0, 0, 0]
+    NEW SELECT FUNCTION: uncorr_abs_atcharge: [0, 0, 0, 0, 0]
+    NEW SELECT FUNCTION: uncorr_zwitt: [False, False, False, False, False]
+    NEW SELECT FUNCTION: coincide: [True, False, False, False, False]
+    NEW SELECT FUNCTION: listofmintot: [0, 1, 2, 3, 4]
+    NEW SELECT FUNCTION: listofminabs: [0, 1, 2, 3, 4]
+    NEW SELECT FUNCTION: tmplist: [0], including:
+    NEW SELECT FUNCTION: Corr_charge=-1
+    NEW SELECT FUNCTION: Smiles=[H]Cl
+    NEW SELECT FUNCTION: found corr_charges=[-1]
+    NEW SELECT FUNCTION: doing tgt_charge=-1
+    NEW SELECT FUNCTION: charge_state added
+    NEW SELECT FUNCTION: Case 1, only one entry for -1 in tmplist
+    POSCHARGE. poscharge added with corrected charge: -1 and uncorrected: 0
+    POSCHARGE. poscharge added with smiles: [H]Cl
+Charge state and protonation received for molecule 1
+
+    ---------------
+    #### Metal ####
+    ---------------
+           Hg coordination_sphere	 ['Cl', 'Cl', 'Cl', 'Cl']
+           Hg coordinating_atoms	 ['Cl', 'Cl', 'Cl', 'Cl']
+Possible charges received for metal: [2]
+
+    ---------------
+    #### Ligand ####
+    ---------------
+           9 H4-C5 6
+        DEFINE_SITES: addressing group with hapticity: ['h5-Cp']
+        DEFINE_SITES: It is an h5-Cp with atlist: [0, 1, 3, 5, 7]
+        DEFINE_SITES: Added H to atom 1 with: a.mconnec=1 and label=C
+        DEFINE_SITES: addressing group with hapticity: ['h5-Cp']
+        DEFINE_SITES: It is an h5-Cp with atlist: [0, 1, 3, 5, 7]
+    POSCHARGE: received 1 protonations for this specie
+ 
+    POSCHARGE: doing PROTONATION with added atoms: 1
+    POSCHARGE will try charges [0, -1, 1, -2, 2]
+    POSCHARGE: charge 0 with smiles [H][C+]1CC([H])([H])[C+]([H])[C-]1[H]
+    POSCHARGE: charge -1 with smiles [H]C1=[C-]C([H])([H])C([H])=C1[H]
+    POSCHARGE: charge 1 with smiles [H][C+]1[C+]([H])C([H])([H])C[C-]1[H]
+    POSCHARGE: charge -2 with smiles [H][C+]1CC([H])([H])[C-]([H])[C-]1[H]
+    POSCHARGE: charge 2 with smiles [H][C+]1CC([H])([H])[C+]([H])[C+]1[H]
+    NEW SELECT FUNCTION: uncorr_total: [1, -1, 1, -1, 3]
+    NEW SELECT FUNCTION: uncorr_abs_total: [1, 1, 1, 1, 3]
+    NEW SELECT FUNCTION: uncorr_abs_atcharge: [3, 1, 3, 3, 3]
+    NEW SELECT FUNCTION: uncorr_zwitt: [True, False, True, True, False]
+    NEW SELECT FUNCTION: coincide: [False, True, True, False, False]
+    NEW SELECT FUNCTION: listofmintot: [0, 1, 2, 3]
+    NEW SELECT FUNCTION: listofminabs: [1]
+    NEW SELECT FUNCTION: tmplist: [1], including:
+    NEW SELECT FUNCTION: Corr_charge=-2
+    NEW SELECT FUNCTION: Smiles=[H]C1=[C-]C([H])([H])C([H])=C1[H]
+    NEW SELECT FUNCTION: found corr_charges=[-2]
+    NEW SELECT FUNCTION: doing tgt_charge=-2
+    NEW SELECT FUNCTION: charge_state added
+    NEW SELECT FUNCTION: Case 1, only one entry for -2 in tmplist
+    POSCHARGE. poscharge added with corrected charge: -2 and uncorrected: -1
+    POSCHARGE. poscharge added with smiles: [H]C1=[C-]C([H])([H])C([H])=C1[H]
+Charge state and protonation received for molecule 1
+
+    ---------------
+    #### Ligand ####
+    ---------------
+           10 H5-C5 5
+        DEFINE_SITES: addressing group with hapticity: ['h5-Cp']
+        DEFINE_SITES: It is an h5-Cp with atlist: [0, 2, 3, 4, 6]
+        DEFINE_SITES: Added H to atom 0 with: a.mconnec=1 and label=C
+        DEFINE_SITES: addressing group with hapticity: ['h5-Cp']
+        DEFINE_SITES: It is an h5-Cp with atlist: [0, 2, 3, 4, 6]
+    POSCHARGE: received 1 protonations for this specie
+ 
+    POSCHARGE: doing PROTONATION with added atoms: 1
+    POSCHARGE will try charges [0, -1, 1, -2, 2]
+    POSCHARGE: charge 0 with smiles [H]C1=C([H])C([H])([H])C([H])=C1[H]
+    POSCHARGE: charge -1 with smiles [H][C+]1[C-]([H])[C-]([H])C([H])([H])[C-]1[H]
+    POSCHARGE: charge 1 with smiles [H][C+]1[C-]([H])[C+]([H])C([H])([H])[C-]1[H]
+    POSCHARGE: charge -2 with smiles [H][C+]1[C-]([H])[C-]([H])[C-]([H])C1([H])[H]
+    POSCHARGE: charge 2 with smiles [H][C+]1[C+]([H])C([H])([H])[C+]([H])[C-]1[H]
+    NEW SELECT FUNCTION: uncorr_total: [0, -2, 0, -2, 2]
+    NEW SELECT FUNCTION: uncorr_abs_total: [0, 2, 0, 2, 2]
+    NEW SELECT FUNCTION: uncorr_abs_atcharge: [0, 4, 4, 4, 4]
+    NEW SELECT FUNCTION: uncorr_zwitt: [False, True, True, True, True]
+    NEW SELECT FUNCTION: coincide: [True, False, False, True, True]
+    NEW SELECT FUNCTION: listofmintot: [0, 2]
+    NEW SELECT FUNCTION: listofminabs: [0]
+    NEW SELECT FUNCTION: tmplist: [0], including:
+    NEW SELECT FUNCTION: Corr_charge=-1
+    NEW SELECT FUNCTION: Smiles=[H]C1=C([H])C([H])([H])C([H])=C1[H]
+    NEW SELECT FUNCTION: found corr_charges=[-1]
+    NEW SELECT FUNCTION: doing tgt_charge=-1
+    NEW SELECT FUNCTION: charge_state added
+    NEW SELECT FUNCTION: Case 1, only one entry for -1 in tmplist
+    POSCHARGE. poscharge added with corrected charge: -1 and uncorrected: 0
+    POSCHARGE. poscharge added with smiles: [H]C1=C([H])C([H])([H])C([H])=C1[H]
+Charge state and protonation received for molecule 1
+
+    ---------------
+    #### Metal ####
+    ---------------
+           Hg coordination_sphere	 ['C', 'Cl']
+           Hg coordinating_atoms	 ['C', 'Cl']
+Possible charges received for metal: [2]
+
+    ---------------
+    #### Metal ####
+    ---------------
+           Fe coordination_sphere	 ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+           Fe coordinating_atoms	 ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+Possible charges received for metal: [2, 3, 0]
+BALANCE: iterlist [[-1], [-1], [2], [-2], [-1], [2], [2, 3, 0]]
+BALANCE: unique_indices [0, 0, 1, 0, 0, 1, 2, 2, 3, 4, 0, 5, 6, 3, 4, 0, 5, 6]
+BALANCE: tmpdistr [(-1, -1, 2, -2, -1, 2, 2), (-1, -1, 2, -2, -1, 2, 3), (-1, -1, 2, -2, -1, 2, 0)]
+BALANCE: alldistr added: [-1, -1, -1, -1, -1, -1, 2, 2, -2, -1, -1, 2, 2, -2, -1, -1, 2, 2]
+BALANCE: alldistr added: [-1, -1, -1, -1, -1, -1, 2, 2, -2, -1, -1, 2, 3, -2, -1, -1, 2, 3]
+BALANCE: alldistr added: [-1, -1, -1, -1, -1, -1, 2, 2, -2, -1, -1, 2, 0, -2, -1, -1, 2, 0]
+final_charge_distribution [[-1, -1, -1, -1, -1, -1, 2, 2, -2, -1, -1, 2, 3, -2, -1, -1, 2, 3]]
+
+FINAL Charge Distribution: [[-1, -1, -1, -1, -1, -1, 2, 2, -2, -1, -1, 2, 3, -2, -1, -1, 2, 3]]
+
+#########################################
+Assigning Charges and Preparing Molecules
+#########################################
+PREPARE: 7 selected_charge_states received
+
+PREPARE: 3 molecules to prepare, of types
+PREPARE: Molecule 0 is a Complex with formula Cl6-Hg2
+PREPARE: Molecule 1 is a Complex with formula H9-C10-Cl-Fe-Hg
+PREPARE: Molecule 2 is a Complex with formula H9-C10-Cl-Fe-Hg
+
+PREPARE: State 0 and option 0. Target state and protonation received with -1 and 1
+PREPARE: State 1 and option 0. Target state and protonation received with -1 and 1
+PREPARE: State 3 and option 0. Target state and protonation received with -2 and 1
+PREPARE: State 4 and option 0. Target state and protonation received with -1 and 1
+
+PREPARE: Molecule 0 is a Complex with formula Cl6-Hg2
+PREPARE: Molecule 0 has 6 ligands
+
+PREPARE: Ligand 0, formula: Cl is specie 0
+PREPARE: Ligand poscharges: [-1]
+PREPARE: Doing ligand 0 with idxtoallocate 0
+PREPARE: Doing -1 of options [-1]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [1]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[1]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -1
+PREPARE: Wanted charge -1, obtained: -1
+PREPARE: smiles: [H]Cl
+PREPARE: Success doing ligand 0. Created Charge State with total_charge=-1
+
+PREPARE: Ligand 1, formula: Cl is specie 0
+PREPARE: Ligand poscharges: [-1]
+PREPARE: Doing ligand 1 with idxtoallocate 1
+PREPARE: Doing -1 of options [-1]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [1]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[1]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -1
+PREPARE: Wanted charge -1, obtained: -1
+PREPARE: smiles: [H]Cl
+PREPARE: Success doing ligand 1. Created Charge State with total_charge=-1
+
+PREPARE: Ligand 2, formula: Cl is specie 1
+PREPARE: Ligand poscharges: [-1]
+PREPARE: Doing ligand 2 with idxtoallocate 2
+PREPARE: Doing -1 of options [-1]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [1]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[1]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -1
+PREPARE: Wanted charge -1, obtained: -1
+PREPARE: smiles: [H]Cl
+PREPARE: Success doing ligand 2. Created Charge State with total_charge=-1
+
+PREPARE: Ligand 3, formula: Cl is specie 0
+PREPARE: Ligand poscharges: [-1]
+PREPARE: Doing ligand 3 with idxtoallocate 3
+PREPARE: Doing -1 of options [-1]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [1]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[1]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -1
+PREPARE: Wanted charge -1, obtained: -1
+PREPARE: smiles: [H]Cl
+PREPARE: Success doing ligand 3. Created Charge State with total_charge=-1
+
+PREPARE: Ligand 4, formula: Cl is specie 0
+PREPARE: Ligand poscharges: [-1]
+PREPARE: Doing ligand 4 with idxtoallocate 4
+PREPARE: Doing -1 of options [-1]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [1]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[1]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -1
+PREPARE: Wanted charge -1, obtained: -1
+PREPARE: smiles: [H]Cl
+PREPARE: Success doing ligand 4. Created Charge State with total_charge=-1
+
+PREPARE: Ligand 5, formula: Cl is specie 1
+PREPARE: Ligand poscharges: [-1]
+PREPARE: Doing ligand 5 with idxtoallocate 5
+PREPARE: Doing -1 of options [-1]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [1]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[1]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -1
+PREPARE: Wanted charge -1, obtained: -1
+PREPARE: smiles: [H]Cl
+PREPARE: Success doing ligand 5. Created Charge State with total_charge=-1
+
+PREPARE: Metal 0, label Hg is specie 2
+PREPARE: Metal poscharges: [2]
+
+PREPARE: Metal 1, label Hg is specie 2
+PREPARE: Metal poscharges: [2]
+PREPARE: Building Molecule 0 From Ligand&Metal Information
+
+PREPARE: Molecule 1 is a Complex with formula H9-C10-Cl-Fe-Hg
+PREPARE: Molecule 1 has 3 ligands
+
+PREPARE: Ligand 0, formula: H4-C5 is specie 3
+PREPARE: Ligand poscharges: [-2]
+PREPARE: Doing ligand 0 with idxtoallocate 8
+PREPARE: Doing -2 of options [-2]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [0 1 0 0 0 0 0 0 0]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[0 1 0 0 0 0 0 0 0]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -2
+PREPARE: Wanted charge -2, obtained: -2
+PREPARE: smiles: [H]C1=[C-]C([H])([H])C([H])=C1[H]
+PREPARE: Success doing ligand 0. Created Charge State with total_charge=-2
+
+PREPARE: Ligand 1, formula: H5-C5 is specie 4
+PREPARE: Ligand poscharges: [-1]
+PREPARE: Doing ligand 1 with idxtoallocate 9
+PREPARE: Doing -1 of options [-1]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [1 0 0 0 0 0 0 0 0 0]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[1 0 0 0 0 0 0 0 0 0]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -1
+PREPARE: Wanted charge -1, obtained: -1
+PREPARE: smiles: [H]C1=C([H])C([H])([H])C([H])=C1[H]
+PREPARE: Success doing ligand 1. Created Charge State with total_charge=-1
+
+PREPARE: Ligand 2, formula: Cl is specie 0
+PREPARE: Ligand poscharges: [-1]
+PREPARE: Doing ligand 2 with idxtoallocate 10
+PREPARE: Doing -1 of options [-1]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [1]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[1]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -1
+PREPARE: Wanted charge -1, obtained: -1
+PREPARE: smiles: [H]Cl
+PREPARE: Success doing ligand 2. Created Charge State with total_charge=-1
+
+PREPARE: Metal 0, label Hg is specie 5
+PREPARE: Metal poscharges: [2]
+
+PREPARE: Metal 1, label Fe is specie 6
+PREPARE: Metal poscharges: [2, 3, 0]
+PREPARE: Building Molecule 1 From Ligand&Metal Information
+
+PREPARE: Molecule 2 is a Complex with formula H9-C10-Cl-Fe-Hg
+PREPARE: Molecule 2 has 3 ligands
+
+PREPARE: Ligand 0, formula: H4-C5 is specie 3
+PREPARE: Ligand poscharges: [-2]
+PREPARE: Doing ligand 0 with idxtoallocate 13
+PREPARE: Doing -2 of options [-2]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [0 1 0 0 0 0 0 0 0]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[0 1 0 0 0 0 0 0 0]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -2
+PREPARE: Wanted charge -2, obtained: -2
+PREPARE: smiles: [H]C1=[C-]C([H])([H])C([H])=C1[H]
+PREPARE: Success doing ligand 0. Created Charge State with total_charge=-2
+
+PREPARE: Ligand 1, formula: H5-C5 is specie 4
+PREPARE: Ligand poscharges: [-1]
+PREPARE: Doing ligand 1 with idxtoallocate 14
+PREPARE: Doing -1 of options [-1]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [1 0 0 0 0 0 0 0 0 0]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[1 0 0 0 0 0 0 0 0 0]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -1
+PREPARE: Wanted charge -1, obtained: -1
+PREPARE: smiles: [H]C1=C([H])C([H])([H])C([H])=C1[H]
+PREPARE: Success doing ligand 1. Created Charge State with total_charge=-1
+
+PREPARE: Ligand 2, formula: Cl is specie 0
+PREPARE: Ligand poscharges: [-1]
+PREPARE: Doing ligand 2 with idxtoallocate 15
+PREPARE: Doing -1 of options [-1]. jdx=0
+PREPARE: Found Target Prot State with 1 added atoms and 0 OS
+PREPARE: addedlist of Target Prot State: [1]
+PREPARE: evaluating prot state with added_atoms=1
+PREPARE: tmp_addedlist=[1]
+PREPARE: found match in protonation with tmpsmiles: 
+PREPARE: Sending getcharge with prot.added_atoms=1 to obtain charge -1
+PREPARE: Wanted charge -1, obtained: -1
+PREPARE: smiles: [H]Cl
+PREPARE: Success doing ligand 2. Created Charge State with total_charge=-1
+
+PREPARE: Metal 0, label Hg is specie 5
+PREPARE: Metal poscharges: [2]
+
+PREPARE: Metal 1, label Fe is specie 6
+PREPARE: Metal poscharges: [2, 3, 0]
+PREPARE: Building Molecule 2 From Ligand&Metal Information
+
+Total execution time for Charge Assignment: 0.02 seconds
+Charge Assignment successfully finished.
+
+#########################################
+Assigning spin multiplicity
+#########################################
+mol.type='Complex', mol.formula='Cl6-Hg2', mol.spin=1
+	lig.formula='Cl'
+	lig.formula='Cl'
+	lig.formula='Cl'
+	lig.formula='Cl'
+	lig.formula='Cl'
+	lig.formula='Cl'
+mol.type='Complex', mol.formula='H9-C10-Cl-Fe-Hg', mol.spin=2
+	lig.formula='H4-C5', lig.spin=1
+	lig.formula='H5-C5', lig.spin=1
+	lig.formula='Cl'
+mol.type='Complex', mol.formula='H9-C10-Cl-Fe-Hg', mol.spin=2
+	lig.formula='H4-C5', lig.spin=1
+	lig.formula='H5-C5', lig.spin=1
+	lig.formula='Cl'
+=====================================Charges for all species in the unit cell=====================================
+[Ref.code] : BACZUB
+
+Complex, totcharge -2, spin multiplicity 1
+	 Metal: Hg charge 2
+	 Metal: Hg charge 2
+	 Ligand charge -1, [Cl-]
+	 Ligand charge -1, [Cl-]
+	 Ligand charge -1, [Cl-]
+	 Ligand charge -1, [Cl-]
+	 Ligand charge -1, [Cl-]
+	 Ligand charge -1, [Cl-]
+
+Complex, totcharge 1, spin multiplicity 2
+	 Metal: Hg charge 2
+	 Metal: Fe charge 3
+	 Ligand charge -2, [H]C1=[C-][C-]([H])C([H])=C1[H]
+	 Ligand charge -1, [H]C1=C([H])[C-]([H])C([H])=C1[H]
+	 Ligand charge -1, [Cl-]
+
+Complex, totcharge 1, spin multiplicity 2
+	 Metal: Hg charge 2
+	 Metal: Fe charge 3
+	 Ligand charge -2, [H]C1=[C-][C-]([H])C([H])=C1[H]
+	 Ligand charge -1, [H]C1=C([H])[C-]([H])C([H])=C1[H]
+	 Ligand charge -1, [Cl-]
+
+
+The Warning type list is : [False, False, False, False, False, False, False, False, False]
+No Warnings!
+
+[Output files]
+Output file path /Users/ycho/Projects/Update_cell2mol/test/BACZUB/Cell_BACZUB.gmol
