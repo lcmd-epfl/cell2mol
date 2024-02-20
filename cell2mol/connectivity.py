@@ -4,43 +4,59 @@ from scipy import sparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
 from typing import Tuple
-from cell2mol.Elementdata import ElementData  
+from cell2mol.elementdata import ElementData
+from cell2mol.other import inv
 elemdatabase = ElementData()
 
-################################
-def find_closest_metal(atom: object, metalist: list, debug: int=0) -> Tuple[np.ndarray, np.ndarray, list]:
+#######################################################
+def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: list, element: str="H", debug: int=0) -> Tuple[bool, list, list]:
+    from cell2mol.other import get_dist
+    # This function adds one atom of a given "element" to a given "site=atom index" of a "ligand".
+    # It does so at the position of the closest "metal" atom to the "site"
+    #:return newlab: labels of the original ligand, plus the label of the new element
+    #:return newcoord: same as above but for coordinates
 
+    # Original labels and coordinates are copied
+    isadded = False
+    posadded = len(labels)
+    newlab = labels.copy()
+    newcoord = coords.copy()
+    newlab.append(str(element))  # One H atom will be added
+
+    if debug >= 2: print("ADD_ATOM: Metalist length", len(metalist))
+    # It is adding the element (H, O, or whatever) at the vector formed by the closest TM atom and the "site"
+    for idx, a in enumerate(ligand.atoms):
+        if idx == site:
+            apos = a.coord.copy()
+            tgt  = a.get_closest_metal(metalist)
+            dist = get_dist(apos, tgt.coord)
+            idealdist = a.radii + elemdatabase.CovalentRadius2[element]
+            addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
+            newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])     # adds H at the position of the closest Metal Atom
+
+            # Evaluates the new adjacency matrix.
+            dummy, tmpconmat, tmpconnec = get_adjmatrix(newlab, newcoord, ligand.factor)
+            # If no undesired adjacencies have been created, the coordinates are kept
+            if tmpconnec[posadded] <= 1:
+                isadded = True
+                if debug >= 2: print(f"ADD_ATOM: Chosen {tgt} Metal atom. {element} is added at site {site}")
+            # Otherwise, coordinates are reset
+            else:
+                if debug >= 1: print(f"ADD_ATOM: Chosen {tgt} Metal atom. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
+                isadded = False
+                newlab = labels.copy()
+                newcoord = coords.copy()
+    return isadded, newlab, newcoord
+
+#######################################################
+def find_closest_metal(atom: object, metalist: list, debug: int=0):
     apos = np.array(atom.coord)
     dist = []
-    for tm in metalist:
-        bpos = np.array(tm.coord)
+    for met in metalist:
+        bpos = np.array(met.coord)
         dist.append(np.linalg.norm(apos - bpos))
-
-    # finds the closest Metal Atom (tgt)
-    tgt = np.argmin(dist)
-    return tgt, apos, dist[tgt]
-
-
-
-################################
-def extract_from_list(entrylist: list, old_array: list, dimension: int=2, debug: int=0) -> list:
-    #if debug >= 0: print("EXTRACT_FROM_LIST. received:", len(entrylist), np.max(entrylist)+1, len(old_array))
-    length = len(entrylist)
-    if dimension == 2:
-        new_array = np.empty((length, length), dtype=object)
-        for idx, row in enumerate(entrylist):
-            for jdx, col in enumerate(entrylist):
-                new_array[idx, jdx] = old_array[row][col]
-    elif dimension == 1:
-        new_array = np.empty((length), dtype=object)
-        for idx, val in enumerate(entrylist):
-            new_array[idx] = old_array[val]
-    return list(new_array)
-
-
-    print("")
-    for idx, l in enumerate(labels):
-        print("%s  %.6f  %.6f  %.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]))
+    # returns the closest metal atom
+    return np.argmin(dist)
 
 ################################
 def labels2formula(labels: list):
@@ -48,10 +64,8 @@ def labels2formula(labels: list):
     formula=[]
     for z in elems:
         nz = labels.count(z)
-        if nz > 1:
-            formula.append(f"{z}{nz}-")
-        if nz == 1:
-            formula.append(f"{z}-")
+        if nz > 1:   formula.append(f"{z}{nz}-")
+        if nz == 1:  formula.append(f"{z}-")
     formula = ''.join(formula)[:-1] 
     return formula 
 
@@ -73,6 +87,27 @@ def labels2electrons(labels):
     elif type(labels) == str:
         eleccount = elemdatabase.elementnr[labels]
     return eleccount 
+
+################################
+def get_metal_idxs(labels: list, debug: int=0):
+    from cell2mol.elementdata import ElementData
+    elemdatabase = ElementData()
+    metal_indices = []
+    for idx, l in enumerate(labels):
+        if (elemdatabase.elementblock[l] == 'd' or elemdatabase.elementblock[l] == 'f'): metal_indices.append(idx)
+    return metal_indices
+
+################################
+def get_metal_species(labels: list):
+    from cell2mol.elementdata import ElementData
+    elemdatabase = ElementData()
+    metal_species = []
+    elems = list(set(labels))
+    for idx, l in enumerate(elems):
+        if l[-1].isdigit(): label = l[:-1]
+        else: label = l
+        if (elemdatabase.elementblock[label] == 'd' or elemdatabase.elementblock[label] == 'f') and l not in metal_species: metal_species.append(l)
+    return metal_species
 
 ################################
 def get_element_count(labels: list, heavy_only: bool=False) -> np.ndarray:
@@ -269,20 +304,21 @@ def merge_atoms(atoms):
     coord  = [] 
     for a in atoms:
         labels.append(a.label) 
-        coords.append(a.coord) 
+        coord.append(a.coord) 
     return labels, coord
 
 #################################
-def compare_atoms(at1, at2, debug: int=0):
+def compare_atoms(at1, at2, check_coordinates: bool=False, debug: int=0):
     if debug > 0: 
         print("Comparing Atoms")
         print(at1)
         print(at2)
     # Compares Species, Coordinates, Charge and Spin
     if (at1.label != at2.label): return False
-    if (at1.coord[0] != at2.coord[0]): return False
-    if (at1.coord[1] != at2.coord[1]): return False
-    if (at1.coord[2] != at2.coord[2]): return False
+    if check_coordinates:
+        if (at1.coord[0] != at2.coord[0]): return False
+        if (at1.coord[1] != at2.coord[1]): return False
+        if (at1.coord[2] != at2.coord[2]): return False
     if hasattr(at1,"charge") and hasattr(at2,"charge"):
         if (at1.charge != at2.charge): return False
     if hasattr(at1,"spin") and hasattr(at2,"spin"):
@@ -290,7 +326,7 @@ def compare_atoms(at1, at2, debug: int=0):
     return True
 
 #################################
-def compare_species(mol1, mol2, debug: int=0):
+def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
     if debug > 0: 
         print("Comparing Species")
         print(mol1)
@@ -314,7 +350,14 @@ def compare_species(mol1, mol2, debug: int=0):
     for kdx, elem in enumerate(mol1.adj_types):
         for ldx, elem2 in enumerate(elem):
             if elem2 != mol2.adj_types[kdx, ldx]: return False
-    return True
-#################################
 
+    if check_coordinates:
+        # 5) Finally, the coordinates if the user wants it
+        for idx in range(0,mol1.natoms,1):
+            if (mol1.coord[idx][0] !=  mol2.coord[idx][0]): return False
+            if (mol1.coord[idx][1] !=  mol2.coord[idx][1]): return False
+            if (mol1.coord[idx][2] !=  mol2.coord[idx][2]): return False
+    return True
+
+#################################
 

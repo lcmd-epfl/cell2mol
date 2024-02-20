@@ -14,6 +14,7 @@ from cell2mol.xyz2mol import int_atom, xyz2mol
 from cell2mol.missingH import getangle
 from cell2mol.hungarian import reorder
 from cell2mol.elementdata import ElementData
+from cell2mol.connectivity import add_atom
 elemdatabase = ElementData()
 
 #############################
@@ -1146,46 +1147,6 @@ def define_sites(ligand: object, molecule: object, debug: int=0) -> list:
                 if debug >= 2:  print(f"        DEFINE_SITES: Protonation DISCARDED. Steric Clashes found when adding atoms. status={new_prot.status}")
                 
     return list_of_protonations 
-
-#######################################################
-def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: list, element: str="H", debug: int=0) -> Tuple[bool, list, list]:
-    # This function adds one atom of a given "element" to a given "site=atom index" of a "ligand".
-    # It does so at the position of the closest "metal" atom to the "site"
-    #:return newlab: labels of the original ligand, plus the label of the new element
-    #:return newcoord: same as above but for coordinates
-
-    # Original labels and coordinates are copied
-    isadded = False
-    posadded = len(labels)
-    newlab = labels.copy()
-    newcoord = coords.copy()
-    newlab.append(str(element))  # One H atom will be added
-
-    if debug >= 2: print("        ADD_ATOM: Metalist length", len(metalist))
-    # It is adding the element (H, O, or whatever) at the vector formed by the closest TM atom and the "site"
-    for idx, a in enumerate(ligand.atoms):
-        if idx == site:
-            tgt, apos, dist = find_closest_metal(a, metalist)
-            idealdist = a.radii + elemdatabase.CovalentRadius2[element]
-            addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
-            newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])  # adds H at the position of the closest Metal Atom
-
-            # Evaluates the new adjacency matrix.
-            tmpradii = getradii(newlab)
-            dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, newcoord, ligand.factor, tmpradii)
-            # If no undesired adjacencies have been created, the coordinates are kept
-            if tmpconnec[posadded] <= 1:
-                isadded = True
-                if debug >= 2: print(f"        ADD_ATOM: Chosen {tgt} Metal atom. {element} is added at site {site}")
-            # Otherwise, coordinates are reset
-            else:
-                if debug >= 1: print(f"        ADD_ATOM: Chosen {tgt} Metal atom. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
-                isadded = False
-                newlab = labels.copy()
-                newcoord = coords.copy()
-    
-    return isadded, newlab, newcoord
-
 
 #######################################################
 def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, selected_charge_states: list, final_charge_distribution: list, debug: int=0) -> Tuple[list, bool]:

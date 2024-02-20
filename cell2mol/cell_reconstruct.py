@@ -8,9 +8,8 @@ from typing import Tuple
 from collections import defaultdict
 
 from cell2mol.cellconversions import frac2cart_fromparam, cart2frac, translate
-from cell2mol.other import compute_centroid, additem, inv
-from cell2mol.connectivity import get_radii, get_adjacency_types, get_adjmatrix, get_blocks, get_element_count, compare_atoms, compare_species
-from cell2mol.tmcharge_common import find_closest_metal
+from cell2mol.other import compute_centroid, additem, inv, absolute_value
+from cell2mol.connectivity import compare_species, count_species, find_closest_metal
 from cell2mol.missingH import getangle
 from cell2mol.coordination_sphere import get_coordination_geometry
 # Imports Classes
@@ -18,65 +17,8 @@ from cell2mol.classes import specie, molecule, ligand, group, atom, metal, cell
 from cosymlib import Geometry
 from cosymlib.shape.tools import shape_structure_references
 
-
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
-
-#######################################################
-def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> None:
-    """Verifies the connectivity of a ligand. It is used to correct the connectivity of the ligand, if needed.
-    
-    Args:
-        ligand (object): ligand object
-        molecule (object): molecule object
-        debug (int, optional): debug level. Defaults to 0.
-    
-    Returns:
-        None
-    """
-
-    metalist = molecule.metalist.copy()
-
-    # Original labels and coordinates are copied
-    newlab = ligand.labels.copy()
-    newlab.append(str("H"))  # One H atom will be added
-    newcoord = ligand.coord.copy()
-
-    # position (index) of the added atom
-    posadded = len(ligand.labels)
-
-    if debug >= 2: print("")
-    if debug >= 2: print(f"VERIFY: checking connectivity of ligand {ligand.formula}")
-    if debug >= 2: print(f"VERIFY: initial connectivity is {ligand.totmconnec}")
-    for g in ligand.grouplist:
-        if g.hapticity is True:
-            if debug >= 2: print("VERIFY: group has hapticity, skipping check")
-        else:
-            for idx, a in enumerate(ligand.atoms):
-                if a.mconnec >= 1 and a.index in g.atlist:
-                    if debug >= 2: print(f"VERIFY: connectivity={a.mconnec} in atom idx={idx}, label={a.label}")
-                    tgt, apos, dist = find_closest_metal(a, metalist)
-                    idealdist = a.radii + elemdatabase.CovalentRadius2["H"]
-                    addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
-                    newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])  # adds H at the position of the closest Metal Atom
-
-                    # Evaluates the new adjacency matrix.
-                    tmpradii = get_radii(newlab)
-                    dummy, tmpconmat, tmpconnec, tmpmconmat, tmpmconnec = getconec(newlab, newcoord, ligand.factor, tmpradii)
-                    # If no undesired adjacencies have been created, the coordinates are kept. Otherwise, data is corrected
-                    if tmpconnec[posadded] == 1:
-                        if debug >= 2: print(f"VERIFY: connectivity verified for atom {idx} with label {a.label}")
-                    else:
-                        # Corrects data of atom object
-                        a.mconnec = 0
-                        if debug >= 2: print(f"VERIFY: corrected mconnec of atom {idx} with label {a.label}")
-                        # Now it should correct data of metal, ligand and molecule objects. Not yet implemented
-
-    # Corrects data of ligand object
-    ligand.totmconnec = 0
-    for a in ligand.atoms:
-        ligand.totmconnec += a.mconnec
-    if debug >= 2: print(f"VERIFY: final connectivity is {ligand.totmconnec}")
 
 #######################################################
 def tmatgenerator(centroid, thres=0.40, full=False, debug: int=0):
@@ -217,9 +159,18 @@ def classify_fragments(blocklist: list, refmoleclist: list, debug: int=0):
     fraglist  = []
     Hlist     = []
 
+    ## Prepares Blocks
+    for b in blocklist:
+        if not hasattr(b,"centroid"):         b.get_centroid()
+        if not hasattr(b,"element_count"):    b.set_element_count()
+        if not hasattr(b,"numH"):             b.numH = b.set_element_count()[4] + b.set_element_count()[3] #"Hidrogen + Deuterium atoms"
+    ## Prepares Reference Molecules
+    for ref in refmoleclist:
+        if not hasattr(ref,"element_count"):  ref.set_element_count()
+        if not hasattr(ref,"numH"):           ref.numH = ref.set_element_count()[4] + ref.set_element_count()[3] #"Hidrogen + Deuterium atoms"
+
     # Classifies blocks and puts them in 3 bags. (1) Full molecules, (2) partial molecules=fragments, (3) Hydrogens
     for idx, block in enumerate(blocklist):
-        if not hasattr(block,"numH"): block.numH = block.set_element_count()[4]
         if (block.natoms == 1) and (block.numH == 1):
             block.subtype = "H"
             Hlist.append(block)
@@ -240,108 +191,41 @@ def classify_fragments(blocklist: list, refmoleclist: list, debug: int=0):
 
 #######################################################
 def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmoleclist: list, cellvec: list, factor: float=1.3, metal_factor: float=1.0, debug: int=0):
-
+    ## Moleclist is the list of species which have been identified as 'complete' molecules
+    ## Fraglist is the list of species which are not 'complete' molecules
+    ## Hlist is the list of species that are only H atoms
+    ## Refmoleclist is the list of species that are identified as reference molecules (that is, molecules that will appear in the unit cell once reconstructed)
     Warning = False
     # Reconstruct Heavy Fragments
     if len(fraglist) > 1:
         print("")
         print("##############################################")
-        print(len(fraglist), "molecules submitted to SEQUENTIAL with Heavy")
+        print("FRAG_RECONSTRUCT.", len(fraglist), "molecules submitted to SEQUENTIAL with Heavy")
         print("##############################################")
         newmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "Heavy", debug)
-        print(f"{len(newmols)} molecules and {len(remfrag)} fragments out of SEQUENTIAL with Heavy")
+        print(f"FRAG_RECONSTRUCT. {len(newmols)} molecules and {len(remfrag)} fragments out of SEQUENTIAL with Heavy")
         moleclist.extend(newmols)
+
+        # After the first step, fraglist is made of the remaining molecules in the first step, and the list of H atoms
         fraglist = []
         fraglist.extend(remfrag)
         fraglist.extend(Hlist)
-
-        # For debugging
-        if debug >= 1:
-            print(" ")
-            # Prints molecules after Heavy Fragment Reconstruction
-            if len(newmols) > 0:
-                for mol in newmols:
-                    print("Molec reconstructed after Heavy", mol.natoms, mol.formula, mol.type)
-            else:
-                print("NO Molecules reconstructed after Heavy")
-            if len(remfrag) > 0:
-                for rem in remfrag:
-                    print("Remaining after Heavy", rem.natoms, rem.formula, rem.subtype)
-            else:
-                print("NO remaining Molecules after Heavy")
-            print(" ")
-    else:
-        print("Only 0 or 1 heavy fragments. Skipping Heavy")
-        remfrag = fraglist.copy()
+    else:  print(f"Only {len(fraglist)} heavy fragments. Skipping Heavy"); remfrag = fraglist.copy()
 
     # Reconstruct Hydrogens with remaining Fragments
     if len(remfrag) > 0 and len(Hlist) > 0:
-        print("")
-        print("##############################################")
-        print(len(fraglist), "molecules submitted to sequential with All")
-        print("##############################################")
+        print("FRAG_RECONSTRUCT.", len(fraglist), "molecules submitted to sequential with All")
         finalmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "All", debug)
-        if len(remfrag) > 0:
-            Warning = True
-            for rem in remfrag:
-                print("Remaining after Hydrogen reconstruction",rem.natoms,rem.formula,rem.subtype)
-        else:
-            print("NO remaining Molecules after Hydrogen reconstruction")
-            Warning = False
-        print(" ")
-    else:
-        if len(remfrag) > 0 and len(Hlist) == 0:
-            Warning = True
-            print("There are remaining Fragments and no H in list")
-            finalmols = []
-            remfrag = []
-        elif len(remfrag) == 0 and len(Hlist) > 0:
-            Warning = True
-            print("There are isolated H atoms in cell")
-            finalmols = []
-            remfrag = []
-        elif len(remfrag) == 0 and len(Hlist) == 0:
-            print("Not necessary to reconstruct Hydrogens")
-            finalmols = fraglist.copy()  # IF not Hidrogen fragments, then is done
-            remfrag = []
+        if len(remfrag) > 0: Warning = True;  print("FRAG_RECONSTRUCT. Remaining after Hydrogen reconstruction",remfrag)
+        else:                Warning = False; print("FRAG_RECONSTRUCT. No remaining Molecules after Hydrogen reconstruction")
+    elif len(remfrag) > 0 and len(Hlist) == 0:
+        Warning = True
+        print("FRAG_RECONSTRUCT. WARNING: There are remaining Fragments and no H in list")
+    elif len(remfrag) == 0 and len(Hlist) > 0:
+        Warning = True
+        print("FRAG_RECONSTRUCT. WARNING: There are isolated H atoms in cell")
 
-    return moleclist, finalmols, Warning
-
-
-    latCnt = [x[:] for x in [[None] * 3] * 3]
-    for a in range(3):
-        for b in range(3):
-            latCnt[a][b] = cellvec[b][a]
-    fracCoords = []
-    detLatCnt = det3(latCnt)
-    for i in cartCoords:
-        aPos = (det3([
-                    [i[0], latCnt[0][1], latCnt[0][2]],
-                    [i[1], latCnt[1][1], latCnt[1][2]],
-                    [i[2], latCnt[2][1], latCnt[2][2]],
-                ]
-            )
-        ) / detLatCnt
-        bPos = (
-            det3(
-                [
-                    [latCnt[0][0], i[0], latCnt[0][2]],
-                    [latCnt[1][0], i[1], latCnt[1][2]],
-                    [latCnt[2][0], i[2], latCnt[2][2]],
-                ]
-            )
-        ) / detLatCnt
-        cPos = (
-            det3(
-                [
-                    [latCnt[0][0], latCnt[0][1], i[0]],
-                    [latCnt[1][0], latCnt[1][1], i[1]],
-                    [latCnt[2][0], latCnt[2][1], i[2]],
-                ]
-            )
-        ) / detLatCnt
-        fracCoords.append([aPos, bPos, cPos])
-    return fracCoords
+    return moleclist, Warning
 
 #######################################################
 def assign_subtype(molecule: object, references: list) -> str:
@@ -411,146 +295,6 @@ def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -
     cell.coord = coord
 
     return cell
-
-
-
-#######################################################
-def check_hapticity_hapttype (atoms_list: list, g: list) -> Tuple[bool, list]:
-    # Check if the list of atoms in a given group has hapticity and return its hapticity and the haptic type
-
-    has_hapticity = False
-    group_hapttype = []
-
-    list_of_coord_atoms = []
-    for idx, a in enumerate(atoms_list):
-        if idx in g and a.mconnec > 0:
-            list_of_coord_atoms.append(a.label)
-
-    numC = list_of_coord_atoms.count("C")  # Carbon is the most common connected atom in ligands with hapticity
-    numAs = list_of_coord_atoms.count("As")  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
-    numP = list_of_coord_atoms.count("P")  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
-    numO = list_of_coord_atoms.count("O")  # For h4-Enone
-    numN = list_of_coord_atoms.count("N")
-
-    # print(f"{g=} {list_of_coord_atoms=} {numC=} {numAs=} {numP=} {numO=} {numN=}")
-
-    ## Carbon-based Haptic Ligands
-    if numC == 2:
-        group_hapttype = ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]
-        has_hapticity = True
-    # elif numC == 2 and numN == 2 : # 2,2′-bipyridine
-
-    elif numC == 3 and numO == 0:
-        group_hapttype = ["h3-Allyl", "h3-Cp"]
-        has_hapticity = True
-    elif numC == 3 and numO == 1:
-        group_hapttype = ["h4-Enone"]
-        has_hapticity = True
-    elif numC == 4:
-        group_hapttype = ["h4-Butadiene", "h4-Benzene"]
-        has_hapticity = True
-    elif numC == 5:
-        group_hapttype = ["h5-Cp"]
-        has_hapticity = True
-    elif numC == 6:
-        group_hapttype = ["h6-Benzene"]
-        has_hapticity = True
-    elif numC == 7:
-        group_hapttype = ["h7-Cycloheptatrienyl"]
-        has_hapticity = True
-    elif numC == 8:
-        group_hapttype = ["h8-Cyclooctatetraenyl"]
-        has_hapticity = True
-
-        has_hapticity = True
-
-    # Other less common types of haptic ligands
-    elif numC == 0 and numAs == 5:
-        group_hapttype = ["h5-AsCp"]
-        has_hapticity = True
-    elif numC == 0 and numP == 5:
-        group_hapttype = ["h5-Pentaphosphole"]
-        has_hapticity = True
-
-    return has_hapticity, group_hapttype
-
-#######################################################
-def get_hapticity(molecule: object, debug: int=0) -> bool:
-    # This function evaluates whether a molecule has any ligand with hapticity and, if so, detects which type of hapticity
-    # The information is stored in both the molecule and ligand objects.
-    # This function also defines the number of groups in a ligand. A "group" is a group of adjacent atoms that is connected to the metal atom.
-    # For instance, a Cp ligand forms a group of 5 C atoms connected to the metal
-    # In turn, a Cp ligand that is substituted with a long functional group that is connected to the metal by, say, an O atom at the end of such functional group
-    # ... would generate 2 groups. The Cp, and the O atom.
-    # This information is useful in the subroutine that decides whether any element must be added to the group to generate a meaningful connectivity and charge. This is done somewhere else
-
-    if molecule.type == "Complex":
-        for lig in molecule.ligandlist:
-            groups = find_groups_within_ligand(lig)
-
-            for g in groups:
-                # Check if the list of atoms in a given group has hapticity and return its hapticity and the haptic type
-                has_hapticity, group_hapttype = check_hapticity_hapttype(lig.atoms, g)
-
-                # Creates Group
-                newgroup = group(g, has_hapticity, group_hapttype)
-                lig.grouplist.append(newgroup)
-
-            # Sets Ligand hapticity
-            if any(g.hapticity == True for g in lig.grouplist):
-                lig.hapticity = True
-                for g in lig.grouplist:
-                    # lig.haptgroups.append(g.atlist)
-                    for typ in g.hapttype:
-                        if typ not in lig.hapttype:
-                            lig.hapttype.append(typ)
-            else:
-                lig.hapticity = False
-
-        # Sets molecule hapticity
-        if any(lig.hapticity == True for lig in molecule.ligandlist):
-            molecule.hapticity = True
-            for lig in molecule.ligandlist:
-                for typ in lig.hapttype:
-                    if typ not in molecule.hapttype:
-                        molecule.hapttype.append(typ)
-        else:
-            molecule.hapticity = False
-
-    elif molecule.type != "Complex":
-        molecule.hapticity = False
-
-    return molecule.hapticity
-
-#######################################################
-def get_hapticity_ligand (lig: object, debug: int=0) -> bool:
-    # This function evaluates whether a ligand has hapticity and, if so, detects which type of hapticity
-
-    groups = find_groups_within_ligand(lig)
-
-    for g in groups:
-        # Check if the list of atoms in a given group has hapticity and return its hapticity and the haptic type
-        has_hapticity, group_hapttype = check_hapticity_hapttype(lig.atoms, g)
-
-        # Creates Group
-        newgroup = group(g, has_hapticity, group_hapttype)
-        lig.grouplist.append(newgroup)
-
-    # Sets Ligand hapticity
-    if any(g.hapticity == True for g in lig.grouplist):
-        lig.hapticity = True
-        for g in lig.grouplist:
-            # lig.haptgroups.append(g.atlist)
-            for typ in g.hapttype:
-                if typ not in lig.hapttype:
-                    lig.hapttype.append(typ)
-    else:
-        lig.hapticity = False
-
-    return lig
-
-
-
 
 #######################################################
 def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: float=1.3, metal_factor: float=1.0, typ: str="All", debug: int=1):
