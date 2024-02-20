@@ -26,94 +26,6 @@ from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
 ##################################################################################
-def get_refmoleclist_and_check_missingH(cell: object, reflabels: list, fracs: list, debug: int=0) -> Tuple[object, float, float]:
-    """Get a list of ref.molecules and check missing hydrogens in ref.molecules
-    
-    Args:
-        cell (object): cell object
-        reflabels (list): list of reference labels
-        fracs (list): list of fractional coordinates
-        debug (int, optional): debug level. Defaults to 0.
-
-    Returns:
-        Tuple[object, float, float]: cell object, covalent_factor, metal_factor        
-    """
-
-    refpos = frac2cart_fromparam(fracs, cell.cellparam)
-
-    # Get ref.molecules --> output: a valid list of ref.molecules
-    # refmoleclist, covalent_factor, metal_factor, Warning = get_reference_molecules(reflabels, refpos, debug=debug)
-    refmoleclist, covalent_factor, metal_factor, Warning = get_reference_molecules_simple (reflabels, refpos, debug)
-    cell.warning_list.append(Warning)
-
-    # Check missing hydrogens in ref.molecules
-    if not any(cell.warning_list):
-        Warning, ismissingH, Missing_H_in_C, Missing_H_in_CoordWater = check_missingH(refmoleclist, debug)
-        cell.warning_list.append(Missing_H_in_C)
-        cell.warning_list.append(Missing_H_in_CoordWater)
-
-    if not any(cell.warning_list):
-        for mol in refmoleclist:
-            mol.refcode = cell.refcode
-            mol.name = str(cell.refcode + "_Reference_" + str(refmoleclist.index(mol)))
-
-        cell.refmoleclist = refmoleclist
-
-    return cell, covalent_factor, metal_factor
-
-
-##################################################################################
-def reconstruct(cell: object, reflabels: list, fracs: list, debug: int=0) -> object:
-
-    # We start with an empty list of molecules
-    moleclist = []
-    Warning = False
-
-    # Get a list of ref.molecules and Check missing H in ref.molecules
-    cell, covalent_factor, metal_factor = get_refmoleclist_and_check_missingH(cell, reflabels, fracs, debug=debug)
-
-    # Get blocks in the unit cells constructing the adjacency matrix (A)
-    if not any(cell.warning_list):
-        Warning, blocklist = getmolecs(cell.labels, cell.atom_coord, covalent_factor, metal_factor, atlist=[], debug=debug)
-        cell.warning_list.append(Warning)
-
-    # Indentify blocks and Reconstruct Fragments
-    if not any(cell.warning_list):
-        moleclist, fraglist, Hlist, init_natoms = identify_frag_molec_H(blocklist, moleclist, cell.refmoleclist, cell.cellvec, debug=debug)
-        moleclist, finalmols, Warning = fragments_reconstruct(moleclist,fraglist,Hlist,cell.refmoleclist,cell.cellvec,covalent_factor,metal_factor,debug=debug)
-        moleclist.extend(finalmols)
-        
-    # Split Complexes and Reassign Type
-    if not any(cell.warning_list):
-
-        cell = split_complexes_reassign_type(cell, moleclist, debug=debug)
-  
-        if debug >= 2: 
-            print("Molecule Types assigned. These are:")
-            for mol in moleclist:
-                print(mol.formula, mol.type)
-         
-        if any(mol.type != "Complex" and mol.type != "Other" for mol in moleclist):
-            Warning = True
-            if debug >= 1: print(f"Fragment hasn't been fully reconstructed. Stopping")
-               
-    # Check final number of atoms after reconstruction   
-    if not any(cell.warning_list):
-        final_natoms = 0
-        for mol in moleclist:
-            final_natoms += mol.natoms
-
-        if final_natoms != init_natoms:
-            Warning = True
-            if debug >= 1: print(f"Final and initial atoms do not coincide. Final/Initial {final_natoms}/{init_natoms}\n")
-
-    cell.warning_list.append(Warning)
-    cell.warning_after_reconstruction = copy.deepcopy(cell.warning_list)
-
-    return cell
-
-
-##################################################################################
 def determine_charge(cell: object, debug: int=0) -> object:
 
 
@@ -346,129 +258,7 @@ def assign_spin (cell: object, debug: int=0) -> object:
 
     return cell
 
-##################################################################################
-def assign_spin_old (cell: object, debug: int=0) -> object:
-    """Assign spin multiplicity to molecules in the cell object
-    
-    Args:
-        cell (object): cell object
-        debug (int, optional): debug level. Defaults to 0.
-    Returns:
-        object: cell object with spin multiplicity assigned
-    """
-    
-    if debug >= 1: 
-        print("#########################################")
-        print("Assigning spin multiplicity")
-        print("#########################################")    
 
-    for mol in cell.moleclist:
-        # count number of electrons in the complex
-        N = count_N(mol)        
-
-        if mol.type == "Complex":
-            if len(mol.metalist) == 1: # mono-metallic complexes
-                met = mol.metalist[0]
-
-                # count valence electrons
-                d_elec = count_d_elec(met.label, met.totcharge)
-
-                # calculate relative metal radius
-                rel = calcualte_relative_metal_radius(met)
-                
-                # Make a list of ligands
-                arr = []
-                for lig in mol.ligandlist:
-                    arr.append(sorted(lig.labels))
-                    if count_N(lig) %2 == 0:
-                        lig.magnetism(1) 
-                    else:
-                        lig.magnetism(2)
-
-                # Count nitrosyl ligands                               
-                nitrosyl = count_nitrosyl(np.array(arr, dtype=object))
-                if debug >= 2: print(np.array(arr, dtype=object))
-                if debug >= 2: print(f"{nitrosyl=}")
-                
-                if met.hapticity == False: # coordination complexes
-                    # Assign spin multiplicity of metal based on empirical rules
-                    met.relative_radius(rel, rel, rel)
-                    spin, rule, threshold  = assign_ground_state_spin_empirical(d_elec, met.totcharge, met.geometry, met.label, met.coordination_number, rel, N)
-                    # spin = predict_ground_state_spin_v1 (met.label, elec, met.coordinating_atoms, met.geometry, met.coordination_number, N, nitrosyl)
-
-                    # Predict spin multiplicity of metal based on Random forest model
-                    feature = generate_feature_vector (met)
-                    print(feature)
-                    path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), "TM-GSspin_RandomForest.pkl")
-
-                    #print(path_rf)
-                    rf = pickle.load(open(path_rf, 'rb'))
-                    predictions = rf.predict(feature)
-                    spin_rf = predictions[0]
-                    #if debug >= 1: print(f"{spin=} {spin_rf=}")
-                    mol.ml_prediction(spin_rf)
-
-                    if spin == 0 : # unknown spin state
-                        if N % 2 == 0:
-                            mol.magnetism(1) 
-                        else:
-                            mol.magnetism(2) 
-                    else:
-                        mol.magnetism(spin_rf)
-                        #mol.magnetism(spin)
-
-                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=} {mol.spin_rf=}")
-                    if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
-                    if debug >= 1: print(f"met_OS={met.totcharge} {d_elec=} {N=} {nitrosyl=} {met.rel=}\n")
-
-                else: # hapticity == True 
-                    rel_g, rel_c = calcualte_relative_metal_radius_haptic_complexes(met)
-                    #if debug >= 1: print(f"{rel_g=} {rel_c=}")
-                    met.relative_radius(rel, rel_g, rel_c)
-                    
-                    if N % 2 == 0:
-                        mol.magnetism(1) # spin multiplicity = 1 Singlet
-                    else:
-                        mol.magnetism(2) # spin multiplicity = 2 Doublet
-
-                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
-                    if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
-                    if debug >= 1: print(f"met_OS={met.totcharge} {d_elec=} {N=} {nitrosyl=} {met.rel=} {met.rel_g=} {met.rel_c=}\n")
-
-            else : # Bi- & Poly-metallic complexes
-                if N % 2 == 0:
-                    mol.magnetism(1) 
-                else:
-                    mol.magnetism(2) 
-                
-                for lig in mol.ligandlist:
-                    if count_N(lig) %2 == 0:
-                        lig.magnetism(1) 
-                    else:
-                        lig.magnetism(2) 
-
-        else: # mol.type == "Other" or "Ligand"
-            if N % 2 == 0:
-                mol.magnetism(1) 
-            else:
-                mol.magnetism(2) 
-
-    if debug >= 1: 
-        for mol in cell.moleclist:
-            if mol.type == "Complex":
-                print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
-                for lig in mol.ligandlist:
-                    if lig.natoms != 1:
-                        print(f"\t{lig.formula=}, {lig.spin=}")
-                    else :
-                        print(f"\t{lig.formula=}")
-            else :
-                if mol.natoms != 1:
-                    print(f"{mol.type=}, {mol.formula=}, {mol.spin=}") 
-                else :
-                    print(f"{mol.type=}, {mol.formula=}")
-
-    return cell
 
 ##################################################################################
 ################################## MAIN ##########################################
@@ -481,12 +271,12 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, cellpath
     if step == 1 or step == 3:
 
         tini = time.time()
-
+        if debug >= 1: print("\n===================================== step 1 : Cell Reconstruction =======================================\n")
         # Reads reference molecules from info file, as well as labels and coordinates
         labels, pos, ref_labels, ref_fracs, cellvec, cellparam = readinfo(infopath)
 
         # Initiates cell
-        newcell = cell(refcode, labels, pos, cellvec, cellparam, warning_list)
+        newcell = cell(refcode, labels, pos, cellvec, cellparam)
 
         # Loads the reference molecules and checks_missing_H
         newcell.get_references_molecules(ref_labels, ref_fracs, debug=debug)      ## Evaluates boolean variable self.has_isolated_H. If true, indicates a problem with the cif
@@ -526,18 +316,16 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, cellpath
             tend_2 = time.time()
             if debug >= 1: print(f"\nTotal execution time for Charge Assignment: {tend_2 - tini_2:.2f} seconds")
 
-            if not any(newcell.warning_list):
+            if newcell.is_empty_poscharges :    handle_error(4)
+            elif newcell.is_multiple_distrib :  handle_error(5)
+            elif newcell.is_empty_distrib :     handle_error(6)
+            elif newcell.is_preparemol :        handle_error(7)
+            else :
                 if debug >= 1: print("Charge Assignment successfully finished.\n")
                 # TODO : Compare assigned charges with ML predicted charges
 
-                # Spin state assignmentc
+                # Spin state assignment
                 newcell = assign_spin(newcell, debug=debug)
-
-                if debug >= 1: newcell.print_charge_assignment()
-                if debug >= 1: newcell.print_Warning()
-            else:
-                if debug >= 1: print("Charge Assignment failed.\n")
-                if debug >= 1: newcell.print_Warning()
     else:
         if step == 1 or step == 3:
             if debug >= 1: print("Cell reconstruction failed.\n")
@@ -546,6 +334,6 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, cellpath
         if debug >= 1: newcell.print_Warning()
         if debug >= 1: print("Cannot proceed step 2 Charge Assignment")
    
-    if not any(newcell.warning_list): newcell.arrange_cell_coord()
+    #if not any(newcell.warning_list): newcell.arrange_cell_coord()
 
     return newcell

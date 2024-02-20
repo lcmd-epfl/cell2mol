@@ -302,6 +302,9 @@ def generate_feature_vector (metal):
     elem_nr = elemdatabase.elementnr[metal.label]
     m_ox = metal.totcharge
     d_elec = count_d_elec (metal.label, m_ox)
+
+    coord_sphere = metal.coordination_sphere
+    CN = len(coord_sphere)
     CN = metal.coordination_number
     geom_nr = make_geom_list()[metal.geometry]
 
