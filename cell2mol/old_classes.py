@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import warnings
 import numpy as np
 from scipy import sparse
 from scipy.sparse import csr_matrix

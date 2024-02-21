@@ -1,339 +1,53 @@
 #!/usr/bin/env python
 
-import pickle
 import time
-import sys
-import os
-import copy
-from typing import Tuple
-import numpy as np
-# Import modules
-from cell2mol.cell_reconstruct import (getmolecs,identify_frag_molec_H,split_complexes_reassign_type,fragments_reconstruct,get_reference_molecules)#, compare_moleclist_refmoleclist)
-from cell2mol.cell_reconstruct import get_reference_molecules_simple
-from cell2mol.formal_charge import (drive_get_poscharges,classify_mols,balance_charge,build_bonds,prepare_mols,prepare_unresolved)
-from cell2mol.missingH import check_missingH
-from cell2mol.tmcharge_common import cell
-from cell2mol.cellconversions import frac2cart_fromparam
-from cell2mol.readwrite import readinfo
-from cell2mol.spin import count_N, count_d_elec, assign_ground_state_spin_empirical, count_nitrosyl, calcualte_relative_metal_radius, calcualte_relative_metal_radius_haptic_complexes, generate_feature_vector
-from typing import Tuple
-import sklearn
-from cell2mol import __file__
-
 from cell2mol.other import handle_error
-
-from cell2mol.elementdata import ElementData
-elemdatabase = ElementData()
-
-##################################################################################
-def determine_charge(cell: object, debug: int=0) -> object:
-
-
-    # Indentify unique chemical species
-    molec_indices, ligand_indices, unique_indices, unique_species = classify_mols(cell.moleclist, debug=debug)
- 
-    # Group all unique species in a cell variable
-    for spec in unique_species:            # spec is a list in which item 1 is the actual unique specie
-        cell.speclist.append(spec[1])    
-
-    if len(unique_species) == 0:
-        if debug >= 1: print("Empty list of species found. Stopping")
-        sys.exit()
-    else:
-        if debug >= 1: print(f"{len(unique_species)} Species (Ligand or Molecules) to Characterize")
-
-    # drive_get_poscharges adds posible charges to the metal, ligand, and molecule objects of all species in the unit cell
-    # also, it retrieves "Selected_charge_states", which is a tuple with [the actual charge state, and the protonation it belongs to] for all objects except metals
-    selected_charge_states, Warning = drive_get_poscharges(unique_species, debug=debug)
-    cell.warning_list.append(Warning)
-
-    # Find possible charge distribution(s)
-    if not any(cell.warning_list):
-        final_charge_distribution = balance_charge(unique_indices,unique_species,debug=debug)
-
-        ### DEALS WITH WARNINGS
-        if debug >= 1: print("final_charge_distribution", final_charge_distribution)
-        if len(final_charge_distribution) > 1:
-            Warning = True
-            if debug >= 1: print("More than one Possible Distribution Found:", final_charge_distribution)
-        else:
-            Warning = False
-        cell.warning_list.append(Warning)
-
-        if len(final_charge_distribution) == 0:
-            Warning = True
-            if debug >= 1: print("No valid Distribution Found", final_charge_distribution)
-        else:
-            Warning = False
-        cell.warning_list.append(Warning)
-        #######################
-
-        if len(final_charge_distribution) > 1:
-           pp_mols, pp_idx, pp_opt = prepare_unresolved(unique_indices,unique_species,final_charge_distribution, debug=debug)
-           cell.data_for_postproc(pp_mols, pp_idx, pp_opt)
-
-    # Only one possible charge distribution -> getcharge for the repeated species
-    if not any(cell.warning_list):
-        if debug >= 1:
-            print(f"\nFINAL Charge Distribution: {final_charge_distribution}\n")
-            print("#########################################")
-            print("Assigning Charges and Preparing Molecules")
-            print("#########################################")
-        cell.moleclist, Warning = prepare_mols(cell.moleclist, unique_indices, unique_species, selected_charge_states, final_charge_distribution[0], debug=debug)
-        cell.warning_list.append(Warning)
-
-    # Build Bond objects for molecules
-    if not any(cell.warning_list):
-        cell.moleclist = build_bonds(cell.moleclist)
-
-    return cell
-
-##################################################################################
-def save_cell(cell: object, ext: str, output_dir: str, debug: int=0):
-    if debug >= 1: print("\n[Output files]")
-
-    cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(cell.refcode))
-    with open(cellpath, "wb") as fil:
-        if ext == "gmol":
-            if debug >= 1: print("Output file path", cellpath)
-            pickle.dump(cell, fil)
-        else:
-            if debug >= 1: print(ext, "not found as a valid print extension in print_molecule")
-
-##################################################################################
-def load_cell_reset_charges (cellpath: str, debug: int=0) -> object:
-    
-    file = open(cellpath, "rb")
-    cell = pickle.load(file)
-    if debug >= 1: print("[Refcode]", cell.refcode, cell)
-    # if debug >= 1: print(f"{cell.moleclist=}")  
-    if debug >= 1: print(f"{cell.warning_list=}")
-    cell.warning_list = copy.deepcopy(cell.warning_after_reconstruction)
-    if debug >= 1: print(f"{cell.warning_after_reconstruction=}")
-
-    for mol in cell.moleclist:
-        mol.poscharge = []
-        mol.posatcharge = []
-        mol.posobjlist = []
-        mol.posspin = []
-        mol.possmiles = []            
-        mol.atcharge = None
-        mol.totcharge = None
-        mol.smiles = None
-        mol.object = None
-        for atom in mol.atoms:
-            atom.atom_charge(None)
-
-        if mol.type == "Complex":
-            for lig in mol.ligandlist:
-                lig.poscharge = []
-                lig.posatcharge = []
-                lig.posobjlist = []
-                lig.posspin = []
-                lig.possmiles = []
-                lig.atcharge = None
-                lig.totcharge = None
-                lig.smiles = None
-                lig.object = None
-                for atom in lig.atoms:
-                    atom.atom_charge(None)
-
-            for met in mol.metalist :
-                met.poscharge = []
-                met.totcharge = None
-
-    return cell
-
-##################################################################################
-def assign_spin (cell: object, debug: int=0) -> object:
-    """Assign spin multiplicity to molecules in the cell object
-    
-    Args:
-        cell (object): cell object
-        debug (int, optional): debug level. Defaults to 0.
-    Returns:
-        object: cell object with spin multiplicity assigned
-    """
-    
-    if debug >= 1: 
-        print("#########################################")
-        print("Assigning spin multiplicity")
-        print("#########################################")    
-
-    for mol in cell.moleclist:
-        # count number of electrons in the complex
-        N = count_N(mol)        
-
-        if mol.type == "Complex":
-            if len(mol.metalist) == 1: # mono-metallic complexes
-                met = mol.metalist[0]
-                period = elemdatabase.elementperiod[met.label]
-                d_elec = count_d_elec (met.label, met.totcharge)
-
-                if period == 4: # 3d transition metals
-                    if d_elec in [0, 1, 9, 10]:
-                        if N % 2 == 0:
-                            mol.magnetism(1) 
-                        else:
-                            mol.magnetism(2) 
-                    elif d_elec in [2, 3] and met.hapticity == False :
-                        if N % 2 == 0:
-                            mol.magnetism(3) 
-                        else:
-                            mol.magnetism(4) 
-                    elif d_elec in [4, 5, 6, 7, 8] or (d_elec in [2, 3] and met.hapticity == True) :
-                        # Predict spin multiplicity of metal based on Random forest model
-                        feature = generate_feature_vector (met)
-                        path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), "total_spin_3131.pkl")
-                        rf = pickle.load(open(path_rf, 'rb'))
-                        predictions = rf.predict(feature)
-                        spin_rf = predictions[0]
-                        mol.magnetism(spin_rf)
-                    else :
-                        print("Error: d_elec is not in the range of 0-10", d_elec)
-
-                    if met.hapticity == False :
-                        rel = calcualte_relative_metal_radius (met)
-                        met.relative_radius(rel, rel, rel)
-                    else :
-                        rel = calcualte_relative_metal_radius (met)
-                        rel_g, rel_c = calcualte_relative_metal_radius_haptic_complexes (met)
-                        met.relative_radius(rel, rel_g, rel_c)
-
-                    for lig in mol.ligandlist:
-                        if count_N(lig) %2 == 0:
-                            lig.magnetism(1) 
-                        else:
-                            lig.magnetism(2) 
-
-                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
-                    if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.hapttype=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
-                
-                #elif (period == 5 or period == 6 ) and (d_elec in [2, 3] and met.hapticity == False) :
-                # TODO : Predict the ground state spin of coordination complexes with 4d or 5d transition metal (d2, d3)
-                else :  # 4d or 5d transition metals     
-                    if N % 2 == 0:
-                        mol.magnetism(1) 
-                    else:
-                        mol.magnetism(2) 
-                    
-                    for lig in mol.ligandlist:
-                        if count_N(lig) %2 == 0:
-                            lig.magnetism(1) 
-                        else:
-                            lig.magnetism(2)                            
-            
-            else : # Bi- & Poly-metallic complexes
-                if N % 2 == 0:
-                    mol.magnetism(1) 
-                else:
-                    mol.magnetism(2) 
-                
-                for lig in mol.ligandlist:
-                    if count_N(lig) %2 == 0:
-                        lig.magnetism(1) 
-                    else:
-                        lig.magnetism(2) 
-
-        else: # mol.type == "Other" 
-            if N % 2 == 0:
-                mol.magnetism(1) 
-            else:
-                mol.magnetism(2) 
-
-    if debug >= 1: 
-        for mol in cell.moleclist:
-            if mol.type == "Complex":
-                print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
-                for lig in mol.ligandlist:
-                    if lig.natoms != 1:
-                        print(f"\t{lig.formula=}, {lig.spin=}")
-                    else :
-                        print(f"\t{lig.formula=}")
-            else :
-                if mol.natoms != 1:
-                    print(f"{mol.type=}, {mol.formula=}, {mol.spin=}") 
-                else :
-                    print(f"{mol.type=}, {mol.formula=}")
-
-    return cell
-
 
 
 ##################################################################################
 ################################## MAIN ##########################################
 ##################################################################################
-def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, cellpath: str=None, debug: int=1) -> object:
-    ## Step == 1: Only Cell Reconstruction
-    ## Step == 2: Only Charge Assignment (cell reconstruction must have been run before)
-    ## Step == 3: Both Cell Reconstruction and Charge Assignment (cell reconstruction must have been run before)
-    
-    if step == 1 or step == 3:
+def cell2mol(newcell: object, reconstruction: bool=True, charge_assignment: bool=True, spin_assignment: bool=True, debug: int=1) -> object:
 
+    if reconstruction: 
         tini = time.time()
-        if debug >= 1: print("\n===================================== step 1 : Cell Reconstruction =======================================\n")
-        # Reads reference molecules from info file, as well as labels and coordinates
-        labels, pos, ref_labels, ref_fracs, cellvec, cellparam = readinfo(infopath)
-
-        # Initiates cell
-        newcell = cell(refcode, labels, pos, cellvec, cellparam)
-
-        # Loads the reference molecules and checks_missing_H
-        newcell.get_references_molecules(ref_labels, ref_fracs, debug=debug)      ## Evaluates boolean variable self.has_isolated_H. If true, indicates a problem with the cif
-        if newcell.has_isolated_H: handle_error(1)
-        newcell.check_missing_H(debug=debug)                                      ## Evaluates boolean variable self.has_missing_H. If true, indicates a problem with the cif
-        if newcell.has_missing_H:  handle_error(2)
+     
+        ## Evaluates boolean variable self.has_isolated_H. If true, indicates a problem with the cif
+        if newcell.has_isolated_H:        handle_error(1)
+        newcell.check_missing_H(debug=debug)                                     
+        ## Evaluates boolean variable self.has_missing_H. If true, indicates a problem with the cif
+        if newcell.has_missing_H:         handle_error(2)
   
         # Cell Reconstruction
-        newcell.reconstruct(debug=debug)
-        if newcell.is_fragmented:  handle_error(3)
+        newcell.reconstruct(debug=debug)                                         
+        ## Evaluates boolean variable self.error_reconstruction. If true, fragments remain
+        if newcell.error_reconstruction:  handle_error(3)
 
         tend = time.time()
         if debug >= 1: print(f"\nCell Reconstruction Finished Normally. Total execution time: {tend - tini:.2f} seconds")
 
-    elif step == 2:
-        from cell2mol.readwrite import load_binary
-        if debug >= 1: print("\n***Runing only Charge Assignment***")
-        if cellpath is None: cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(refcode))
-        newcell = load_binary(cellpath)
-        if debug >= 1: print("\nCell object loaded with pickle")
-        newcell.reset_charges() 
-        ### newcell = load_cell_reset_charges(cellpath)       --- Split into load_binary and newcell.reset_charges
+    if charge_assignment:
+        #if not newcell.has_missing_H and not newcell.has_isolated_H and not newcell.is_fragmented:
+        tini = time.time()
+        if not newcell.is_fragmented:
+            newcell.reset_charges() 
+            newcell.determine_charge(debug=debug)
 
-    else:
-        if debug >= 1: print("Step number is incorrect. Only values 1, 2 or 3 are accepted")
-        sys.exit(1)
+            tend = time.time()
+            if debug >= 1: print(f"\nTotal execution time for Charge Assignment: {tend - tini:.2f} seconds")
 
-    if not newcell.has_missing_H and not newcell.has_isolated_H and not newcell.is_fragmented:
-
-        if step == 1:
-            pass
-        elif step == 2 or step == 3:
-            # Charge Assignment
-            tini_2 = time.time()
-            if debug >= 1: print("===================================== step 2 : Charge Assignment =======================================\n")
-            newcell = determine_charge(newcell, debug=debug)
-            tend_2 = time.time()
-            if debug >= 1: print(f"\nTotal execution time for Charge Assignment: {tend_2 - tini_2:.2f} seconds")
-
-            if newcell.is_empty_poscharges :    handle_error(4)
-            elif newcell.is_multiple_distrib :  handle_error(5)
-            elif newcell.is_empty_distrib :     handle_error(6)
-            elif newcell.is_preparemol :        handle_error(7)
+            if   newcell.error_empty_poscharges :  handle_error(4)
+            elif newcell.error_multiple_distrib :  handle_error(5)
+            elif newcell.error_empty_distrib :     handle_error(6)
+            elif newcell.error_prepare_mols :        handle_error(7)
             else :
                 if debug >= 1: print("Charge Assignment successfully finished.\n")
                 # TODO : Compare assigned charges with ML predicted charges
 
-                # Spin state assignment
-                newcell = assign_spin(newcell, debug=debug)
-    else:
-        if step == 1 or step == 3:
-            if debug >= 1: print("Cell reconstruction failed.\n")
-        elif step == 2:
-            if debug >= 1: print("Warnings in loaded Cell object\n")
-        if debug >= 1: newcell.print_Warning()
-        if debug >= 1: print("Cannot proceed step 2 Charge Assignment")
-   
-    #if not any(newcell.warning_list): newcell.arrange_cell_coord()
+    if spin_assignment:
+        tini = time.time()
+        newcell.assign_spin(debug=debug)
+        tend = time.time()
+        if debug >= 1: print(f"\nTotal execution time for Spin Assignment: {tend - tini:.2f} seconds")
 
     return newcell

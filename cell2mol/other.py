@@ -70,6 +70,18 @@ def get_dist (atom1_pos: list, atom2_pos: list) -> float :
     dist = np.linalg.norm(np.array(atom1_pos) - np.array(atom2_pos))
     return round(dist, 3)
 
+##############################
+def get_angle(vec1, vec2) -> float : 
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+    dotprod = np.dot(vec1, vec2)
+    factor = dotprod / (norm1 * norm2)
+    angle = np.arccos(factor)
+    if np.isnan(angle):
+        print("GET_ANGLE nan Problem", norm1, norm2, dotprod, factor, angle)
+        print("GET_ANGLE nan Problem, vecs:", vec1, vec2)
+    return float(angle)
+
 #######################################################
 def handle_error(case: int):
     print(f"Cell2mol terminated with error number {case}. Message:")

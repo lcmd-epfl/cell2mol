@@ -7,108 +7,75 @@ import os
 from cell2mol.helper import parsing_arguments
 from cell2mol.c2m_module import save_cell, cell2mol
 from cell2mol.cif2info import cif_2_info
+from cell2mol.classes import *
 
-if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
+if __name__ != "__main__" and __name__ != "cell2mol.c2m_driver": sys.exit(1)
 
-    pwd = os.getcwd()
+input, isverbose, isquiet = parsing_arguments()
+current_dir     = os.getcwd()
+input_path      = os.path.normpath(input)
+dir, file       = os.path.split(input_path)
+root, extension = os.path.splitext(file)
+root = root.split(".")
+name = root[0]
 
-    input, step, isverbose, isquiet = parsing_arguments()
-    input_path = os.path.normpath(input)
-    dir, file = os.path.split(input_path)
-    root, extension = os.path.splitext(file)
-    root = root.split(".")
-    refcode = root[0]
+stdout = sys.stdout
+stderr = sys.stderr
 
-    output_dir = pwd
+# Filenames for output and cell object
+cell_fname   = os.path.join(current_dir, "Cell_{}.cell".format(name))
+output_fname = os.path.join(current_dir, "cell2mol.out")
 
-    stdout = sys.stdout
-    stderr = sys.stderr
+##### Deals with the parsed arguments for verbosity ######
+if isverbose and not isquiet:       debug = 2
+elif isverbose and isquiet:         debug = 0
+elif not isverbose and isquiet:     debug = 0
+elif not isverbose and not isquiet: debug = 1
 
-    ##### Deals with the parsed arguments for verbosity ######
-    if isverbose and not isquiet: debug = 2
-    elif isverbose and isquiet: debug = 0
-    elif not isverbose and isquiet: debug = 0
-    elif not isverbose and not isquiet: debug = 1
-    
-    ##### Deals with the parsed argument "STEP" ######
-    if step == None:
-        step = 3
-        pass
-    elif step in [1, 2, 3]:
-        pass
-    else:
-        sys.exit(1)
+##### Deals with files ######
+if os.path.exists(input_path):
+        
+    ## If the input is a .cif file, then it is converted to a .info file using cif_2_info from cif2cell
+    if extension == ".cif":
+        errorpath    = os.path.join(current_dir, "cif2cell.err")
+        infopath     = os.path.join(current_dir, "{}.info".format(name))
+        # TODO: Pre-filtering of the .cif file
+        # if error exist : sys.exit(1)
+        # Create .info file 
+        cif_2_info(input_path, infopath, errorpath)
+        # Checks errors in cif_2_info
+        with open(errorpath, 'r') as err:
+            for line in err.readlines():
+                if "Error" in line: sys.exit(1)
 
-    if step == 2:
-        infopath = None  
-    elif step == 1 or step == 3:
-        if os.path.exists(input_path):
-            if extension == ".cif":
+    ## If the input is an .info file, then is used directly
+    elif extension == ".info": infopath = input_path
+    else:                      sys.exit(1)
 
-                infopath = os.path.join(output_dir, f"{refcode}.info")
-                errorpath = os.path.join(output_dir, "error_cif2cell.txt")
-                
-                # Create .info file 
-                cif_2_info(input_path, infopath, errorpath)
-  
-                with open(errorpath, 'r') as err:
-                    for line in err.readlines():
-                        if "Error" in line:
-                            sys.exit(1)
+output = open(output_fname, "w")
+sys.stdout = output
 
-            elif extension == ".info":
-                infopath = input_path
+################################
+### PREPARES THE CELL OBJECT ###
+################################
+print(f"INITIATING cell object from input") 
 
-            else:
-                # print("Wrong Input File Format")
-                sys.exit(1)
-        else:
-            # print(f"Error: The file {input_path} could not be found.\n")
-            sys.exit(1)
+# Reads reference molecules from info file, as well as labels and coordinates
+labels, pos, ref_labels, ref_fracs, cellvec, cellparam = readinfo(infopath)
+# Initiates cell
+newcell = cell(name, labels, pos, cellvec, cellparam)
+# Loads the reference molecules and checks_missing_H
+# TODO : reconstruct the unit cell without using reference molecules
+# TODO : reconstruct the unit cell using (only reconstruction of) reference molecules and Space group
+newcell.get_reference_molecules(ref_labels, ref_fracs, debug=debug) 
 
-    if step == 2:
-        cellpath = os.path.join(output_dir, "Cell_{}.gmol".format(refcode))
-        if not os.path.exists(cellpath):
-            # print("No Cell object")
-            sys.exit(1)
+######################
+### CALLS CELL2MOL ###
+######################
+print(f"ENTERING cell2mol with debug={debug}")
+cell = cell2mol(newcell, reconstruction=True, charge_assignment=True, spin_assignment=True, debug=debug)
+cell.assess_errors()
+cell.save(cell_fname)
 
-    # save output and cell object
-    output_fname = os.path.join(output_dir, "output.out")
-
-    if step == 1 or step == 3:
-        output = open(output_fname, "w")
-    elif step == 2:
-        output = open(output_fname, "a")
-
-    sys.stdout = output
-
-    ######################
-    ### CALLS CELL2MOL ###
-    ######################
-    print(f"running cell2mol with debug={debug}")
-
-## def __init__(self, refcode: str, labels: list, pos: list, cellvec: list, cellparam: list, warning_list: list) -> None:
-    cell = cell2mol(infopath, refcode, output_dir, step, debug)
-    print_types = "gmol"
-    save_cell(cell, print_types, output_dir, debug=debug)
-    output.close()
-
-    sys.stdout = stdout
-
-    # save error
-    res = [i for i, val in enumerate(cell.warning_list) if val]
-    if len(res) == 0:
-        error_code = 0
-    else:
-        for i in res:
-            error_code = i + 1
-
-    error_fname = os.path.join(output_dir, f"error_{error_code}.out")
-    error = open(error_fname, "w")
-    sys.stdout = error
-    cell.print_Warning()
-    error.close()
-
-    sys.stdout = stdout
-else:
-    sys.exit(1)
+output.close()
+sys.stdout = stdout

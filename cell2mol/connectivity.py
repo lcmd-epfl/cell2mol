@@ -4,8 +4,8 @@ from scipy import sparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
 from typing import Tuple
-from cell2mol.elementdata import ElementData
 from cell2mol.other import inv
+from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
 #######################################################
@@ -323,6 +323,29 @@ def compare_atoms(at1, at2, check_coordinates: bool=False, debug: int=0):
         if (at1.charge != at2.charge): return False
     if hasattr(at1,"spin") and hasattr(at2,"spin"):
         if (at1.spin != at2.spin): return False
+    return True
+
+#################################
+def compare_metals (at1, at2, check_coordinates: bool=False, debug: int=0):
+    if at1.subtype != "metal" or at2.subtype != "metal": return False
+    if debug > 0: 
+        print("Comparing Metals")
+        print(at1.label)
+        print(at2.label)
+
+    if (at1.label != at2.label): return False
+
+    if not hasattr(at1,"coord_sphere"): at1.get_coord_sphere()
+    if not hasattr(at2,"coord_sphere"): at2.get_coord_sphere()
+    at1_coord_sphere_formula = labels2formula ([atom.label for atom in at1.coord_sphere])
+    at2_coord_sphere_formula = labels2formula ([atom.label for atom in at2.coord_sphere])    
+    if (at1_coord_sphere_formula != at2_coord_sphere_formula) : return False
+    
+    if check_coordinates:
+        if (at1.coord[0] != at2.coord[0]): return False
+        if (at1.coord[1] != at2.coord[1]): return False
+        if (at1.coord[2] != at2.coord[2]): return False
+        
     return True
 
 #################################
