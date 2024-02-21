@@ -17,6 +17,8 @@ from cell2mol.elementdata import ElementData
 from cell2mol.connectivity import add_atom
 elemdatabase = ElementData()
 
+from cell2mol.classes import specie, molecule, ligand, atom, metal, group, bond
+
 #############################
 ### Loads Rdkit & xyz2mol ###
 #############################
@@ -1389,8 +1391,8 @@ def build_bonds(moleclist: list, debug: int=0) -> list:
     if debug >= 2: print("BUILD_BONDS: Doing 1st Part")
     if debug >= 2: print("###########################")
     for mol in moleclist:
-        if mol.type != "Complex":
-            if debug >= 2: print(f"BUILD BONDS: doing mol with Natoms {mol.natoms}")
+        if not mol.iscomplex:
+            if debug >= 2: print(f"BUILD BONDS: doing mol with mol.natoms={mol.natoms}")
             # Checks that the gmol and rdkit-mol objects have same order
             for idx, a in enumerate(mol.atoms):
 
@@ -1398,32 +1400,24 @@ def build_bonds(moleclist: list, debug: int=0) -> list:
                 #if debug >= 2: print("BUILD BONDS: atom", idx, a.label)
                 rdkitatom = mol.rdkit_mol.GetAtomWithIdx(idx)
                 tmp = rdkitatom.GetSymbol()
-                if a.label != tmp: 
-                    if debug >= 1: print("Error in Build_Bonds. Atom labels do not coincide. GMOL vs. MOL:",a.label,tmp)
+                if a.label != tmp: print("Error in Build_Bonds. Atom labels do not coincide. GMOL vs. MOL:",a.label,tmp)
                 else:
                     # First part. Creates bond information
-                    starts = []
-                    ends = []
-                    orders = []
                     for b in rdkitatom.GetBonds():
                         bond_startatom = b.GetBeginAtomIdx()
-                        bond_endatom = b.GetEndAtomIdx()
-                        bond_order = b.GetBondTypeAsDouble()
-                        # if debug >= 1: print(bond_endatom, bond_order)
+                        bond_endatom   = b.GetEndAtomIdx()
+                        bond_order     = b.GetBondTypeAsDouble()
                         if mol.atoms[bond_endatom].label != mol.rdkit_mol.GetAtomWithIdx(bond_endatom).GetSymbol():
                             if debug >= 1: print("Error with Bond EndAtom",mol.atoms[bond_endatom].label,mol.rdkit_mol.GetAtomWithIdx(bond_endatom).GetSymbol())
                         else:
                             if bond_endatom == idx:
-                                starts.append(bond_endatom)
-                                ends.append(bond_startatom)
-                                orders.append(bond_order)
+                                start = bond_endatom
+                                end   = bond_startatom
                             elif bond_startatom == idx:
-                                starts.append(bond_startatom)
-                                ends.append(bond_endatom)
-                                orders.append(bond_order)
-                            else:
-                                if debug >= 1: print("Warning BUILD_BONDS: Index atom is neither start nor end bond")
-                    a.bonds(starts, ends, orders)
+                                start = bond_startatom
+                                end   = bond_endatom
+                            new_bond = bond(mol.atoms[start], mol.atoms[end], bond_order) ## This has changed. Now there is a bond object, and we send the atom objects, not only the index
+                        a.add_bond(new_bond)
 
     if debug >= 2: print("")
     if debug >= 2: print("BUILD_BONDS: Doing 2nd Part")
@@ -1434,30 +1428,17 @@ def build_bonds(moleclist: list, debug: int=0) -> list:
     #######
     for mol in moleclist:
         if debug >= 2: print(f"BUILD BONDS: doing mol {mol.formula} with Natoms {mol.natoms}")
-        if mol.type == "Complex":
-            for lig in mol.ligandlist:
+        if mol.iscomplex:
+            for lig in mol.ligands:
                 if debug >= 2: print(f"BUILD BONDS: doing ligand {lig.formula}")
 
                 for idx, a in enumerate(lig.atoms):
                     # Security Check. Confirms that the labels are the same
                     rdkitatom = lig.rdkit_mol.GetAtomWithIdx(idx)
                     tmp = rdkitatom.GetSymbol()
-                    if a.label != tmp:
-                        if debug >= 1: print(f"Error in Build_Bonds. Atom labels do not coincide. GMOL vs. MOL: {a.label} {tmp}")
-                        if debug >= 1: print("BUILD BONDS DEBUG:")
-                        if debug >= 1: print(f"Ligand; {lig.labels}")
-                        if debug >= 1: print("Atoms of RDKIT-Object")
-                        if debug >= 1: 
-                            for kdx, a in enumerate(lig.rdkit_mol.GetAtoms()):
-                                print(kdx, a.GetSymbol())
-                            print("Atoms of GMOL-Object")
-                            for kdx, a in enumerate(lig.atoms):
-                                print(kdx, a.label)
+                    if a.label != tmp: print(f"Error in Build_Bonds. Atom labels do not coincide. GMOL vs. MOL: {a.label} {tmp}")
                     else:
                         # First part. Creates bond information
-                        starts = []
-                        ends = []
-                        orders = []
                         for b in rdkitatom.GetBonds():
                             bond_startatom = b.GetBeginAtomIdx()
                             bond_endatom = b.GetEndAtomIdx()
@@ -1469,62 +1450,63 @@ def build_bonds(moleclist: list, debug: int=0) -> list:
                                     if debug >= 1: print( "Error with Bond EndAtom",lig.atoms[bond_endatom].label,lig.rdkit_mol.GetAtomWithIdx(bond_endatom).GetSymbol())
                                 else:
                                     if bond_endatom == idx:
-                                        starts.append(bond_endatom)
-                                        ends.append(bond_startatom)
-                                        orders.append(bond_order)
+                                        start = bond_endatom
+                                        end   = bond_startatom
                                     elif bond_startatom == idx:
-                                        starts.append(bond_startatom)
-                                        ends.append(bond_endatom)
-                                        orders.append(bond_order)
-                        a.bonds(starts, ends, orders)
+                                        start = bond_startatom
+                                        end   = bond_endatom
+                                    new_bond = bond(mol.atoms[start], mol.atoms[end], bond_order) ## This has changed. Now there is a bond object, and we send the atom objects, not only the index
+                                a.add_bond(new_bond)
 
     if debug >= 2: print("")
     if debug >= 2: print("BUILD_BONDS: Doing 3rd Part")
     if debug >= 2: print("###########################")
 
-    #######
-    # 3rd Part. Merges Ligand Information into Molecule Object using the atlists
-    #######
-    for mol in moleclist:
-        if debug >= 2: print("BUILD BONDS: doing mol", mol.formula, "with Natoms", mol.natoms)
-        if mol.type == "Complex":
-            allstarts = []
-            allends = []
-            allorders = []
-            # Adds atoms within ligands
-            for lig in mol.ligandlist:
-                for a in lig.atoms:
-                    for b in a.bond:
-                        allstarts.append(lig.atlist[b[0]])
-                        allends.append(lig.atlist[b[1]])
-                        allorders.append(b[2])
+    ## SERGI: I need to work on that, but I'll do something first
+     
+    ########
+    ## 3rd Part. Merges Ligand Information into Molecule Object using the atlists
+    ########
+    #for mol in moleclist:
+    #    if debug >= 2: print("BUILD BONDS: doing mol", mol.formula, "with Natoms", mol.natoms)
+    #    if mol.iscomplex:
+    #        allstarts = []
+    #        allends = []
+    #        allorders = []
+    #        # Adds atoms within ligands
+    #        for lig in mol.ligandlist:
+    #            for a in lig.atoms:
+    #                for b in a.bond:
+    #                    allstarts.append(lig.atlist[b[0]])
+    #                    allends.append(lig.atlist[b[1]])
+    #                    allorders.append(b[2])
 
-            # Adds Metal-Ligand Bonds, with an arbitrary 0.5 order:
-            for idx, row in enumerate(mol.mconmat):
-                # if debug >= 2: print(row)
-                for jdx, val in enumerate(row):
-                    if val > 0:
-                        # if debug >= 2: print(idx, jdx, val)
-                        allstarts.append(idx)
-                        allends.append(jdx)
-                        allorders.append(0.5)
+    #        # Adds Metal-Ligand Bonds, with an arbitrary 0.5 order:
+    #        for idx, row in enumerate(mol.mconmat):
+    #            # if debug >= 2: print(row)
+    #            for jdx, val in enumerate(row):
+    #                if val > 0:
+    #                    # if debug >= 2: print(idx, jdx, val)
+    #                    allstarts.append(idx)
+    #                    allends.append(jdx)
+    #                    allorders.append(0.5)
 
-            # I sould work to add Metal-Metal Bonds. Would need to work on the Metal class:
-            # Finally, puts everything together, and creates bonds for MOLECULE atom objects
-            for idx, a in enumerate(mol.atoms):
-                starts = []
-                ends = []
-                orders = []
-                group = []
-                for entry in zip(allstarts, allends, allorders):
-                    if entry[0] == idx or entry[1] == idx:
-                        if entry not in group and (entry[1], entry[0], entry[2]) not in group:
-                            starts.append(entry[0])
-                            ends.append(entry[1])
-                            orders.append(entry[2])
-                            group.append(entry)
+    #        # I sould work to add Metal-Metal Bonds. Would need to work on the Metal class:
+    #        # Finally, puts everything together, and creates bonds for MOLECULE atom objects
+    #        for idx, a in enumerate(mol.atoms):
+    #            starts = []
+    #            ends = []
+    #            orders = []
+    #            group = []
+    #            for entry in zip(allstarts, allends, allorders):
+    #                if entry[0] == idx or entry[1] == idx:
+    #                    if entry not in group and (entry[1], entry[0], entry[2]) not in group:
+    #                        starts.append(entry[0])
+    #                        ends.append(entry[1])
+    #                        orders.append(entry[2])
+    #                        group.append(entry)
 
-                a.bonds(starts, ends, orders)
+    #            a.bonds(starts, ends, orders)
 
     #######
     # 4th Part. Corrects Ligand Smiles to Remove Added H atoms, the old smiles is stored in "lig.smiles_with_H" as it can still be useful
