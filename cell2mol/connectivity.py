@@ -149,11 +149,11 @@ def get_radii(labels: list) -> np.ndarray:
     for l in labels:
         if l[-1].isdigit(): label = l[:-1]
         else: label = l
-        radii.append(elemdatabase.CovalentRadius2[label])
+        radii.append(elemdatabase.CovalentRadius3[label])
     return np.array(radii)
 
 ####################################
-def get_adjmatrix(labels: list, pos: list, cov_factor: float, radii="default", metal_only: bool=False) -> Tuple[int, list, list]:
+def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default", metal_only: bool=False) -> Tuple[int, list, list]:
     isgood = True 
     clash_threshold = 0.3
     natoms = len(labels)
