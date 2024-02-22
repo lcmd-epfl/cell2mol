@@ -45,14 +45,13 @@ def classify_mols(moleclist: list, debug: int=0) -> Tuple[list, list, list, list
     # identifies those that are identical based on a sort of ID number, which is
     # the variable "elemcountvec". This is a vector of occurrences for all elements in the elementdatabase
 
-    molec_indices = []  # molecule index
-    ligand_indices = []  # ligand index
-    metal_ion_indices = []
-    unique_indices = []  # Unique Specie (molecule or ligand) Index in Typelist
-    unique_species = []  # List of Unique Species
-    typelist_mols = []  # List of ID codes for Molecules
-    typelist_ligs = []  # List of ID codes for Ligands
-    typelist_mets = []
+    molec_indices       = []  # molecule index
+    ligand_indices      = []  # ligand index
+    unique_indices      = []  # Unique Specie (molecule or ligand) Index in Typelist
+    unique_species      = []  # List of Unique Species
+    typelist_mols       = []  # List of ID codes for Molecules
+    typelist_ligs       = []  # List of ID codes for Ligands
+    typelist_mets       = []
 
     # The reason for splitting typelist in two is that
     # some species might appear as ligands and as counterions, (eg. Cl-)
@@ -62,67 +61,59 @@ def classify_mols(moleclist: list, debug: int=0) -> Tuple[list, list, list, list
     specs_found = -1
     # Non-Complexes
     for idx, mol in enumerate(moleclist):
-        if mol.type != "Complex":
+        if not mol.iscomplex:
             found = False
             for ldx, typ in enumerate(typelist_mols):
-                if (mol.elemcountvec == typ[0]).all() and not found:
-                    if (mol.adjtypes == typ[1]).all():
-                        if mol.totmconnec == typ[2]:
-                            found = True
-                            kdx = typ[3]
-                            if debug >= 2: print(f"Molecule {idx} is the same than {ldx} in typelist")
+                if compare_species(mol,typ[0]) and not found:
+                    found = True
+                    kdx = typ[1]
+                    if debug >= 2: print(f"Molecule {idx} is the same than {ldx} in typelist")
             if not found:
+                if debug >= 2: print(f"New molecule found with: formula={mol.formula}, totmconnec={mol.totmconnec}, and added in position {kdx}")
                 specs_found += 1
                 kdx = specs_found
-                if debug >= 2: print(f"New molecule found with: formula={mol.formula}, totmconnec={mol.totmconnec}, and added in position {kdx}")
-                typ_comparison = [mol.elemcountvec, mol.adjtypes, mol.totmconnec, kdx]
-                typelist_mols.append(typ_comparison)
-                unique_species.append(list([mol.type, mol]))
+                typelist_mols.append(mol, kdx)
+                unique_species.append(mol)
 
-            jdx = "-"
             molec_indices.append(idx)
-            ligand_indices.append(jdx)
+            ligand_indices.append("-")
             unique_indices.append(kdx)
 
     # Complexes
-        elif mol.type == "Complex":
-            for jdx, lig in enumerate(mol.ligandlist):
+        elif mol.iscomplex:
+            for jdx, lig in enumerate(mol.ligands):
                 found = False
     # Ligands
                 for ldx, typ in enumerate(typelist_ligs):
-                    if (lig.elemcountvec == typ[0]).all() and not found:
-                        if (lig.adjtypes == typ[1]).all():
-                            if lig.totmconnec == typ[2]:
-                                found = True
-                                kdx = typ[3]
-                                if debug >= 2: print(f"Ligand {jdx} is the same than {ldx} in typelist")
+                    if compare_species(lig,typ[0]) and not found:
+                        found = True
+                        kdx = typ[1]
+                        if debug >= 2: print(f"Ligand {jdx} is the same than {ldx} in typelist")
                 if not found:
                     specs_found += 1
                     kdx = specs_found
                     if debug >= 2: print(f"New ligand found with: formula {lig.formula} and totmconnec={lig.totmconnec}, and added in position {kdx}")
-                    typ_comparison = [lig.elemcountvec, lig.adjtypes, lig.totmconnec, kdx]
-                    typelist_ligs.append(typ_comparison)
-                    unique_species.append(list([lig.type, lig, mol]))
+                    typelist_ligs.append(lig, kdx)
+                    unique_species.append(lig)
 
                 molec_indices.append(idx)
                 ligand_indices.append(jdx)
                 unique_indices.append(kdx)
 
     # Metals
-            for jdx, met in enumerate(mol.metalist):
+            for jdx, met in enumerate(mol.metals):
                 found = False
                 for ldx, typ in enumerate(typelist_mets):
-                    if (met.coord_sphere_ID == typ[0]).all() and not found:
+                    if compare_metals(met,typ[0]) and not found:
                         found = True
-                        kdx = typelist_mets[ldx][1]
+                        kdx = typ[1]
                         if debug >= 2: print(f"Metal {jdx} is the same than {ldx} in typelist")
                 if not found:
                     specs_found += 1
                     kdx = specs_found
                     if debug >= 2: print(f"New Metal Center found with: labels {met.label} and added in position {kdx}")
-                    typ_comparison = list([met.coord_sphere_ID, kdx])
-                    typelist_mets.append(typ_comparison)
-                    unique_species.append(list([met.type, met, mol]))
+                    typelist_mets.append(met, kdx)
+                    unique_species.append(met)
 
                 molec_indices.append(idx)
                 ligand_indices.append(jdx)
@@ -136,7 +127,6 @@ def classify_mols(moleclist: list, debug: int=0) -> Tuple[list, list, list, list
     for idx in range(0, nspecs):
         count = unique_indices.count(idx)
         if debug >= 2: print(f"CLASSIFY: specie {idx} appears {count} times, with type: {unique_species[idx][0]}")
-        #unique_species[idx][1].occurrence = count
 
     return molec_indices, ligand_indices, unique_indices, unique_species
 

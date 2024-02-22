@@ -187,6 +187,20 @@ class specie(object):
         return occurrence
 
     ############
+    def get_protonation_states(self, debug: int=0):
+        # !!! WARNING. FUNCTION defined at the "specie" level, but will only do something for ligands and organic (iscomplex == False) molecules
+        if self.subtype == "group": self.protonation_states = None
+        else:                       self.protonation_states = get_protonation_states(self, debug=debug)
+        return self.protonation_states
+
+    ############
+    def get_possible_cs(self, debug: int=0):
+        ## Arranges a list of possible charge_states associated with this species, which is later managed at the cell level to determine the good one
+        if not hasattr(self,"protonation_states"): self.get_protonation_states(debug=debug)
+        if self.protonation_states is not None:    self.possible_cs = get_poscharges(self, debug=debug)  
+        return self.possible_cs
+
+    ############
     def print_xyz(self):
         print(self.natoms)
         print("")
@@ -486,6 +500,12 @@ class group(specie):
         return self.haptic_type 
 
     #######################################################
+    def coordination_correction (self, debug=1) :
+        if self.is_haptic:                     self = coordination_correction_for_haptic(self, debug=debug)
+        if self.is_haptic == False :           self = coordination_correction_for_nonhaptic(self, debug=debug)
+        return self 
+
+    #######################################################
     def check_denticity(self, debug: int=0):
         from cell2mol.connectivity import add_atom
         if not hasattr(self,"is_haptic"): self.get_hapticity()
@@ -497,11 +517,11 @@ class group(specie):
                 if debug > 0: print(f"GROUP.check_denticity: connectivity verified for atom {idx} with label {a.label}")
             else:
                 if debug > 0: print(f"GROUP.check_denticity: corrected mconnec of atom {idx} with label {a.label}")
-                a.mconnec = 0                                                                        # Corrects data of atom object in self
-                self.parent.atoms[self.parent_indices[idx]].mconnec = 0                              # Corrects data of atom object in ligand class
-                self.parent.madjnum[self.parent_indices[idx]] = 0                                    # Corrects data in metal_adjacency number of the ligand class
-                self.parent.parent.atoms[self.parent.parent_indices[self.parent_indices[idx]]] = 0   # Corrects data of atom object in molecule class
-                self.parent.parent.madjnum[self.parent.parent_indices[self.parent_indices[idx]]] = 0 # Corrects data in metal_adjacency number of the molecule class
+                a.reset_mconnec(idx)
+        
+        # TODO : check whether assgined denticifiy is correct. otherwise, correct it.
+        if self.is_haptic:                     self = coordination_correction_for_haptic(self, debug=debug)
+        if self.is_haptic == False :           self = coordination_correction_for_nonhaptic(self, debug=debug)
         self.checked_denticity = True
 
     #######################################################
@@ -601,6 +621,14 @@ class atom(object):
         if hasattr(self,"charge"):     to_print += f' Atom Charge           = {self.charge}\n'
         to_print += '----------------------------------------------------\n'
         return to_print
+    
+    #######################################################
+    def reset_mconnec(self, idx: int):
+        self.mconnec = 0                                                                        # Corrects data of atom object in self
+        self.parent.atoms[self.parent_indices[idx]].mconnec = 0                                 # Corrects data of atom object in ligand class
+        self.parent.madjnum[self.parent_indices[idx]] = 0                                       # Corrects data in metal_adjacency number of the ligand class
+        self.parent.parent.atoms[self.parent.parent_indices[self.parent_indices[idx]]] = 0      # Corrects data of atom object in molecule class
+        self.parent.parent.madjnum[self.parent.parent_indices[self.parent_indices[idx]]] = 0    # Corrects data in metal_adjacency number of the molecule class
 
 ###############
 #### METAL ####
@@ -611,13 +639,11 @@ class metal(atom):
         atom.__init__(self, label, coord, parent_index=parent_index, radii=radii, parent=parent, frac_coord=frac_coord)
 
     #######################################################
-    def count_valence_elec (self, m_ox: int):
+    def get_valence_elec (self, m_ox: int):
         """ Count valence electrons for a given transition metal and metal oxidation state """
         v_elec = elemdatabase.valenceelectrons[self.label] - m_ox      
-        if v_elec >= 0 :
-            self.valence_elec = v_elec
-        else :
-            self.valence_elec = elemdatabase.elementgroup[self.label] - m_ox
+        if v_elec >= 0 :  self.valence_elec = v_elec
+        else :            self.valence_elec = elemdatabase.elementgroup[self.label] - m_ox
         return self.valence_elec
 
     #######################################################
@@ -629,9 +655,14 @@ class metal(atom):
         ## Cordination sphere defined as a collection of atoms
         self.coord_sphere = []
         for idx, at in enumerate(adjmat[self.parent_index]):
-            if at >= 1:
-                self.coord_sphere.append(self.parent.atoms[idx])
+            if at >= 1: self.coord_sphere.append(self.parent.atoms[idx])
         return self.coord_sphere
+
+    #######################################################
+    def get_coord_sphere_formula(self):
+        if not hasattr(self,"coord_sphere"): self.get_coord_sphere()
+        self.coord_sphere_formula = labels2formula([(at.label for at in self.coord_sphere)])
+        return self.coord_sphere_formula 
 
     #######################################################
     def get_connected_groups(self, debug: int=0):
@@ -668,11 +699,14 @@ class metal(atom):
         
         return self.rel_metal_radius
 
+    #######################################################
+    def get_possible_cs(self, debug: int=0):
+        self.possible_cs = get_metal_poscharges(self)
+        return self.possible_cs
+
+    #######################################################
     def get_spin(self):
         self.spin = assign_spin_metal(self)
-    
-    def get_poscharges(self, debug: int=0):
-        self.poscharges = get_metal_poscharges(self, self.parent, debug=debug)
 
     ############
     def reset_charge(self):
@@ -830,19 +864,39 @@ class cell(object):
         
     #######################################################
     def assign_charges(self, debug: int=0) -> object:
+    #########
+    # CHARGE#
+    #########
+    # This function drives the determination of the charge the species in the unit cell
+    # The whole process is done by 4 functions, which are run at the specie class level:
+    # 1) spec.get_protonation_states(), which determines which atoms of the specie must have added elements (see above) to have a meaningful Lewis structure
+    # 2) spec.get_possible_cs(), which retrieves the possible charge states associated with the specie
+    # 3) spec.get_charge(), which generates one connectivity for a set of charges
+    # 4) cell.select_charge_distr() chooses the best connectivity among the generated ones.
+
+    # Basically, this function connects these other three functions,
+    # while managing some key information for those
+    # Initiates variables
+    ############
         
         if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)  
         if self.is_fragmented: return None # Stopping. self.is_fragmented must be false to determine the charges of the cell
 
-        # Indentify unique chemical species
+        # (1) Indentify unique chemical species
         unique_species, unique_indices = identify_unique_species(self.moleclist, debug=debug)
         if debug >= 1: print(f"{len(unique_species)} Species (Metal or Ligand or Molecules) to Characterize")
         self.speclist = [spec[1] for spec in unique_species] # spec is a list in which item 1 is the actual unique specie
 
-        # Gets a preliminary list of possible charge states for each specie
-        selected_charge_states, Warning = drive_get_poscharges(unique_species, debug=debug)
-        if Warning: self.error_empty_poscharges = True; return None # Empty list of possible charges received for molecule or ligand. Stopping
-        else:       self.error_empty_poscharges = False
+        # (2) Gets a preliminary list of possible charge states for each specie (former drive_poscharge)
+        selected_cs = []
+        for idx, spec in enumerate(unique_species):
+            tmp = spec.get_possible_cs(debug=debug)
+            if tmp is None: 
+                self.error_empty_poscharges = True; return None # Empty list of possible charges received. Stopping
+            else: 
+                self.error_empty_poscharges = False
+                if spec.subtype == "metal":  selected_cs.append([])         ## I don't like to add an empty list
+                else:                        selected_cs.append(tmp)
 
         # Finds the charge_state that satisfies that the crystal must be neutral
         final_charge_distribution = balance_charge(unique_indices, unique_species, debug=debug)

@@ -10,10 +10,10 @@ from collections import defaultdict
 from cell2mol.cellconversions import frac2cart_fromparam, cart2frac, translate
 from cell2mol.other import compute_centroid, additem, inv, absolute_value
 from cell2mol.connectivity import compare_species, count_species, find_closest_metal
-from cell2mol.missingH import getangle
+from cell2mol.missingH import get_angle
 from cell2mol.coordination_sphere import get_coordination_geometry
 # Imports Classes
-from cell2mol.classes import specie, molecule, ligand, group, atom, metal, cell
+from cell2mol.classes import specie, molecule, ligand, group, atom, metal, cell, bond
 from cosymlib import Geometry
 from cosymlib.shape.tools import shape_structure_references
 
