@@ -83,6 +83,7 @@ def translate(vector, coords, cellvec):
     return newcoord
 
 #######################################################
+# TODO : something is missing 
 def cart2frac(cartCoords, cellvec):
     """ Translate coordinates by a vector
     Args:

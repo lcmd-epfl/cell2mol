@@ -1,13 +1,15 @@
 import numpy as np
-import sys
-from cell2mol.connectivity import get_adjacency_types, get_element_count, labels2electrons, labels2formula, labels2ratio, get_adjmatrix, compare_atoms, compare_species
-from cell2mol.connectivity import get_metal_idxs, split_species, get_radii 
-from cell2mol.cell2mol.cell_reconstruction import *
-from cell2mol.cell_operations import cart2frac, frac2cart_fromcellvec, frac2cart_fromparam
-from cell2mol.cell2mol.charge_assignment import *
-from cell2mol.yuri_spin import *
+from cell2mol.connectivity import get_adjacency_types, get_element_count, labels2electrons, labels2formula, get_adjmatrix
+from cell2mol.connectivity import get_metal_idxs, split_species, get_radii
+from cell2mol.connectivity import compare_atoms, compare_species, compare_metals
+from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
+from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
+from cell2mol.charge_assignment import get_protonation_states, get_possible_cs, get_metal_poscharges
+from cell2mol.charge_assignment import balance_charge, prepare_unresolved, prepare_mols, correct_smiles_ligand
+from cell2mol.spin import assign_spin_metal, assign_spin_complexes
 from cell2mol.other import extract_from_list, compute_centroid, get_dist, get_angle
 from cell2mol.elementdata import ElementData
+from cell2mol.coordination_sphere import coordination_correction_for_haptic, coordination_correction_for_nonhaptic
 elemdatabase = ElementData()
 import pickle
 
@@ -768,7 +770,8 @@ class cell(object):
         self.cellvec    = cellvec
         self.cellparam  = cellparam
         self.natoms     = len(labels)
-
+        self.frac_coord = cart2frac(self.coord, self.cellvec)
+        
     #######################################################
     def get_unique_species(self, debug: int=0): 
         if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)  
@@ -834,7 +837,7 @@ class cell(object):
 
     #######################################################
     def get_fractional_coord(self):
-        self.frac_coord = cart2frac(self.coord, self.cellv)
+        self.frac_coord = cart2frac(self.coord, self.cellvec)
         return self.frac_coord
 
     #######################################################
@@ -940,7 +943,6 @@ class cell(object):
 
     #######################################################
     def reconstruct(self, cov_factor: float=None, metal_factor: float=None, debug: int=0):
-        from cell2mol.cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
         if not hasattr(self,"refmoleclist"): print("CELL.RECONSTRUCT. CELL missing list of reference molecules"); return None
         if not hasattr(self,"moleclist"): self.get_moleclist()
         blocklist    = self.moleclist.copy() # In principle, in moleclist now there are both fragments and molecules
@@ -1047,7 +1049,8 @@ class cell(object):
                     for at in lig.atoms:
                         count = 0
                         for met in mol.metals: 
-                            isconnected = check_connectivity(at, met)
+                            isconnected = at.check_connectivity(met, debug=debug)
+                            # isconnected = check_connectivity(at, met)
                             if isconnected: 
                                 newbond = bond(at, met, 0.5)
                                 count += 1 

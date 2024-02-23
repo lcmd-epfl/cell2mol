@@ -1,22 +1,8 @@
 import numpy as np
 import itertools
-
-from scipy import sparse
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import reverse_cuthill_mckee
-from typing import Tuple
-from collections import defaultdict
-
-from cell2mol.cellconversions import frac2cart_fromparam, cart2frac, translate
-from cell2mol.other import compute_centroid, additem, inv, absolute_value
-from cell2mol.connectivity import compare_species, count_species, find_closest_metal
-from cell2mol.missingH import get_angle
-from cell2mol.coordination_sphere import get_coordination_geometry
-# Imports Classes
-from cell2mol.classes import specie, molecule, ligand, group, atom, metal, cell, bond
-from cosymlib import Geometry
-from cosymlib.shape.tools import shape_structure_references
-
+from cell2mol.cell_operations import translate
+from cell2mol.other import additem, absolute_value
+from cell2mol.connectivity import compare_species, count_species, split_species
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
@@ -143,8 +129,6 @@ def tmatgenerator(centroid, thres=0.40, full=False, debug: int=0):
                 if centroid[1] <= tmin:
                     tmatrix = additem((0, 1, -1), tmatrix)
     elif full:
-        import itertools
-
         x = [-1, 0, 1]
         tmatrix = [p for p in itertools.product(x, repeat=3)]
 
@@ -228,73 +212,15 @@ def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmolec
     return moleclist, Warning
 
 #######################################################
-def assign_subtype(molecule: object, references: list) -> str:
+def assign_subtype(mol: object, references: list) -> str:
     for ref in references:
-        issame = compare_species(molecule, ref)
+        issame = compare_species(mol, ref)
         if issame: 
             if ref.iscomplex: return "Complex"
             else:             return "Other"
     # If not in references
-    if molecule.iscomplex: return "Complex"
+    if mol.iscomplex: return "Complex"
     else:                  return "Other"
-
-#######################################################
-def split_complexes_reassign_type(cell: object, moleclist: list, debug: int=0) -> object:
-
-    if not all(cell.warning_list):
-        # Split Complexes
-        for mol in moleclist:
-            if mol.type == "Complex":
-                mol.ligandlist, mol.metalist = splitcomplex(
-                    mol, mol.factor, mol.metal_factor
-                )
-                dummy = get_hapticity(mol)
-
-                # Check coordination geometry around metal
-                mol = get_coordination_geometry(mol, debug=0)
-
-        # Reassign Type of molecules and store information
-        for mol in moleclist:
-            mol.type = assigntype(mol, cell.refmoleclist)
-            mol.refcode = cell.refcode
-            mol.name = str(cell.refcode + "_" + mol.type + "_" + str(moleclist.index(mol)))
-            if mol.type == "Complex":
-                for lig in mol.ligandlist:
-                    lig.refcode = cell.refcode
-                    lig.name = str(
-                        cell.refcode
-                        + "_"
-                        + mol.type
-                        + "_"
-                        + str(moleclist.index(mol))
-                        + "_"
-                        + lig.type
-                        + "_"
-                        + str(mol.ligandlist.index(lig))
-                    )
-                for met in mol.metalist:
-                    met.refcode = cell.refcode
-                    met.name = str(
-                        cell.refcode
-                        + "_"
-                        + mol.type
-                        + "_"
-                        + str(moleclist.index(mol))
-                        + "_"
-                        + met.type
-                        + "_"
-                        + str(mol.metalist.index(met))
-                    )
-
-    cell.moleclist = moleclist
-
-    coord = [None] * cell.natoms # Atom coordinate after cell reconstruction
-    for mol in cell.moleclist:
-        for z in zip(mol.atlist, mol.coord):
-            coord[z[0]] = z[1]
-    cell.coord = coord
-
-    return cell
 
 #######################################################
 def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: float=1.3, metal_factor: float=1.0, typ: str="All", debug: int=1):
@@ -554,6 +480,8 @@ def combine(tobemerged: list, references: list, cellvec: list, threshold_tmat: f
 
 #######################################################
 def merge_fragments(frags: list, refs: list, cellvec: list, cov_factor: float=1.3, metal_factor: float=1.0, debug: int=0):
+    from cell2mol.classes import molecule
+
     # finds biggest fragment and keeps it in the original cell
     sizes = []
     for f in frags:
