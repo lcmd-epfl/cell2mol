@@ -307,7 +307,7 @@ def coordination_correction_for_nonhaptic (group, debug=1) -> list:
 
     ## First Correction (former verify_connectivity)
     for idx, atom in enumerate(group.atoms):
-        if debug > 0: print(f"GROUP.check_denticity: connectivity={a.mconnec} in atom idx={idx}, label={atom.label}")
+        if debug > 0: print(f"GROUP.check_denticity: connectivity={atom.mconnec} in atom idx={idx}, label={atom.label}")
         isadded, newlab, newcoord = add_atom(group.parent.labels, group.parent.coord, group.parent_indices[idx], group.parent, group.parent.parent.metals, "H", debug=debug)
         if isadded:
             if debug > 0: print(f"GROUP.check_denticity: connectivity verified for atom {idx} with label {atom.label}")

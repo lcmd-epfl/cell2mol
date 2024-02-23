@@ -9,8 +9,6 @@ import sys
 from cell2mol.hungarian import reorder
 from cell2mol.xyz2mol import xyz2mol
 
-from cell2mol.classes import specie, molecule, ligand, atom, metal, group, bond
-
 elemdatabase = ElementData()
 
 #############################
@@ -1074,6 +1072,8 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
 
 #######################################################
 def build_bonds(moleclist: list, debug: int=0) -> list:
+    from cell2mol.classes import bond
+
     ## Builds bond data for all molecules
     ## Now that charges are known, we use the rdkit-objects with the correct charge to do that
     ## Bond entries are defined in the mol and lig objects
@@ -1235,15 +1235,15 @@ def correct_smiles_ligand(ligand: object):
     # Sets bond information and hybridization
     for jdx, atom in enumerate(ligand.atoms):
         nbonds = 0
-        for bond in atom.bonds:
+        for b in atom.bonds:
             nbonds += 1
-            if bond.order== 1.0: btype = Chem.BondType.SINGLE
-            elif bond.order == 2.0: btype = Chem.BondType.DOUBLE
-            elif bond.order == 3.0: btype = Chem.BondType.TRIPLE
-            elif bond.order == 1.5: 
+            if b.order== 1.0: btype = Chem.BondType.SINGLE
+            elif b.order == 2.0: btype = Chem.BondType.DOUBLE
+            elif b.order == 3.0: btype = Chem.BondType.TRIPLE
+            elif b.order == 1.5: 
                 btype = Chem.BondType.AROMATIC
                 rdkit_atom.SetIsAromatic(True)
-            if bond.atom1 == jdx and bond.atom2 > jdx: rwlig.AddBond(bond.atom1, bond.atom2, btype)
+            if b.atom1 == jdx and b.atom2 > jdx: rwlig.AddBond(b.atom1, b.atom2, btype)
 
         if nbonds == 1: hyb = Chem.HybridizationType.S
         elif nbonds == 2: hyb = Chem.HybridizationType.SP
@@ -1268,7 +1268,6 @@ class protonation(object):
     def __init__(self, labels, cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, tmpsmiles=" ", os=int(0), typ="Local", parent: object=None):
         self.labels                     = labels
         self.natoms                     = len(labels)
-        self.coords                     = coords
         self.added_atoms                = added_atoms
         self.addedlist                  = addedlist
         self.block                      = block
@@ -1312,7 +1311,7 @@ class charge_state(object):
             for idx, add in enumerate(self.addedlist):  # Iterates over the original number of ligand atoms, thus without the added H
                 if add != 0:
                     count += 1 
-                    corrected = self.uncorr_atom_charges[idx] - self.addedlist[idx] + metal_electrons[idx] - self.uncorr_atom_charges[len(self.addedlist)-1+count]
+                    corrected = self.uncorr_atom_charges[idx] - self.addedlist[idx] + self.metal_electrons[idx] - self.uncorr_atom_charges[len(self.addedlist)-1+count]
                     self.corr_atom_charges.append(corrected)
                     # last term corrects for cases in which a charge has been assigned to the added atom
                 else:
