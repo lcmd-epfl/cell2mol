@@ -2,25 +2,25 @@ import numpy as np
 import sys
 from cell2mol.connectivity import get_adjacency_types, get_element_count, labels2electrons, labels2formula, labels2ratio, get_adjmatrix, compare_atoms, compare_species
 from cell2mol.connectivity import get_metal_idxs, split_species, get_radii 
-from cell2mol.cell_reconstruct import *
+from cell2mol.cell2mol.cell_reconstruction import *
 from cell2mol.cell_operations import cart2frac, frac2cart_fromcellvec, frac2cart_fromparam
-from cell2mol.yuri_formal_charge import *
+from cell2mol.cell2mol.charge_assignment import *
 from cell2mol.yuri_spin import *
 from cell2mol.other import extract_from_list, compute_centroid, get_dist, get_angle
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 import pickle
 
-################################
-####  BASIS FOR CELL2MOL 2  ####
-################################
+##################################
+####  CLASSES FOR CELL2MOL 2  ####
+##################################
 class specie(object):
     def __init__(self, labels: list, coord: list, parent_indices: list=None, radii: list=None, parent: object=None) -> None:
 
        # Sanity Checks
         assert len(labels) == len(coord)
-        if parent_indices is not None: assert len(labels) == len(parent_indices)
-        if radii   is not None: assert len(labels) == len(radii)
+        if parent_indices is not None:  assert len(labels) == len(parent_indices)
+        if radii   is not None:         assert len(labels) == len(radii)
 
         # Optional Information
         if radii   is not None: self.radii   = radii
@@ -97,7 +97,7 @@ class specie(object):
             a.reset_charge() 
 
     ############
-    def set_charges(self, totcharge: int=None, atomic_charges: list=None) -> None:
+    def set_charges(self, totcharge: int=None, atomic_charges: list=None, smiles: str=None, rdkit_obj: object=None) -> None:
         ## Sets total charge  
         if totcharge is not None:                              self.totcharge = totcharge
         elif totcharge is None and atomic_charges is not None: self.totcharge = np.sum(atomic_charges)
@@ -108,6 +108,8 @@ class specie(object):
             if not hasattr(self,"atoms"): self.set_atoms()
             for idx, a in enumerate(self.atoms):
                 a.set_charge(self.atomic_charges[idx])
+        if smiles is not None:      self.smiles = smiles
+        if rdkit_obj is not None:   self.rdkit_obj = rdkit_obj
 
     ############
     def set_atoms(self, atomlist=None, overwrite_parent: bool=False):
@@ -197,7 +199,7 @@ class specie(object):
     def get_possible_cs(self, debug: int=0):
         ## Arranges a list of possible charge_states associated with this species, which is later managed at the cell level to determine the good one
         if not hasattr(self,"protonation_states"): self.get_protonation_states(debug=debug)
-        if self.protonation_states is not None:    self.possible_cs = get_poscharges(self, debug=debug)  
+        if self.protonation_states is not None:    self.possible_cs = get_possible_cs(self, debug=debug)  
         return self.possible_cs
     
     ############
@@ -768,6 +770,69 @@ class cell(object):
         self.natoms     = len(labels)
 
     #######################################################
+    def get_unique_species(self, debug: int=0): 
+        if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)  
+        if self.is_fragmented: return None # Stopping. self.is_fragmented must be false to determine the charges of the cell
+
+        self.unique_species = []
+        self.unique_indices = []
+
+        typelist_mols = [] # temporary variable  
+        typelist_ligs = [] # temporary variable
+        typelist_mets = [] # temporary variable
+
+        specs_found = -1
+        for idx, mol in enumerate(self.moleclist):
+            if debug >= 2: print(f"Molecule {idx} formula={mol.formula}")
+            if not mol.iscomplex:
+                found = False
+                for ldx, typ in enumerate(typelist_mols):   # Molecules
+                    issame = compare_species(mol, typ[0], debug=1)
+                    if issame :
+                        found = True ; kdx = typ[1]
+                        if debug >= 2: print(f"Molecule {idx} is the same with {ldx} in typelist")
+                if not found:
+                    specs_found += 1 ; kdx = specs_found
+                    typelist_mols.append(list([mol, kdx]))
+                    self.unique_species.append(mol)
+                    if debug >= 2: print(f"New molecule found with: formula={mol.formula} and added in position {kdx}")
+                self.unique_indices.append(kdx)
+                mol.unique_index = kdx
+
+            else:
+                for jdx, lig in enumerate(mol.ligands):     # ligands
+                    found = False
+                    for ldx, typ in enumerate(typelist_ligs):
+                        issame = compare_species(lig, typ[0], debug=1)
+                        if issame :
+                            found = True ; kdx = typ[1]
+                            if debug >= 2: print(f"ligand {jdx} is the same with {ldx} in typelist")
+                    if not found:
+                        specs_found += 1 ; kdx = specs_found
+                        typelist_ligs.append(list([lig, kdx]))
+                        self.unique_species.append(lig)
+                        if debug >= 2: print(f"New ligand found with: formula {lig.formula} and denticity={lig.denticity}, and added in position {kdx}")
+                    self.unique_indices.append(kdx)
+                    lig.unique_index = kdx
+
+                for jdx, met in enumerate(mol.metals):      #  metals
+                    found = False
+                    for ldx, typ in enumerate(typelist_mets):
+                        issame = compare_metals(met, typ[0], debug=1)
+                        if issame :
+                            found = True ; kdx = typ[1]
+                            if debug >= 2: print(f"Metal {jdx} is the same with {ldx} in typelist")
+                    if not found:
+                        specs_found += 1 ; kdx = specs_found
+                        typelist_mets.append(list([met, kdx]))
+                        self.unique_species.append(met)
+                        if debug >= 2: print(f"New Metal Center found with: labels {met.label} and added in position {kdx}")
+                    self.unique_indices.append(kdx)
+                    met.unique_index = kdx
+
+        return self.unique_species
+
+    #######################################################
     def get_fractional_coord(self):
         self.frac_coord = cart2frac(self.coord, self.cellv)
         return self.frac_coord
@@ -875,7 +940,7 @@ class cell(object):
 
     #######################################################
     def reconstruct(self, cov_factor: float=None, metal_factor: float=None, debug: int=0):
-        from cell2mol.cell_reconstruct import classify_fragments, fragments_reconstruct
+        from cell2mol.cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
         if not hasattr(self,"refmoleclist"): print("CELL.RECONSTRUCT. CELL missing list of reference molecules"); return None
         if not hasattr(self,"moleclist"): self.get_moleclist()
         blocklist    = self.moleclist.copy() # In principle, in moleclist now there are both fragments and molecules
@@ -919,16 +984,17 @@ class cell(object):
     # Initiates variables
     ############
         
+        # (0) Makes sure the cell is reconstructed
         if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)  
         if self.is_fragmented: return None # Stopping. self.is_fragmented must be false to determine the charges of the cell
 
         # (1) Indentify unique chemical species
-        self.speclist, self.unique_indices = identify_unique_species(self.moleclist, debug=debug)
-        if debug >= 1: print(f"{len(self.speclist)} Species (Metal or Ligand or Molecules) to Characterize")
+        if not hasattr(self,"unique_species"): self.get_unique_species(debug=debug)  
+        if debug >= 1: print(f"{len(self.unique_species)} Species (Metal or Ligand or Molecules) to Characterize")
 
         # (2) Gets a preliminary list of possible charge states for each specie (former drive_poscharge)
         selected_cs = []
-        for idx, spec in enumerate(self.speclist):
+        for idx, spec in enumerate(self.unique_species):
             tmp = spec.get_possible_cs(debug=debug)
             if tmp is None: self.error_empty_poscharges = True; return None # Empty list of possible charges received. Stopping
             if spec.subtype == "metal":  selected_cs.append([])         ## I don't like to add an empty list
@@ -936,13 +1002,13 @@ class cell(object):
         self.error_empty_poscharges = False
 
         # Finds the charge_state that satisfies that the crystal must be neutral
-        final_charge_distribution = balance_charge(self.unique_indices, self.speclist, debug=debug)
+        final_charge_distribution = balance_charge(self.unique_indices, self.unique_species, debug=debug)
 
         if len(final_charge_distribution) > 1:
             if debug >= 1: print("More than one Possible Distribution Found:", final_charge_distribution)
             self.error_multiple_distrib = True
             self.error_empty_distrib    = False
-            pp_mols, pp_idx, pp_opt = prepare_unresolved(self.unique_indices, self.speclist, final_charge_distribution, debug=debug)
+            pp_mols, pp_idx, pp_opt = prepare_unresolved(self.unique_indices, self.unique_species, final_charge_distribution, debug=debug)
             self.data_for_postproc(pp_mols, pp_idx, pp_opt)
             return None
         elif len(final_charge_distribution) == 0: # 
@@ -956,7 +1022,7 @@ class cell(object):
                 print("#########################################")
                 print("Assigning Charges and Preparing Molecules")
                 print("#########################################")
-            self.moleclist, self.error_prepare_mols = prepare_mols(self.moleclist, self.unique_indices, self.speclist, selected_cs, final_charge_distribution[0], debug=debug)
+            self.moleclist, self.error_prepare_mols = prepare_mols(self.moleclist, self.unique_indices, self.unique_species, selected_cs, final_charge_distribution[0], debug=debug)
             if self.error_prepare_mols: return None # Error while preparing molecules
             
             return self.moleclist

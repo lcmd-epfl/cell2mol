@@ -8,7 +8,7 @@ from cell2mol.helper import parsing_arguments
 from cell2mol.c2m_module import save_cell, cell2mol
 from cell2mol.cif2info import cif_2_info
 from cell2mol.classes import *
-from cell2mol.readwrite import readinfo
+from cell2mol.cell2mol.read_write import readinfo
 
 if __name__ != "__main__" and __name__ != "cell2mol.c2m_driver": sys.exit(1)
 
