@@ -2,7 +2,26 @@
 
 import numpy as np
 import pickle
+import sys
 
+#######################
+def prefiter_cif(input_path):
+
+    with open(input_path, 'r') as ciffile:
+        file_content = ciffile.read()
+        if 'radical' in file_content:                   
+            sys.exit(0)
+        elif '_atom_site_fract_x' not in file_content:  
+            sys.exit(0)
+        elif '?' in file_content:
+            if "_diffrn_ambient_temperature ?" not in file_content and "_chemical_melting_point ?" not in file_content:
+                sys.exit(0)
+            else:
+                num_greps = file_content.count('?')
+                if num_greps > 1:                      
+                    sys.exit(0)
+        else:
+            pass
 #######################
 def save_binary(variable, pathfile, backup: bool=False):
     try:
