@@ -199,6 +199,40 @@ class specie(object):
         if not hasattr(self,"protonation_states"): self.get_protonation_states(debug=debug)
         if self.protonation_states is not None:    self.possible_cs = get_poscharges(self, debug=debug)  
         return self.possible_cs
+    
+    ############
+    def create_bonds(self, debug: int=0):
+        if not hasattr(self,"rdkit_mol"): self.parent.assign_charges()
+        for idx, atom in enumerate(self.atoms):
+            # Security Check. Confirms that the labels are the same
+            #if debug >= 2: print("BUILD BONDS: atom", idx, a.label)
+            rdkitatom = self.rdkit_mol.GetAtomWithIdx(idx)
+            tmp = rdkitatom.GetSymbol()
+            if atom.label != tmp: print("Error in Build_Bonds. Atom labels do not coincide. GMOL vs. MOL:", atom.label, tmp)
+            else:
+                # First part. Creates bond information
+                for b in rdkitatom.GetBonds():
+                    bond_startatom = b.GetBeginAtomIdx()
+                    bond_endatom   = b.GetEndAtomIdx()
+                    bond_order     = b.GetBondTypeAsDouble()
+
+                    if (self.subtype == "ligand") and (bond_startatom >= self.natoms or bond_endatom >= self.natoms):
+                        continue
+                    else:
+                        if self.atoms[bond_endatom].label != self.rdkit_mol.GetAtomWithIdx(bond_endatom).GetSymbol():
+                            if debug >= 1: 
+                                print("Error with Bond EndAtom", self.atoms[bond_endatom].label, self.rdkit_mol.GetAtomWithIdx(bond_endatom).GetSymbol())
+                        else:
+                            if bond_endatom == idx:
+                                start = bond_endatom
+                                end   = bond_startatom
+                            elif bond_startatom == idx:
+                                start = bond_startatom
+                                end   = bond_endatom
+
+                            ## This has changed. Now there is a bond object, and we send the atom objects, not only the index
+                            new_bond = bond(self.atoms[start], self.atoms[end], bond_order) 
+                        atom.add_bond(new_bond)
 
     ############
     def print_xyz(self):
@@ -295,8 +329,6 @@ class molecule(specie):
                 if hasattr(self,"frac_coord"): 
                     lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
                     newligand.set_fractional_coord(lig_frac_coord)
-                    #newligand = check_metal_coordinating_atoms (newligand, debug=debug)  
-                    # newligand.check_metal_coordinating_atoms(debug=debug) # TODO: Implement this function to ligand class
                 self.ligands.append(newligand)
 
             ## Arranges Metals
@@ -518,8 +550,6 @@ class group(specie):
             else:
                 if debug > 0: print(f"GROUP.check_denticity: corrected mconnec of atom {idx} with label {a.label}")
                 a.reset_mconnec(idx)
-        
-        # TODO : check whether assgined denticifiy is correct. otherwise, correct it.
         if self.is_haptic:                     self = coordination_correction_for_haptic(self, debug=debug)
         if self.is_haptic == False :           self = coordination_correction_for_nonhaptic(self, debug=debug)
         self.checked_denticity = True
@@ -559,6 +589,16 @@ class atom(object):
         if parent is not None:     self.parent  = parent
         if parent is not None:     self.occurence = parent.get_occurrence(self)
         if frac_coord is not None: self.frac_coord = frac_coord
+
+    #######################################################
+    def check_connectivity(self, other: object, debug: int=0):
+        ## Checks whether two atoms are connected (through the adjacency)
+        if not isinstance(other, type(self)): return False
+        labels = list([self.label,other.label]) 
+        coords = list([self.coord,other.coord]) 
+        isgood, adjmat, adjnum = get_adjmatrix(labels, coords)
+        if isgood and adjnum[0] > 0: return True
+        else:                        return False
 
     #######################################################
     def add_bond(self,newbond: object):
@@ -750,8 +790,8 @@ class cell(object):
         self.refmoleclist = []
         for b in blocklist:
             mol_labels       = extract_from_list(b, ref_labels, dimension=1)
-            mol_coord       = extract_from_list(b, ref_pos, dimension=1)
-            mol_frac_coord  = extract_from_list(b, self.frac_coord, dimension=1)
+            mol_coord        = extract_from_list(b, ref_pos, dimension=1)
+            mol_frac_coord   = extract_from_list(b, self.frac_coord, dimension=1)
             newmolec         = molecule(mol_labels, mol_coord)
             newmolec.set_fractional_coord(mol_frac_coord)
             # This must be below the frac_coord, so they are carried on to the ligands
@@ -793,7 +833,7 @@ class cell(object):
         self.moleclist = []
         for b in blocklist:
             mol_labels  = extract_from_list(b, self.labels, dimension=1)
-            mol_coord  = extract_from_list(b, self.coord, dimension=1)
+            mol_coord   = extract_from_list(b, self.coord, dimension=1)
             mol_radii   = extract_from_list(b, self.radii, dimension=1)
             newmolec    = molecule(mol_labels, mol_coord, b, mol_radii, parent=self)
             # If fractional coordinates are available...
@@ -883,29 +923,26 @@ class cell(object):
         if self.is_fragmented: return None # Stopping. self.is_fragmented must be false to determine the charges of the cell
 
         # (1) Indentify unique chemical species
-        unique_species, unique_indices = identify_unique_species(self.moleclist, debug=debug)
-        if debug >= 1: print(f"{len(unique_species)} Species (Metal or Ligand or Molecules) to Characterize")
-        self.speclist = [spec[1] for spec in unique_species] # spec is a list in which item 1 is the actual unique specie
+        self.speclist, self.unique_indices = identify_unique_species(self.moleclist, debug=debug)
+        if debug >= 1: print(f"{len(self.speclist)} Species (Metal or Ligand or Molecules) to Characterize")
 
         # (2) Gets a preliminary list of possible charge states for each specie (former drive_poscharge)
         selected_cs = []
-        for idx, spec in enumerate(unique_species):
+        for idx, spec in enumerate(self.speclist):
             tmp = spec.get_possible_cs(debug=debug)
-            if tmp is None: 
-                self.error_empty_poscharges = True; return None # Empty list of possible charges received. Stopping
-            else: 
-                self.error_empty_poscharges = False
-                if spec.subtype == "metal":  selected_cs.append([])         ## I don't like to add an empty list
-                else:                        selected_cs.append(tmp)
+            if tmp is None: self.error_empty_poscharges = True; return None # Empty list of possible charges received. Stopping
+            if spec.subtype == "metal":  selected_cs.append([])         ## I don't like to add an empty list
+            else:                        selected_cs.append(tmp)
+        self.error_empty_poscharges = False
 
         # Finds the charge_state that satisfies that the crystal must be neutral
-        final_charge_distribution = balance_charge(unique_indices, unique_species, debug=debug)
+        final_charge_distribution = balance_charge(self.unique_indices, self.speclist, debug=debug)
 
         if len(final_charge_distribution) > 1:
             if debug >= 1: print("More than one Possible Distribution Found:", final_charge_distribution)
             self.error_multiple_distrib = True
             self.error_empty_distrib    = False
-            pp_mols, pp_idx, pp_opt = prepare_unresolved(unique_indices, unique_species, final_charge_distribution, debug=debug)
+            pp_mols, pp_idx, pp_opt = prepare_unresolved(self.unique_indices, self.speclist, final_charge_distribution, debug=debug)
             self.data_for_postproc(pp_mols, pp_idx, pp_opt)
             return None
         elif len(final_charge_distribution) == 0: # 
@@ -919,19 +956,56 @@ class cell(object):
                 print("#########################################")
                 print("Assigning Charges and Preparing Molecules")
                 print("#########################################")
-            self.moleclist, self.error_prepare_mols = prepare_mols(self.moleclist, unique_indices, unique_species, selected_charge_states, final_charge_distribution[0], debug=debug)
-
+            self.moleclist, self.error_prepare_mols = prepare_mols(self.moleclist, self.unique_indices, self.speclist, selected_cs, final_charge_distribution[0], debug=debug)
             if self.error_prepare_mols: return None # Error while preparing molecules
             
-            for mol in self.moleclist:
-                mol.build_bonds(debug=debug) ## TODO: Adapt build_bonds function to specie class
-            
             return self.moleclist
+
+    #######################################################
+    def create_bonds(self, debug: int=0):
+        if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)  
+        if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to create the spin
+        for mol in self.moleclist:
+            # First part
+            if not mol.iscomplex: 
+                mol.create_bonds(debug=debug)          ### Creates bonds between molecule.atoms using the molecule.rdkit_object
             
+            # Second part
+            if mol.iscomplex:
+                for lig in mol.ligands:
+                    lig.create_bonds(debug=debug)      ### Creates bonds between ligand.atoms, which also belong to molecule.atoms, using the ligand.rdkit_object
+                
+            # Third Part. Adds Metal-Ligand Bonds, with an arbitrary 0.5 order:
+            if mol.iscomplex:
+                for lig in mol.ligands:
+                    for at in lig.atoms:
+                        count = 0
+                        for met in mol.metals: 
+                            isconnected = check_connectivity(at, met)
+                            if isconnected: 
+                                newbond = bond(at, met, 0.5)
+                                count += 1 
+                        if count != at.mconnec: 
+                            print(f"CELL.CREATE_BONDS: error creating bonds for atom: \n{atom}\n of ligand: \n{lig}\n")
+                            print(f"CELL.CREATE_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
+
+                # Adds Metal-Metal Bonds, with an arbitrary 0.5 order:
+
+                # Fourth part : correction smiles of ligands
+                mol.smiles_with_H = [lig.smiles for lig in mol.ligands]
+                for lig in mol.ligands: 
+                    lig.correction_smiles()
+
+    #######################################################
+    def correction_smiles (self):
+        if not hasattr(self.parent,"smiles"): self.parent.smiles = []
+        self.smiles, self.rdkit_mol = correct_smiles_ligand(self)
+        self.parent.smiles.append(self.smiles)
+
     #######################################################
     def assign_spin(self, debug: int=0) -> object:
-        if not hasattr(self,"is_preparemol"): self.determine_charge(debug=debug)  
-        if self.is_preparemol: return None # Stopping. self.is_preparemol must be false to assign the spin
+        if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)  
+        if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to assign the spin
         for mol in self.moleclist:
             if mol.iscomplex:
                 for metal in mol.metals:

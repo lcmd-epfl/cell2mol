@@ -163,8 +163,6 @@ shape_structure_references_simplified = {'2 Vertices': [['L-2', 1, 'Dinfh', 'Lin
 #######################################################
 ###    Make corrcetion for coordination sphere      ###
 #######################################################
-# TODO: will be done in the future
-#######################################################
 covalent_factor_for_metal_v2 = {
     'H': 1.19,
     'D': 1.19,
@@ -402,3 +400,5 @@ def coordination_correction_for_haptic (group, debug=1) -> list:
     else :
         group.get_hapticity()    
         return group
+
+#######################################################

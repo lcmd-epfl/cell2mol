@@ -8,6 +8,7 @@ from cell2mol.helper import parsing_arguments
 from cell2mol.c2m_module import save_cell, cell2mol
 from cell2mol.cif2info import cif_2_info
 from cell2mol.classes import *
+from cell2mol.readwrite import readinfo
 
 if __name__ != "__main__" and __name__ != "cell2mol.c2m_driver": sys.exit(1)
 
@@ -37,9 +38,18 @@ if os.path.exists(input_path):
         
     ## If the input is a .cif file, then it is converted to a .info file using cif_2_info from cif2cell
     if extension == ".cif":
+        # TODO: Pre-filtering of the .cif file
+        with open(input_path, 'r') as ciffile:
+            if 'radical' in ciffile.read():
+                sys.exit(0)
+            elif '_atom_site_fract_x' not in ciffile.read():      
+                sys.exit(0)
+            elif '?' in ciffile.read():
+                sys.exit(0)
+            else: pass
+
         errorpath    = os.path.join(current_dir, "cif2cell.err")
         infopath     = os.path.join(current_dir, "{}.info".format(name))
-        # TODO: Pre-filtering of the .cif file
         # if error exist : sys.exit(1)
         # Create .info file 
         cif_2_info(input_path, infopath, errorpath)
