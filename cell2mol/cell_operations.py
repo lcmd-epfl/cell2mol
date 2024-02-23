@@ -116,3 +116,38 @@ def cart2frac(cartCoords, cellvec):
         newcoord.append([float(newx), float(newy), float(newz)])
     
     return newcoord
+
+#######################################################
+def translate(vector, coords, cellvec):
+    """ Translate coordinates by a vector
+    Args:
+        vector (list): list of vector components
+        coords (list): list of coordinates
+        cellvec (list): list of cell vectors
+    Returns:
+        newcoord (list): list of translated coordinates
+    """
+
+    newcoord = []
+    for idx, coord in enumerate(coords):
+        newx = (
+            coord[0]
+            + vector[0] * cellvec[0][0]
+            + vector[1] * cellvec[1][0]
+            + vector[2] * cellvec[2][0]
+        )
+        newy = (
+            coord[1]
+            + vector[0] * cellvec[0][1]
+            + vector[1] * cellvec[1][1]
+            + vector[2] * cellvec[2][1]
+        )
+        newz = (
+            coord[2]
+            + vector[0] * cellvec[0][2]
+            + vector[1] * cellvec[1][2]
+            + vector[2] * cellvec[2][2]
+        )
+        newcoord.append([float(newx), float(newy), float(newz)])
+    
+    return newcoord
