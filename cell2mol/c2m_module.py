@@ -43,7 +43,7 @@ def cell2mol(newcell: object, reconstruction: bool=True, charge_assignment: bool
             else :
                 if debug >= 1: print("Charge Assignment successfully finished.\n")
                 # TODO : Compare assigned charges with ML predicted charges
-
+                
     if spin_assignment:
         tini = time.time()
         newcell.assign_spin(debug=debug)
