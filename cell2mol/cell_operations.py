@@ -83,40 +83,72 @@ def translate(vector, coords, cellvec):
     return newcoord
 
 #######################################################
-# TODO : something is missing 
 def cart2frac(cartCoords, cellvec):
-    """ Translate coordinates by a vector
+    """ Convert cartesian coordinates to fractional coordinates
+
     Args:
-        vector (list): list of vector components
-        coords (list): list of coordinates
+        cartCoords (list): list of cartesian coordinates
         cellvec (list): list of cell vectors
     Returns:
-        newcoord (list): list of translated coordinates
+        fracCoords (list): list of fractional coordinates
     """
 
-    newcoord = []
-    for idx, coord in enumerate(coords):
-        newx = (
-            coord[0]
-            + vector[0] * cellvec[0][0]
-            + vector[1] * cellvec[1][0]
-            + vector[2] * cellvec[2][0]
-        )
-        newy = (
-            coord[1]
-            + vector[0] * cellvec[0][1]
-            + vector[1] * cellvec[1][1]
-            + vector[2] * cellvec[2][1]
-        )
-        newz = (
-            coord[2]
-            + vector[0] * cellvec[0][2]
-            + vector[1] * cellvec[1][2]
-            + vector[2] * cellvec[2][2]
-        )
-        newcoord.append([float(newx), float(newy), float(newz)])
-    
-    return newcoord
+    latCnt = [x[:] for x in [[None] * 3] * 3]
+    for a in range(3):
+        for b in range(3):
+            latCnt[a][b] = cellvec[b][a]
+
+    fracCoords = []
+    detLatCnt = det3(latCnt)
+
+    for i in cartCoords:
+        aPos = (
+            det3(
+                [
+                    [i[0], latCnt[0][1], latCnt[0][2]],
+                    [i[1], latCnt[1][1], latCnt[1][2]],
+                    [i[2], latCnt[2][1], latCnt[2][2]],
+                ]
+            )
+        ) / detLatCnt
+        bPos = (
+            det3(
+                [
+                    [latCnt[0][0], i[0], latCnt[0][2]],
+                    [latCnt[1][0], i[1], latCnt[1][2]],
+                    [latCnt[2][0], i[2], latCnt[2][2]],
+                ]
+            )
+        ) / detLatCnt
+        cPos = (
+            det3(
+                [
+                    [latCnt[0][0], latCnt[0][1], i[0]],
+                    [latCnt[1][0], latCnt[1][1], i[1]],
+                    [latCnt[2][0], latCnt[2][1], i[2]],
+                ]
+            )
+        ) / detLatCnt
+        fracCoords.append([aPos, bPos, cPos])
+    return fracCoords
+
+#######################################################
+def det3(mat):
+    """ Calculate the determinant of a 3x3 matrix
+
+    Args:
+        mat (list): list of 3x3 matrix
+    Returns:
+        determinant (float): determinant of the matrix
+    """
+    return (
+        (mat[0][0] * mat[1][1] * mat[2][2])
+        + (mat[0][1] * mat[1][2] * mat[2][0])
+        + (mat[0][2] * mat[1][0] * mat[2][1])
+        - (mat[0][2] * mat[1][1] * mat[2][0])
+        - (mat[0][1] * mat[1][0] * mat[2][2])
+        - (mat[0][0] * mat[1][2] * mat[2][1])
+    )
 
 #######################################################
 def translate(vector, coords, cellvec):
