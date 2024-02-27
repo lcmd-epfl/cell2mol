@@ -127,15 +127,16 @@ class specie(object):
             for idx, l in enumerate(self.labels):
                 ## For each l in labels, create an atom class object.
                 ismetal = elemdatabase.elementblock[l] == "d" or elemdatabase.elementblock[l] == "f"
-                if ismetal: newatom = atom(l, self.coord[idx], parent=self, index=idx, radii=self.radii[idx])
-                else:       newatom = metal(l, self.coord[idx], parent=self, index=idx, radii=self.radii[idx])
+                if ismetal: newatom = atom(l, self.coord[idx], parent_index=idx, radii=self.radii[idx], parent=self)
+                else:       newatom = metal(l, self.coord[idx], parent_index=idx, radii=self.radii[idx], parent=self)
                 self.atoms.append(newatom)
+        
         ## Irrespectively of the choice, we update the adjacencies of the atom to match the new parent
         if not hasattr(self,"adjmat"):  self.get_adjmatrix()
         if not hasattr(self,"madjmat"): self.get_metal_adjmatrix()
         if self.adjmat is not None and self.madjmat is not None: 
-            for at in self.atoms: 
-                newatom.set_adjacencies(self.adjmat[idx],self.madjmat[idx],self.adjnum[idx],self.madjnum[idx])
+            for idx, at in enumerate(self.atoms): 
+                at.set_adjacencies(self.adjmat[idx],self.madjmat[idx],self.adjnum[idx],self.madjnum[idx])
     
     ############
     def get_adjmatrix(self):
@@ -305,39 +306,55 @@ class molecule(specie):
             self.metals  = []
             # Identify Metals and the rest
             metal_idx = get_metal_idxs(self.labels, debug=debug)
-            rest_idx  = list(idx for idx in self.indices if idx not in metal_idx) 
+            if debug > 0 :
+                print(f"SPLIT COMPLEX: {self.parent_indices=}")
+                print(f"SPLIT COMPLEX: {self.indices=}")
+            rest_idx  = list(idx for idx in self.parent_indices if idx not in metal_idx) 
+
             if debug > 0: 
                 print(f"SPLIT COMPLEX: found metals in indices {metal_idx}")
-            #rest_idx  = list(idx for idx in self.indices if idx not in metal_idx)
+                print(f"SPLIT COMPLEX: found rest in indices {rest_idx}")
+            #rest_idx  = list(idx for idx in self.parent_indices if idx not in metal_idx)
             # Split the "rest" to obtain the ligands
             rest_labels  = extract_from_list(rest_idx, self.labels, dimension=1)
             rest_coord  = extract_from_list(rest_idx, self.coord, dimension=1)
-            rest_indices = extract_from_list(rest_idx, self.indices, dimension=1)
+            rest_indices = extract_from_list(rest_idx, self.parent_indices, dimension=1)
             rest_radii   = extract_from_list(rest_idx, self.radii, dimension=1)
+            if debug > 0: 
+                print(f"SPLIT COMPLEX: rest labels: {rest_labels}")
+                print(f"SPLIT COMPLEX: rest coord: {rest_coord}")
+                print(f"SPLIT COMPLEX: rest indices: {rest_indices}")
+                print(f"SPLIT COMPLEX: rest radii: {rest_radii}")
+
             if hasattr(self,"frac_coord"): rest_frac = extract_from_list(rest_idx, self.frac_coord, dimension=1)
             if debug > 0: print(f"SPLIT COMPLEX: rest labels: {rest_labels}")
             if debug > 0: print(f"SPLIT COMPLEX: splitting species with {len(rest_labels)} atoms in block")
-            if hasattr(self,"cov_factor"): blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, indices=rest_indices, cov_factor=self.cov_factor, debug=debug)
-            else:                          blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, indices=rest_indices, debug=debug)
+            if hasattr(self,"cov_factor"): blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)
+            else:                          blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)      
+            # if hasattr(self,"cov_factor"): blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, indices=rest_indices, cov_factor=self.cov_factor, debug=debug)
+            # else:                          blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, indices=rest_indices, debug=debug)
             
             ## Arranges Ligands
             for b in blocklist:
                 if debug > 0: print(f"PREPARING BLOCK: {b}")
+
+            for b in blocklist:    
                 lig_labels  = extract_from_list(b, rest_labels, dimension=1) 
                 lig_coord   = extract_from_list(b, rest_coord, dimension=1) 
                 lig_radii   = extract_from_list(b, rest_radii, dimension=1) 
                 lig_atoms   = extract_from_list(b, self.atoms, dimension=1) 
-                newligand   = ligand(lig_labels, lig_coord, indices=b, radii=lig_radii, parent=self)
+                newligand   = ligand(lig_labels, lig_coord, parent_indices=b, radii=lig_radii, parent=self)
                 newligand.set_atoms(atomlist=lig_atoms, overwrite_parent=True)
                 # If fractional coordinates are available...
                 if hasattr(self,"frac_coord"): 
                     lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
-                    newligand.set_fractional_coord(lig_frac_coord)
+                    newligand.frac_coord = lig_frac_coord
+                    # newligand.get_fractional_coord(lig_frac_coord)
                 self.ligands.append(newligand)
 
             ## Arranges Metals
             for m in metal_idx:
-                newmetal    = metal(self.labels[m], self.coord[m], self.indices[m], self.radii[m], parent=self)
+                newmetal    = metal(self.labels[m], self.coord[m], self.parent_indices[m], self.radii[m], parent=self)
                 self.metals.append(newmetal)                            
         return self.ligands, self.metals
 
@@ -432,9 +449,9 @@ class ligand(specie):
     #######################################################
     def get_connected_idx(self, debug: int=0):
        self.connected_idx = [] 
-       if not hasattr(self.parent,"madjmat"): madjmat, madjnum = self.parent.get_metal_adjmatrix()
-       self.madjmat = extract_from_list(self.parent_indices, madjmat, dimension=2)    ## Here we use parent_indices because we're operating with a molecule variable (madjmat and madjnum)
-       self.madjnum = extract_from_list(self.parent_indices, madjnum, dimension=1)
+       if not hasattr(self.parent,"madjmat"): self.parent.get_metal_adjmatrix()
+       self.madjmat = extract_from_list(self.parent_indices, self.parent.madjmat, dimension=2)    ## Here we use parent_indices because we're operating with a molecule variable (madjmat and madjnum)
+       self.madjnum = extract_from_list(self.parent_indices, self.parent.madjnum, dimension=1)
        for idx, con in enumerate(self.madjnum):
            if con > 0: self.connected_idx.append(self.indices[idx]) 
        return self.connected_idx 
@@ -455,7 +472,7 @@ class ligand(specie):
         if debug > 0: print(f"LIGAND.Get_denticity: initial connectivity is {len(self.connected_idx)}")
         
         self.denticity = 0
-        for g in self.grouplist:
+        for g in self.groups:
             self.denticity += g.get_denticity()      ## A check is also performed at the group level
         return self.denticity 
 
@@ -465,16 +482,23 @@ class ligand(specie):
         # Identify Connected and Unconnected atoms (to the metal)
         if not hasattr(self,"connected_idx"): self.get_connected_idx()
         conn_idx = self.connected_idx
-        rest_idx = list(idx for idx in self.indices if idx not in conn_idx)
+        rest_idx = list(idx for idx in self.parent_indices if idx not in conn_idx)
 
         # Split the "ligand to obtain the groups
         conn_labels  = extract_from_list(conn_idx, self.labels, dimension=1)
         conn_coord  = extract_from_list(conn_idx, self.coord, dimension=1)
-        conn_indices = extract_from_list(conn_idx, self.indices, dimension=1)
+        conn_indices = extract_from_list(conn_idx, self.parent_indices, dimension=1)
 
-        if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, indices=conn_indices, cov_factor=self.cov_factor)
-        else:                          blocklist = split_species(conn_labels, conn_coord, indices=conn_indices)
+        # if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, indices=conn_indices, cov_factor=self.cov_factor)
+        # else:                          blocklist = split_species(conn_labels, conn_coord, indices=conn_indices)
+        if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, cov_factor=self.cov_factor, debug=debug)
+        else:                          blocklist = split_species(conn_labels, conn_coord, debug=debug)      
+     
+        
         ## Arranges Groups 
+        for b in blocklist:
+            if debug > 1: print(f"PREPARING BLOCK: {b}")
+
         for b in blocklist:
             gr_labels  = extract_from_list(b, self.labels, dimension=1)
             gr_coord   = extract_from_list(b, self.coord, dimension=1)
@@ -636,7 +660,7 @@ class atom(object):
                 if debug > 0: print(f"ATOM.ADD_BOND found the same bond with atoms:") 
                 if debug > 0: print(f"atom1: {b.atom1}") 
                 if debug > 0: print(f"atom2: {b.atom2}") 
-                found = True   ### It means that the same bond has already been defined
+                found = True    ### It means that the same bond has already been defined
         if not found: self.bonds.append(newbond)
 
     #######################################################
@@ -904,7 +928,8 @@ class cell(object):
             mol_coord        = extract_from_list(b, ref_pos, dimension=1)
             mol_frac_coord   = extract_from_list(b, self.frac_coord, dimension=1)
             newmolec         = molecule(mol_labels, mol_coord)
-            newmolec.set_fractional_coord(mol_frac_coord)
+            newmolec.frac_coord = mol_frac_coord
+            # newmolec.get_fractional_coord(mol_frac_coord)
             # This must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex: 
                 newmolec.split_complex()
@@ -925,9 +950,9 @@ class cell(object):
         if isgood:
             for ref in self.refmoleclist:
                 if ref.iscomplex: 
-                    ref.check_hapticity(debug=debug)                          ### Former "get_hapticity(ref)" function
-                    ref.get_coordination_geometry(debug=debug)                ### Former "get_coordination_Geometry(ref)" function 
-                    for lig in ref.ligandlist:
+                    ref.get_hapticity(debug=debug)                          ### Former "get_hapticity(ref)" function
+                    # ref.get_coordination_geometry(debug=debug)                ### Former "get_coordination_Geometry(ref)" function 
+                    for lig in ref.ligands:
                         lig.get_denticity(debug=0)
 
         if isgood: self.has_isolated_H = False
@@ -950,7 +975,7 @@ class cell(object):
             # If fractional coordinates are available...
             if hasattr(self,"frac_coord"): 
                 mol_frac_coord  = extract_from_list(b, self.frac_coord, dimension=1)
-                newmolec.set_fractional_coord(mol_frac_coord)
+                newmolec.get_fractional_coord(mol_frac_coord)
             # This must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex: newmolec.split_complex()
             self.moleclist.append(newmolec)
@@ -1108,7 +1133,8 @@ class cell(object):
                 for idx, met1 in mol.metals:
                     for jdx, met2 in mol.metals:
                         if idx <= jdx: continue
-                        isconnected = check_connectivity(met1, met2)
+                        isconnected = met1.check_connectivity(met2, debug=debug)
+                        # isconnected = check_connectivity(met1, met2)
                         if isconnected:
                             newbond = bond(met1, met2, 0.5)
                             met1.add_bond(newbond) 

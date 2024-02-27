@@ -893,7 +893,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
     
                     if new_cs.corr_total_charge == cs.corr_total_charge:
                         mol.set_charges(new_cs.corr_total_charge, new_cs.corr_atom_charges, new_cs.smiles, new_cs.rdkit_mol)
-                        if debug >= 2: print(f"PREPARE: Success doing molecule {idx}. Created Charge State with total_charge={ch_state.corr_total_charge}") 
+                        if debug >= 2: print(f"PREPARE: Success doing molecule {idx}. Created Charge State with total_charge={new_cs.corr_total_charge}") 
                     else:
                         if debug >= 2: print(f"PREPARE: Error doing molecule {idx}. Created Charge State is different than Target {new_cs.corr_total_charge} vs {cs.corr_total_charge}")
                         return None
@@ -950,7 +950,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
             for kdx, met in enumerate(mol.metals):
                 spec = unique_species[met.unique_index]
                 if debug >= 2: print("")
-                if debug >= 2: print(f"PREPARE: Metal {kdx}, label {met.label} is specie {specie}")
+                # if debug >= 2: print(f"PREPARE: Metal {kdx}, label {met.label} is specie {specie}") # "specie" is not defined
                 if debug >= 2: print(f"PREPARE: Metal possible_css: {spec.possible_cs}")
                 allocated = False
                 for jdx, cs in enumerate(spec.possible_cs):

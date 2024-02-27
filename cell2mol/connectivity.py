@@ -27,15 +27,15 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
     # It is adding the element (H, O, or whatever) at the vector formed by the closest TM atom and the "site"
     for idx, a in enumerate(ligand.atoms):
         if idx == site:
-            apos = a.coord.copy()
+            apos = np.array(a.coord.copy())
             tgt  = a.get_closest_metal(metalist)
             dist = get_dist(apos, tgt.coord)
             idealdist = a.radii + elemdatabase.CovalentRadius2[element]
-            addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
+            addedHcoords = apos + (tgt.coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
             newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])     # adds H at the position of the closest Metal Atom
 
             # Evaluates the new adjacency matrix.
-            dummy, tmpconmat, tmpconnec = get_adjmatrix(newlab, newcoord, ligand.factor)
+            dummy, tmpconmat, tmpconnec = get_adjmatrix(newlab, newcoord, ligand.cov_factor)
             # If no undesired adjacencies have been created, the coordinates are kept
             if tmpconnec[posadded] <= 1:
                 isadded = True
@@ -255,6 +255,10 @@ def count_species(labels: list, pos: list, radii: list=None, indices: list=None,
 ####################################
 def split_species(labels: list, pos: list, radii: list=None, indices: list=None, cov_factor: float=1.3, debug: int=0) -> Tuple[bool, list]:
     ## Function that identifies connected groups of atoms from their atomic coordinates and labels.
+    
+    if debug > 1:
+        print(f"{labels=}", len(labels))
+        print(f"{indices=}")
 
     # Gets the covalent radii
     if radii is None:    radii = get_radii(labels)
