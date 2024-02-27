@@ -31,7 +31,8 @@ def cell2mol(newcell: object, reconstruction: bool=True, charge_assignment: bool
         tini = time.time()
         if not newcell.is_fragmented:
             newcell.reset_charges() 
-            newcell.determine_charge(debug=debug)
+            newcell.assign_charges(debug=debug)
+            newcell.create_bonds(debug=debug)
 
             tend = time.time()
             if debug >= 1: print(f"\nTotal execution time for Charge Assignment: {tend - tini:.2f} seconds")

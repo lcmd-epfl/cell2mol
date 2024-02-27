@@ -897,15 +897,17 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                     else:
                         if debug >= 2: print(f"PREPARE: Error doing molecule {idx}. Created Charge State is different than Target {new_cs.corr_total_charge} vs {cs.corr_total_charge}")
                         return None
+            if not allocated: Warning = False
     
         ###########################
         ######  FOR LIGANDS  ######
         ###########################
-        elif mol.iscomplex:
+        elif mol.subtype == "molecule" and mol.iscomplex:
             if debug >= 2: print(f"PREPARE: Molecule {moleclist.index(mol)} has {len(mol.ligands)} ligands")
     
             for kdx, lig in enumerate(mol.ligands):
                 spec = unique_species[lig.unique_index]   # This is the reference specie
+                if debug >= 2: print("")
                 if debug >= 2: print(f"PREPARE: Doing Ligand {kdx} with unique_index: {lig.unique_index}")
                 if debug >= 2: print(f"PREPARE: Specie with poscharges: {spec.possible_cs}")
     
@@ -922,19 +924,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                             ref_data.append(a.label+str(a.mconnec))
                         dummy1, dummy2, map12 = reorder(ref_data, target_data, spec.coord, lig.coord)
                         ###############    
-
-                        ## Recomputes the protonation states, but I think it should be able to use the one in cs
                         prot = cs.protonation.reorder(map12)
-                        #list_of_protonations = get_protonation_states(lig, debug=debug)
-                        #found_prot = False
-                        #for p in list_of_protonations:
-                        #    if p.os == spec.protonation.os and p.added_atoms == spec.protonation.added_atoms and not found_prot:
-                        #        tmp_addedlist = list(np.array(p.addedlist)[map12])
-                        #        if debug >= 2: print(f"PREPARE: tmp_addedlist={tmp_addedlist}")
-                        #        if all(tmp_addedlist[idx] == spec.protonation.addedlist[idx] for idx in range(len(p.addedlist))):
-                        #            if debug >= 2: print(f"PREPARE: found match in protonation with tmpsmiles:{p.tmpsmiles}")
-                        #            prot = p
-                        #            found_prot = True
 
                         if lig.is_nitrosyl:
                             if lig.NO_type == "Linear": NOcharge = 1   #NOcharge is the charge with which I need to run getcharge to make it work
@@ -952,64 +942,27 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                         else:
                             lig.set_charges(new_cs.corr_total_charge, new_cs.corr_atom_charges, new_cs.smiles, new_cs.rdkit_mol)
                             if debug >= 1: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={new_cs.corr_total_charge}") 
+                            allocated = True 
 
-                ### SERGI: DONE UNTIL HERE
+                if allocated: idxtoallocate += 1
+                else:         Warning = False
 
-                else:
-                    if debug >= 1: print(f"PREPARE: WARNING, I Could not identify the protonation state. I'll try to obtain the desired result")
-                    found_charge_state = False
-                    for prot in list_of_protonations:
-                        list_of_charge_states = []
-                        list_of_protonations_for_each_state = []
-                         
-                        tmpobject = ["Ligand", lig, mol]
-                        chargestried = get_list_of_charges_to_try(spec, prot)
-                        for ich in chargestried:
-                            ch_state = get_charge(prot.labels, prot.coords, prot.conmat, ich, prot.cov_factor)
-                            list_of_charge_states.append(ch_state)
-                            list_of_protonations_for_each_state.append(prot)
-                            if debug >= 1: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}") 
-
-                    if len(list_of_charge_states) > 0:
-                        best_charge_distr_idx = select_charge_distr(list_of_charge_states, debug=debug)
-                    else:
-                        if debug >= 1: print(f"    POSCHARGE. found EMPTY best_charge_distr_idx for PROTONATION state")
-                        best_charge_distr_idx = []
-
-                    if debug >= 2: print(f"    POSCHARGE. best_charge_distr_idx={best_charge_distr_idx}")
-                    for idx in best_charge_distr_idx:
-                        c = list_of_charge_states[idx]
-                        p = list_of_protonations_for_each_state[idx]
-                        if debug >= 2: print(f"    POSCHARGE. {c.corr_total_charge}={ch}, {p.added_atoms}={tgt_protonation.added_atoms}")
-                        if c.corr_total_charge == ch and p.added_atoms == tgt_protonation.added_atoms:
-                            lig.charge(c.corr_atom_charges, c.corr_total_charge, c.rdkit_mol, c.smiles)
-                            if debug >= 1: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={c.corr_total_charge}") 
-                            found_charge_state = True
- 
-                    if not found_charge_state: Warning = True
-                if allocated: 
-                    idxtoallocate += 1
-                else:
-                    idxtoallocate += 1
-                    if debug >= 1: print(f"PREPARE: Warning allocating molecule {idx} with {final_charge_distribution[idxtoallocate]} as target charge") 
-                    Warning = True
-    
             for kdx, met in enumerate(mol.metals):
-                specie = unique_indices[idxtoallocate]
-                spec_object = unique_species[specie][1]
-                allocated = False
+                spec = unique_species[met.unique_index]
                 if debug >= 2: print("")
                 if debug >= 2: print(f"PREPARE: Metal {kdx}, label {met.label} is specie {specie}")
-                if debug >= 2: print(f"PREPARE: Metal possible_css: {spec_object.possible_cs}")
-                for jdx, ch in enumerate(spec_object.possible_cs):
-                    if final_charge_distribution[idxtoallocate] == ch and not allocated:
+                if debug >= 2: print(f"PREPARE: Metal possible_css: {spec.possible_cs}")
+                allocated = False
+                for jdx, cs in enumerate(spec.possible_cs):
+                    if final_charge_distribution[idxtoallocate] == cs.corr_total_charge and not allocated:
                         allocated = True
-                        met.charge(ch)
-                if allocated:
-                    idxtoallocate += 1
+                        met.set_charge(cs.corr_total_charge)
+
+                if allocated: idxtoallocate += 1
+                else:         Warning = False
     
             if not Warning:
-                # Now builds the Charge Data for the final molecule. Smiles is a list with all ligand smiles separately.
+                # Now sets the charge for the final molecule, using metal and ligand data
                 if debug >= 2: print(f"PREPARE: Building Molecule {idx} From Ligand&Metal Information")
                 tmp_atcharge = np.zeros((mol.natoms))
                 tmp_smiles = []
@@ -1018,13 +971,13 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                     for kdx, a in enumerate(lig.parent_indices):
                         tmp_atcharge[a] = lig.atcharge[kdx]
                 for met in mol.metals:
-                    tmp_atcharge[met.atlist] = met.totcharge
-    
-                mol.charge(tmp_atcharge, int(sum(tmp_atcharge)), [], tmp_smiles)
+                    tmp_atcharge[met.parent_index] = met.charge
+                mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge, smiles=tmp_smiles)
 
     return moleclist, Warning
 
 #######################################################
+<<<<<<< HEAD
 def build_bonds(moleclist: list, debug: int=0) -> list:
     from cell2mol.classes import bond
 
@@ -1172,6 +1125,8 @@ def build_bonds(moleclist: list, debug: int=0) -> list:
     return moleclist
 
 #######################################################
+=======
+>>>>>>> 3c676b24 (finished prepare_mols, small fixes)
 def correct_smiles_ligand(ligand: object):
     ## Receives a ligand class object and constructs the smiles and the rdkit_mol object from scratch, using atoms and bond information
 

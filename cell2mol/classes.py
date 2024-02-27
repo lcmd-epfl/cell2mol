@@ -212,7 +212,7 @@ class specie(object):
             #if debug >= 2: print("BUILD BONDS: atom", idx, a.label)
             rdkitatom = self.rdkit_mol.GetAtomWithIdx(idx)
             tmp = rdkitatom.GetSymbol()
-            if atom.label != tmp: print("Error in Build_Bonds. Atom labels do not coincide. GMOL vs. MOL:", atom.label, tmp)
+            if atom.label != tmp: print("Error in Create Bonds. Atom labels do not coincide. GMOL vs. MOL:", atom.label, tmp)
             else:
                 # First part. Creates bond information
                 for b in rdkitatom.GetBonds():
@@ -369,6 +369,13 @@ class ligand(specie):
     #         remove = group.check_coordination(debug=debug)        
     #     self.reset_adjacencies_lig_metalist_v2 (remove, debug=debug)    
 
+    #######################################################
+    def correction_smiles(self):
+        if not hasattr(self.parent,"smiles"): self.parent.smiles = []
+        self.smiles, self.rdkit_mol = correct_smiles_ligand(self)
+        self.parent.smiles.append(self.smiles)
+
+    #######################################################
     def get_connected_metals(self, debug: int=0):
         # metal.groups will be used for the calculation of the relative metal radius 
         # and define the coordination geometry of the metal /hapicitiy/ hapttype    
@@ -379,7 +386,7 @@ class ligand(specie):
             tmplabels.append(met.label)
             tmpcoord.append(met.coord)
             isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
-            if isgood and any(tmpadjnum) > 0: self.groups.append(group)
+            if isgood and any(tmpadjnum) > 0: self.metals.append(met)
         return self.metals
 
     #######################################################
@@ -571,9 +578,23 @@ class group(specie):
 ###############
 class bond(object):
     def __init__(self, atom1: object, atom2: object, bond_order: int=1):
-        self.atom1 = atom1
-        self.atom2 = atom2
-        self.order = bond_order
+        self.type       = "bond"
+        self.version    = "0.1"
+        self.atom1      = atom1
+        self.atom2      = atom2
+        self.order      = bond_order
+
+    def __repr__(self):
+        to_print  = f'---------------------------------------------------\n'
+        to_print +=  '   >>> Cell2mol BOND Object >>>                    \n'
+        to_print += f'---------------------------------------------------\n'
+        to_print += f' Version               = {self.version}\n'
+        to_print += f' Type                  = {self.type}\n'
+        to_print += f' Atom 1                = {self.atom1.parent_index}\n'
+        to_print += f' Atom 2                = {self.atom2.parent_index}\n'
+        to_print += f' Bond Order            = {self.order}\n'
+        to_print += '----------------------------------------------------\n'
+        return to_print
 
 ###############
 ### ATOM ######
@@ -605,9 +626,18 @@ class atom(object):
         else:                        return False
 
     #######################################################
-    def add_bond(self,newbond: object):
+    def add_bond(self, newbond: object, debug: int=0):
         if not hasattr(self,"bonds"): self.bonds = []
-        self.bonds.append(newbond)
+        at1 = newbond.atom1
+        at2 = newbond.atom2
+        found = False
+        for b in self.bonds:
+            if (b.atom1 == at1 and b.atom2 == at2) or (b.atom1 == at2 and b.atom2 == at1): 
+                if debug > 0: print(f"ATOM.ADD_BOND found the same bond with atoms:") 
+                if debug > 0: print(f"atom1: {b.atom1}") 
+                if debug > 0: print(f"atom2: {b.atom2}") 
+                found = True   ### It means that the same bond has already been defined
+        if not found: self.bonds.append(newbond)
 
     #######################################################
     def set_adjacency_parameters(self, cov_factor: float, metal_factor: float) -> None:
@@ -633,6 +663,19 @@ class atom(object):
             if c > 0: self.adjacency.append(idx)
         for idx, c in enumerate(madjmat):  ## The atom only receives one row of madjmat, so this is not a matrix anymore
             if c > 0: self.metal_adjacency.append(idx)
+
+
+    #######################################################
+    def get_connected_metals(self, metalist: list, debug: int=0):
+        self.metals = []
+        for met in metalist:
+            tmplabels = self.label.copy()
+            tmpcoord  = self.coord.copy()
+            tmplabels.append(met.label)
+            tmpcoord.append(met.coord)
+            isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+            if isgood and any(tmpadjnum) > 0: self.metals.append(met)
+        return self.metals
 
     #######################################################
     def get_closest_metal(self, metalist: list, debug: int=0):
@@ -754,7 +797,7 @@ class metal(atom):
 
     ############
     def reset_charge(self):
-        atom.reset_charge(self)     ## First uses the generic specie class function for itself and its atoms
+        atom.reset_charge(self)     ## First uses the generic atom class function for itself
         if hasattr(self,"poscharges"):   delattr(self,"poscharge") 
 
 ##############
@@ -1053,23 +1096,28 @@ class cell(object):
                             # isconnected = check_connectivity(at, met)
                             if isconnected: 
                                 newbond = bond(at, met, 0.5)
+                                at.add_bond(newbond)
+                                met.add_bond(newbond)
                                 count += 1 
                         if count != at.mconnec: 
                             print(f"CELL.CREATE_BONDS: error creating bonds for atom: \n{atom}\n of ligand: \n{lig}\n")
                             print(f"CELL.CREATE_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
 
-                # Adds Metal-Metal Bonds, with an arbitrary 0.5 order:
+            # Adds Metal-Metal Bonds, with an arbitrary 0.5 order:
+            if mol.iscomplex:
+                for idx, met1 in mol.metals:
+                    for jdx, met2 in mol.metals:
+                        if idx <= jdx: continue
+                        isconnected = check_connectivity(met1, met2)
+                        if isconnected:
+                            newbond = bond(met1, met2, 0.5)
+                            met1.add_bond(newbond) 
+                            met2.add_bond(newbond) 
+
 
                 # Fourth part : correction smiles of ligands
                 mol.smiles_with_H = [lig.smiles for lig in mol.ligands]
-                for lig in mol.ligands: 
-                    lig.correction_smiles()
-
-    #######################################################
-    def correction_smiles (self):
-        if not hasattr(self.parent,"smiles"): self.parent.smiles = []
-        self.smiles, self.rdkit_mol = correct_smiles_ligand(self)
-        self.parent.smiles.append(self.smiles)
+                mol.smiles = [lig.correction_smiles() for lig in mol.ligands]
 
     #######################################################
     def assign_spin(self, debug: int=0) -> object:
