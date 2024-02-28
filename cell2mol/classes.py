@@ -54,13 +54,18 @@ class specie(object):
         return self.centroid
     
     ############
-    def get_fractional_coord(self, cell_vector=None) -> None:
+    def set_fractional_coord(self, frac_coord: list, debug: int=0) -> None:
+        assert len(frac_coord) == len(self.coord)
+        self.frac_coord = frac_coord 
+
+    ############
+    def get_fractional_coord(self, cell_vector=None, debug: int=0) -> None:
         if cell_vector is None:
             if hasattr(self,"parent"):
                 if hasattr(self.parent,"cellvec"): cell_vector = self.parent.cellvec.copy()
-            else:     print("CLASS_SPECIE: get_fractional coordinates. Missing cell vector. Please provide it"); return None
-        else:         
-            self.frac_coord = cart2frac(self.coord, cell_vector)
+            else:     print("SPECIE.GET_FRACTIONAL_COORD: get_fractional coordinates. Missing cell vector. Please provide it"); return None
+        if debug > 1: print(f"SPECIE.GET_FRACTIONAL_COORD: Using cell_vector:{cell_vector}")
+        self.frac_coord = cart2frac(self.coord, cell_vector)
         return self.frac_coord
 
     ############
@@ -253,10 +258,11 @@ class specie(object):
         return self
 
     ############
-    def __repr__(self):
-        to_print  = f'---------------------------------------------------\n'
-        to_print +=  '   >>> Cell2mol SPECIE Object >>>                  \n'
-        to_print += f'---------------------------------------------------\n'
+    def __repr__(self, indirect: bool=False):
+        to_print = ""
+        if not indirect: to_print += f'---------------------------------------------------\n'
+        if not indirect: to_print +=  '   >>> Cell2mol SPECIE Object >>>                  \n'
+        if not indirect: to_print += f'---------------------------------------------------\n'
         to_print += f' Version               = {self.version}\n'
         to_print += f' Type                  = {self.type}\n'
         if hasattr(self,'subtype'): to_print += f' Sub-Type              = {self.subtype}\n'
@@ -282,10 +288,18 @@ class molecule(specie):
         self.subtype = "molecule"
         specie.__init__(self, labels, coord, parent_indices, radii, parent)
 
+    def __repr__(self):
+        to_print = ""
+        to_print += f'---------------------------------------------------\n'
+        to_print +=  '   >>> Cell2mol MOLECULE Object >>>                \n'
+        to_print += f'---------------------------------------------------\n'
+        specie.__repr__(self, indirect=True)
+
     ############
     def get_spin(self):
         if self.iscomplex:  self.spin = assign_spin_complexes(self) 
         else :              self.spin = 1
+        return self.spin
                 
     ############
     def reset_charge(self):
@@ -305,20 +319,17 @@ class molecule(specie):
             self.ligands = []
             self.metals  = []
             # Identify Metals and the rest
-            metal_idx = get_metal_idxs(self.labels, debug=debug)
-            if debug > 0 :
-                print(f"SPLIT COMPLEX: {self.parent_indices=}")
-                print(f"SPLIT COMPLEX: {self.indices=}")
-            rest_idx  = list(idx for idx in self.parent_indices if idx not in metal_idx) 
+            metal_idx = list([self.indices[idx] for idx in get_metal_idxs(self.labels, debug=debug)])
+            rest_idx  = list(idx for idx in self.indices if idx not in metal_idx) 
+            if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: labels={self.labels}")
+            if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: parent_indices={self.parent_indices}")
+            if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: metal_idx={metal_idx}")
+            if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: rest_idx={rest_idx}")
 
-            if debug > 0: 
-                print(f"SPLIT COMPLEX: found metals in indices {metal_idx}")
-                print(f"SPLIT COMPLEX: found rest in indices {rest_idx}")
-            #rest_idx  = list(idx for idx in self.parent_indices if idx not in metal_idx)
             # Split the "rest" to obtain the ligands
             rest_labels  = extract_from_list(rest_idx, self.labels, dimension=1)
-            rest_coord  = extract_from_list(rest_idx, self.coord, dimension=1)
-            rest_indices = extract_from_list(rest_idx, self.parent_indices, dimension=1)
+            rest_coord   = extract_from_list(rest_idx, self.coord, dimension=1)
+            rest_indices = extract_from_list(rest_idx, self.indices, dimension=1)
             rest_radii   = extract_from_list(rest_idx, self.radii, dimension=1)
             if debug > 0: 
                 print(f"SPLIT COMPLEX: rest labels: {rest_labels}")
@@ -337,24 +348,22 @@ class molecule(specie):
             ## Arranges Ligands
             for b in blocklist:
                 if debug > 0: print(f"PREPARING BLOCK: {b}")
-
-            for b in blocklist:    
+                lig_indices = extract_from_list(b, rest_indices, dimension=1)
                 lig_labels  = extract_from_list(b, rest_labels, dimension=1) 
                 lig_coord   = extract_from_list(b, rest_coord, dimension=1) 
                 lig_radii   = extract_from_list(b, rest_radii, dimension=1) 
                 lig_atoms   = extract_from_list(b, self.atoms, dimension=1) 
-                newligand   = ligand(lig_labels, lig_coord, parent_indices=b, radii=lig_radii, parent=self)
+                newligand   = ligand(lig_labels, lig_coord, parent_indices=lig_indices, radii=lig_radii, parent=self)
                 newligand.set_atoms(atomlist=lig_atoms, overwrite_parent=True)
                 # If fractional coordinates are available...
                 if hasattr(self,"frac_coord"): 
                     lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
-                    newligand.frac_coord = lig_frac_coord
-                    # newligand.get_fractional_coord(lig_frac_coord)
+                    newligand.set_fractional_coord(lig_frac_coord)
                 self.ligands.append(newligand)
 
             ## Arranges Metals
             for m in metal_idx:
-                newmetal    = metal(self.labels[m], self.coord[m], self.parent_indices[m], self.radii[m], parent=self)
+                newmetal    = metal(self.labels[m], self.coord[m], self.indices[m], self.radii[m], parent=self)
                 self.metals.append(newmetal)                            
         return self.ligands, self.metals
 
@@ -385,6 +394,14 @@ class ligand(specie):
     #     for group in self.groups :
     #         remove = group.check_coordination(debug=debug)        
     #     self.reset_adjacencies_lig_metalist_v2 (remove, debug=debug)    
+
+    #######################################################
+    def __repr__(self):
+        to_print = ""
+        to_print += f'---------------------------------------------------\n'
+        to_print +=  '   >>> Cell2mol LIGAND Object >>>                  \n'
+        to_print += f'---------------------------------------------------\n'
+        specie.__repr__(self, indirect=True)
 
     #######################################################
     def correction_smiles(self):
@@ -467,7 +484,7 @@ class ligand(specie):
 
     #######################################################
     def get_denticity(self, debug: int=0):
-        if not hasattr(self,"groups"):      self.split_ligand()
+        if not hasattr(self,"groups"):      self.split_ligand(debug=debug)
         if debug > 0: print(f"LIGAND.Get_denticity: checking connectivity of ligand {self.formula}")
         if debug > 0: print(f"LIGAND.Get_denticity: initial connectivity is {len(self.connected_idx)}")
         
@@ -482,29 +499,22 @@ class ligand(specie):
         # Identify Connected and Unconnected atoms (to the metal)
         if not hasattr(self,"connected_idx"): self.get_connected_idx()
         conn_idx = self.connected_idx
-        rest_idx = list(idx for idx in self.parent_indices if idx not in conn_idx)
 
         # Split the "ligand to obtain the groups
         conn_labels  = extract_from_list(conn_idx, self.labels, dimension=1)
-        conn_coord  = extract_from_list(conn_idx, self.coord, dimension=1)
-        conn_indices = extract_from_list(conn_idx, self.parent_indices, dimension=1)
-
-        # if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, indices=conn_indices, cov_factor=self.cov_factor)
-        # else:                          blocklist = split_species(conn_labels, conn_coord, indices=conn_indices)
+        conn_coord   = extract_from_list(conn_idx, self.coord, dimension=1)
         if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, cov_factor=self.cov_factor, debug=debug)
         else:                          blocklist = split_species(conn_labels, conn_coord, debug=debug)      
-     
         
         ## Arranges Groups 
         for b in blocklist:
-            if debug > 1: print(f"PREPARING BLOCK: {b}")
-
-        for b in blocklist:
+            if debug > 0: print(f"PREPARING BLOCK: {b}")
+            gr_indices = extract_from_list(b, conn_idx, dimension=1)
             gr_labels  = extract_from_list(b, self.labels, dimension=1)
             gr_coord   = extract_from_list(b, self.coord, dimension=1)
             gr_radii   = extract_from_list(b, self.radii, dimension=1)
             gr_atoms   = extract_from_list(b, self.atoms, dimension=1)
-            newgroup   = group(gr_labels, gr_coord, b, gr_radii, parent=self)
+            newgroup   = group(gr_labels, gr_coord, parent_indices=gr_indices, radii=gr_radii, parent=self)
             newgroup.set_atoms(atomlist=gr_atoms, overwrite_parent=False)
             newgroup.get_closest_metal()
             self.groups.append(newgroup)
@@ -528,6 +538,14 @@ class group(specie):
     def __init__(self, labels: list, coord: list, parent_indices: list=None, radii: list=None, parent: object=None) -> None:
         self.subtype = "group"
         specie.__init__(self, labels, coord, parent_indices, radii, parent)
+
+    #######################################################
+    def __repr__(self):
+        to_print = ""
+        to_print += f'---------------------------------------------------\n'
+        to_print +=  '   >>> Cell2mol GROUP Object >>>                   \n'
+        to_print += f'---------------------------------------------------\n'
+        specie.__repr__(self, indirect=True)
 
     #######################################################
     def get_closest_metal(self, debug: int=0):
@@ -567,7 +585,7 @@ class group(specie):
         return self.haptic_type 
 
     #######################################################
-    def coordination_correction (self, debug=1) :
+    def coordination_correction(self, debug=1) :
         if self.is_haptic:                     self = coordination_correction_for_haptic(self, debug=debug)
         if self.is_haptic == False :           self = coordination_correction_for_nonhaptic(self, debug=debug)
         return self 
@@ -928,8 +946,7 @@ class cell(object):
             mol_coord        = extract_from_list(b, ref_pos, dimension=1)
             mol_frac_coord   = extract_from_list(b, self.frac_coord, dimension=1)
             newmolec         = molecule(mol_labels, mol_coord)
-            newmolec.frac_coord = mol_frac_coord
-            # newmolec.get_fractional_coord(mol_frac_coord)
+            newmolec.set_fractional_coord(mol_frac_coord)
             # This must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex: 
                 newmolec.split_complex()
@@ -960,24 +977,34 @@ class cell(object):
         return self.refmoleclist
 
     #######################################################
-    def get_moleclist(self, blocklist=None):
-        if not hasattr(self,"labels") or not hasattr(self,"pos"): return None
-        if len(self.labels) == 0 or len(self.pos) == 0:           return None
+    def get_moleclist(self, blocklist=None, debug: int=0):
+        if debug > 0: print(f"Entered CELL.MOLECLIST with debug={debug}")
+        if not hasattr(self,"labels") or not hasattr(self,"coord"): 
+            if debug > 0: print(f"CELL.MOLECLIST. Labels or coordinates not found. Returning None")
+            return None
+        if len(self.labels) == 0 or len(self.coord) == 0:           
+            if debug > 0: print(f"CELL.MOLECLIST. Empty labels or coordinates. Returning None")
+            return None
+        if debug > 0: print(f"CELL.MOLECLIST passed initial checks")
         cov_factor = 1.3
 
-        if blocklist is None: blocklist = split_species(self.labels, self.pos, cov_factor=cov_factor)
+        if blocklist is None: blocklist = split_species(self.labels, self.coord, cov_factor=cov_factor)
+
         self.moleclist = []
         for b in blocklist:
+            if debug > 0: print(f"CELL.MOLECLIST: doing block={b}")
             mol_labels  = extract_from_list(b, self.labels, dimension=1)
             mol_coord   = extract_from_list(b, self.coord, dimension=1)
-            mol_radii   = extract_from_list(b, self.radii, dimension=1)
-            newmolec    = molecule(mol_labels, mol_coord, b, mol_radii, parent=self)
+            newmolec    = molecule(mol_labels, mol_coord, b, parent=self)
             # If fractional coordinates are available...
             if hasattr(self,"frac_coord"): 
+                assert len(self.frac_coord) == len(self.coord)
                 mol_frac_coord  = extract_from_list(b, self.frac_coord, dimension=1)
-                newmolec.get_fractional_coord(mol_frac_coord)
+                newmolec.set_fractional_coord(mol_frac_coord, debug=debug)
             # This must be below the frac_coord, so they are carried on to the ligands
-            if newmolec.iscomplex: newmolec.split_complex()
+            if newmolec.iscomplex: 
+                if debug > 0: print(f"CELL.MOLECLIST: splitting complex")
+                newmolec.split_complex(debug=debug)
             self.moleclist.append(newmolec)
         return self.moleclist
    
