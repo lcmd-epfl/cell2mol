@@ -25,6 +25,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
 
     # Filenames for output and cell object
     cell_fname   = os.path.join(current_dir, "Cell_{}.cell".format(name))
+    ref_cell_fname = os.path.join(current_dir, "Ref_Cell_{}.cell".format(name))
     output_fname = os.path.join(current_dir, "cell2mol.out")
 
     ##### Deals with the parsed arguments for verbosity ######
@@ -68,8 +69,9 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     # Loads the reference molecules and checks_missing_H
     # TODO : reconstruct the unit cell without using reference molecules
     # TODO : reconstruct the unit cell using (only reconstruction of) reference molecules and Space group
-    newcell.get_reference_molecules(ref_labels, ref_fracs, debug=debug) 
-
+    newcell.get_reference_molecules(ref_labels, ref_fracs, debug=2) 
+    newcell.assess_errors()
+    newcell.save(ref_cell_fname)
     ######################
     ### CALLS CELL2MOL ###
     ######################
