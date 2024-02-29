@@ -1,0 +1,993 @@
+INITIATING cell object from input
+labels=['C', 'C', 'C', 'C', 'C'] 5
+indices=None
+PREPARING BLOCK: [0, 1, 2, 3, 4]
+[0, 2, 4, 6, 8] [0, 1, 2, 3, 4] [0, 2, 4, 6, 8] ['C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H'] 10 ['C', 'C', 'C', 'C', 'C'] [0.73, 0.73, 0.73, 0.73, 0.73]
+10
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 0
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 2
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 4
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 6
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 8
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 2, 4, 6, 8]
+----------------------------------------------------
+]
+labels=['C', 'C', 'C', 'C', 'C'] 5
+indices=None
+PREPARING BLOCK: [0, 1, 2, 3, 4]
+[0, 1, 3, 5, 7] [0, 1, 2, 3, 4] [0, 1, 3, 5, 7] ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H'] 9 ['C', 'C', 'C', 'C', 'C'] [0.73, 0.73, 0.73, 0.73, 0.73]
+9
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 0
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 1
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 3
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 5
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 7
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 1, 3, 5, 7]
+----------------------------------------------------
+]
+labels=['Cl'] 1
+indices=None
+PREPARING BLOCK: [0]
+[0] [0] [0] ['Cl'] 1 ['Cl'] [1.02]
+1
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = Cl
+ Atomic Number         = 17
+ Index in Parent       = 0
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking connectivity of ligand H5-C5
+LIGAND.Get_denticity: initial connectivity is 5
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 2, 4, 6, 8]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 2, 4, 6, 8]
+----------------------------------------------------
+
+	Atom 0 : C 	Metal : Fe 	distance : 2.065 	thres : 2.501
+	Atom 1 : C 	Metal : Fe 	distance : 2.062 	thres : 2.501
+	Atom 2 : C 	Metal : Fe 	distance : 2.045 	thres : 2.501
+	Atom 3 : C 	Metal : Fe 	distance : 2.084 	thres : 2.501
+	Atom 4 : C 	Metal : Fe 	distance : 2.104 	thres : 2.501
+ratio_list=[0.826, 0.824, 0.818, 0.833, 0.841] std_dev=0.008
+LIGAND.Get_denticity: checking connectivity of ligand H4-C5
+LIGAND.Get_denticity: initial connectivity is 5
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 1, 3, 5, 7]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 1, 3, 5, 7]
+----------------------------------------------------
+
+	Atom 0 : C 	Metal : Hg 	distance : 2.042 	thres : 2.501
+	Atom 1 : C 	Metal : Fe 	distance : 2.051 	thres : 2.501
+	Atom 2 : C 	Metal : Fe 	distance : 2.081 	thres : 2.501
+	Atom 3 : C 	Metal : Fe 	distance : 2.068 	thres : 2.501
+	Atom 4 : C 	Metal : Fe 	distance : 2.077 	thres : 2.501
+ratio_list=[0.816, 0.82, 0.832, 0.827, 0.83] std_dev=0.006
+LIGAND.Get_denticity: checking connectivity of ligand Cl
+LIGAND.Get_denticity: initial connectivity is 1
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+
+labels=['C', 'C', 'C', 'C', 'C'] 5
+indices=None
+PREPARING BLOCK: [0, 1, 2, 3, 4]
+[0, 2, 4, 6, 8] [0, 1, 2, 3, 4] [0, 2, 4, 6, 8] ['C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H'] 10 ['C', 'C', 'C', 'C', 'C'] [0.73, 0.73, 0.73, 0.73, 0.73]
+10
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 0
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 2
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 4
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 6
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 8
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 2, 4, 6, 8]
+----------------------------------------------------
+]
+labels=['C', 'C', 'C', 'C', 'C'] 5
+indices=None
+PREPARING BLOCK: [0, 1, 2, 3, 4]
+[0, 1, 3, 5, 7] [0, 1, 2, 3, 4] [0, 1, 3, 5, 7] ['C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H'] 9 ['C', 'C', 'C', 'C', 'C'] [0.73, 0.73, 0.73, 0.73, 0.73]
+9
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 0
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 1
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 3
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 5
+----------------------------------------------------
+, ---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = C
+ Atomic Number         = 6
+ Index in Parent       = 7
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 1, 3, 5, 7]
+----------------------------------------------------
+]
+labels=['Cl'] 1
+indices=None
+PREPARING BLOCK: [0]
+[0] [0] [0] ['Cl'] 1 ['Cl'] [1.02]
+1
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = Cl
+ Atomic Number         = 17
+ Index in Parent       = 0
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking connectivity of ligand H5-C5
+LIGAND.Get_denticity: initial connectivity is 5
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 2, 4, 6, 8]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 2, 4, 6, 8]
+----------------------------------------------------
+
+	Atom 0 : C 	Metal : Fe 	distance : 2.065 	thres : 2.501
+	Atom 1 : C 	Metal : Fe 	distance : 2.062 	thres : 2.501
+	Atom 2 : C 	Metal : Fe 	distance : 2.045 	thres : 2.501
+	Atom 3 : C 	Metal : Fe 	distance : 2.084 	thres : 2.501
+	Atom 4 : C 	Metal : Fe 	distance : 2.104 	thres : 2.501
+ratio_list=[0.826, 0.824, 0.818, 0.833, 0.841] std_dev=0.008
+LIGAND.Get_denticity: checking connectivity of ligand H4-C5
+LIGAND.Get_denticity: initial connectivity is 5
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 1, 3, 5, 7]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['C', 'C', 'C', 'C', 'C']
+ Indices in Parent       = [0, 1, 3, 5, 7]
+----------------------------------------------------
+
+	Atom 0 : C 	Metal : Hg 	distance : 2.042 	thres : 2.501
+	Atom 1 : C 	Metal : Fe 	distance : 2.051 	thres : 2.501
+	Atom 2 : C 	Metal : Fe 	distance : 2.081 	thres : 2.501
+	Atom 3 : C 	Metal : Fe 	distance : 2.068 	thres : 2.501
+	Atom 4 : C 	Metal : Fe 	distance : 2.077 	thres : 2.501
+ratio_list=[0.816, 0.82, 0.832, 0.827, 0.83] std_dev=0.006
+LIGAND.Get_denticity: checking connectivity of ligand Cl
+LIGAND.Get_denticity: initial connectivity is 1
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+
+labels=['Cl'] 1
+indices=None
+PREPARING BLOCK: [0]
+[0] [0] [0] ['Cl'] 1 ['Cl'] [1.02]
+1
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = Cl
+ Atomic Number         = 17
+ Index in Parent       = 0
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+labels=['Cl'] 1
+indices=None
+PREPARING BLOCK: [0]
+[0] [0] [0] ['Cl'] 1 ['Cl'] [1.02]
+1
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = Cl
+ Atomic Number         = 17
+ Index in Parent       = 0
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+labels=['Cl'] 1
+indices=None
+PREPARING BLOCK: [0]
+[0] [0] [0] ['Cl'] 1 ['Cl'] [1.02]
+1
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = Cl
+ Atomic Number         = 17
+ Index in Parent       = 0
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+labels=['Cl'] 1
+indices=None
+PREPARING BLOCK: [0]
+[0] [0] [0] ['Cl'] 1 ['Cl'] [1.02]
+1
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = Cl
+ Atomic Number         = 17
+ Index in Parent       = 0
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+labels=['Cl'] 1
+indices=None
+PREPARING BLOCK: [0]
+[0] [0] [0] ['Cl'] 1 ['Cl'] [1.02]
+1
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = Cl
+ Atomic Number         = 17
+ Index in Parent       = 0
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+labels=['Cl'] 1
+indices=None
+PREPARING BLOCK: [0]
+[0] [0] [0] ['Cl'] 1 ['Cl'] [1.02]
+1
+[---------------------------------------------------
+   >>> Cell2mol ATOM Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = atom
+ Sub-Type              = metal
+ Label                 = Cl
+ Atomic Number         = 17
+ Index in Parent       = 0
+----------------------------------------------------
+]
+[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking connectivity of ligand Cl
+LIGAND.Get_denticity: initial connectivity is 1
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+
+LIGAND.Get_denticity: checking connectivity of ligand Cl
+LIGAND.Get_denticity: initial connectivity is 1
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+
+LIGAND.Get_denticity: checking connectivity of ligand Cl
+LIGAND.Get_denticity: initial connectivity is 1
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+
+LIGAND.Get_denticity: checking connectivity of ligand Cl
+LIGAND.Get_denticity: initial connectivity is 1
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+
+LIGAND.Get_denticity: checking connectivity of ligand Cl
+LIGAND.Get_denticity: initial connectivity is 1
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+
+LIGAND.Get_denticity: checking connectivity of ligand Cl
+LIGAND.Get_denticity: initial connectivity is 1
+self.groups=[---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+]
+LIGAND.Get_denticity: checking denticity of group ---------------------------------------------------
+   >>> Cell2mol GROUP Object >>>                    
+---------------------------------------------------
+ Version               = 0.1
+ Type                  = specie
+ Sub-Type              = group
+ Label                 = ['Cl']
+ Indices in Parent       = [0]
+----------------------------------------------------
+
+SAVING cell2mol CELL object to /Users/ycho/Debug_cell2mol/BACZUB/Ref_Cell_BACZUB.cell
+ENTERING cell2mol with debug=2
+
+##################
+Checking Missing H
+##################
+GET_ANGLE nan Problem 0.9999999999999999 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [-0.41249869 -0.44436524  0.79522598] [nan nan nan]
+GET_ANGLE nan Problem nan 0.9999999999999999 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [-0.41249869 -0.44436524  0.79522598]
+GET_ANGLE nan Problem nan 1.0 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [-0.35961224  0.92272282  0.13878629]
+GET_ANGLE nan Problem 1.0 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [-0.35961224  0.92272282  0.13878629] [nan nan nan]
+
+WARNING in Missing H function for: specie, 0, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 3 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [nan, 1.7226997473417496, nan, nan, nan] Avg: nan
+Angles [        nan 98.70342489         nan         nan         nan] Avg: nan
+Diffs: [nan, nan, nan, nan] Minval: nan
+
+GET_ANGLE nan Problem 1.0 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [-0.19105558 -0.1782712   0.96525496] [nan nan nan]
+GET_ANGLE nan Problem nan 1.0 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [-0.19105558 -0.1782712   0.96525496]
+GET_ANGLE nan Problem nan 1.0 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [-0.38926315  0.33117255 -0.85953415]
+GET_ANGLE nan Problem 1.0 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [-0.38926315  0.33117255 -0.85953415] [nan nan nan]
+
+WARNING in Missing H function for: specie, 0, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 5 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [nan, 2.5223826690015136, nan, nan, nan] Avg: nan
+Angles [         nan 144.52188125          nan          nan          nan] Avg: nan
+Diffs: [nan, nan, nan, nan] Minval: nan
+
+GET_ANGLE nan Problem 1.0 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [-0.28253755  0.88829837  0.36207532] [nan nan nan]
+GET_ANGLE nan Problem nan 1.0 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [-0.28253755  0.88829837  0.36207532]
+GET_ANGLE nan Problem nan 0.9999999999999999 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [ 0.13268887 -0.71422897 -0.6872195 ]
+GET_ANGLE nan Problem 0.9999999999999999 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [ 0.13268887 -0.71422897 -0.6872195 ] [nan nan nan]
+
+WARNING in Missing H function for: specie, 0, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 7 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [nan, 2.7408287291667857, nan, nan, nan] Avg: nan
+Angles [         nan 157.03791855          nan          nan          nan] Avg: nan
+Diffs: [nan, nan, nan, nan] Minval: nan
+
+GET_ANGLE nan Problem 1.0 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [-0.6550087  -0.03211051  0.75493875] [nan nan nan]
+GET_ANGLE nan Problem 0.9999999999999999 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [-0.42582936  0.50132027 -0.75322463] [nan nan nan]
+GET_ANGLE nan Problem nan 1.0 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [-0.6550087  -0.03211051  0.75493875]
+GET_ANGLE nan Problem nan 0.9999999999999999 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [-0.42582936  0.50132027 -0.75322463]
+
+WARNING in Missing H function for: specie, 0, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 9 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [1.881589774293059, nan, nan, nan, nan] Avg: nan
+Angles [107.80715284          nan          nan          nan          nan] Avg: nan
+Diffs: [nan, nan, nan, nan] Minval: nan
+
+
+WARNING in Missing H function for: specie, 0, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 11 has missing H atoms
+Summary of facts:
+ -Atom has 2 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [0.9658549218602688] Avg: 0.9658549218602688
+Angles [55.33941064] Avg: 55.33941064453131
+Diffs: [2.1757377317295243, 1.1285400781397312, 0.6049410781397313, 0.9452810781397312] Minval: 0.6049410781397313
+
+
+WARNING in Missing H function for: specie, 0, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 14 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [0.8810717723764516, 0.4605249593703718, 0.5761705143930929] Avg: 0.6392557487133054
+Angles [50.48169401 26.38613653 33.01213875] Avg: 36.6266564307479
+Diffs: [2.5023369048764876, 1.4551392512866945, 0.9315402512866947, 1.2718802512866945] Minval: 0.9315402512866947
+
+
+WARNING in Missing H function for: specie, 0, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 16 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [0.5958191161717821, 0.6139262475080143, 0.5822756488928795] Avg: 0.5973403375242253
+Angles [34.13792071 35.17538291 33.36193719] Avg: 34.22508027305819
+Diffs: [2.5442523160655677, 1.4970546624757746, 0.9734556624757748, 1.3137956624757745] Minval: 0.9734556624757748
+
+
+WARNING in Missing H function for: specie, 0, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 18 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape SquarePlanar that suggests coordination 4 
+Angles [1.5543166478658395, 1.7656524925653505, 0.5881915809827591] Avg: 1.3027202404713163
+Angles [ 89.05578395 101.16443591  33.70089514] Avg: 74.64037166527412
+Diffs: [1.8388724131184768, 0.7916747595286837, 0.2680757595286838, 0.6084157595286837] Minval: 0.2680757595286838
+
+GET_ANGLE nan Problem 0.9999999999999999 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [ 0.41249869  0.44436524 -0.79522598] [nan nan nan]
+GET_ANGLE nan Problem nan 0.9999999999999999 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [ 0.41249869  0.44436524 -0.79522598]
+GET_ANGLE nan Problem nan 0.9999999999999999 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [ 0.35961224 -0.92272282 -0.13878629]
+GET_ANGLE nan Problem 0.9999999999999999 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [ 0.35961224 -0.92272282 -0.13878629] [nan nan nan]
+
+WARNING in Missing H function for: specie, 1, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 3 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [nan, 1.72269974734175, nan, nan, nan] Avg: nan
+Angles [        nan 98.70342489         nan         nan         nan] Avg: nan
+Diffs: [nan, nan, nan, nan] Minval: nan
+
+GET_ANGLE nan Problem 1.0 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [ 0.19105558  0.1782712  -0.96525496] [nan nan nan]
+GET_ANGLE nan Problem nan 1.0 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [ 0.19105558  0.1782712  -0.96525496]
+GET_ANGLE nan Problem nan 1.0 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [ 0.38926315 -0.33117255  0.85953415]
+GET_ANGLE nan Problem 1.0 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [ 0.38926315 -0.33117255  0.85953415] [nan nan nan]
+
+WARNING in Missing H function for: specie, 1, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 5 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [nan, 2.5223826690015128, nan, nan, nan] Avg: nan
+Angles [         nan 144.52188125          nan          nan          nan] Avg: nan
+Diffs: [nan, nan, nan, nan] Minval: nan
+
+GET_ANGLE nan Problem 1.0 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [ 0.28253755 -0.88829837 -0.36207532] [nan nan nan]
+GET_ANGLE nan Problem nan 1.0 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [ 0.28253755 -0.88829837 -0.36207532]
+GET_ANGLE nan Problem nan 0.9999999999999999 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [-0.13268887  0.71422897  0.6872195 ]
+GET_ANGLE nan Problem 0.9999999999999999 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [-0.13268887  0.71422897  0.6872195 ] [nan nan nan]
+
+WARNING in Missing H function for: specie, 1, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 7 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [nan, 2.7408287291667857, nan, nan, nan] Avg: nan
+Angles [         nan 157.03791855          nan          nan          nan] Avg: nan
+Diffs: [nan, nan, nan, nan] Minval: nan
+
+GET_ANGLE nan Problem 1.0 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [ 0.6550087   0.03211051 -0.75493875] [nan nan nan]
+GET_ANGLE nan Problem 0.9999999999999999 nan nan nan nan
+GET_ANGLE nan Problem, vecs: [ 0.42582936 -0.50132027  0.75322463] [nan nan nan]
+GET_ANGLE nan Problem nan 1.0 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [ 0.6550087   0.03211051 -0.75493875]
+GET_ANGLE nan Problem nan 0.9999999999999999 nan nan nan
+GET_ANGLE nan Problem, vecs: [nan nan nan] [ 0.42582936 -0.50132027  0.75322463]
+
+WARNING in Missing H function for: specie, 1, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 9 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [1.8815897742930587, nan, nan, nan, nan] Avg: nan
+Angles [107.80715284          nan          nan          nan          nan] Avg: nan
+Diffs: [nan, nan, nan, nan] Minval: nan
+
+
+WARNING in Missing H function for: specie, 1, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 11 has missing H atoms
+Summary of facts:
+ -Atom has 2 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [0.965854921860268] Avg: 0.965854921860268
+Angles [55.33941064] Avg: 55.33941064453127
+Diffs: [2.1757377317295252, 1.1285400781397321, 0.6049410781397321, 0.945281078139732] Minval: 0.6049410781397321
+
+
+WARNING in Missing H function for: specie, 1, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 14 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [0.8810717723764507, 0.4605249593703716, 0.5761705143930923] Avg: 0.6392557487133049
+Angles [50.48169401 26.38613653 33.01213875] Avg: 36.62665643074788
+Diffs: [2.502336904876488, 1.455139251286695, 0.9315402512866952, 1.271880251286695] Minval: 0.9315402512866952
+
+
+WARNING in Missing H function for: specie, 1, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 16 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape Unassigned that suggests coordination 0 
+Angles [0.5958191161717821, 0.6139262475080143, 0.5822756488928796] Avg: 0.5973403375242253
+Angles [34.13792071 35.17538291 33.36193719] Avg: 34.22508027305819
+Diffs: [2.5442523160655677, 1.4970546624757746, 0.9734556624757748, 1.3137956624757745] Minval: 0.9734556624757748
+
+
+WARNING in Missing H function for: specie, 1, ['Hg', 'Fe', 'Cl', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'C', 'H', 'C', 'H', 'C', 'H', 'C', 'H']
+C Atom 18 has missing H atoms
+Summary of facts:
+ -Atom has 3 adjacent atoms 
+ -arranged in a shape SquarePlanar that suggests coordination 4 
+Angles [1.5543166478658397, 1.76565249256535, 0.5881915809827591] Avg: 1.3027202404713163
+Angles [ 89.05578395 101.16443591  33.70089514] Avg: 74.64037166527412
+Diffs: [1.8388724131184768, 0.7916747595286837, 0.2680757595286838, 0.6084157595286837] Minval: 0.2680757595286838
+
+Cell2mol terminated with error number 2. Message:
+We detected that H atoms are likely missing. This will cause errors in the charge prediction, so STOPPING pre-emptively.

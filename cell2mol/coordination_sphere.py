@@ -318,6 +318,7 @@ def coordination_correction_for_nonhaptic (group, debug=1) -> list:
     ## Second Correction
     for idx, atom in enumerate(group.atoms):
         metal = atom.get_closest_metal()
+        dist = get_dist(atom.coord, metal.coord)
         thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
         if debug >= 1 : print(f"\tAtom {atom.label} connected to {metal.label} distance {get_dist(atom.coord, metal.coord)} with threshold {thres}")
         
@@ -369,7 +370,7 @@ def coordination_correction_for_nonhaptic (group, debug=1) -> list:
     return group 
 
 #######################################################    
-def coordination_correction_for_haptic (group, debug=1) -> list:
+def coordination_correction_for_haptic (group, debug=2) -> list:
 
     ratio_list = []
     for idx, atom in enumerate(group.atoms):
@@ -377,19 +378,23 @@ def coordination_correction_for_haptic (group, debug=1) -> list:
         dist = get_dist(atom.coord, metal.coord)
         thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
         ratio_list.append(round(dist/thres,3))
-        if debug >= 1 : print(f"\tAtom {idx} :", atom.label, f"\tMetal :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
+        # if debug >= 1 : 
+        print(f"\tAtom {idx} :", atom.label, f"\tMetal :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
 
     std_dev = round(np.std(ratio_list), 3)
-    if debug >= 1 : print(f"{ratio_list=} {std_dev=}")
-
+    # if debug >= 1 : 
+    print(f"{ratio_list=} {std_dev=}")
+    # print()
     count = 0
     for idx, (atom, ratio) in enumerate(zip(group.atoms, ratio_list)) :
         if atom.label == "H" : 
             if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
+            print(atom.label)
             atom.reset_mconnec(idx)
             count += 1          
         elif std_dev > 0.05 and ratio > 0.9 :
             if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to the long distance")
+            print(atom.label)
             atom.reset_mconnec(idx) 
             count += 1      
         else :

@@ -484,12 +484,13 @@ class ligand(specie):
 
     #######################################################
     def get_denticity(self, debug: int=0):
-        if not hasattr(self,"groups"):      self.split_ligand(debug=debug)
+        #if not hasattr(self,"groups"):      self.split_ligand(debug=2)
         if debug > 0: print(f"LIGAND.Get_denticity: checking connectivity of ligand {self.formula}")
         if debug > 0: print(f"LIGAND.Get_denticity: initial connectivity is {len(self.connected_idx)}")
-        
+        print(f"{self.groups=}")
         self.denticity = 0
         for g in self.groups:
+            if debug > 0: print(f"LIGAND.Get_denticity: checking denticity of group {g}")
             self.denticity += g.get_denticity()      ## A check is also performed at the group level
         return self.denticity 
 
@@ -499,7 +500,8 @@ class ligand(specie):
         # Identify Connected and Unconnected atoms (to the metal)
         if not hasattr(self,"connected_idx"): self.get_connected_idx()
         conn_idx = self.connected_idx
-
+        self.set_atoms()  
+        # if not hasattr(self,"atoms"):       self.set_atoms() 
         # Split the "ligand to obtain the groups
         conn_labels  = extract_from_list(conn_idx, self.labels, dimension=1)
         conn_coord   = extract_from_list(conn_idx, self.coord, dimension=1)
@@ -510,15 +512,24 @@ class ligand(specie):
         for b in blocklist:
             if debug > 0: print(f"PREPARING BLOCK: {b}")
             gr_indices = extract_from_list(b, conn_idx, dimension=1)
-            gr_labels  = extract_from_list(b, self.labels, dimension=1)
-            gr_coord   = extract_from_list(b, self.coord, dimension=1)
-            gr_radii   = extract_from_list(b, self.radii, dimension=1)
-            gr_atoms   = extract_from_list(b, self.atoms, dimension=1)
-            newgroup   = group(gr_labels, gr_coord, parent_indices=gr_indices, radii=gr_radii, parent=self)
+            gr_labels  = extract_from_list(gr_indices, self.labels, dimension=1)
+            gr_coord   = extract_from_list(gr_indices, self.coord, dimension=1)
+            gr_radii   = extract_from_list(gr_indices, self.radii, dimension=1)
+            gr_atoms   = extract_from_list(gr_indices, self.atoms, dimension=1)
+
+            # gr_labels  = extract_from_list(b, self.labels, dimension=1)
+            # gr_coord   = extract_from_list(b, self.coord, dimension=1)
+            # gr_radii   = extract_from_list(b, self.radii, dimension=1)
+            # gr_atoms   = extract_from_list(b, self.atoms, dimension=1)
+            print(gr_indices, b, conn_idx, self.labels, len(self.labels), gr_labels, gr_radii)
+            print(len(self.atoms))
+            print(gr_atoms)
+            newgroup = group(gr_labels, gr_coord, parent_indices=gr_indices, radii=gr_radii, parent=self)
             newgroup.set_atoms(atomlist=gr_atoms, overwrite_parent=False)
             newgroup.get_closest_metal()
             self.groups.append(newgroup)
-            
+        print(self.groups)
+
     #######################################################
     def get_hapticity(self, debug: int=0):
         if not hasattr(self,"groups"): self.split_ligand(debug=debug)
@@ -540,13 +551,23 @@ class group(specie):
         specie.__init__(self, labels, coord, parent_indices, radii, parent)
 
     #######################################################
+    # def __repr__(self):
+    #     to_print = ""
+    #     to_print += f'---------------------------------------------------\n'
+    #     to_print +=  '   >>> Cell2mol GROUP Object >>>                   \n'
+    #     to_print += f'---------------------------------------------------\n'
+    #     specie.__repr__(self, indirect=True)
     def __repr__(self):
-        to_print = ""
+        to_print  = f'---------------------------------------------------\n'
+        to_print +=  '   >>> Cell2mol GROUP Object >>>                    \n'
         to_print += f'---------------------------------------------------\n'
-        to_print +=  '   >>> Cell2mol GROUP Object >>>                   \n'
-        to_print += f'---------------------------------------------------\n'
-        specie.__repr__(self, indirect=True)
-
+        to_print += f' Version               = {self.version}\n'
+        to_print += f' Type                  = {self.type}\n'
+        if hasattr(self,'subtype'): to_print += f' Sub-Type              = {self.subtype}\n'
+        to_print += f' Label                 = {self.labels}\n'
+        to_print += f' Indices in Parent       = {self.parent_indices}\n'
+        to_print += '----------------------------------------------------\n'
+        return to_print
     #######################################################
     def get_closest_metal(self, debug: int=0):
         apos = compute_centroid(np.array(self.coord))
@@ -585,13 +606,13 @@ class group(specie):
         return self.haptic_type 
 
     #######################################################
-    def coordination_correction(self, debug=1) :
+    def coordination_correction(self, debug=2) :
         if self.is_haptic:                     self = coordination_correction_for_haptic(self, debug=debug)
         if self.is_haptic == False :           self = coordination_correction_for_nonhaptic(self, debug=debug)
         return self 
 
     #######################################################
-    def check_denticity(self, debug: int=0):
+    def check_denticity(self, debug: int=2):
         from cell2mol.connectivity import add_atom
         if not hasattr(self,"is_haptic"): self.get_hapticity()
         if not hasattr(self,"atoms"):     self.set_atoms()
@@ -720,14 +741,14 @@ class atom(object):
         return self.metals
 
     #######################################################
-    def get_closest_metal(self, metalist: list, debug: int=0):
+    def get_closest_metal(self, debug: int=0):
         ## Here, the list of metal atoms must be provided
         apos = self.coord
         dist = []
-        for met in metalist:
+        for met in self.parent.parent.metals:
             bpos = np.array(met.coord)
             dist.append(np.linalg.norm(apos - bpos))
-        self.closest_metal = metalist[np.argmin(dist)]
+        self.closest_metal = self.parent.parent.metals[np.argmin(dist)]
         return self.closest_metal
 
     #######################################################
@@ -753,6 +774,7 @@ class atom(object):
     
     #######################################################
     def reset_mconnec(self, idx: int):
+        print(f"ATOM.RESET_MCONN: resetting mconnec for atom {self.label=} with {self.parent_index=} {self.parent=} index {idx=}")
         self.mconnec = 0                                                                        # Corrects data of atom object in self
         self.parent.atoms[self.parent_indices[idx]].mconnec = 0                                 # Corrects data of atom object in ligand class
         self.parent.madjnum[self.parent_indices[idx]] = 0                                       # Corrects data in metal_adjacency number of the ligand class
@@ -970,7 +992,7 @@ class cell(object):
                     ref.get_hapticity(debug=debug)                          ### Former "get_hapticity(ref)" function
                     # ref.get_coordination_geometry(debug=debug)                ### Former "get_coordination_Geometry(ref)" function 
                     for lig in ref.ligands:
-                        lig.get_denticity(debug=0)
+                        lig.get_denticity(debug=2)
 
         if isgood: self.has_isolated_H = False
         else:      self.has_isolated_H = True
