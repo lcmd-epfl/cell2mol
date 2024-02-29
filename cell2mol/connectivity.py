@@ -39,10 +39,10 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
             # If no undesired adjacencies have been created, the coordinates are kept
             if tmpconnec[posadded] <= 1:
                 isadded = True
-                if debug >= 2: print(f"ADD_ATOM: Chosen {tgt} Metal atom. {element} is added at site {site}")
+                if debug >= 2: print(f"ADD_ATOM: Chosen Metal index {tgt.parent_index}. {element} is added at site {site}")
             # Otherwise, coordinates are reset
             else:
-                if debug >= 1: print(f"ADD_ATOM: Chosen {tgt} Metal atom. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
+                if debug >= 1: print(f"ADD_ATOM: Chosen Metal index {tgt.parent_index}. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
                 isadded = False
                 newlab = labels.copy()
                 newcoord = coords.copy()
