@@ -145,11 +145,13 @@ def classify_fragments(blocklist: list, refmoleclist: list, debug: int=0):
 
     ## Prepares Blocks
     for b in blocklist:
+        if debug > 0: print(f"CLASSIFY FRAGMENTS, preparing block {b}")
         if not hasattr(b,"centroid"):         b.get_centroid()
         if not hasattr(b,"element_count"):    b.set_element_count()
         if not hasattr(b,"numH"):             b.numH = b.set_element_count()[4] + b.set_element_count()[3] #"Hidrogen + Deuterium atoms"
     ## Prepares Reference Molecules
     for ref in refmoleclist:
+        if debug > 0: print(f"CLASSIFY FRAGMENTS, preparing reference {ref}")
         if not hasattr(ref,"element_count"):  ref.set_element_count()
         if not hasattr(ref,"numH"):           ref.numH = ref.set_element_count()[4] + ref.set_element_count()[3] #"Hidrogen + Deuterium atoms"
 

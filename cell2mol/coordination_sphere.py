@@ -303,69 +303,79 @@ def get_thres_from_two_atoms(label_i, label_j, factor=1.3, debug=0):
     return thres
 
 #######################################################    
-def coordination_correction_for_nonhaptic (group, debug=1) -> list:
+def coordination_correction_for_nonhaptic(group, debug=1) -> list:
+    if debug > 0: print("Entering COORD_CORR_NONHAPTIC:")
 
     ## First Correction (former verify_connectivity)
     for idx, atom in enumerate(group.atoms):
-        if debug > 0: print(f"GROUP.check_denticity: connectivity={atom.mconnec} in atom idx={idx}, label={atom.label}")
-        isadded, newlab, newcoord = add_atom(group.parent.labels, group.parent.coord, group.parent_indices[idx], group.parent, group.parent.parent.metals, "H", debug=debug)
+        if debug > 0: print(f"\tconnectivity={atom.mconnec} in atom idx={idx}, label={atom.label}")
+        isadded, newlab, newcoord = add_atom(group.parent.labels, group.parent.coord, group.parent_indices[idx], group.parent, group.parent.parent.metals, "H", debug=0)
         if isadded:
-            if debug > 0: print(f"GROUP.check_denticity: connectivity verified for atom {idx} with label {atom.label}")
+            if debug > 0: print(f"\tconnectivity verified for atom {idx} with label {atom.label}")
         else:
-            if debug > 0: print(f"GROUP.check_denticity: corrected mconnec of atom {idx} with label {atom.label}")
-            atom.reset_mconnec(idx)
+            if debug > 0: print(f"\tcorrected mconnec of atom {idx} with label {atom.label}")
+            atom.reset_mconnec(idx, value=0, debug=debug)
 
-    ## Second Correction
-    for idx, atom in enumerate(group.atoms):
-        metal = atom.get_closest_metal()
-        dist = get_dist(atom.coord, metal.coord)
-        thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
-        if debug >= 1 : print(f"\tAtom {atom.label} connected to {metal.label} distance {get_dist(atom.coord, metal.coord)} with threshold {thres}")
-        
-        neighbors = [ atom.parent.atoms[j] for j in atom.adjacency ]
-        nb_dist_from_metal = [ get_dist(nb.coord, metal.coord) for nb in neighbors]
-        neighbors_mconnec =[]
+            ### Remove the atom from the group
+            group.remove_atom(idx, debug=debug)
 
-        for nb, dist in zip(neighbors, nb_dist_from_metal) :
-            thres = get_thres_from_two_atoms(metal.label, nb.label, debug=debug)
-            if dist > thres :   pass
-            else :              neighbors_mconnec.append(nb)   
-        
-        if debug >= 2 : 
-            print(f"\t\t{atom.label} connected to {[nb.label for nb in neighbors]}")
-            print(f"\t\tAmong these neighbors, {[nb_m for nb_m in neighbors_mconnec]} are connected to the metal {metal.label}")
+    ### Second Correction
+    #for idx, atom in enumerate(group.atoms):
+    #    if debug >= 1 : print(f"\tSecond Correction with atom {idx}")
+    #    metal = atom.get_closest_metal()
+    #    dist = get_dist(atom.coord, metal.coord)
+    #    thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
+    #    if debug >= 1 : print(f"\tAtom {atom.label} connected to {metal.label} distance {get_dist(atom.coord, metal.coord)} with threshold {thres}")
+    #    
+    #    neighbors = [ atom.parent.atoms[j] for j in atom.adjacency ]
+    #    nb_dist_from_metal = [ get_dist(nb.coord, metal.coord) for nb in neighbors]
+    #    neighbors_mconnec =[]
 
-        if len(neighbors_mconnec) >= 2 :
-            if debug >=1 : print(f"\t[Check] This coordinating atom {atom.label} connected to more than one coordinating atoms to the metal {metal.label}")
-            if set([nb_m.label for nb_m in neighbors_mconnec]) == set(["H"]) :  pass  # TODO : Figure out why I put this condition
-            else :  
-                atom.reset_mconnec(idx)
-                if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label, get_dist(atom.coord, metal.coord), "due to neighboring atoms")
+    #    for nb, dist in zip(neighbors, nb_dist_from_metal) :
+    #        thres = get_thres_from_two_atoms(metal.label, nb.label, debug=debug)
+    #        if dist > thres :   pass
+    #        else :              neighbors_mconnec.append(nb)   
+    #    
+    #    if debug >= 2 : 
+    #        print(f"\t\t{atom.label} connected to {[nb.label for nb in neighbors]}")
+    #        print(f"\t\tAmong these neighbors, {[nb_m.label for nb_m in neighbors_mconnec]} are connected to the metal {metal.label}")
 
-        elif len(neighbors_mconnec) == 1 :
-            nb_m = neighbors_mconnec[0]
-            if debug >=1 : print(f"\t[Check] This coordinating atom {atom.label} connected to another coordinating atom {nb_m.label} to the metal {metal.label}")
+    #    if len(neighbors_mconnec) >= 2 :
+    #        if debug >=1 : print(f"\t[Check] This coordinating atom {atom.label} connected to more than one coordinating atoms to the metal {metal.label}")
+    #        if set([nb_m.label for nb_m in neighbors_mconnec]) == set(["H"]) :  pass  # TODO : Figure out why I put this condition
+    #        else :  
+    #            atom.reset_mconnec(idx, value=0, debug=debug)
+    #            group.remove_atom(idx, debug=debug)
+    #            if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label, get_dist(atom.coord, metal.coord), "due to neighboring atoms")
 
-            if (atom.label == "H" and nb_m.label in ["B", "O", "N", "C"]) :
-                atom.reset_mconnec(idx)
-                if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label, get_dist(atom.coord, metal.coord), "due to H")
-            elif (atom.label in ["B", "O", "N", "C"] and nb_m.label == "H") :
-                if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", nb_m.label, get_dist(nb_m.coord, metal.coord), "due to H")
-                nb_m.reset_mconnec() # put an index of nb_m in group
-            else : # Check angle between metal-coordinating atoms               
-                vector1 = np.subtract(np.array(atom.coord), np.array(nb_m.coord))
-                vector2 = np.subtract(np.array(atom.coord), np.array(metal.coord))                        
-                angle = np.degrees(get_angle(vector1, vector2))
-                if angle < 55 :
-                    if debug >= 1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label, get_dist(atom.coord, metal.coord), "due to the angle", round(angle,2))
-                    atom.reset_mconnec(idx)
+    #    elif len(neighbors_mconnec) == 1 :
+    #        nb_m = neighbors_mconnec[0]
+    #        if debug >=1 : print(f"\t[Check] This coordinating atom {atom.label} connected to another coordinating atom {nb_m.label} to the metal {metal.label}")
 
-        elif round(dist/thres, 3) > 0.95 :
-            if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to the long distance")
-            atom.reset_mconnec(idx)
-        else :
-            if debug >=1 :print(f"\tThere is no neighbor atom connected to the metal {metal.label}")
-            pass
+    #        if (atom.label == "H" and nb_m.label in ["B", "O", "N", "C"]) :
+    #            atom.reset_mconnec(idx, value=0, debug=debug)
+    #            group.remove_atom(idx, debug=debug)
+
+    #            if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label, get_dist(atom.coord, metal.coord), "due to H")
+    #        elif (atom.label in ["B", "O", "N", "C"] and nb_m.label == "H") :
+    #            if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", nb_m.label, get_dist(nb_m.coord, metal.coord), "due to H")
+    #            nb_m.reset_mconnec() # put an index of nb_m in group
+    #        else : # Check angle between metal-coordinating atoms               
+    #            vector1 = np.subtract(np.array(atom.coord), np.array(nb_m.coord))
+    #            vector2 = np.subtract(np.array(atom.coord), np.array(metal.coord))                        
+    #            angle = np.degrees(get_angle(vector1, vector2))
+    #            if angle < 55 :
+    #                if debug >= 1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label, get_dist(atom.coord, metal.coord), "due to the angle", round(angle,2))
+    #                atom.reset_mconnec(idx, value=0, debug=debug)
+    #                group.remove_atom(idx, debug=debug)
+
+    #    elif round(dist/thres, 3) > 0.95 :
+    #        if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to the long distance")
+    #        atom.reset_mconnec(idx, value=0, debug=debug)
+    #        group.remove_atom(idx, debug=debug)
+    #    else :
+    #        if debug >=1 :print(f"\tThere is no neighbor atom connected to the metal {metal.label}")
+    #        pass
     
     return group 
 
@@ -390,12 +400,12 @@ def coordination_correction_for_haptic (group, debug=2) -> list:
         if atom.label == "H" : 
             if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
             print(atom.label)
-            atom.reset_mconnec(idx)
+            atom.reset_mconnec(idx, value=0, debug=debug)
             count += 1          
         elif std_dev > 0.05 and ratio > 0.9 :
             if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to the long distance")
             print(atom.label)
-            atom.reset_mconnec(idx) 
+            atom.reset_mconnec(idx, value=0, debug=debug) 
             count += 1      
         else :
             pass
