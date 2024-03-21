@@ -30,7 +30,7 @@ def cell2mol(newcell: object, reconstruction: bool=True, charge_assignment: bool
         #if not newcell.has_missing_H and not newcell.has_isolated_H and not newcell.is_fragmented:
         tini = time.time()
         if not newcell.is_fragmented:
-            newcell.reset_charges() 
+            # newcell.reset_charges()  # TODO: make reset_charges in the class cell
             newcell.assign_charges(debug=debug)
             newcell.create_bonds(debug=debug)
 

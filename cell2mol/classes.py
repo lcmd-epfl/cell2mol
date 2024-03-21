@@ -4,7 +4,7 @@ from cell2mol.connectivity import get_metal_idxs, split_species, get_radii
 from cell2mol.connectivity import compare_atoms, compare_species, compare_metals
 from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
-from cell2mol.charge_assignment import get_protonation_states, get_possible_cs, get_metal_poscharges
+from cell2mol.charge_assignment import get_protonation_states_specie, get_possible_charge_state, get_metal_poscharges
 from cell2mol.charge_assignment import balance_charge, prepare_unresolved, prepare_mols, correct_smiles_ligand
 from cell2mol.spin import assign_spin_metal, assign_spin_complexes
 from cell2mol.other import extract_from_list, compute_centroid, get_dist, get_angle
@@ -204,15 +204,26 @@ class specie(object):
     ############
     def get_protonation_states(self, debug: int=0):
         # !!! WARNING. FUNCTION defined at the "specie" level, but will only do something for ligands and organic (iscomplex == False) molecules
-        if self.subtype == "group": self.protonation_states = None
-        else:                       self.protonation_states = get_protonation_states(self, debug=debug)
+        if self.subtype == "group": 
+            if not hasattr(self,"is_haptic"): self.get_hapticity()
+            self.protonation_states = None
+        elif self.subtype == "ligand" :
+            # if not hasattr(self,"groups"): self.split_ligand()
+            if not hasattr(self, "is_haptic"): self.get_hapticity()
+            if not hasattr(self, "denticity"): self.get_denticity()
+            self.protonation_states = get_protonation_states_specie(self, debug=debug)
+        else : 
+            if not hasattr(self,"is_haptic"): self.get_hapticity()
+            self.protonation_states = get_protonation_states_specie(self, debug=debug)
         return self.protonation_states
 
     ############
     def get_possible_cs(self, debug: int=0):
-        ## Arranges a list of possible charge_states associated with this species, which is later managed at the cell level to determine the good one
+        ## Arranges a list of possible charge_states associated with this species, 
+        ## which is later managed at the cell level to determine the good one
         if not hasattr(self,"protonation_states"): self.get_protonation_states(debug=debug)
-        if self.protonation_states is not None:    self.possible_cs = get_possible_cs(self, debug=debug)  
+        if debug > 1 : print(self.protonation_states)
+        if self.protonation_states is not None:    self.possible_cs = get_possible_charge_state(self, debug=debug)  
         return self.possible_cs
     
     ############
@@ -507,7 +518,7 @@ class ligand(specie):
         return self.denticity 
 
     #######################################################
-    def split_ligand(self, debug: int=0):
+    def split_ligand(self, debug: int=2):
         # Split the "ligand to obtain the groups
         self.groups = []
         # Identify Connected and Unconnected atoms (to the metal)
@@ -515,29 +526,37 @@ class ligand(specie):
 
         ## Creates the list of variables
         conn_idx     = self.connected_idx
-        if debug > 0: print(f"LIGAND.SPLIT_LIGAND: {self.indices=}")
-        if debug > 0: print(f"LIGAND.SPLIT_LIGAND: {conn_idx=}")
+        # if debug > 0: 
+        print(f"LIGAND.SPLIT_LIGAND: {self.indices=}")
+        # if debug > 0: 
+        print(f"LIGAND.SPLIT_LIGAND: {conn_idx=}")
         conn_labels  = extract_from_list(conn_idx, self.labels, dimension=1)
         conn_coord   = extract_from_list(conn_idx, self.coord, dimension=1)
         conn_radii   = extract_from_list(conn_idx, self.radii, dimension=1)
         conn_atoms   = extract_from_list(conn_idx, self.atoms, dimension=1)
-        if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, cov_factor=self.cov_factor, debug=debug)
-        else:                          blocklist = split_species(conn_labels, conn_coord, debug=debug)      
-        
+        print(f"LIGAND.SPLIT_LIGAND: {conn_labels=}")
+        print(f"LIGAND.SPLIT_LIGAND: {conn_coord=}")
+        print(f"LIGAND.SPLIT_LIGAND: {conn_radii=}")
+        # print(f"LIGAND.SPLIT_LIGAND: {conn_atoms=}")
+        if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=self.cov_factor, debug=debug)
+        else:                          blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, debug=debug)      
+        print(f"blocklist={blocklist}")
         ## Arranges Groups 
         for b in blocklist:
-            if debug > 0: print(f"LIGAND.SPLIT_LIGAND: block={b}")
+            # if debug > 0: 
+            print(f"LIGAND.SPLIT_LIGAND: block={b}")
             gr_indices = extract_from_list(b, conn_idx, dimension=1)
-            if debug > 0: print(f"LIGAND.SPLIT_LIGAND: {gr_indices=}")
-            gr_labels  = extract_from_list(gr_indices, conn_labels, dimension=1)
-            gr_coord   = extract_from_list(gr_indices, conn_coord, dimension=1)
-            gr_radii   = extract_from_list(gr_indices, conn_radii, dimension=1)
-            gr_atoms   = extract_from_list(gr_indices, conn_atoms, dimension=1)
+            # if debug > 0: print(f"LIGAND.SPLIT_LIGAND: {gr_indices=}")
+            gr_labels  = extract_from_list(b, conn_labels, dimension=1)
+            gr_coord   = extract_from_list(b, conn_coord, dimension=1)
+            gr_radii   = extract_from_list(b, conn_radii, dimension=1)
+            gr_atoms   = extract_from_list(b, conn_atoms, dimension=1)
             newgroup = group(gr_labels, gr_coord, parent_indices=gr_indices, radii=gr_radii, parent=self)
             ## For group, we do not update parent. Atoms remain at the ligand level
             newgroup.set_atoms(atomlist=gr_atoms, overwrite_parent=False)
             newgroup.get_closest_metal()
             self.groups.append(newgroup)
+
         return self.groups
 
     #######################################################
@@ -933,6 +952,7 @@ class cell(object):
                 mol.unique_index = kdx
 
             else:
+                if not hasattr(mol,"ligands"): mol.split_complex(debug=debug)
                 for jdx, lig in enumerate(mol.ligands):     # ligands
                     found = False
                     for ldx, typ in enumerate(typelist_ligs):
@@ -1009,13 +1029,13 @@ class cell(object):
                     if debug >= 2: print(f"GETREFS: found ref molecule with only one atom {ref.labels}")
 
         # If all good, then works with the reference molecules
-        #if isgood:
-        #    for ref in self.refmoleclist:
-        #        if ref.iscomplex: 
-        #            ref.get_hapticity(debug=debug)                          ### Former "get_hapticity(ref)" function
-        #            # ref.get_coordination_geometry(debug=debug)                ### Former "get_coordination_Geometry(ref)" function 
-        #            for lig in ref.ligands:
-        #                lig.get_denticity(debug=2)
+        if isgood:
+           for ref in self.refmoleclist:
+               if ref.iscomplex: 
+                   ref.get_hapticity(debug=debug)                          ### Former "get_hapticity(ref)" function
+                   # ref.get_coordination_geometry(debug=debug)                ### Former "get_coordination_Geometry(ref)" function 
+                   for lig in ref.ligands:
+                       lig.get_denticity(debug=2)
 
         if isgood: self.has_isolated_H = False
         else:      self.has_isolated_H = True
@@ -1052,6 +1072,7 @@ class cell(object):
                 if debug > 0: print(f"CELL.MOLECLIST: splitting complex")
                 newmolec.split_complex(debug=debug)
             self.moleclist.append(newmolec)
+
         return self.moleclist
    
     #######################################################
@@ -1085,24 +1106,53 @@ class cell(object):
     #######################################################
     def reconstruct(self, cov_factor: float=None, metal_factor: float=None, debug: int=0):
         if not hasattr(self,"refmoleclist"): print("CELL.RECONSTRUCT. CELL missing list of reference molecules"); return None
-        if not hasattr(self,"moleclist"): self.get_moleclist()
-        blocklist    = self.moleclist.copy() # In principle, in moleclist now there are both fragments and molecules
+        #if not hasattr(self,"moleclist"): self.get_moleclist()
+        # blocklist    = self.moleclist.copy() # In principle, in moleclist now there are both fragments and molecules
+
+        blocklist = self.get_moleclist().copy() # In principle, in blocklist there are both fragments and molecules
+
         if cov_factor is None:   cov_factor   = self.refmoleclist[0].cov_factor
         if metal_factor is None: metal_factor = self.refmoleclist[0].metal_factor
         ## Classifies fragments
         for b in blocklist:
             if not hasattr(b,"frac_coord"):       b.get_fractional_coord(self.cellvec)
+        
         moleclist, fraglist, Hlist = classify_fragments(blocklist, self.refmoleclist, debug=debug)
 
         ## Determines if Reconstruction is necessary
         if len(fraglist) > 0 or len(Hlist) > 0: self.is_fragmented = True
         else:                                   self.is_fragmented = False
+        
+        self.moleclist = []
+        if not self.is_fragmented: 
+            for mol in moleclist:
+                newmolec         = molecule(mol.labels, mol.coord)
+                newmolec.set_fractional_coord(mol.frac_coord)
+                newmolec.set_atoms(debug=debug, create_adjacencies=True)          
+                if newmolec.iscomplex: 
+                    newmolec.split_complex()
+                    newmolec.get_hapticity()
+                self.moleclist.append(newmolec)   
+            return self.moleclist     
+        else :
+            reconstructed_moleclist, Warning = fragments_reconstruct(moleclist, fraglist, Hlist, self.refmoleclist, self.cellvec, cov_factor, metal_factor)
+            
+            if Warning:
+                self.is_fragmented = True
+                self.error_reconstruction = True 
+            else :
+                self.is_fragmented = False
+                self.error_reconstruction = False 
 
-        if not self.is_fragmented: return self.moleclist 
-        self.moleclist, Warning = fragments_reconstruct(moleclist,fraglist,Hlist,self.refmoleclist,self.cellvec,cov_factor,metal_factor)
-        if Warning:      self.is_fragmented = True;  self.error_reconstruction = True 
-        else:            self.is_fragmented = False; self.error_reconstruction = False
-        return self.moleclist
+            for mol in reconstructed_moleclist:
+                newmolec         = molecule(mol.labels, mol.coord)
+                newmolec.set_fractional_coord(mol.frac_coord)
+                newmolec.set_atoms(debug=debug, create_adjacencies=True)          
+                if newmolec.iscomplex: 
+                    newmolec.split_complex()
+                    newmolec.get_hapticity()
+                self.moleclist.append(newmolec)         
+            return self.moleclist
     
     def reset_charge_assignment(self, debug: int=0):
         if not hasattr(self,"moleclist"): return None
@@ -1138,7 +1188,9 @@ class cell(object):
         selected_cs = []
         for idx, spec in enumerate(self.unique_species):
             tmp = spec.get_possible_cs(debug=debug)
-            if tmp is None: self.error_empty_poscharges = True; return None # Empty list of possible charges received. Stopping
+            if tmp is None: 
+                self.error_empty_poscharges = True
+                return None # Empty list of possible charges received. Stopping
             if spec.subtype == "metal":  selected_cs.append([])         ## I don't like to add an empty list
             else:                        selected_cs.append(tmp)
         self.error_empty_poscharges = False
