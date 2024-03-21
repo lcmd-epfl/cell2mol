@@ -30,7 +30,7 @@ if "ipykernel" in sys.modules:
 rdBase.DisableLog("rdApp.*")
 
 #######################################################
-def get_possible_cs(spec: object, debug: int=0): 
+def get_possible_charge_state(spec: object, debug: int=0): 
     if not hasattr(spec,"protonation_states"): spec.get_protonation_states(debug=debug)
     if spec.protonation_states is None:                                             return None
     if spec.subtype == "group" or (spec.subtype == 'molecule' and spec.is_complex): return None
@@ -40,7 +40,7 @@ def get_possible_cs(spec: object, debug: int=0):
     ##############################
     for prot in spec.protonation_states:
         charge_states = []
-        target_charges = get_list_of_charges_to_try(spec, prot)
+        target_charges = get_list_of_charges_to_try(prot)
         if debug >= 2: print(f"    POSCHARGE will try charges {target_charges}") 
 
         for ich in target_charges:
@@ -171,7 +171,7 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
     return good_states
 
 #######################################################
-def get_protonation_states(specie: object, debug: int=0) -> list:
+def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     ##############################
     #### Creates protonation states. That is, geometries in which atoms have been added to the original molecule
     ##############################
@@ -446,7 +446,7 @@ def get_protonation_states(specie: object, debug: int=0) -> list:
         # The block variable makes that more atoms cannot be added to these connected atoms
         for idx, a in enumerate(ligand.atoms):
             if addedlist[idx] != 0 and block[idx] == 0:
-                isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, ligand.molecule.metals, elemlist[idx])
+                isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, ligand.parent.metals, elemlist[idx])
                 if isadded:
                     added_atoms += addedlist[idx]
                     block[idx] = 1  # No more elements will be added to those atoms
@@ -546,7 +546,7 @@ def get_protonation_states(specie: object, debug: int=0) -> list:
                 if debug >= 2:  print(f"        GET_PROTONATION_STATES: Protonation SAVED with {added_atoms} atoms added to ligand. status={new_prot.status}")
             else:
                 if debug >= 2:  print(f"        GET_PROTONATION_STATES: Protonation DISCARDED. Steric Clashes found when adding atoms. status={new_prot.status}")
-                
+    print(f"{protonation_states=}")            
     return protonation_states 
 
 #######################################################
@@ -654,6 +654,7 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
             if a.label == "O" and a.mconnec == 0 and a.connec == 1:
                 count_non_connected_O += 1
         if not spec.is_haptic:
+            if not hasattr(spec,"denticity"):         spec.get_denticity()
             maxcharge = spec.denticity + count_non_connected_O - prot.added_atoms
             if debug >= 2: print(f"MAXCHARGE: maxcharge set at {maxcharge} with {spec.denticity}+{count_non_connected_O}-{prot.added_atoms}")
         else: maxcharge = 2
@@ -664,7 +665,8 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
             if maxcharge > spec.natoms: maxcharge = spec.natoms
         if maxcharge > 4: maxcharge = 4  ## At most, we try range(-4,5,1)
         if maxcharge < 2: maxcharge = 2  ## At leaest, we try range(-2,3,1)
-    if debug >= 2: print(f"MAXCHARGE: maxcharge set at {maxcharge}")
+    # if debug >= 2: 
+    print(f"MAXCHARGE: maxcharge set at {maxcharge}")
     
     # Defines list of charges that will try
     for magn in range(0, int(maxcharge + 1)):
@@ -791,8 +793,7 @@ def balance_charge(unique_indices: list, unique_species: list, debug: int=0) -> 
 
     iserror = False
     iterlist = []
-    for idx, spec_tuple in enumerate(unique_species):
-        spec = spec_tuple[1]
+    for idx, spec in enumerate(unique_species):
         toadd = []
         if len(spec.possible_cs) == 1:
             toadd.append(spec.possible_cs[0])
@@ -1024,8 +1025,9 @@ def correct_smiles_ligand(ligand: object):
 
 #######################################################
 class protonation(object):
-    def __init__(self, labels, cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, tmpsmiles=" ", os=int(0), typ="Local", parent: object=None):
+    def __init__(self, labels, coord, cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, tmpsmiles=" ", os=int(0), typ="Local", parent: object=None):
         self.labels                     = labels
+        self.coords                     = coord
         self.natoms                     = len(labels)
         self.added_atoms                = added_atoms
         self.addedlist                  = addedlist

@@ -175,6 +175,7 @@ def classify_fragments(blocklist: list, refmoleclist: list, debug: int=0):
     if debug > 0: print(len(blocklist),"Blocks sorted as (Molec, Frag, H):",len(moleclist),len(fraglist),len(Hlist))
     return moleclist, fraglist, Hlist
 
+
 #######################################################
 def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmoleclist: list, cellvec: list, factor: float=1.3, metal_factor: float=1.0, debug: int=0):
     ## Moleclist is the list of species which have been identified as 'complete' molecules
@@ -202,6 +203,7 @@ def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmolec
     if len(remfrag) > 0 and len(Hlist) > 0:
         print("FRAG_RECONSTRUCT.", len(fraglist), "molecules submitted to sequential with All")
         finalmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "All", debug)
+        moleclist.extend(finalmols)
         if len(remfrag) > 0: Warning = True;  print("FRAG_RECONSTRUCT. Remaining after Hydrogen reconstruction",remfrag)
         else:                Warning = False; print("FRAG_RECONSTRUCT. No remaining Molecules after Hydrogen reconstruction")
     elif len(remfrag) > 0 and len(Hlist) == 0:
