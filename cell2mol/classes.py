@@ -1191,8 +1191,10 @@ class cell(object):
             if tmp is None: 
                 self.error_empty_poscharges = True
                 return None # Empty list of possible charges received. Stopping
-            if spec.subtype == "metal":  selected_cs.append([])         ## I don't like to add an empty list
-            else:                        selected_cs.append(tmp)
+            if spec.subtype != "metal":
+                selected_cs.append([cs.corr_total_charge for cs in spec.possible_cs])
+            else :
+                selected_cs.append(spec.possible_cs)   
         self.error_empty_poscharges = False
 
         # Finds the charge_state that satisfies that the crystal must be neutral
