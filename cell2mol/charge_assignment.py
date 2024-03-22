@@ -795,14 +795,18 @@ def balance_charge(unique_indices: list, unique_species: list, debug: int=0) -> 
     iterlist = []
     for idx, spec in enumerate(unique_species):
         toadd = []
-        if len(spec.possible_cs) == 1:
-            toadd.append(spec.possible_cs[0])
-        elif len(spec.possible_cs) > 1:
+        if spec.subtype == "metal":
             for tch in spec.possible_cs:
                 toadd.append(tch)
-        elif len(spec.possible_cs) == 0:
-            iserror = True
-            toadd.append("-")
+        else :   
+            if len(spec.possible_cs) == 1:
+                toadd.append(spec.possible_cs[0].corr_total_charge)
+            elif len(spec.possible_cs) > 1:
+                for tch in spec.possible_cs:
+                    toadd.append(tch.corr_total_charge)   
+            elif len(spec.possible_cs) == 0:
+                iserror = True
+                toadd.append("-")
         iterlist.append(toadd)
 
     if debug >= 2: print("BALANCE: iterlist", iterlist)
@@ -823,6 +827,7 @@ def balance_charge(unique_indices: list, unique_species: list, debug: int=0) -> 
 
             final_charge_distribution = []
             for idx, d in enumerate(alldistr):
+                print(f"{d=}")
                 final_charge = np.sum(d)
                 if final_charge == 0:
                     final_charge_distribution.append(d)
