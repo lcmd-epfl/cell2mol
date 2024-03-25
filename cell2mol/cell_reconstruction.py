@@ -252,11 +252,8 @@ def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: fl
     ###################################################
     threshold_tmat = 0.40
     increase_tmat = 0.20
-    fragtoallocate = 0
-    Htoallocate = 0
     niter = 1
     maxiter = 3000
-    mixsize = 1
     lastiter = 0
     lastitermargin = maxiter
     ###################################################
@@ -525,6 +522,7 @@ def merge_fragments(frags: list, refs: list, cellvec: list, cov_factor: float=1.
             if len(blocklist) != 1: continue
             if len(blocklist) == 1: 
                 newmolec = molecule(reclabels, reccoord)
+                newmolec.cell_indices = blocklist[0]
                 newmolec.set_adjacency_parameters(cov_factor, metal_factor)
                 newmolec.set_adj_types()
                 newmolec.set_element_count()

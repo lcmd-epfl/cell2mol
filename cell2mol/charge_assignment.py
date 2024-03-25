@@ -207,6 +207,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
     # Program runs sequentially for each group of the ligand
     for g in ligand.groups:
+        parent_indices = g.get_parent_indices("ligand")
 
         ########################
         # Cases with Hapticity #
@@ -214,14 +215,14 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         if g.is_haptic:
             Selected_Hapticity = False
             if debug >= 2: print("        GET_PROTONATION_STATES: addressing group with hapticity:", g.haptic_type)
-            if debug >= 2: print("        GET_PROTONATION_STATES: and parent indices:", g.parent_indices)
+            if debug >= 2: print("        GET_PROTONATION_STATES: and parent indices:", parent_indices)
 
             if "h5-Cp" in g.haptic_type and not Selected_Hapticity:
                 Selected_Hapticity = True
                 tobeadded = 1
                 tmp_added_atoms = 0
                 for idx, a in enumerate(ligand.atoms):
-                    if idx in g.parent_indices and a.mconnec == 1:
+                    if idx in parent_indices and a.mconnec == 1:
                         if tmp_added_atoms < tobeadded:
                             elemlist[idx] = "H"
                             addedlist[idx] = 1
@@ -233,7 +234,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 tobeadded = 1
                 tmp_added_atoms = 0
                 for idx, a in enumerate(ligand.atoms):
-                    if idx in g.parent_indices and a.mconnec == 1:
+                    if idx in parent_indices and a.mconnec == 1:
                         if tmp_added_atoms < tobeadded:
                             elemlist[idx] = "H"
                             addedlist[idx] = 1
@@ -246,7 +247,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 # Rules change depending on whether the ring is substituted or not 
                 issubstituted = False
                 for idx, a in enumerate(ligand.atoms):
-                    if idx in g.parent_indices and a.mconnec == 1:
+                    if idx in parent_indices and a.mconnec == 1:
                         for jdx in a.adjacency:
                             if ligand.labels[jdx] != "As":
                                 issubstituted = True
@@ -255,7 +256,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
                 tmp_added_atoms = 0
                 for idx, a in enumerate(ligand.atoms):
-                    if idx in g.parent_indices and a.mconnec == 1:
+                    if idx in parent_indices and a.mconnec == 1:
                         if tmp_added_atoms < tobeadded:
                             elemlist[idx] = "H"
                             addedlist[idx] = 1
@@ -269,7 +270,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 # Rules change depending on whether the ring is substituted or not 
                 issubstituted = False
                 for idx, a in enumerate(ligand.atoms):
-                    if idx in g.parent_indices and a.mconnec == 1:
+                    if idx in parent_indices and a.mconnec == 1:
                         for jdx in a.adjacency:
                             if ligand.labels[jdx] != "P":
                                 issubstituted = True
@@ -280,7 +281,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
                 tmp_added_atoms = 0
                 for idx, a in enumerate(ligand.atoms):
-                    if idx in g.parent_indices and a.mconnec == 1:
+                    if idx in parent_indices and a.mconnec == 1:
                         if tmp_added_atoms < tobeadded:
                             elemlist[idx] = "H"
                             addedlist[idx] = 1
@@ -293,7 +294,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 tobeadded = 1
                 tmp_added_atoms = 0
                 for idx, a in enumerate(ligand.atoms):
-                    if idx in g.parent_indices and a.mconnec == 1:
+                    if idx in parent_indices and a.mconnec == 1:
                         if tmp_added_atoms < tobeadded:
                             elemlist[idx] = "H"
                             addedlist[idx] = 1
@@ -306,7 +307,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 Selected_Hapticity = True
                 tobeadded = 0
                 for idx, a in enumerate(ligand.atoms):
-                    if idx in g.parent_indices and a.mconnec == 1:
+                    if idx in parent_indices and a.mconnec == 1:
                         block[idx] = 1
 
             elif ("h2-Benzene" in g.haptic_type or "h2-Butadiene" or "h2-ethylene" in g.haptic_type) and not Selected_Hapticity:
@@ -314,7 +315,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 Selected_Hapticity = True
                 tobeadded = 0
                 for idx, a in enumerate(ligand.atoms):
-                    if idx in g.parent_indices and a.mconnec == 1:
+                    if idx in parent_indices and a.mconnec == 1:
                         block[idx] = 1
 
             elif "h4-Enone" in g.haptic_type and not Selected_Hapticity:
@@ -322,7 +323,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 Selected_Hapticity = True
                 tobeadded = 0
                 for idx, a in enumerate(ligand.atoms):
-                    if idx in g.parent_indices and a.mconnec == 1:
+                    if idx in parent_indices and a.mconnec == 1:
                         block[idx] = 1
 
             # If the group hapticity type is not recognized -or instructions are not defined-, nothing is done
@@ -335,7 +336,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
             # Cases with No Hapticity #
             ###########################
             # An initial attempt to add elements based on the adjacency of the connected atom
-            for idx in g.parent_indices:
+            for idx in parent_indices:
                 a = ligand.atoms[idx]
                 if debug >= 2: print(f"        GET_PROTONATION_STATES: evaluating non-haptic group with index {idx} and label {a.label}")
                 # Simple Ionic Case
@@ -412,7 +413,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
                     else:
-                        iscarbene, tmp_element, tmp_added, tmp_metal = check_carbenes(a, ligand, ligand.parent)
+                        mol = ligand.get_parent("molecule")
+                        iscarbene, tmp_element, tmp_added, tmp_metal = check_carbenes(a, ligand, mol)
                         if debug >= 2: print(f"        GET_PROTONATION_STATES: Evaluating as carbene and {iscarbene}")
                         if iscarbene:
                             # Carbene identified
@@ -446,7 +448,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         # The block variable makes that more atoms cannot be added to these connected atoms
         for idx, a in enumerate(ligand.atoms):
             if addedlist[idx] != 0 and block[idx] == 0:
-                isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, ligand.parent.metals, elemlist[idx])
+                mol = ligand.get_parent("molecule")
+                isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, mol.metals, elemlist[idx])
                 if isadded:
                     added_atoms += addedlist[idx]
                     block[idx] = 1  # No more elements will be added to those atoms
@@ -517,7 +520,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         if com[toallocate] == 1:
                             elemlist[jdx] = "H"
                             addedlist[jdx] = 1
-                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, ligand.parent.metals, elemlist[jdx])
+                            mol = ligand.get_parent("molecule")
+                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx])
                             if isadded:
                                 added_atoms += addedlist[jdx]
                                 if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
@@ -528,7 +532,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         if com == 1:
                             elemlist[jdx] = "H"
                             addedlist[jdx] = 1
-                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, ligand.parent.metals, elemlist[jdx])
+                            mol = ligand.get_parent("molecule")
+                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx])
                             if isadded:
                                 added_atoms += addedlist[jdx]
                                 if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
@@ -730,6 +735,7 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     # Coordination Geometry Table of the D-Block Elements and Their Ions.
     # J. Chem. Educ. 1997, 74, 915.
    
+    mol = metal.get_parent("molecule")
     atnum = elemdatabase.elementnr[metal.label]
 
     at_charge = defaultdict(list)
@@ -773,11 +779,11 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     if metal.label in list_of_zero_OS:
         # In some cases, it adds 0 as possible metal charge
         # -if it has CO ligands
-        if any((lig.natoms == 2 and "C" in lig.labels and "O" in lig.labels) for lig in metal.parent.ligands):
+        if any((lig.natoms == 2 and "C" in lig.labels and "O" in lig.labels) for lig in mol.ligands):
             if int(0) not in poscharges:
                 poscharges.append(int(0))
         # -if it has any ligand with hapticity
-        if any((lig.is_haptic) for lig in metal.parent.ligands):
+        if any((lig.is_haptic) for lig in mol.ligands):
             if int(0) not in poscharges:
                 poscharges.append(int(0))
     
@@ -974,7 +980,8 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                 tmp_smiles = []
                 for lig in mol.ligands:
                     tmp_smiles.append(lig.smiles)
-                    for kdx, a in enumerate(lig.parent_indices):
+                    parent_indices = lig.get_parent_indices("molecule")
+                    for kdx, a in enumerate(parent_indices):
                         tmp_atcharge[a] = lig.atcharge[kdx]
                 for met in mol.metals:
                     tmp_atcharge[met.parent_index] = met.charge

@@ -17,34 +17,81 @@ import pickle
 ####  CLASSES FOR CELL2MOL 2  ####
 ##################################
 class specie(object):
-    def __init__(self, labels: list, coord: list, parent_indices: list=None, radii: list=None, parent: object=None) -> None:
+    def __init__(self, labels: list, coord: list, radii: list=None) -> None:
 
        # Sanity Checks
         assert len(labels) == len(coord)
-        if parent_indices is not None:  assert len(labels) == len(parent_indices)
-        if radii   is not None:         assert len(labels) == len(radii)
 
         # Optional Information
         if radii   is not None: self.radii   = radii
         else:                   self.radii   = get_radii(labels)
-        if parent  is not None: self.parent = parent
-#        if parent  is not None: self.occurence = parent.get_occurrence(self)  ## Commented because it wasn't working well sometimes.
 
-        self.type      = "specie"
-        self.version   = "0.1"
-        self.labels    = labels
-        self.coord     = coord
-        self.formula   = labels2formula(labels)
-        self.eleccount = labels2electrons(labels)   ### Assuming neutral specie (so basically this is the sum of atomic numbers)
-        self.natoms    = len(labels)
-        self.iscomplex = any((elemdatabase.elementblock[l] == "d") or (elemdatabase.elementblock[l] == "f") for l in self.labels)
+        self.type              = "specie"
+        self.version           = "0.1"
+        self.labels            = labels
+        self.coord             = coord
+        self.formula           = labels2formula(labels)
+        self.eleccount         = labels2electrons(labels)   ### Assuming neutral specie (so basically this is the sum of atomic numbers)
+        self.natoms            = len(labels)
+        self.iscomplex         = any((elemdatabase.elementblock[l] == "d") or (elemdatabase.elementblock[l] == "f") for l in self.labels)
+        self.parents           = []
+        self.parents_indices   = []
+        self.cov_factor        = 1.3
+        self.metal_factor      = 1.0
+        self.indices           = [*range(0,self.natoms,1)]  ## Indices might be the atom ordering within a given specie. e.g. 1st, 2nd, 3rd atom of a specie.
 
-        if parent_indices is not None: self.parent_indices = parent_indices                     ## Species are often created from the parent object. Ligands are created from molecules.
-        else:                          self.parent_indices = [*range(0,self.natoms,1)]          ## Indices might refer to those of the parent object. e.g. atoms 3, 4, 10 of parent molecule make one ligand
-        self.indices   = [*range(0,self.natoms,1)]                                              ## Or, indices might be the atom ordering within a given specie. e.g. 1st, 2nd, 3rd atom of a specie.
+    ############
+    def add_parent(self, parent: object, indices: list, overwrite: bool=True):
+        ## associates a parent specie to self. The atom indices of self in parent are given in "indices"
+        ## if parent of the same subtype already in self.parent then it is overwritten
+        ## this is to avoid having a substructure (e.g. a ligand) in more than one superstructure (e.g. a molecule) 
 
-        self.cov_factor   = 1.3
-        self.metal_factor = 1.0
+        # 1st-evaluates parent
+        append = True
+        for idx, p in enumerate(self.parents):
+            if p.subtype == parent.subtype:
+                if overwrite: 
+                    self.parents[idx]         = parent
+                    self.parents_indices[idx] = indices
+                append = False
+        if append: 
+            self.parents.append(parent)
+            self.parents_indices.append(indices)
+
+        # 2nd-evaluates parents of parent
+        if hasattr(parent,"parents"):
+            for jdx, p2 in enumerate(parent.parents):
+                append = True
+                for idx, p in enumerate(self.parents):
+                    if p.subtype == p2.subtype:
+                        if overwrite: 
+                            self.parents[idx]         = p2
+                            self.parents_indices[idx] = parent.get_parent_indices(p2.subtype)
+                        append = False
+                if append: 
+                    self.parents.append(p2)
+                    self.parents_indices.append(parent.get_parent_indices(p2.subtype))
+
+    ############
+    def check_parent(self, subtype: str):
+        ## checks if parent of a given subtype exists
+        for p in self.parents:
+            if p.subtype == subtype: return True
+        return False
+
+    ############
+    def get_parent(self, subtype: str):
+        ## retrieves parent of a given subtype 
+        for p in self.parents:
+            if p.subtype == subtype: return p
+        return None
+
+    ############
+    def get_parent_indices(self, subtype: str):
+        ## retrieves parent of a given subtype 
+        for idx, p in enumerate(self.parents):
+            if p.subtype == subtype: return self.parents_indices[idx]
+        return None
 
     ############
     def get_centroid(self):
@@ -61,8 +108,9 @@ class specie(object):
     ############
     def get_fractional_coord(self, cell_vector=None, debug: int=0) -> None:
         if cell_vector is None:
-            if hasattr(self,"parent"):
-                if hasattr(self.parent,"cellvec"): cell_vector = self.parent.cellvec.copy()
+            if self.check_parent("cell"):
+                cell = self.get_parent("cell")
+                if hasattr(cell,"cellvec"): cell_vector = cell.cellvec.copy()
             else:     print("SPECIE.GET_FRACTIONAL_COORD: get_fractional coordinates. Missing cell vector. Please provide it"); return None
         if debug > 1: print(f"SPECIE.GET_FRACTIONAL_COORD: Using cell_vector:{cell_vector}")
         self.frac_coord = cart2frac(self.coord, cell_vector)
@@ -119,14 +167,13 @@ class specie(object):
         if rdkit_obj is not None:   self.rdkit_obj = rdkit_obj
 
     ############
-    def set_atoms(self, atomlist=None, overwrite_parent: bool=False, create_adjacencies: bool=False, debug: int=0):
+    def set_atoms(self, atomlist=None, create_adjacencies: bool=False, debug: int=0):
         ## If the atom objects already exist, and you want to set them in self from a different specie
         if atomlist is not None: 
             if debug > 0: print(f"SPECIE.SET_ATOMS: received {atomlist=}")
             self.atoms = atomlist.copy()
-            if overwrite_parent: 
-                for at in self.atoms:
-                    setattr(at,"parent",self) #at.parent = self
+            for idx, at in enumerate(self.atoms):
+                at.add_parent(self, index=idx)
 
         ## If not, that is, if the atom objects must be created from scratch....
         else: 
@@ -136,9 +183,10 @@ class specie(object):
                 ## For each l in labels, create an atom class object.
                 ismetal = elemdatabase.elementblock[l] == "d" or elemdatabase.elementblock[l] == "f"
                 if debug > 0: print(f"SPECIE.SET_ATOMS: {ismetal=}")
-                if ismetal: newatom = metal(l, self.coord[idx], parent_index=idx, radii=self.radii[idx], parent=self)
-                else:       newatom = atom(l, self.coord[idx], parent_index=idx, radii=self.radii[idx], parent=self)
-                if debug > 0: print(f"SPECIE.SET_ATOMS: added atom to specie: \n{newatom}")
+                if ismetal: newatom = metal(l, self.coord[idx], radii=self.radii[idx])
+                else:       newatom = atom(l, self.coord[idx], radii=self.radii[idx])
+                if debug > 0: print(f"SPECIE.SET_ATOMS: added atom to specie: {self.formula}")
+                newatom.add_parent(self,index=idx)
                 self.atoms.append(newatom)
         
         if create_adjacencies:
@@ -298,9 +346,9 @@ class specie(object):
 ### MOLECULE ##
 ###############
 class molecule(specie):
-    def __init__(self, labels: list, coord: list, parent_indices: list=None, radii: list=None, parent: object=None) -> None:
+    def __init__(self, labels: list, coord: list, radii: list=None) -> None:
         self.subtype = "molecule"
-        specie.__init__(self, labels, coord, parent_indices, radii, parent)
+        specie.__init__(self, labels, coord, radii)
 
     def __repr__(self):
         to_print = ""
@@ -328,7 +376,7 @@ class molecule(specie):
                 met.reset_charge()
 
     ############
-    def split_complex(self, debug: int=0):
+    def split_complex(self, debug: int=2):
         if not hasattr(self,"atoms"): self.set_atoms()
         if not self.iscomplex:        self.ligands = None; self.metals = None
         else: 
@@ -338,7 +386,6 @@ class molecule(specie):
             metal_idx = list([self.indices[idx] for idx in get_metal_idxs(self.labels, debug=debug)])
             rest_idx  = list(idx for idx in self.indices if idx not in metal_idx) 
             if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: labels={self.labels}")
-            if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: parent_indices={self.parent_indices}")
             if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: metal_idx={metal_idx}")
             if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: rest_idx={rest_idx}")
 
@@ -355,12 +402,10 @@ class molecule(specie):
                 print(f"SPLIT COMPLEX: rest radii: {rest_radii}")
 
             if hasattr(self,"frac_coord"): rest_frac = extract_from_list(rest_idx, self.frac_coord, dimension=1)
-            if debug > 0: print(f"SPLIT COMPLEX: rest labels: {rest_labels}")
             if debug > 0: print(f"SPLIT COMPLEX: splitting species with {len(rest_labels)} atoms in block")
             if hasattr(self,"cov_factor"): blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)
             else:                          blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)      
-            # if hasattr(self,"cov_factor"): blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, indices=rest_indices, cov_factor=self.cov_factor, debug=debug)
-            # else:                          blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, indices=rest_indices, debug=debug)
+            if debug > 0: print(f"SPLIT COMPLEX: received {len(blocklist)} blocks")
             
             ## Arranges Ligands
             for b in blocklist:
@@ -371,19 +416,23 @@ class molecule(specie):
                 lig_radii   = extract_from_list(b, rest_radii, dimension=1) 
                 lig_atoms   = extract_from_list(b, rest_atoms, dimension=1) 
                 if debug > 0: print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
-                if debug > 0: print(f"CREATING LIGAND with atoms: {lig_atoms}")
-                newligand   = ligand(lig_labels, lig_coord, parent_indices=lig_indices, radii=lig_radii, parent=self)
-                # We pass the molecule atoms to the ligand, and create an intermediate parent (ligand) 
-                newligand.set_atoms(atomlist=lig_atoms, overwrite_parent=True)
+                # Create Ligand Object
+                newligand   = ligand(lig_labels, lig_coord, radii=lig_radii)
+                # Define the molecule as parent of the ligand. Bottom-Up hierarchy
+                newligand.add_parent(self, indices=lig_indices)
+                # Pass the molecule atoms to the ligand
+                newligand.set_atoms(atomlist=lig_atoms)
                 # If fractional coordinates are available...
                 if hasattr(self,"frac_coord"): 
                     lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
                     newligand.set_fractional_coord(lig_frac_coord)
+                # Add ligand to the list. Top-Down hierarchy
                 self.ligands.append(newligand)
 
             ## Arranges Metals
             for m in metal_idx:
-                newmetal    = metal(self.labels[m], self.coord[m], self.indices[m], self.radii[m], parent=self)
+                newmetal    = metal(self.labels[m], self.coord[m], self.radii[m])
+                newmetal.add_parent(self, index=self.indices[m])
                 self.metals.append(newmetal)                            
         return self.ligands, self.metals
 
@@ -399,13 +448,21 @@ class molecule(specie):
                     if entry not in self.haptic_type: self.haptic_type.append(entry)
         return self.haptic_type
 
+    #######################################################
+    def correct_smiles(self):
+        if not hasattr(self,"smiles"): self.smiles = []
+        if not self.iscomplex: return self.smiles
+        for lig in self.ligands:
+            lig.smiles, lig.rdkit_mol = correct_smiles_ligand(lig)
+            self.smiles.append(lig.smiles)
+
 ###############
 ### LIGAND ####
 ###############
 class ligand(specie):
-    def __init__(self, labels: list, coord: list, parent_indices: list=None, radii: list=None, parent: object=None) -> None:
+    def __init__(self, labels: list, coord: list, radii: list=None) -> None:
         self.subtype  = "ligand"
-        specie.__init__(self, labels, coord, parent_indices, radii, parent)
+        specie.__init__(self, labels, coord, radii)
         self.evaluate_as_nitrosyl()
         
     #######################################################
@@ -418,17 +475,12 @@ class ligand(specie):
         return to_print
 
     #######################################################
-    def correction_smiles(self):
-        if not hasattr(self.parent,"smiles"): self.parent.smiles = []
-        self.smiles, self.rdkit_mol = correct_smiles_ligand(self)
-        self.parent.smiles.append(self.smiles)
-
-    #######################################################
     def get_connected_metals(self, debug: int=0):
         # metal.groups will be used for the calculation of the relative metal radius 
         # and define the coordination geometry of the metal /hapicitiy/ hapttype    
         self.metals = []
-        for met in self.parent.metals:
+        mol = self.get_parent("molecule")
+        for met in mol.metals:
             tmplabels = self.labels.copy()
             tmpcoord  = self.coord.copy()
             tmplabels.append(met.label)
@@ -485,12 +537,14 @@ class ligand(specie):
                 if con > 0: self.connected_idx.append(self.indices[idx]) 
         else:
             ## Remember madjmat should not be computed at the ligand level. Since the metal is not there.
-            ## This is why we compute it at the parent (molecule) level 
-            if not hasattr(self.parent,"madjnum"): self.parent.get_metal_adjmatrix()
-            self.madjmat = extract_from_list(self.parent_indices, self.parent.madjmat, dimension=2)    ## Here we use parent_indices because we're operating with a molecule variable (madjmat and madjnum)
-            self.madjnum = extract_from_list(self.parent_indices, self.parent.madjnum, dimension=1)
+            ## Now we operate at the molecular level. We get the parent molecule, and the indices of the ligand atoms in the molecule
+            mol     = self.get_parent("molecule")
+            indices = self.get_parent_indices("molecule")
+            if not hasattr(mol,"madjnum"): mol.get_metal_adjmatrix()
+            self.madjmat = extract_from_list(indices, mol.madjmat, dimension=2)
+            self.madjnum = extract_from_list(indices, mol.madjnum, dimension=1)
             for idx, con in enumerate(self.madjnum):
-                if con > 0: self.connected_idx.append(self.indices[idx]) 
+                if con > 0: self.connected_idx.append(idx)
         return self.connected_idx 
 
     #######################################################
@@ -551,12 +605,15 @@ class ligand(specie):
             gr_coord   = extract_from_list(b, conn_coord, dimension=1)
             gr_radii   = extract_from_list(b, conn_radii, dimension=1)
             gr_atoms   = extract_from_list(b, conn_atoms, dimension=1)
-            newgroup = group(gr_labels, gr_coord, parent_indices=gr_indices, radii=gr_radii, parent=self)
-            ## For group, we do not update parent. Atoms remain at the ligand level
-            newgroup.set_atoms(atomlist=gr_atoms, overwrite_parent=False)
+            # Create Group Object
+            newgroup = group(gr_labels, gr_coord, radii=gr_radii)
+            # Define the ligand as parent of the group. Bottom-Up hierarchy
+            newgroup.add_parent(self, indices=gr_indices)
+            # Pass the ligand atoms to the groud
+            newgroup.set_atoms(atomlist=gr_atoms)
             newgroup.get_closest_metal()
+            # Top-down hierarchy
             self.groups.append(newgroup)
-
         return self.groups
 
     #######################################################
@@ -575,9 +632,9 @@ class ligand(specie):
 #### GROUP ####
 ###############
 class group(specie):
-    def __init__(self, labels: list, coord: list, parent_indices: list=None, radii: list=None, parent: object=None) -> None:
+    def __init__(self, labels: list, coord: list, radii: list=None) -> None:
         self.subtype = "group"
-        specie.__init__(self, labels, coord, parent_indices, radii, parent)
+        specie.__init__(self, labels, coord, radii)
 
     #######################################################
     def __repr__(self):
@@ -595,29 +652,31 @@ class group(specie):
         self.atoms.pop(index)
         self.labels.pop(index)
         self.coord.pop(index)
-        self.parent_indices.pop(index)
-        self.indices.pop(index)
         self.radii.pop(index)
         self.formula   = labels2formula(self.labels)
         self.eleccount = labels2electrons(self.labels)   ### Assuming neutral specie (so basically this is the sum of atomic numbers)
         self.natoms    = len(self.labels)
         self.iscomplex = any((elemdatabase.elementblock[l] == "d") or (elemdatabase.elementblock[l] == "f") for l in self.labels)
-        if hasattr(self,"closest_metal"): self.get_closest_metal()
-        if hasattr(self,"is_haptic"):     self.get_hapticity()
-        if hasattr(self,"centroid"):      self.get_centroid()
-        if hasattr(self,"frac_coord"):    self.frac_coord.pop(index)
-        if hasattr(self,"adjmat"):        self.get_adjmatrix()
-        if hasattr(self,"madjmat"):       self.get_metal_adjmatrix()
+        print("group after removing atom")
+        print(self)
+        if self.natoms > 0:
+            if hasattr(self,"closest_metal"): self.get_closest_metal()
+            if hasattr(self,"is_haptic"):     self.get_hapticity()
+            if hasattr(self,"centroid"):      self.get_centroid()
+            if hasattr(self,"frac_coord"):    self.frac_coord.pop(index)
+            if hasattr(self,"adjmat"):        self.get_adjmatrix()
+            if hasattr(self,"madjmat"):       self.get_metal_adjmatrix()
 
     #######################################################
     def get_closest_metal(self, debug: int=0):
         apos = compute_centroid(np.array(self.coord))
         dist = []
-        for met in self.parent.parent.metals:
+        mol  = self.get_parent("molecule")
+        for met in mol.metals:
             bpos = np.array(met.coord)
             dist.append(np.linalg.norm(apos - bpos))
         # finds the closest Metal Atom (tgt)
-        self.closest_metal = self.parent.parent.metals[np.argmin(dist)]
+        self.closest_metal = mol.metals[np.argmin(dist)]
         return self.closest_metal
     
     #######################################################
@@ -678,8 +737,10 @@ class bond(object):
         to_print += f'------------- Cell2mol BOND Object --------------\n'
         to_print += f' Version               = {self.version}\n'
         to_print += f' Type                  = {self.type}\n'
-        to_print += f' Atom 1                = {self.atom1.parent_index}\n'
-        to_print += f' Atom 2                = {self.atom2.parent_index}\n'
+        idx1 = self.atom1.get_parent_index("molecule")
+        idx2 = self.atom2.get_parent_index("molecule")
+        to_print += f' Molecule Atom 1       = {idx1}\n'
+        to_print += f' Molecule Atom 2       = {idx2}\n'
         to_print += f' Bond Order            = {self.order}\n'
         to_print += '----------------------------------------------------\n'
         return to_print
@@ -688,20 +749,56 @@ class bond(object):
 ### ATOM ######
 ###############
 class atom(object):
-    def __init__(self, label: str, coord: list, parent_index: int=None, radii: float=None, parent: object=None, frac_coord: list=None) -> None:
-        self.type          = "atom"
-        self.version       = "0.1"
-        self.label         = label
-        self.coord         = coord
-        self.atnum         = elemdatabase.elementnr[label]
-        self.block         = elemdatabase.elementblock[label]
+    def __init__(self, label: str, coord: list, radii: float=None, frac_coord: list=None) -> None:
+        self.type            = "atom"
+        self.version         = "0.1"
+        self.label           = label
+        self.coord           = coord
+        self.atnum           = elemdatabase.elementnr[label]
+        self.block           = elemdatabase.elementblock[label]
+        self.parents         = []
+        self.parents_index   = []
 
-        if parent_index is not None:      self.parent_index = parent_index
-        if radii is None:          self.radii = get_radii(label)
-        else:                      self.radii = radii
-        if parent is not None:     self.parent  = parent
-        if parent is not None:     self.occurence = parent.get_occurrence(self)
-        if frac_coord is not None: self.frac_coord = frac_coord
+        if radii is None:                 self.radii = get_radii(label)
+        else:                             self.radii = radii
+        if frac_coord is not None:        self.frac_coord = frac_coord
+
+        ############
+    def add_parent(self, parent: object, index: int, overwrite: bool=True):
+        ## associates a parent specie to self. The atom indices of self in parent are given in "indices"
+        ## if parent of the same subtype already in self.parent then it is overwritten
+        ## this is to avoid having a substructure (e.g. a ligand) in more than one superstructure (e.g. a molecule) 
+        append = True
+        for idx, p in enumerate(self.parents):
+            if p.subtype == parent.subtype:
+                if overwrite: 
+                    self.parents[idx]         = parent
+                    self.parents_index[idx]   = index
+                append = False
+        if append: 
+            self.parents.append(parent)
+            self.parents_index.append(index)
+
+    ############
+    def check_parent(self, subtype: str):
+        ## checks if parent of a given subtype exists
+        for p in self.parents:
+            if p.subtype == subtype: return True
+        return False
+
+    ############
+    def get_parent(self, subtype: str):
+        ## retrieves parent of a given subtype 
+        for p in self.parents:
+            if p.subtype == subtype: return p
+        return None
+
+    ############
+    def get_parent_index(self, subtype: str):
+        ## retrieves parent of a given subtype 
+        for idx, p in enumerate(self.parents):
+            if p.subtype == subtype: return self.parents_index[idx]
+        return None
 
     #######################################################
     def check_connectivity(self, other: object, debug: int=0):
@@ -770,10 +867,11 @@ class atom(object):
         ## Here, the list of metal atoms must be provided
         apos = self.coord
         dist = []
-        for met in self.parent.parent.metals:
+        mol = self.get_parent("molecule")
+        for met in mol.metals:
             bpos = np.array(met.coord)
             dist.append(np.linalg.norm(apos - bpos))
-        self.closest_metal = self.parent.parent.metals[np.argmin(dist)]
+        self.closest_metal = mol.metals[np.argmin(dist)]
         return self.closest_metal
 
     #######################################################
@@ -787,10 +885,13 @@ class atom(object):
         if not indirect: to_print += f'------------- Cell2mol ATOM Object ----------------\n'
         to_print += f' Version                      = {self.version}\n'
         to_print += f' Type                         = {self.type}\n'
-        if hasattr(self,'subtype'): to_print += f' Sub-Type                    = {self.subtype}\n'
+        if hasattr(self,'subtype'): to_print += f' Sub-Type                     = {self.subtype}\n'
         to_print += f' Label                        = {self.label}\n'
         to_print += f' Atomic Number                = {self.atnum}\n'
-        to_print += f' Index in Parent ({self.parent.subtype})     = {self.parent_index}\n'
+        idx = self.get_parent_index("molecule") 
+        if idx is not None: to_print += f' Index in Molecule            = {idx}\n'
+        idx = self.get_parent_index("ligand") 
+        if idx is not None: to_print += f' Index in Ligand              = {idx}\n'
         if hasattr(self,"occurrence"): to_print += f' Occurrence in Parent         = {self.occurrence}\n'
         if hasattr(self,"mconnec"):    to_print += f' Metal Adjacency (mconnec)    = {self.mconnec}\n'
         if hasattr(self,"connec"):     to_print += f' Regular Adjacencies (connec) = {self.mconnec}\n'
@@ -799,30 +900,36 @@ class atom(object):
         return to_print
     
     #######################################################
-    def reset_mconnec(self, index: int, value: int=0, debug: int=0):
+    def reset_mconnec(self, value: int=0, debug: int=0):
         ## Careful. In group.atoms, the parent_index is that of the molecule
-        if debug > 0: print(f"ATOM.RESET_MCONN: resetting mconnec for atom {self.label=} with {self.parent_index=}") 
+        if debug > 0: print(f"ATOM.RESET_MCONN: resetting mconnec for atom {self.label=}")
         self.mconnec = value                                                                             # Corrects data of atom object in self
-        if hasattr(self,"parent"):   ## Normally, ligand level
+        exists = self.check_parent("ligand")
+        if exists:
+            lig     = self.get_parent("ligand")
+            lig_idx = self.get_parent_index("ligand")
             if debug > 0: print(f"ATOM.RESET_MCONN: updating ligand atoms and madjnum")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {self.parent.madjnum=}") 
-            self.parent.atoms[index].mconnec = value                                    # Corrects data of atom object in ligand class
-            self.parent.madjnum[index] = value                                          # Corrects data in metal_adjacency number of the ligand class
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {self.parent.madjnum=}") 
-            if self.parent.subtype == "ligand": self.parent.get_connected_idx(debug=debug)
-            if self.parent.subtype == "ligand": self.parent.get_connected_atoms(debug=debug)
-            if hasattr(self.parent,"parent"):
-                if debug > 0: print(f"ATOM.RESET_MCONN: updating molecule atoms and madjnum")
-                self.parent.parent.atoms[self.parent.parent_indices[index]] = value   # Corrects data of atom object in molecule class
-                self.parent.parent.madjnum[self.parent.parent_indices[index]] = value # Corrects data in metal_adjacency number of the molecule class
+            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.madjnum=}") 
+            lig.atoms[lig_idx].mconnec = value                                    # Corrects data of atom object in ligand class
+            lig.madjnum[lig_idx] = value                                          # Corrects data in metal_adjacency number of the ligand class
+            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.madjnum=}") 
+            lig.get_connected_idx(debug=debug)
+            lig.get_connected_atoms(debug=debug)
+        exists = self.check_parent("molecule")
+        if exists:
+            mol     = self.get_parent("molecule")
+            mol_idx = self.get_parent_index("molecule")
+            if debug > 0: print(f"ATOM.RESET_MCONN: updating molecule atoms and madjnum")
+            mol.atoms[mol_idx]   = value # Corrects data of atom object in molecule class
+            mol.madjnum[mol_idx] = value # Corrects data in metal_adjacency number of the molecule class
 
 ###############
 #### METAL ####
 ###############
 class metal(atom):
-    def __init__(self, label: str, coord: list, parent_index: int=None, radii: float=None, parent: object=None, frac_coord: list=None) -> None:
-        self.subtype      = "metal"
-        atom.__init__(self, label, coord, parent_index=parent_index, radii=radii, parent=parent, frac_coord=frac_coord)
+    def __init__(self, label: str, coord: list, radii: float=None, frac_coord: list=None) -> None:
+        self.subtype = "metal"
+        atom.__init__(self, label, coord, radii=radii, frac_coord=frac_coord)
 
     #######################################################
     def get_valence_elec (self, m_ox: int):
@@ -834,29 +941,32 @@ class metal(atom):
 
     #######################################################
     def get_coord_sphere(self):
-        if not hasattr(self,"parent"): return None
-        if not hasattr(self.parent,"adjmat"): self.parent.get_adjmatrix()
-        adjmat = self.parent.adjmat.copy()
+        if not self.check_parent("molecule"): return None
+        mol = self.get_parent("molecule")
+        pidx = self.get_parent_index("molecule")
+        if not hasattr(mol,"adjmat"): mol.get_adjmatrix()
+        adjmat = mol.adjmat.copy()
         
         ## Cordination sphere defined as a collection of atoms
         self.coord_sphere = []
-        for idx, at in enumerate(adjmat[self.parent_index]):
-            if at >= 1: self.coord_sphere.append(self.parent.atoms[idx])
+        for idx, at in enumerate(adjmat[pidx]):
+            if at >= 1: self.coord_sphere.append(mol.atoms[idx])
         return self.coord_sphere
 
     #######################################################
     def get_coord_sphere_formula(self):
         if not hasattr(self,"coord_sphere"): self.get_coord_sphere()
-        self.coord_sphere_formula = labels2formula([(at.label for at in self.coord_sphere)])
+        self.coord_sphere_formula = labels2formula(list([at.label for at in self.coord_sphere])) 
         return self.coord_sphere_formula 
 
     #######################################################
     def get_connected_groups(self, debug: int=0):
         # metal.groups will be used for the calculation of the relative metal radius 
         # and define the coordination geometry of the metal /hapicitiy/ hapttype    
-        if not hasattr(self,"parent"): return None
+        if not self.check_parent("molecule"): return None
+        mol = self.get_parent("molecule")
         self.groups = []
-        for group in self.parent.ligand.groups:
+        for group in mol.ligand.groups:
             tmplabels = self.label.copy()
             tmpcoord  = self.coord.copy()
             tmplabels.append(group.labels)
@@ -903,6 +1013,7 @@ class metal(atom):
         to_print = ""
         to_print += f'------------- Cell2mol METAL Object --------------\n'
         to_print += atom.__repr__(self, indirect=True)
+        if hasattr(self,"coord_sphere_formula"): to_print += f' Coordination Sphere Formula  = {self.coord_sphere_formula}\n'
         to_print += '----------------------------------------------------\n'
         return to_print
 
@@ -913,6 +1024,7 @@ class cell(object):
     def __init__(self, name: str, labels: list, pos: list, cellvec: list, cellparam: list) -> None:
         self.version    = "0.1"
         self.type       = "cell"
+        self.subtype    = "cell"
         self.name       = name
         self.labels     = labels 
         self.coord      = pos
@@ -939,7 +1051,7 @@ class cell(object):
             if not mol.iscomplex:
                 found = False
                 for ldx, typ in enumerate(typelist_mols):   # Molecules
-                    issame = compare_species(mol, typ[0], debug=1)
+                    issame = compare_species(mol, typ[0], debug=debug)
                     if issame :
                         found = True ; kdx = typ[1]
                         if debug >= 2: print(f"Molecule {idx} is the same with {ldx} in typelist")
@@ -956,7 +1068,7 @@ class cell(object):
                 for jdx, lig in enumerate(mol.ligands):     # ligands
                     found = False
                     for ldx, typ in enumerate(typelist_ligs):
-                        issame = compare_species(lig, typ[0], debug=1)
+                        issame = compare_species(lig, typ[0], debug=debug)
                         if issame :
                             found = True ; kdx = typ[1]
                             if debug >= 2: print(f"ligand {jdx} is the same with {ldx} in typelist")
@@ -964,14 +1076,14 @@ class cell(object):
                         specs_found += 1 ; kdx = specs_found
                         typelist_ligs.append(list([lig, kdx]))
                         self.unique_species.append(lig)
-                        if debug >= 2: print(f"New ligand found with: formula {lig.formula} and denticity={lig.denticity}, and added in position {kdx}")
+                        if debug >= 2: print(f"New ligand found with: formula {lig.formula} added in position {kdx}")
                     self.unique_indices.append(kdx)
                     lig.unique_index = kdx
 
                 for jdx, met in enumerate(mol.metals):      #  metals
                     found = False
                     for ldx, typ in enumerate(typelist_mets):
-                        issame = compare_metals(met, typ[0], debug=1)
+                        issame = compare_metals(met, typ[0], debug=debug)
                         if issame :
                             found = True ; kdx = typ[1]
                             if debug >= 2: print(f"Metal {jdx} is the same with {ldx} in typelist")
@@ -1011,8 +1123,9 @@ class cell(object):
             mol_coord        = extract_from_list(b, ref_pos, dimension=1)
             mol_frac_coord   = extract_from_list(b, self.frac_coord, dimension=1)
             newmolec         = molecule(mol_labels, mol_coord)
+            newmolec.add_parent(self, indices=b)
             newmolec.set_fractional_coord(mol_frac_coord)
-            newmolec.set_atoms(debug=debug, create_adjacencies=True)
+            newmolec.set_atoms(create_adjacencies=True, debug=debug)
             # This must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex: newmolec.split_complex()
             self.refmoleclist.append(newmolec)
@@ -1060,13 +1173,15 @@ class cell(object):
             if debug > 0: print(f"CELL.MOLECLIST: doing block={b}")
             mol_labels  = extract_from_list(b, self.labels, dimension=1)
             mol_coord   = extract_from_list(b, self.coord, dimension=1)
-            newmolec    = molecule(mol_labels, mol_coord, b, parent=self)
+            newmolec    = molecule(mol_labels, mol_coord)
+            # Adds cell as parent of the molecule, with indices b
+            newmolec.add_parent(self, indices=b)
             # If fractional coordinates are available...
             if hasattr(self,"frac_coord"): 
                 assert len(self.frac_coord) == len(self.coord)
                 mol_frac_coord  = extract_from_list(b, self.frac_coord, dimension=1)
                 newmolec.set_fractional_coord(mol_frac_coord, debug=debug)
-                newmolec.set_atoms(debug=debug, create_adjacencies=True)
+                newmolec.set_atoms(create_adjacencies=True, debug=debug)
             # This must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex: 
                 if debug > 0: print(f"CELL.MOLECLIST: splitting complex")
@@ -1081,7 +1196,8 @@ class cell(object):
         ## Do do so, it uses the variable parent_indices stored in each molecule
         self.coord = np.zeros((self.natoms,3))
         for mol in self.moleclist:
-            for z in zip(mol.parent_indices, mol.coord):
+            idx = mol.get_parent_indices("cell")
+            for z in zip(idx, mol.coord):
                 for i in range(0,3):
                     self.coord[z[0]][i] = z[1][i]
         self.coord = np.ndarray.tolist(self.coord)
@@ -1106,36 +1222,38 @@ class cell(object):
     #######################################################
     def reconstruct(self, cov_factor: float=None, metal_factor: float=None, debug: int=0):
         if not hasattr(self,"refmoleclist"): print("CELL.RECONSTRUCT. CELL missing list of reference molecules"); return None
-        #if not hasattr(self,"moleclist"): self.get_moleclist()
-        # blocklist    = self.moleclist.copy() # In principle, in moleclist now there are both fragments and molecules
-
-        blocklist = self.get_moleclist().copy() # In principle, in blocklist there are both fragments and molecules
-
         if cov_factor is None:   cov_factor   = self.refmoleclist[0].cov_factor
         if metal_factor is None: metal_factor = self.refmoleclist[0].metal_factor
+
+        ## Get the fragments, which is the moleclist of a fragmented cell
+        fragments = self.get_moleclist().copy() 
         ## Classifies fragments
-        for b in blocklist:
-            if not hasattr(b,"frac_coord"):       b.get_fractional_coord(self.cellvec)
-        
-        moleclist, fraglist, Hlist = classify_fragments(blocklist, self.refmoleclist, debug=debug)
+        for f in fragments:
+            if not hasattr(f,"frac_coord"):       f.get_fractional_coord(self.cellvec)
+        molecules, fragments, hydrogens = classify_fragments(fragments, self.refmoleclist, debug=debug)
 
         ## Determines if Reconstruction is necessary
-        if len(fraglist) > 0 or len(Hlist) > 0: self.is_fragmented = True
-        else:                                   self.is_fragmented = False
+        if len(fragments) > 0 or len(hydrogens) > 0: self.is_fragmented = True
+        else:                                        self.is_fragmented = False
         
         self.moleclist = []
         if not self.is_fragmented: 
-            for mol in moleclist:
-                newmolec         = molecule(mol.labels, mol.coord)
-                newmolec.set_fractional_coord(mol.frac_coord)
-                newmolec.set_atoms(debug=debug, create_adjacencies=True)          
-                if newmolec.iscomplex: 
-                    newmolec.split_complex()
-                    newmolec.get_hapticity()
-                self.moleclist.append(newmolec)   
+            for mol in molecules:
+                self.moleclist.append(mol)
+                #########################################
+                ## In principle, this is not necessary ##
+                #########################################
+                #newmolec = molecule(mol.labels, mol.coord)
+                #newmolec.add_parent(self,mol_indices)
+                #newmolec.set_fractional_coord(mol.frac_coord)
+                #newmolec.set_atoms(debug=debug, create_adjacencies=True)          
+                #if newmolec.iscomplex: 
+                #    newmolec.split_complex()
+                #    newmolec.get_hapticity()
+                #self.moleclist.append(newmolec)   
             return self.moleclist     
         else :
-            reconstructed_moleclist, Warning = fragments_reconstruct(moleclist, fraglist, Hlist, self.refmoleclist, self.cellvec, cov_factor, metal_factor)
+            reconstructed_molecules, Warning = fragments_reconstruct(molecules, fragments, hydrogens, self.refmoleclist, self.cellvec, cov_factor, metal_factor)
             
             if Warning:
                 self.is_fragmented = True
@@ -1144,10 +1262,12 @@ class cell(object):
                 self.is_fragmented = False
                 self.error_reconstruction = False 
 
-            for mol in reconstructed_moleclist:
-                newmolec         = molecule(mol.labels, mol.coord)
+            ## For consistency, we create the molecules once again, even if mol is already a molecule-class object.
+            for mol in reconstructed_molecules:
+                newmolec = molecule(mol.labels, mol.coord)
+                newmolec.add_parent(self,mol.cell_indices) # !!!WARNING
                 newmolec.set_fractional_coord(mol.frac_coord)
-                newmolec.set_atoms(debug=debug, create_adjacencies=True)          
+                newmolec.set_atoms(create_adjacencies=True, debug=debug)
                 if newmolec.iscomplex: 
                     newmolec.split_complex()
                     newmolec.get_hapticity()
@@ -1269,7 +1389,7 @@ class cell(object):
 
                 # Fourth part : correction smiles of ligands
                 mol.smiles_with_H = [lig.smiles for lig in mol.ligands]
-                mol.smiles = [lig.correction_smiles() for lig in mol.ligands]
+                mol.smiles = mol.correct_smiles()
 
     #######################################################
     def assign_spin(self, debug: int=0) -> object:
