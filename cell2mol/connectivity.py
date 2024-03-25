@@ -29,6 +29,7 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
         if idx == site:
             apos = np.array(a.coord.copy())
             tgt  = a.get_closest_metal(metalist)
+            ligand_idx = tgt.get_parent_index("ligand")
             dist = get_dist(apos, tgt.coord)
             idealdist = a.radii + elemdatabase.CovalentRadius2[element]
             addedHcoords = apos + (tgt.coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
@@ -39,10 +40,10 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
             # If no undesired adjacencies have been created, the coordinates are kept
             if tmpconnec[posadded] <= 1:
                 isadded = True
-                if debug >= 2: print(f"ADD_ATOM: Chosen Metal index {tgt.parent_index}. {element} is added at site {site}")
+                if debug >= 2: print(f"ADD_ATOM: Chosen Metal index {ligand_idx}. {element} is added at site {site}")
             # Otherwise, coordinates are reset
             else:
-                if debug >= 1: print(f"ADD_ATOM: Chosen Metal index {tgt.parent_index}. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
+                if debug >= 1: print(f"ADD_ATOM: Chosen Metal index {ligand_idx}. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
                 isadded = False
                 newlab = labels.copy()
                 newcoord = coords.copy()
@@ -331,19 +332,28 @@ def compare_atoms(at1, at2, check_coordinates: bool=False, debug: int=0):
 
 #################################
 def compare_metals (at1, at2, check_coordinates: bool=False, debug: int=0):
-    if at1.subtype != "metal" or at2.subtype != "metal": return False
     if debug > 0: 
-        print("Comparing Metals")
+        print("COMPARE_METALS. Comparing:")
         print(at1.label)
         print(at2.label)
 
-    if (at1.label != at2.label): return False
+    if at1.subtype != "metal" or at2.subtype != "metal": 
+        if debug > 0: print("COMPARE_METALS. Different subtype")
+        if debug > 0: print(at1.subtype)
+        if debug > 0: print(at1.subtype)
+        return False
 
-    if not hasattr(at1,"coord_sphere"): at1.get_coord_sphere()
-    if not hasattr(at2,"coord_sphere"): at2.get_coord_sphere()
-    at1_coord_sphere_formula = labels2formula ([atom.label for atom in at1.coord_sphere])
-    at2_coord_sphere_formula = labels2formula ([atom.label for atom in at2.coord_sphere])    
-    if (at1_coord_sphere_formula != at2_coord_sphere_formula) : return False
+    if (at1.label != at2.label): 
+        if debug > 0: print("COMPARE_METALS. Different label")
+        return False
+
+    if not hasattr(at1,"coord_sphere_formula"): at1.get_coord_sphere_formula()
+    if not hasattr(at2,"coord_sphere_formula"): at2.get_coord_sphere_formula()
+    if (at1.coord_sphere_formula != at2.coord_sphere_formula):
+        if debug > 0: print("COMPARE_METALS. Different coordination sphere")
+        if debug > 0: print(at1.coord_sphere_formula)
+        if debug > 0: print(at2.coord_sphere_formula)
+        return False
     
     if check_coordinates:
         if (at1.coord[0] != at2.coord[0]): return False
@@ -355,28 +365,38 @@ def compare_metals (at1, at2, check_coordinates: bool=False, debug: int=0):
 #################################
 def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
     if debug > 0: 
-        print("Comparing Species")
-        print(mol1)
-        print(mol2)
+        print("COMPARE_SPECIES. Comparing:")
+        if debug == 1: print(mol1.formula)
+        if debug == 1: print(mol2.formula)
+        if debug == 2: print(mol1)
+        if debug == 2: print(mol2)
     # a pair of species is compared on the basis of:
     # 1) the total number of atoms
-    if (mol1.natoms != mol2.natoms): return False
+    if (mol1.natoms != mol2.natoms): 
+        if debug > 0: print("COMPARE_SPECIES. FALSE, different natoms:")
+        return False
 
     # 2) the total number of electrons (as sum of atomic number)
-    if (mol1.eleccount != mol2.eleccount): return False
+    if (mol1.eleccount != mol2.eleccount): 
+        if debug > 0: print("COMPARE_SPECIES. FALSE, different eleccount:")
+        return False
 
     # 3) the number of atoms of each type
     if not hasattr(mol1,"element_count"): mol1.set_element_count()
     if not hasattr(mol2,"element_count"): mol2.set_element_count()
     for kdx, elem in enumerate(mol1.element_count):
-        if elem != mol2.element_count[kdx]: return False       
+        if elem != mol2.element_count[kdx]: 
+            if debug > 0: print(f"COMPARE_SPECIES. FALSE, different {elem} count:")
+            return False       
 
     # 4) the number of adjacencies between each pair of element types
     if not hasattr(mol1,"adj_types"):     mol1.set_adj_types()
     if not hasattr(mol2,"adj_types"):     mol2.set_adj_types()
     for kdx, elem in enumerate(mol1.adj_types):
         for ldx, elem2 in enumerate(elem):
-            if elem2 != mol2.adj_types[kdx, ldx]: return False
+            if elem2 != mol2.adj_types[kdx, ldx]: 
+                if debug > 0: print(f"COMPARE_SPECIES. FALSE, different adjacency count")
+                return False
 
     if check_coordinates:
         # 5) Finally, the coordinates if the user wants it

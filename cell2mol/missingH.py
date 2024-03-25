@@ -113,12 +113,13 @@ def check_missingH(refmoleclist: list, debug: int=0):
     if debug >= 2: print("Checking Missing H")
     if debug >= 2: print("##################")
     for idx, ref in enumerate(refmoleclist):
-        if ref.type != "Complex":
+        if not ref.iscomplex:
             if ref.natoms == 1 and "O" in ref.labels: 
                 Missing_H_in_CoordWater = True
                 if debug >= 2: print(f"WARNING found isolated O atom in the cell. This tends to be a water with missing H, so stopping")
             else:
                 for kdx, a in enumerate(ref.atoms):
+                    if not hasattr(a,"adjacency"): continue 
                     if a.label == "C":
                         bonded_atom_coord = []
                         for adj in a.adjacency:
@@ -130,9 +131,9 @@ def check_missingH(refmoleclist: list, debug: int=0):
                             if debug >= 2: print(f"C Atom {kdx} has missing H atoms")
                             if debug >= 2: print(report)
                             Missing_H_in_C = True
-        elif ref.type == "Complex":
-            for jdx, lig in enumerate(ref.ligandlist):
-                if lig.natoms == 1 and "O" in lig.labels and lig.totmconnec <= 1:
+        else:
+            for jdx, lig in enumerate(ref.ligands):
+                if lig.natoms == 1 and "O" in lig.labels and lig.denticity <= 1:
                     if any(m.label in Exceptions_for_CoordWater for m in lig.metalatoms): pass
                     else:
                         Missing_H_in_CoordWater = True
