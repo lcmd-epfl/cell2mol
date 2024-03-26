@@ -168,6 +168,7 @@ class specie(object):
 
     ############
     def set_atoms(self, atomlist=None, create_adjacencies: bool=False, debug: int=0):
+        debug = 0
         ## If the atom objects already exist, and you want to set them in self from a different specie
         if atomlist is not None: 
             if debug > 0: print(f"SPECIE.SET_ATOMS: received {atomlist=}")
@@ -196,6 +197,26 @@ class specie(object):
                 for idx, at in enumerate(self.atoms): 
                     at.set_adjacencies(self.adjmat[idx],self.madjmat[idx],self.adjnum[idx],self.madjnum[idx])
     
+
+    #######################################################
+    def inherit_adjmatrix(self, parent_subtype: str, debug: int=0):
+        exists  = self.check_parent(parent_subtype)
+        if not exists: 
+            print(f"SPECIE.INHERIT. {parent_subtype=} does not exist")
+            return None
+        parent  = self.get_parent(parent_subtype)
+        indices = self.get_parent_indices(parent_subtype)
+        if not hasattr(parent,"madjnum"): 
+            print(f"SPECIE.INHERIT. {parent_subtype=} does not have madjnum")
+            return None 
+        print(f"SPECIE.INHERIT. found self in parent with {indices=}")
+        print(f"SPECIE.INHERIT: parent data:\n{parent.labels=}\n{parent.madjmat=}\n{parent.madjnum=}\n{parent.adjmat=}\n{parent.adjnum=}")
+        self.madjmat = np.stack(extract_from_list(indices, parent.madjmat, dimension=2), axis=0)
+        self.madjnum = np.stack(extract_from_list(indices, parent.madjnum, dimension=1), axis=0)
+        self.adjmat  = np.stack(extract_from_list(indices, parent.adjmat, dimension=2), axis=0)
+        self.adjnum  = np.stack(extract_from_list(indices, parent.adjnum, dimension=1), axis=0)
+        print(f"SPECIE.INHERIT: self data:\n{self.labels=}\n{self.madjmat=}\n{self.madjnum=}\n{self.adjmat=}\n{self.adjnum=}")
+
     ############
     def get_adjmatrix(self):
         isgood, adjmat, adjnum = get_adjmatrix(self.labels, self.coord, self.cov_factor, self.radii)
@@ -270,7 +291,6 @@ class specie(object):
         ## Arranges a list of possible charge_states associated with this species, 
         ## which is later managed at the cell level to determine the good one
         if not hasattr(self,"protonation_states"): self.get_protonation_states(debug=debug)
-        if debug > 1 : print(self.protonation_states)
         if self.protonation_states is not None:    self.possible_cs = get_possible_charge_state(self, debug=debug)  
         return self.possible_cs
     
@@ -325,20 +345,16 @@ class specie(object):
     def __repr__(self, indirect: bool=False):
         to_print = ""
         if not indirect: to_print  += f'------------- Cell2mol SPECIE Object --------------\n'
-        to_print += f' Version               = {self.version}\n'
-        to_print += f' Type                  = {self.type}\n'
-        if hasattr(self,'subtype'): to_print += f' Sub-Type               = {self.subtype}\n'
-        to_print += f' Number of Atoms       = {self.natoms}\n'
-        to_print += f' Formula               = {self.formula}\n'
-        if hasattr(self,"adjmat"):     to_print += f' Has Adjacency Matrix  = YES\n'
-        else:                          to_print += f' Has Adjacency Matrix  = NO \n'
-        if hasattr(self,"parent"):    
-            if self.parent is not None:    to_print += f' Has Parent            = YES\n'
-            else:                          to_print += f' Has Parent            = NO \n'
-        if hasattr(self,"occurrence"): to_print += f' Occurrence in Parent  = {self.occurrence}\n'
-        if hasattr(self,"totcharge"):  to_print += f' Total Charge          = {self.totcharge}\n'
-        if hasattr(self,"spin"):       to_print += f' Spin                  = {self.spin}\n'
-        if hasattr(self,"smiles"):     to_print += f' SMILES                = {self.smiles}\n'
+        to_print += f' Version                      = {self.version}\n'
+        to_print += f' Type                         = {self.type}\n'
+        if hasattr(self,'subtype'): to_print += f' Sub-Type                     = {self.subtype}\n'
+        to_print += f' Number of Atoms              = {self.natoms}\n'
+        to_print += f' Formula                      = {self.formula}\n'
+        if hasattr(self,"adjmat"):     to_print += f' Has Adjacency Matrix         = YES\n'
+        else:                          to_print += f' Has Adjacency Matrix         = NO \n'
+        if hasattr(self,"totcharge"):  to_print += f' Total Charge                 = {self.totcharge}\n'
+        if hasattr(self,"spin"):       to_print += f' Spin                         = {self.spin}\n'
+        if hasattr(self,"smiles"):     to_print += f' SMILES                       = {self.smiles}\n'
         if not indirect: to_print += '---------------------------------------------------\n'
         return to_print
 
@@ -354,8 +370,8 @@ class molecule(specie):
         to_print = ""
         to_print += f'------------- Cell2mol MOLECULE Object --------------\n'
         to_print += specie.__repr__(self, indirect=True)
-        if hasattr(self,"ligands"):  to_print += f' # Ligands             = {len(self.ligands)}\n'
-        if hasattr(self,"metals"):   to_print += f' # Metals              = {len(self.metals)}\n'
+        if hasattr(self,"ligands"):  to_print += f' Number of Ligands            = {len(self.ligands)}\n'
+        if hasattr(self,"metals"):   to_print += f' Number of Metals             = {len(self.metals)}\n'
         to_print += '---------------------------------------------------\n'
         return to_print
 
@@ -422,6 +438,8 @@ class molecule(specie):
                 newligand.add_parent(self, indices=lig_indices)
                 # Pass the molecule atoms to the ligand
                 newligand.set_atoms(atomlist=lig_atoms)
+                # Inherit the adjacencies from molecule
+                newligand.inherit_adjmatrix("molecule")
                 # If fractional coordinates are available...
                 if hasattr(self,"frac_coord"): 
                     lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
@@ -431,9 +449,11 @@ class molecule(specie):
 
             ## Arranges Metals
             for m in metal_idx:
-                newmetal    = metal(self.labels[m], self.coord[m], self.radii[m])
-                newmetal.add_parent(self, index=self.indices[m])
-                self.metals.append(newmetal)                            
+                ## We were creating the metal again, but it is already in the list of molecule.atoms
+                #newmetal    = metal(self.labels[m], self.coord[m], self.radii[m])
+                #newmetal.add_parent(self, index=self.indices[m])
+                #self.metals.append(newmetal)                            
+                self.metals.append(self.atoms[m])                            
         return self.ligands, self.metals
 
     def get_hapticity(self, debug: int=0):
@@ -470,7 +490,7 @@ class ligand(specie):
         to_print = ""
         to_print += f'------------- Cell2mol LIGAND Object --------------\n'
         to_print += specie.__repr__(self, indirect=True)
-        if hasattr(self,"groups"): to_print += f' # Groups              = {len(self.groups)}\n'
+        if hasattr(self,"groups"): to_print += f' Number of Groups             = {len(self.groups)}\n'
         to_print += '---------------------------------------------------\n'
         return to_print
 
@@ -531,20 +551,12 @@ class ligand(specie):
 
     #######################################################
     def get_connected_idx(self, debug: int=0):
+        ## Remember madjmat should not be computed at the ligand level. Since the metal is not there.
+        ## Now we operate at the molecular level. We get the parent molecule, and the indices of the ligand atoms in the molecule
         self.connected_idx = [] 
-        if hasattr(self,"madjnum"): 
-            for idx, con in enumerate(self.madjnum):
-                if con > 0: self.connected_idx.append(self.indices[idx]) 
-        else:
-            ## Remember madjmat should not be computed at the ligand level. Since the metal is not there.
-            ## Now we operate at the molecular level. We get the parent molecule, and the indices of the ligand atoms in the molecule
-            mol     = self.get_parent("molecule")
-            indices = self.get_parent_indices("molecule")
-            if not hasattr(mol,"madjnum"): mol.get_metal_adjmatrix()
-            self.madjmat = extract_from_list(indices, mol.madjmat, dimension=2)
-            self.madjnum = extract_from_list(indices, mol.madjnum, dimension=1)
-            for idx, con in enumerate(self.madjnum):
-                if con > 0: self.connected_idx.append(idx)
+        if not hasattr(self,"madjnum"): self.inherit_adjmatrix("molecule")
+        for idx, con in enumerate(self.madjnum):
+            if con > 0: self.connected_idx.append(idx)
         return self.connected_idx 
 
     #######################################################
@@ -560,13 +572,19 @@ class ligand(specie):
         return self.connected_atoms
 
     #######################################################
+    def check_coordination(self, debug: int=0):
+        if not hasattr(self,"groups"):      self.split_ligand(debug=debug)
+        for g in self.groups:
+            if not hasattr(g,"checked_coordination"): g.check_coordination(debug=debug)
+
+    #######################################################
     def get_denticity(self, debug: int=0):
-        if not hasattr(self,"groups"):      self.split_ligand(debug=2)
+        if not hasattr(self,"groups"):      self.split_ligand(debug=debug)
         if debug > 0: print(f"LIGAND.Get_denticity: checking connectivity of ligand {self.formula}")
         if debug > 0: print(f"LIGAND.Get_denticity: initial connectivity is {len(self.connected_idx)}")
         self.denticity = 0
         for g in self.groups:
-            if debug > 0: print(f"LIGAND.Get_denticity: checking denticity of group \n{g}")
+            #if debug > 0: print(f"LIGAND.Get_denticity: checking denticity of group \n{g}\n{g.madjnum=}\n{g.madjmat=}")
             self.denticity += g.get_denticity(debug=debug)      ## A check is also performed at the group level
         if debug > 0: print(f"LIGAND.Get_denticity: final connectivity is {self.denticity}")
         return self.denticity 
@@ -611,6 +629,10 @@ class ligand(specie):
             newgroup.add_parent(self, indices=gr_indices)
             # Pass the ligand atoms to the groud
             newgroup.set_atoms(atomlist=gr_atoms)
+            # Inherit the adjacencies from molecule
+            newgroup.inherit_adjmatrix("ligand")
+            # Associate the Groups with the Metals
+            newgroup.get_connected_metals()
             newgroup.get_closest_metal()
             # Top-down hierarchy
             self.groups.append(newgroup)
@@ -641,12 +663,13 @@ class group(specie):
         to_print = ""
         to_print += f'------------- Cell2mol GROUP Object --------------\n'
         to_print += specie.__repr__(self, indirect=True)
+        if hasattr(self,"metals"):   to_print += f' Number of Metals             = {len(self.metals)}\n'
         to_print += '---------------------------------------------------\n'
         return to_print
 
     #######################################################
     def remove_atom(self, index: int, debug: int=0):
-        if debug > 0: print(f"GROUP.REMOVE_ATOM: deleting atom {index=} from group")
+        if debug > 0: print(f"GROUP.REMOVE_ATOM: deleting atom {index=} from group with {self.natoms} atoms")
         if index > self.natoms: return None
         if not hasattr(self,"atoms"): self.set_atoms()
         self.atoms.pop(index)
@@ -657,8 +680,8 @@ class group(specie):
         self.eleccount = labels2electrons(self.labels)   ### Assuming neutral specie (so basically this is the sum of atomic numbers)
         self.natoms    = len(self.labels)
         self.iscomplex = any((elemdatabase.elementblock[l] == "d") or (elemdatabase.elementblock[l] == "f") for l in self.labels)
-        print("group after removing atom")
-        print(self)
+        if debug > 0: print("GROUP.REMOVE_ATOM. Group after removing atom:")
+        if debug > 0: print(self)
         if self.natoms > 0:
             if hasattr(self,"closest_metal"): self.get_closest_metal()
             if hasattr(self,"is_haptic"):     self.get_hapticity()
@@ -678,6 +701,22 @@ class group(specie):
         # finds the closest Metal Atom (tgt)
         self.closest_metal = mol.metals[np.argmin(dist)]
         return self.closest_metal
+
+    #######################################################
+    def get_connected_metals(self, debug: int=0):
+        # metal.groups will be used for the calculation of the relative metal radius 
+        # and define the coordination geometry of the metal /hapicitiy/ hapttype    
+        self.metals = []
+        lig = self.get_parent("ligand")
+        if not hasattr(lig,"metals"): lig.get_connected_metals()
+        for met in lig.metals:
+            tmplabels = self.labels.copy()
+            tmpcoord  = self.coord.copy()
+            tmplabels.append(met.label)
+            tmpcoord.append(met.coord)
+            isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+            if isgood and any(tmpadjnum) > 0: self.metals.append(met)
+        return self.metals
     
     #######################################################
     def get_hapticity(self, debug: int=0):
@@ -712,7 +751,7 @@ class group(specie):
         if not hasattr(self,"atoms"):     self.set_atoms()
         if self.is_haptic:                self = coordination_correction_for_haptic(self, debug=debug)
         if self.is_haptic == False:       self = coordination_correction_for_nonhaptic(self, debug=debug)
-        self.checked_coordination= True
+        self.checked_coordination = True
 
     #######################################################
     def get_denticity(self, debug: int=0):
@@ -839,16 +878,15 @@ class atom(object):
         self.charge = charge 
 
     #######################################################
-    def set_adjacencies(self, adjmat, madjmat, connectivity: int, metal_connectivity: int=0):
-        self.connec  = int(connectivity)
-        self.mconnec = int(metal_connectivity)
+    def set_adjacencies(self, adjmat, madjmat, adjnum: int, madjnum: int):
+        self.connec  = int(adjnum)
+        self.mconnec = int(madjnum)
         self.adjacency       = []
         self.metal_adjacency = []
         for idx, c in enumerate(adjmat):   ## The atom only receives one row of adjmat, so this is not a matrix anymore. Keep in mind that the idx are the indices of parent
             if c > 0: self.adjacency.append(idx)
         for idx, c in enumerate(madjmat):  ## The atom only receives one row of madjmat, so this is not a matrix anymore
             if c > 0: self.metal_adjacency.append(idx)
-
 
     #######################################################
     def get_connected_metals(self, metalist: list, debug: int=0):
@@ -900,28 +938,51 @@ class atom(object):
         return to_print
     
     #######################################################
-    def reset_mconnec(self, value: int=0, debug: int=0):
-        ## Careful. In group.atoms, the parent_index is that of the molecule
-        if debug > 0: print(f"ATOM.RESET_MCONN: resetting mconnec for atom {self.label=}")
-        self.mconnec = value                                                                             # Corrects data of atom object in self
+    def reset_mconnec(self, met, diff: int=-1, debug: int=0):
+        if debug > 0: print(f"ATOM.RESET_MCONN: resetting mconnec (and connec) for atom {self.label=}")
+        self.mconnec += diff
+        self.connec  += diff
         exists = self.check_parent("ligand")
         if exists:
             lig     = self.get_parent("ligand")
             lig_idx = self.get_parent_index("ligand")
+            met_idx = met.get_parent_index("ligand")
             if debug > 0: print(f"ATOM.RESET_MCONN: updating ligand atoms and madjnum")
             if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.madjnum=}") 
-            lig.atoms[lig_idx].mconnec = value                                    # Corrects data of atom object in ligand class
-            lig.madjnum[lig_idx] = value                                          # Corrects data in metal_adjacency number of the ligand class
+            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.madjmat=}") 
+            # Correct Ligand Data
+            #lig.atoms[lig_idx].mconnec += diff           # Corrects data of atom object in ligand class
+            #lig.atoms[lig_idx].connec  += diff           # Corrects data of atom object in ligand class
+            lig.madjnum[lig_idx] += diff                    # Corrects data in metal_adjacency number of the ligand class
+            lig.madjmat[lig_idx,met_idx] += diff            # Corrects data in metal_adjacency matrix
+            lig.madjmat[met_idx,lig_idx] += diff            # Corrects data in metal_adjacency matrix
+            lig.adjnum[lig_idx]  += diff                    # Corrects data in adjacency number of the ligand class
+            lig.adjmat[lig_idx,met_idx]  += diff            # Corrects data in adjacency matrix
+            lig.adjmat[met_idx,lig_idx]  += diff            # Corrects data in adjacency matrix
+            # Correct Metal Data
+            #met.mconnec += diff                             # Corrects data of metal object
+            #met.connec  += diff                             # Corrects data of metal object
+            # we should delete the adjacencies, but not a priority 
             if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.madjnum=}") 
+            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.madjmat=}") 
             lig.get_connected_idx(debug=debug)
             lig.get_connected_atoms(debug=debug)
+
         exists = self.check_parent("molecule")
         if exists:
             mol     = self.get_parent("molecule")
             mol_idx = self.get_parent_index("molecule")
+            met_idx = met.get_parent_index("molecule")
             if debug > 0: print(f"ATOM.RESET_MCONN: updating molecule atoms and madjnum")
-            mol.atoms[mol_idx]   = value # Corrects data of atom object in molecule class
-            mol.madjnum[mol_idx] = value # Corrects data in metal_adjacency number of the molecule class
+            # Correct Molecule Data
+            #mol.atoms[mol_idx].mconnec += diff              # Corrects data of atom object in molecule class
+            #mol.atoms[mol_idx].connec  += diff              # Corrects data of atom object in molecule class
+            mol.madjnum[mol_idx] += diff                    # Corrects data in metal_adjacency number of the molecule class
+            mol.madjmat[mol_idx,met_idx] += diff            # Corrects data in metal_adjacency matrix
+            mol.madjmat[met_idx,mol_idx] += diff            # Corrects data in metal_adjacency matrix
+            mol.adjnum[mol_idx]  += diff                    # Corrects data in adjacency number of the molecule class
+            mol.adjmat[mol_idx,met_idx]  += diff            # Corrects data in adjacency matrix
+            mol.adjmat[met_idx,mol_idx]  += diff            # Corrects data in adjacency matrix
 
 ###############
 #### METAL ####
@@ -1014,6 +1075,7 @@ class metal(atom):
         to_print += f'------------- Cell2mol METAL Object --------------\n'
         to_print += atom.__repr__(self, indirect=True)
         if hasattr(self,"coord_sphere_formula"): to_print += f' Coordination Sphere Formula  = {self.coord_sphere_formula}\n'
+        if hasattr(self,"possible_cs"):          to_print += f' Possible Charges             = {self.possible_cs}\n'
         to_print += '----------------------------------------------------\n'
         return to_print
 
@@ -1312,7 +1374,7 @@ class cell(object):
                 self.error_empty_poscharges = True
                 return None # Empty list of possible charges received. Stopping
             if spec.subtype != "metal":
-                selected_cs.append([cs.corr_total_charge for cs in spec.possible_cs])
+                selected_cs.append(list([cs.corr_total_charge for cs in spec.possible_cs]))
             else :
                 selected_cs.append(spec.possible_cs)   
         self.error_empty_poscharges = False

@@ -15,6 +15,7 @@ def extract_from_list(entrylist: list, old_array: list, dimension: int=2, debug:
         for idx, val in enumerate(entrylist):
             new_array[idx] = old_array[val]
     return list(new_array)
+    #return list([np.stack(list(new_array), axis=0)])
 
 #######################################################
 def additem(item, vector):
