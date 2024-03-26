@@ -24,11 +24,14 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
     newlab.append(str(element))  # One H atom will be added
 
     if debug >= 2: print("ADD_ATOM: Metalist length", len(metalist))
+    if debug >= 2: print("ADD_ATOM: Ligand Atoms", len(ligand.atoms))
+    if debug >= 2: print("ADD_ATOM: site=", site)
     # It is adding the element (H, O, or whatever) at the vector formed by the closest TM atom and the "site"
     for idx, a in enumerate(ligand.atoms):
         if idx == site:
             apos = np.array(a.coord.copy())
             tgt  = a.get_closest_metal(metalist)
+            if debug >= 2: print(f"ADD_ATOM: evaluating {apos=} and {tgt.coord=}")
             ligand_idx = tgt.get_parent_index("ligand")
             dist = get_dist(apos, tgt.coord)
             idealdist = a.radii + elemdatabase.CovalentRadius2[element]
@@ -37,6 +40,7 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
 
             # Evaluates the new adjacency matrix.
             dummy, tmpconmat, tmpconnec = get_adjmatrix(newlab, newcoord, ligand.cov_factor)
+            if debug >= 2: print(f"ADD_ATOM: received {tmpconnec[posadded]=}")
             # If no undesired adjacencies have been created, the coordinates are kept
             if tmpconnec[posadded] <= 1:
                 isadded = True
@@ -64,7 +68,7 @@ def labels2formula(labels: list):
     elems = elemdatabase.elementnr.keys()
     formula=[]
     for z in elems:
-        nz = labels.count(z)
+        nz = list(labels).count(z)
         if nz > 1:   formula.append(f"{z}{nz}-")
         if nz == 1:  formula.append(f"{z}-")
     formula = ''.join(formula)[:-1] 
@@ -75,7 +79,7 @@ def labels2ratio(labels):
     elems = elemdatabase.elementnr.keys()
     ratio=[]
     for z in elems:
-        nz = labels.count(z)
+        nz = list(labels).count(z)
         if nz > 0: ratio.append(nz)
     return ratio
 

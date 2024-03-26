@@ -617,6 +617,7 @@ def get_proto_mol(atoms):
     mol = Chem.MolFromSmarts("[#" + str(atoms[0]) + "]")
     rwMol = Chem.RWMol(mol)
     for i in range(1, len(atoms)):
+        print(f"XYZ2MOL.PROTO_MOL: doing {atoms[i]=}")
         a = Chem.Atom(atoms[i])
         rwMol.AddAtom(a)
 
