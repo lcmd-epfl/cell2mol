@@ -33,7 +33,7 @@ rdBase.DisableLog("rdApp.*")
 def get_possible_charge_state(spec: object, debug: int=0): 
     if not hasattr(spec,"protonation_states"): spec.get_protonation_states(debug=debug)
     if spec.protonation_states is None:                                             return None
-    if spec.subtype == "group" or (spec.subtype == 'molecule' and spec.is_complex): return None
+    if spec.subtype == "group" or (spec.subtype == 'molecule' and spec.iscomplex):  return None
 
     ### Evaluates possible charges for each protonation state ###
     for prot in spec.protonation_states:
@@ -169,8 +169,13 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     elif specie.subtype == "molecule" and specie.iscomplex == True: return None
     elif specie.subtype == "molecule" and specie.iscomplex == False: 
         if debug >= 2: print(f"    POSCHARGE: doing empty PROTONATION for this specie")
-        empty_protonation = protonation(specie.labels, specie.coord, specie.cov_factor, int(0), [], [], [], [], typ="Empty", parent=specie)
-        return list(empty_protonation)
+        #empty_list = list([np.zeros((len(specie.labels)))])
+        empty_list = []
+        for i in range(len(specie.labels)):
+            empty_list.append(int(0))
+        empty_protonation = protonation(specie.labels, specie.coord, specie.cov_factor, int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=specie)
+        print("CREATED EMPTY PROTONATION", empty_protonation)
+        return list([empty_protonation])
 
     ## If specie.subtype == "ligand": 
     ligand = specie      ## Change the variable name as it is easier to follow
@@ -724,6 +729,7 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     # J. Chem. Educ. 1997, 74, 915.
    
     mol = metal.get_parent("molecule")
+    if not hasattr(mol,"is_haptic"): mol.get_hapticity()
     atnum = elemdatabase.elementnr[metal.label]
 
     at_charge = defaultdict(list)
@@ -771,9 +777,9 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
             if int(0) not in poscharges:
                 poscharges.append(int(0))
         # -if it has any ligand with hapticity
-        if any((lig.is_haptic) for lig in mol.ligands):
-            if int(0) not in poscharges:
-                poscharges.append(int(0))
+        #if any((lig.is_haptic) for lig in mol.ligands):
+        if mol.is_haptic and int(0) not in poscharges:
+            poscharges.append(int(0))
     
     return poscharges
 
@@ -913,17 +919,22 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
             if debug >= 2: print(f"PREPARE: Doing molecule {idx} with unique_index: {mol.unique_index}")
             if debug >= 2: print(f"PREPARE: Specie with poscharges: {spec.possible_cs}")
     
-            ## Reorders the atoms to increase chance of perfectly reproducing the desired charge
-            dummy1, dummy2, map12 = reorder(spec.labels, mol.labels, spec.coord, mol.coord)
-            ###############    
-
             allocated = False
             for jdx, cs in enumerate(spec.possible_cs):
                 if final_charge_distribution[idxtoallocate] == cs.corr_total_charge and not allocated:   # If the charge in poscharges coincides with the one for this entry in final_distribution
-                    if debug >= 2: print(f"PREPARE: target state and protonation loaded, with {cs.corr_total_charge} and {cs.protonation.added_atoms}")
+
+                    ## Reorders the atoms to increase chance of perfectly reproducing the desired charge
+                    ref_data, target_data = arrange_data_for_reorder(spec, mol)
+                    if debug >= 2: print(f"PREPARE: reordering with data: \n{ref_data=}\n{target_data=}")
+                    dummy1, dummy2, map12 = reorder(ref_data, target_data, spec.coord, mol.coord)
+                    if debug >= 2: print(f"PREPARE: reordering protonation with {map12}")
+                    prot = cs.protonation.reorder(map12)
+                    if debug >= 2: print(f"PREPARE: reordered protonation: \n{prot}")
+                    ###############    
+
                     allocated = True 
                     idxtoallocate += 1
-                    new_cs = get_charge(mol.labels, mol.coord, mol.adjmat, cs.corr_total_charge, mol.cov_factor)
+                    new_cs = get_charge(cs.corr_total_charge, prot, allow=cs.allow, debug=debug)
     
                     if new_cs.corr_total_charge == cs.corr_total_charge:
                         mol.set_charges(new_cs.corr_total_charge, new_cs.corr_atom_charges, new_cs.smiles, new_cs.rdkit_mol)
