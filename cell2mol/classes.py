@@ -209,13 +209,13 @@ class specie(object):
         if not hasattr(parent,"madjnum"): 
             print(f"SPECIE.INHERIT. {parent_subtype=} does not have madjnum")
             return None 
-        print(f"SPECIE.INHERIT. found self in parent with {indices=}")
-        print(f"SPECIE.INHERIT: parent data:\n{parent.labels=}\n{parent.madjmat=}\n{parent.madjnum=}\n{parent.adjmat=}\n{parent.adjnum=}")
+        #print(f"SPECIE.INHERIT. found self in parent with {indices=}")
+        #print(f"SPECIE.INHERIT: parent data:\n{parent.labels=}\n{parent.madjmat=}\n{parent.madjnum=}\n{parent.adjmat=}\n{parent.adjnum=}")
         self.madjmat = np.stack(extract_from_list(indices, parent.madjmat, dimension=2), axis=0)
         self.madjnum = np.stack(extract_from_list(indices, parent.madjnum, dimension=1), axis=0)
         self.adjmat  = np.stack(extract_from_list(indices, parent.adjmat, dimension=2), axis=0)
         self.adjnum  = np.stack(extract_from_list(indices, parent.adjnum, dimension=1), axis=0)
-        print(f"SPECIE.INHERIT: self data:\n{self.labels=}\n{self.madjmat=}\n{self.madjnum=}\n{self.adjmat=}\n{self.adjnum=}")
+        #print(f"SPECIE.INHERIT: self data:\n{self.labels=}\n{self.madjmat=}\n{self.madjnum=}\n{self.adjmat=}\n{self.adjnum=}")
 
     ############
     def get_adjmatrix(self):
@@ -354,7 +354,8 @@ class specie(object):
         else:                          to_print += f' Has Adjacency Matrix         = NO \n'
         if hasattr(self,"totcharge"):  to_print += f' Total Charge                 = {self.totcharge}\n'
         if hasattr(self,"spin"):       to_print += f' Spin                         = {self.spin}\n'
-        if hasattr(self,"smiles"):     to_print += f' SMILES                       = {self.smiles}\n'
+        if hasattr(self,"smiles"):     to_print += f' Smiles                       = {self.smiles}\n'
+        if hasattr(self,"origin"):     to_print += f' Origin                       = {self.origin}\n'
         if not indirect: to_print += '---------------------------------------------------\n'
         return to_print
 
@@ -370,8 +371,10 @@ class molecule(specie):
         to_print = ""
         to_print += f'------------- Cell2mol MOLECULE Object --------------\n'
         to_print += specie.__repr__(self, indirect=True)
-        if hasattr(self,"ligands"):  to_print += f' Number of Ligands            = {len(self.ligands)}\n'
-        if hasattr(self,"metals"):   to_print += f' Number of Metals             = {len(self.metals)}\n'
+        if hasattr(self,"ligands"):  
+            if self.ligands is not None: to_print += f' Number of Ligands            = {len(self.ligands)}\n'
+        if hasattr(self,"metals"):   
+            if self.metals is not None:  to_print += f' Number of Metals             = {len(self.metals)}\n'
         to_print += '---------------------------------------------------\n'
         return to_print
 
@@ -434,6 +437,8 @@ class molecule(specie):
                 if debug > 0: print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
                 # Create Ligand Object
                 newligand   = ligand(lig_labels, lig_coord, radii=lig_radii)
+                # For debugging
+                newligand.origin = "split_complex"
                 # Define the molecule as parent of the ligand. Bottom-Up hierarchy
                 newligand.add_parent(self, indices=lig_indices)
                 # Pass the molecule atoms to the ligand
@@ -456,6 +461,7 @@ class molecule(specie):
                 self.metals.append(self.atoms[m])                            
         return self.ligands, self.metals
 
+    #######################################################
     def get_hapticity(self, debug: int=0):
         if not hasattr(self,"ligands"): self.split_complex(debug=debug)
         self.is_haptic = False 
@@ -625,6 +631,8 @@ class ligand(specie):
             gr_atoms   = extract_from_list(b, conn_atoms, dimension=1)
             # Create Group Object
             newgroup = group(gr_labels, gr_coord, radii=gr_radii)
+            # For debugging
+            newgroup.origin = "split_ligand"
             # Define the ligand as parent of the group. Bottom-Up hierarchy
             newgroup.add_parent(self, indices=gr_indices)
             # Pass the ligand atoms to the groud
@@ -1235,7 +1243,12 @@ class cell(object):
             if debug > 0: print(f"CELL.MOLECLIST: doing block={b}")
             mol_labels  = extract_from_list(b, self.labels, dimension=1)
             mol_coord   = extract_from_list(b, self.coord, dimension=1)
+            # Creates Molecule Object
             newmolec    = molecule(mol_labels, mol_coord)
+            # For debugging
+            newmolec.origin = "cell.get_moleclist"
+            # Creates The atom objects with adjacencies
+            newmolec.set_atoms(create_adjacencies=True, debug=debug)
             # Adds cell as parent of the molecule, with indices b
             newmolec.add_parent(self, indices=b)
             # If fractional coordinates are available...
@@ -1243,8 +1256,7 @@ class cell(object):
                 assert len(self.frac_coord) == len(self.coord)
                 mol_frac_coord  = extract_from_list(b, self.frac_coord, dimension=1)
                 newmolec.set_fractional_coord(mol_frac_coord, debug=debug)
-                newmolec.set_atoms(create_adjacencies=True, debug=debug)
-            # This must be below the frac_coord, so they are carried on to the ligands
+            # The split_complex must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex: 
                 if debug > 0: print(f"CELL.MOLECLIST: splitting complex")
                 newmolec.split_complex(debug=debug)
@@ -1325,14 +1337,14 @@ class cell(object):
                 self.error_reconstruction = False 
 
             ## For consistency, we create the molecules once again, even if mol is already a molecule-class object.
+            ## One must follow the same structure as in self.get_moleclist()
             for mol in reconstructed_molecules:
                 newmolec = molecule(mol.labels, mol.coord)
-                newmolec.add_parent(self,mol.cell_indices) # !!!WARNING
-                newmolec.set_fractional_coord(mol.frac_coord)
+                newmolec.origin = "cell.reconstruct"
                 newmolec.set_atoms(create_adjacencies=True, debug=debug)
-                if newmolec.iscomplex: 
-                    newmolec.split_complex()
-                    newmolec.get_hapticity()
+                newmolec.add_parent(self,mol.cell_indices) 
+                newmolec.set_fractional_coord(mol.frac_coord)
+                if newmolec.iscomplex: newmolec.split_complex()
                 self.moleclist.append(newmolec)         
             return self.moleclist
     

@@ -145,13 +145,13 @@ def classify_fragments(blocklist: list, refmoleclist: list, debug: int=0):
 
     ## Prepares Blocks
     for b in blocklist:
-        if debug > 0: print(f"CLASSIFY FRAGMENTS, preparing block {b}")
+        if debug > 2: print(f"CLASSIFY_FRAGMENTS, preparing block\n{b.formula}")
         if not hasattr(b,"centroid"):         b.get_centroid()
         if not hasattr(b,"element_count"):    b.set_element_count()
         if not hasattr(b,"numH"):             b.numH = b.set_element_count()[4] + b.set_element_count()[3] #"Hidrogen + Deuterium atoms"
     ## Prepares Reference Molecules
     for ref in refmoleclist:
-        if debug > 0: print(f"CLASSIFY FRAGMENTS, preparing reference {ref}")
+        if debug > 2: print(f"CLASSIFY_FRAGMENTS, preparing reference\n{ref.formula}")
         if not hasattr(ref,"element_count"):  ref.set_element_count()
         if not hasattr(ref,"numH"):           ref.numH = ref.set_element_count()[4] + ref.set_element_count()[3] #"Hidrogen + Deuterium atoms"
 
@@ -172,7 +172,7 @@ def classify_fragments(blocklist: list, refmoleclist: list, debug: int=0):
                 block.subtype = "fragment"
                 fraglist.append(block)
 
-    if debug > 0: print(len(blocklist),"Blocks sorted as (Molec, Frag, H):",len(moleclist),len(fraglist),len(Hlist))
+    if debug > 0: print(f"CLASSIFY_FRAGMENTS. {len(blocklist)} Blocks sorted as (Molec, Frag, H): {len(moleclist)} {len(fraglist)} {len(Hlist)}")
     return moleclist, fraglist, Hlist
 
 
@@ -212,6 +212,15 @@ def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmolec
     elif len(remfrag) == 0 and len(Hlist) > 0:
         Warning = True
         print("FRAG_RECONSTRUCT. WARNING: There are isolated H atoms in cell")
+
+    # In moleclist, now there is a mix between molecules that were already complete (non-fragmented), and molecules that have been reconstructed
+    # The former were identified in the cell.get_moleclist() function, and have cell as parent. 
+    # The latter have been constructed by merging fragments, and do not have cell as parent, but have the cell_indices stored in mol.cell_indices
+    # Here we homogenize the situation by adding the cell_indices variable to all molecules
+    for mol in moleclist:
+        if not hasattr(mol,"cell_indices"): 
+            if mol.check_parent("cell"):
+                mol.cell_indices = mol.get_parent_indices("cell")
 
     return moleclist, Warning
 
@@ -471,7 +480,7 @@ def combine(tobemerged: list, references: list, cellvec: list, threshold_tmat: f
                     found = True 
                     newmolec.subtype = ref.subtype
                     goodlist.append(newmolec)
-                    if debug >= 1: print("COMBINE: Fragment",newmolec.formula,"added to goodlist")
+                    if debug >= 1: print(f"COMBINE: Fragment {newmolec.formula} added to goodlist with {newmolec.cell_indices=}")
         if not found:        ## Then it is a fragment. A bigger one, but still a fragment
             newmolec.subtype = "Rec. Fragment"
             avglist.append(newmolec)
