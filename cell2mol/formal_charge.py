@@ -1166,7 +1166,7 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
     for idx, a in enumerate(ligand.atoms):
         if idx == site:
             tgt, apos, dist = find_closest_metal(a, metalist)
-            idealdist = a.radii + elemdatabase.CovalentRadius2[element]
+            idealdist = a.radii + elemdatabase.CovalentRadius3[element]
             addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
             newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])  # adds H at the position of the closest Metal Atom
 

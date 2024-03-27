@@ -5,23 +5,21 @@ import os.path
 import sklearn
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split, StratifiedKFold
-from sklearn.metrics import confusion_matrix, accuracy_score, f1_score
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import accuracy_score, f1_score
 import matplotlib
 import pickle
 import pandas as pd
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 from sys import argv
-import ast
 from cell2mol.spin import make_geom_list
 
 
 dataframe=argv[1]
 metal = argv[2]
-#mode = argv[3]
 prop = argv[3]
+mode = argv[4]
 
 
 print("Sklearn version:", sklearn.__version__)
@@ -34,7 +32,6 @@ df["geom_nr"] = ""
 for tmc in df.refcode :
     df.loc[df.refcode==tmc, "geom_nr"] = make_geom_list()[df[df.refcode==tmc].geometry.item()]
 
-
 if metal == "total":
     pass
 else :
@@ -45,21 +42,13 @@ else :
         exit()
 
 print("the length of", metal,  len(df))
-#print(df[:10])
-
-#exit()
-
-#prop = "spin_multiplicity"
-
-#prop = "m_ox"
 
 if prop == "spin_multiplicity" or prop == "spin" or prop == "s" :
     # extract = ["elem_nr", "m_ox", "d_elec"] # F_TM 
     # extract = ["CN", "geom_nr", "rel_m"] # F_CE
-    #extract = ["elem_nr", "m_ox", "d_elec", "CN", "geom_nr", "rel_m"] # F_TM+CE
-    extract = ["elem_nr", "m_ox", "d_elec", "CN", "geom_nr", "rel_m", "hapticity"] # F_TM+CE+hapticity
+    extract = ["elem_nr", "m_ox", "d_elec", "CN", "geom_nr", "rel_m"] # F_TM+CE
 elif prop == "m_ox":
-    extract = ["elem_nr", "CN", "geom_nr", "rel_m", "hapticity"] 
+    extract = ["elem_nr", "CN", "geom_nr", "rel_m"] 
 else :
     print("No such property in the database")
     exit()
@@ -188,44 +177,3 @@ learner = learner = rf_random.best_estimator_.fit(X, Y)
 pickle.dump(learner, open(filename, "wb"))
 print("feature importance", learner.feature_importances_)
 
-exit()
-
-# Not doing out of sample things because there is no out of sample
-if run_diagnosis:
-
-    # Initializing the learner
-    learner = learner = rf_random.best_estimator_.fit(X, Y)
-
-    predictions = learner.predict(X)
-    prediction_probs = np.around(learner.predict_proba(X), 2)
-    is_correct = predictions == Y
-    is_certain = [True if np.max(probs) >= 0.5 else False for probs in prediction_probs]
-    n_correct = np.count_nonzero(is_correct)
-    print(
-        "\nWith final model, agreement in training is: %f %%"
-        % (100 * float(n_correct) / Y.shape[0])
-    )
-    if print_incorrect:
-        print("\n Incorrect predictions:")
-    for idx, sys in enumerate(is_correct):
-        if not sys and print_incorrect:
-            print(
-                f"System {Nfix[idx]} has prediction {predictions[idx]} with probability {np.max(prediction_probs[idx])} and reference {Y[idx]}"
-            )
-    if print_uncertain:
-        print("\n Uncertain predictions:")
-    for idx, sys in enumerate(is_certain):
-        if not sys and print_uncertain:
-            print(
-                f"System {Nfix[idx]} has prediction {predictions[idx]} with probability {np.max(prediction_probs[idx])} and reference {Y[idx]}"
-            )
-    if extra_analysis:
-        from treeinterpreter import treeinterpreter as ti
-
-        prediction, bias, contributions = ti.predict(learner, X)
-        for idx, sys in enumerate(Nfix):
-            print(f"System {Nfix[idx]} has contributions {contributions[0,idx]}:")
-
-# trained_model = pickle.load(open(filename, 'rb'))
-
-exit()

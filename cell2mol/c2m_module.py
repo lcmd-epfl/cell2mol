@@ -15,9 +15,8 @@ from cell2mol.missingH import check_missingH
 from cell2mol.tmcharge_common import cell
 from cell2mol.cellconversions import frac2cart_fromparam
 from cell2mol.readwrite import readinfo
-from cell2mol.spin import count_N, count_d_elec, assign_ground_state_spin_empirical, count_nitrosyl, calcualte_relative_metal_radius, calcualte_relative_metal_radius_haptic_complexes, generate_feature_vector
+from cell2mol.spin import count_N, count_d_elec, assign_ground_state_spin_empirical, generate_feature_vector
 from typing import Tuple
-import sklearn
 from cell2mol import __file__
 from cell2mol.elementdata import ElementData
 
@@ -252,222 +251,67 @@ def assign_spin (cell: object, debug: int=0) -> object:
         N = count_N(mol)        
 
         if mol.type == "Complex":
-            if len(mol.metalist) == 1: # mono-metallic complexes
+            if len(mol.metalist) == 1: # Mononuclear complexes
                 met = mol.metalist[0]
                 period = elemdatabase.elementperiod[met.label]
                 d_elec = count_d_elec (met.label, met.totcharge)
 
-                if period == 4: # 3d transition metals
-                    if d_elec in [0, 1, 9, 10]:
-                        if N % 2 == 0:
-                            mol.magnetism(1) 
-                        else:
-                            mol.magnetism(2) 
-                    elif d_elec in [2, 3] and met.hapticity == False :
-                        if N % 2 == 0:
-                            mol.magnetism(3) 
-                        else:
-                            mol.magnetism(4) 
-                    elif d_elec in [4, 5, 6, 7, 8] or (d_elec in [2, 3] and met.hapticity == True) :
-                        # Predict spin multiplicity of metal based on Random forest model
-                        feature = generate_feature_vector (met)
-                        path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), "total_spin_3131.pkl")
-                        rf = pickle.load(open(path_rf, 'rb'))
-                        predictions = rf.predict(feature)
-                        spin_rf = predictions[0]
-                        mol.magnetism(spin_rf)
-                    else :
-                        print("Error: d_elec is not in the range of 0-10", d_elec)
+                if period == 4:               
+                    if met.hapticity == False: # 3d transition metal coordination complexes      
+                        # i) Assign spin multiplicity based on empirical rules
+                        spin, rule, threshold  = assign_ground_state_spin_empirical(met, N)
+                        if debug >= 1: print(f"By empirical model {spin=} {rule=}, {threshold=}")
+                        # mol.magnetism(spin)
 
-                    if met.hapticity == False :
-                        rel = calcualte_relative_metal_radius (met)
-                        met.relative_radius(rel, rel, rel)
-                    else :
-                        rel = calcualte_relative_metal_radius (met)
-                        rel_g, rel_c = calcualte_relative_metal_radius_haptic_complexes (met)
-                        met.relative_radius(rel, rel_g, rel_c)
-
-                    for lig in mol.ligandlist:
-                        if count_N(lig) %2 == 0:
-                            lig.magnetism(1) 
-                        else:
-                            lig.magnetism(2) 
+                        # ii) Predict spin multiplicity of metal based on Random forest model
+                        if d_elec in [0, 1, 9, 10]:
+                            if N % 2 == 0:  mol.magnetism(1) 
+                            else:           mol.magnetism(2) 
+                        elif d_elec in [2, 3]:
+                            if N % 2 == 0:  mol.magnetism(3) 
+                            else:           mol.magnetism(4) 
+                        elif d_elec in [4, 5, 6, 7, 8]:                            
+                            feature = generate_feature_vector (met)
+                            path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), "TM-GSspin_RandomForest.pkl")
+                            rf = pickle.load(open(path_rf, 'rb'))
+                            predictions = rf.predict(feature)
+                            spin_rf = predictions[0]
+                            mol.magnetism(spin_rf)
+                        else :
+                            print("Error: d_elec is not in the range of 0-10", d_elec)
+                    else : # 3d transition metal complexes with haptic ligands      
+                        if N % 2 == 0:  mol.magnetism(1) 
+                        else:           mol.magnetism(2)                         
 
                     if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
                     if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.hapttype=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
+
+                    for lig in mol.ligandlist:
+                        if count_N(lig) %2 == 0:    lig.magnetism(1) 
+                        else:                       lig.magnetism(2) 
                 
-                #elif (period == 5 or period == 6 ) and (d_elec in [2, 3] and met.hapticity == False) :
-                # TODO : Predict the ground state spin of coordination complexes with 4d or 5d transition metal (d2, d3)
                 else :  # 4d or 5d transition metals     
-                    if N % 2 == 0:
-                        mol.magnetism(1) 
-                    else:
-                        mol.magnetism(2) 
+                    if N % 2 == 0:  mol.magnetism(1) 
+                    else:           mol.magnetism(2)  
                     
                     for lig in mol.ligandlist:
-                        if count_N(lig) %2 == 0:
-                            lig.magnetism(1) 
-                        else:
-                            lig.magnetism(2)                            
+                        if count_N(lig) %2 == 0:    lig.magnetism(1) 
+                        else:                       lig.magnetism(2)                       
             
-            else : # Bi- & Poly-metallic complexes
-                if N % 2 == 0:
-                    mol.magnetism(1) 
-                else:
-                    mol.magnetism(2) 
+            else : # Bi- & Polynuclear complexes
+                if N % 2 == 0:  mol.magnetism(1) 
+                else:           mol.magnetism(2) 
                 
                 for lig in mol.ligandlist:
-                    if count_N(lig) %2 == 0:
-                        lig.magnetism(1) 
-                    else:
-                        lig.magnetism(2) 
+                    if count_N(lig) %2 == 0:    lig.magnetism(1) 
+                    else:                       lig.magnetism(2)    
 
         else: # mol.type == "Other" 
-            if N % 2 == 0:
-                mol.magnetism(1) 
-            else:
-                mol.magnetism(2) 
-
-    if debug >= 1: 
-        for mol in cell.moleclist:
-            if mol.type == "Complex":
-                print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
-                for lig in mol.ligandlist:
-                    if lig.natoms != 1:
-                        print(f"\t{lig.formula=}, {lig.spin=}")
-                    else :
-                        print(f"\t{lig.formula=}")
-            else :
-                if mol.natoms != 1:
-                    print(f"{mol.type=}, {mol.formula=}, {mol.spin=}") 
-                else :
-                    print(f"{mol.type=}, {mol.formula=}")
+            if N % 2 == 0:  mol.magnetism(1) 
+            else:           mol.magnetism(2) 
 
     return cell
 
-##################################################################################
-def assign_spin_old (cell: object, debug: int=0) -> object:
-    """Assign spin multiplicity to molecules in the cell object
-    
-    Args:
-        cell (object): cell object
-        debug (int, optional): debug level. Defaults to 0.
-    Returns:
-        object: cell object with spin multiplicity assigned
-    """
-    
-    if debug >= 1: 
-        print("#########################################")
-        print("Assigning spin multiplicity")
-        print("#########################################")    
-
-    for mol in cell.moleclist:
-        # count number of electrons in the complex
-        N = count_N(mol)        
-
-        if mol.type == "Complex":
-            if len(mol.metalist) == 1: # mono-metallic complexes
-                met = mol.metalist[0]
-
-                # count valence electrons
-                d_elec = count_d_elec(met.label, met.totcharge)
-
-                # calculate relative metal radius
-                rel = calcualte_relative_metal_radius(met)
-                
-                # Make a list of ligands
-                arr = []
-                for lig in mol.ligandlist:
-                    arr.append(sorted(lig.labels))
-                    if count_N(lig) %2 == 0:
-                        lig.magnetism(1) 
-                    else:
-                        lig.magnetism(2)
-
-                # Count nitrosyl ligands                               
-                nitrosyl = count_nitrosyl(np.array(arr, dtype=object))
-                if debug >= 2: print(np.array(arr, dtype=object))
-                if debug >= 2: print(f"{nitrosyl=}")
-                
-                if met.hapticity == False: # coordination complexes
-                    # Assign spin multiplicity of metal based on empirical rules
-                    met.relative_radius(rel, rel, rel)
-                    spin, rule, threshold  = assign_ground_state_spin_empirical(d_elec, met.totcharge, met.geometry, met.label, met.coordination_number, rel, N)
-                    # spin = predict_ground_state_spin_v1 (met.label, elec, met.coordinating_atoms, met.geometry, met.coordination_number, N, nitrosyl)
-
-                    # Predict spin multiplicity of metal based on Random forest model
-                    feature = generate_feature_vector (met)
-                    print(feature)
-                    path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), "TM-GSspin_RandomForest.pkl")
-
-                    #print(path_rf)
-                    rf = pickle.load(open(path_rf, 'rb'))
-                    predictions = rf.predict(feature)
-                    spin_rf = predictions[0]
-                    #if debug >= 1: print(f"{spin=} {spin_rf=}")
-                    mol.ml_prediction(spin_rf)
-
-                    if spin == 0 : # unknown spin state
-                        if N % 2 == 0:
-                            mol.magnetism(1) 
-                        else:
-                            mol.magnetism(2) 
-                    else:
-                        mol.magnetism(spin_rf)
-                        #mol.magnetism(spin)
-
-                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=} {mol.spin_rf=}")
-                    if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
-                    if debug >= 1: print(f"met_OS={met.totcharge} {d_elec=} {N=} {nitrosyl=} {met.rel=}\n")
-
-                else: # hapticity == True 
-                    rel_g, rel_c = calcualte_relative_metal_radius_haptic_complexes(met)
-                    #if debug >= 1: print(f"{rel_g=} {rel_c=}")
-                    met.relative_radius(rel, rel_g, rel_c)
-                    
-                    if N % 2 == 0:
-                        mol.magnetism(1) # spin multiplicity = 1 Singlet
-                    else:
-                        mol.magnetism(2) # spin multiplicity = 2 Doublet
-
-                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
-                    if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
-                    if debug >= 1: print(f"met_OS={met.totcharge} {d_elec=} {N=} {nitrosyl=} {met.rel=} {met.rel_g=} {met.rel_c=}\n")
-
-            else : # Bi- & Poly-metallic complexes
-                if N % 2 == 0:
-                    mol.magnetism(1) 
-                else:
-                    mol.magnetism(2) 
-                
-                for lig in mol.ligandlist:
-                    if count_N(lig) %2 == 0:
-                        lig.magnetism(1) 
-                    else:
-                        lig.magnetism(2) 
-
-        else: # mol.type == "Other" or "Ligand"
-            if N % 2 == 0:
-                mol.magnetism(1) 
-            else:
-                mol.magnetism(2) 
-
-    if debug >= 1: 
-        for mol in cell.moleclist:
-            if mol.type == "Complex":
-                print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
-                for lig in mol.ligandlist:
-                    if lig.natoms != 1:
-                        print(f"\t{lig.formula=}, {lig.spin=}")
-                    else :
-                        print(f"\t{lig.formula=}")
-            else :
-                if mol.natoms != 1:
-                    print(f"{mol.type=}, {mol.formula=}, {mol.spin=}") 
-                else :
-                    print(f"{mol.type=}, {mol.formula=}")
-
-    return cell
 
 ##################################################################################
 ################################## MAIN ##########################################
@@ -519,9 +363,8 @@ def cell2mol(infopath: str, refcode: str, output_dir: str, step: int=3, debug: i
 
             if not any(newcell.warning_list):
                 if debug >= 1: print("Charge Assignment successfully finished.\n")
-                # TODO : Compare assigned charges with ML predicted charges
-
-                # Spin state assignmentc
+                
+                # Spin state assignment
                 newcell = assign_spin(newcell, debug=debug)
 
                 if debug >= 1: newcell.print_charge_assignment()

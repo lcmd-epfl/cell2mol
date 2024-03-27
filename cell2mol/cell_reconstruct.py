@@ -52,7 +52,7 @@ def verify_connectivity(ligand: object, molecule: object, debug: int = 0) -> Non
                 if a.mconnec >= 1 and a.index in g.atlist:
                     if debug >= 2: print(f"VERIFY: connectivity={a.mconnec} in atom idx={idx}, label={a.label}")
                     tgt, apos, dist = find_closest_metal(a, metalist)
-                    idealdist = a.radii + elemdatabase.CovalentRadius2["H"]
+                    idealdist = a.radii + elemdatabase.CovalentRadius3["H"]
                     addedHcoords = apos + (metalist[tgt].coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
                     newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])  # adds H at the position of the closest Metal Atom
 
@@ -513,17 +513,28 @@ def coordination_correction (lig, g, metalist, remove, debug=1) -> list:
     
         if debug >= 1 : 
             print(f"\tAtom {g_idx} :", atom.label, f"\tMetal {tgt} :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
-
+        if debug >= 1 : print(g_idx, atom.adjacency)
         neighbors_totmconnec = []  
+        neighbors =[]
         for j in atom.adjacency:
             neighbor = lig.atoms[j]
+            neighbors.append(neighbor)
             neighbors_totmconnec.append(neighbor.mconnec)
             if debug >= 2 : print(f"\t\t{atom.label} connected to {neighbor.label}") #{neighbor.adjacency} {neighbor.mconnec} {neighbor.coord}")      
-
+        
+        if debug >= 1 : print(g_idx, neighbors , neighbors_totmconnec)
+        
         if sum(neighbors_totmconnec) >= 2 :
             if debug >= 2 : print(f"\t[Check] This metal-coordinating atom {atom.label} connected to more than one metal-coordinating atoms")               
+            # for index, (neighbor, mconnec) in enumerate(zip(neighbors, neighbors_totmconnec)):
+            #     if mconnec >= 1 :
+            #         nb = lig.atoms[atom.adjacency[index]]
+            #         if debug >= 1 : print(neighbor.label, neighbor.coord, nb.label, nb.coord)
+            
+            
             nb_idx_list = [index for index, value in enumerate(neighbors_totmconnec) if value >= 1]
             nb_label = []
+            if debug >= 1 : print(f"\t{nb_idx_list=}")
             for nb_idx in nb_idx_list :
                 nb = lig.atoms[atom.adjacency[nb_idx]]
                 nb_label.append(nb.label)
@@ -537,6 +548,7 @@ def coordination_correction (lig, g, metalist, remove, debug=1) -> list:
         elif sum(neighbors_totmconnec) == 1 : # e.g. "S" atom in refcode YOBCUO, PORNOC                                         
             nb_idx = [index for index, value in enumerate(neighbors_totmconnec) if value == 1][0]
             nb = lig.atoms[atom.adjacency[nb_idx]]      
+            if debug >= 1 : print(f"\t{nb_idx=}\t{nb.label=}")
             if debug >= 2 : print(f"\t[Check] This metal-coordinating atom {atom.label} connected to another metal-coordinating atom {nb.label}") 
 
             if (atom.label == "H" and nb.label in ["B", "O", "N", "C"]) :
