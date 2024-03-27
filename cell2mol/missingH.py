@@ -186,9 +186,12 @@ def check_missingH(refmoleclist: list, debug: int=0):
                             bonded_atom_coord.append(ref.coord[adj])
                         ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord)
                         if ismissingH:
+                            for adj in a.adjacency:
+                                if debug >= 2: print("bonded_atom_coord", ref.labels[adj], ref.coord[adj])
                             if debug >= 2: print("")
                             if debug >= 2: print(f"WARNING in Missing H function for: {ref.type}, {idx}, {ref.labels}")
                             if debug >= 2: print(f"C Atom {kdx} has missing H atoms")
+                            if debug >= 2: print(f"C Atom coordinate {a.coord}")
                             if debug >= 2: print(report)
                             Missing_H_in_C = True
         elif ref.type == "Complex":
@@ -205,11 +208,16 @@ def check_missingH(refmoleclist: list, debug: int=0):
                             bonded_atom_coord = []
                             for adj in a.adjacency:
                                 bonded_atom_coord.append(lig.coord[adj])
+
                             ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord)
+                            
                             if ismissingH:
+                                for adj in a.adjacency:
+                                    if debug >= 2: print("bonded_atom_coord", ref.labels[adj], ref.coord[adj])
                                 if debug >= 2: print("")
                                 if debug >= 2: print(f"WARNING in Missing H function for: {ref.type}, {idx}, {jdx}, {lig.labels}")
                                 if debug >= 2: print(f"Atom {kdx} has missing H atoms")
+                                if debug >= 2: print(f"Atom coordinate {a.coord}")
                                 if debug >= 2: print(report)
                                 Missing_H_in_C = True
 

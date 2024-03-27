@@ -101,7 +101,7 @@ def checkchemistry(molecule: object, references: list, typ: str="Max") -> int:
 def getradii(labels: list) -> np.ndarray:
     radii = []
     for l in labels:
-        radii.append(elemdatabase.CovalentRadius2[l])
+        radii.append(elemdatabase.CovalentRadius3[l])
     return np.array(radii)
 
 
@@ -139,27 +139,27 @@ def extract_from_matrix(entrylist: list, old_array: np.ndarray, dimension: int=2
 
 ################################
 covalent_factor_for_metal = {
-    "H": 1.30,
-    "D": 1.30,
+    "H": 1,
+    "D": 1,
     "He": 1.30,
-    "Li": 1.30,  
-    "Be": 1.30,  
+    "Li": 1,  
+    "Be": 1,  
     "B": 1.15,
     "C": 1.30,
     "N": 1.25,
     "O": 1.25,
     "F": 1.15,
     "Ne": 1.30,
-    "Na": 1.30,  
-    "Mg": 1.30,  
+    "Na": 1,  
+    "Mg": 1,  
     "Al": 1.30,
     "Si": 1.10,
     "P": 1.30,   
     "S": 1.25,
     "Cl": 1.25,
     "Ar": 1.30,
-    "K": 1.30,  
-    "Ca": 1.30,
+    "K": 1,  
+    "Ca": 1,
     "Sc": 1.30,
     "Ti": 1.30,
     "V": 1.30,
@@ -176,8 +176,8 @@ covalent_factor_for_metal = {
     "Se": 1.15,
     "Br": 1.25,
     "Kr": 1.30,
-    "Rb": 1.30,
-    "Sr": 1.30,
+    "Rb": 1,
+    "Sr": 1,
     "Y": 1.30,
     "Zr": 1.30,
     "Nb": 1.30,
@@ -194,8 +194,8 @@ covalent_factor_for_metal = {
     "Te": 1.15,  
     "I": 1.25,
     "Xe": 1.30,
-    "Cs": 1.30,
-    "Ba": 1.30,
+    "Cs": 0.6,
+    "Ba": 1,
     "La": 1.30,
     "Ce": 1.30,
     "Pr": 1.30,
@@ -226,8 +226,8 @@ covalent_factor_for_metal = {
     "Po": 1.30,
     "At": 1.30,
     "Rn": 1.30,
-    "Fr": 1.30,
-    "Ra": 1.30,
+    "Fr": 1,
+    "Ra": 1,
     "Ac": 1.30,
     "Th": 1.30,
     "Pa": 1.30,
@@ -251,10 +251,123 @@ covalent_factor_for_metal = {
     "Mt": 1.30,
 }
 
+covalent_factor_for_metal_v2 = {
+'H': 1.19,
+ 'D': 1.19,
+ 'He': 1.68,
+ 'Li': 0.99,
+ 'Be': 0.95,
+ 'B': 1.1,
+ 'C': 1.22,
+ 'N': 1.19,
+ 'O': 1.21,
+ 'F': 1.14,
+ 'Ne': 1.56,
+ 'Na': 0.88,
+ 'Mg': 1.04,
+ 'Al': 1.32,
+ 'Si': 1.06,
+ 'P': 1.14,
+ 'S': 1.19,
+ 'Cl': 1.19,
+ 'Ar': 1.5,
+ 'K': 0.79,
+ 'Ca': 0.97,
+ 'Sc': 1.3,
+ 'Ti': 1.3,
+ 'V': 1.3,
+ 'Cr': 1.3,
+ 'Mn': 1.3,
+ 'Fe': 1.3,
+ 'Co': 1.3,
+ 'Ni': 1.3,
+ 'Cu': 1.3,
+ 'Zn': 1.3,
+ 'Ga': 1.26,
+ 'Ge': 1.24,
+ 'As': 1.12,
+ 'Se': 1.12,
+ 'Br': 1.21,
+ 'Kr': 1.6,
+ 'Rb': 1.02,
+ 'Sr': 0.97,
+ 'Y': 1.3,
+ 'Zr': 1.3,
+ 'Nb': 1.3,
+ 'Mo': 1.3,
+ 'Tc': 1.3,
+ 'Ru': 1.3,
+ 'Rh': 1.3,
+ 'Pd': 1.3,
+ 'Ag': 1.3,
+ 'Cd': 1.3,
+ 'In': 1.35,
+ 'Sn': 1.29,
+ 'Sb': 1.04,
+ 'Te': 1.06,
+ 'I': 1.21,
+ 'Xe': 1.51,
+ 'Cs': 1.03,
+ 'Ba': 0.99,
+ 'La': 1.3,
+ 'Ce': 1.3,
+ 'Pr': 1.3,
+ 'Nd': 1.3,
+ 'Pm': 1.3,
+ 'Sm': 1.3,
+ 'Eu': 1.3,
+ 'Gd': 1.3,
+ 'Tb': 1.3,
+ 'Dy': 1.3,
+ 'Ho': 1.3,
+ 'Er': 1.3,
+ 'Tm': 1.3,
+ 'Yb': 1.3,
+ 'Lu': 1.3,
+ 'Hf': 1.3,
+ 'Ta': 1.3,
+ 'W': 1.3,
+ 'Re': 1.3,
+ 'Os': 1.3,
+ 'Ir': 1.3,
+ 'Pt': 1.3,
+ 'Au': 1.3,
+ 'Hg': 1.3,
+ 'Tl': 1.3,
+ 'Pb': 1.29,
+ 'Bi': 1.28,
+ 'Po': 1.38,
+ 'At': 1.34,
+ 'Rn': 1.63,
+ 'Fr': 1.09,
+ 'Ra': 1.16,
+ 'Ac': 1.3,
+ 'Th': 1.3,
+ 'Pa': 1.3,
+ 'U': 1.3,
+ 'Np': 1.3,
+ 'Pu': 1.3,
+ 'Am': 1.3,
+ 'Cm': 1.3,
+ 'Bk': 1.3,
+ 'Cf': 1.3,
+ 'Es': 1.3,
+ 'Fm': 1.3,
+ 'Md': 1.3,
+ 'No': 1.3,
+ 'Lr': 1.3,
+ 'Rf': 1.3,
+ 'Db': 1.3,
+ 'Sg': 1.3,
+ 'Bh': 1.3,
+ 'Hs': 1.3,
+ 'Mt': 1.3
+}
+
 def get_thres_from_two_atoms(label_i, label_j, factor=1.3, debug=0): 
    
-    radii_i = elemdatabase.CovalentRadius2[label_i]
-    radii_j = elemdatabase.CovalentRadius2[label_j]
+    radii_i = elemdatabase.CovalentRadius3[label_i]
+    radii_j = elemdatabase.CovalentRadius3[label_j]
 
     if (
             elemdatabase.elementblock[label_i] != "d"
@@ -270,12 +383,12 @@ def get_thres_from_two_atoms(label_i, label_j, factor=1.3, debug=0):
                 print(f"{label_i} : {radii_i}, {label_j} : {radii_j}, {factor}, {thres=}")
     elif (
             elemdatabase.elementblock[label_i] == "d"
-            and elemdatabase.elementblock[label_i] == "f"
-            and elemdatabase.elementblock[label_j] == "d"
-            and elemdatabase.elementblock[label_j] == "f"
+            or elemdatabase.elementblock[label_i] == "f"
+            or elemdatabase.elementblock[label_j] == "d"
+            or elemdatabase.elementblock[label_j] == "f"
         ):
-            factor_i = covalent_factor_for_metal[label_i]
-            factor_j = covalent_factor_for_metal[label_j]
+            factor_i = covalent_factor_for_metal_v2[label_i]
+            factor_j = covalent_factor_for_metal_v2[label_j]
 
             if factor_i < factor_j  :
                 new_factor = factor_i
@@ -289,7 +402,7 @@ def get_thres_from_two_atoms(label_i, label_j, factor=1.3, debug=0):
             thres = (radii_i + radii_j) * new_factor
             thres = round(thres, 3)
 
-            if debug >=2 :
+            if debug >=0 :
                 print(f"{label_i} : {radii_i} ({factor_i}), {label_j} : {radii_j} ({factor_j}), {new_factor=}, {thres=}")
     else :
 
@@ -304,127 +417,108 @@ def get_thres_from_two_atoms(label_i, label_j, factor=1.3, debug=0):
 ####################################
 def getconec(labels: list, pos: list, factor: float, radii="default") -> Tuple[int, list, list, list, list]:
     status = 1  # good molecule, no clashes yet
-    clash = 0.3
+    clash = 0.25 # modified from 0.3
     natoms = len(labels)
     conmat = np.zeros((natoms, natoms))
     connec = np.zeros((natoms))
     mconmat = np.zeros((natoms, natoms))
     mconnec = np.zeros((natoms))
 
+    # Sometimes argument radii np.ndarry, or list
+    with warnings.catch_warnings():
+        warnings.simplefilter(action="ignore", category=FutureWarning)
+        if radii == "default":
+            radii = getradii(labels)
 
-    covalent_factor_for_metal = {
-        "H": 1.30,
-        "D": 1.30,
-        "He": 1.30,
-        "Li": 1.30,  
-        "Be": 1.30,  
-        "B": 1.15,
-        "C": 1.30,
-        "N": 1.25,
-        "O": 1.25,
-        "F": 1.15,
-        "Ne": 1.30,
-        "Na": 1.30,  
-        "Mg": 1.30,  
-        "Al": 1.30,
-        "Si": 1.10,
-        "P": 1.30,   
-        "S": 1.25,
-        "Cl": 1.25,
-        "Ar": 1.30,
-        "K": 1.30,  
-        "Ca": 1.30,
-        "Sc": 1.30,
-        "Ti": 1.30,
-        "V": 1.30,
-        "Cr": 1.30,
-        "Mn": 1.30,
-        "Fe": 1.30,
-        "Co": 1.30,
-        "Ni": 1.30,
-        "Cu": 1.30,
-        "Zn": 1.30,
-        "Ga": 1.30,
-        "Ge": 1.30,
-        "As": 1.15,
-        "Se": 1.15,
-        "Br": 1.25,
-        "Kr": 1.30,
-        "Rb": 1.30,
-        "Sr": 1.30,
-        "Y": 1.30,
-        "Zr": 1.30,
-        "Nb": 1.30,
-        "Mo": 1.30,
-        "Tc": 1.30,
-        "Ru": 1.30,
-        "Rh": 1.30,
-        "Pd": 1.30,
-        "Ag": 1.30,
-        "Cd": 1.30,
-        "In": 1.30,
-        "Sn": 1.30,
-        "Sb": 1.15,  
-        "Te": 1.15,  
-        "I": 1.25,
-        "Xe": 1.30,
-        "Cs": 1.30,
-        "Ba": 1.30,
-        "La": 1.30,
-        "Ce": 1.30,
-        "Pr": 1.30,
-        "Nd": 1.30,
-        "Pm": 1.30,
-        "Sm": 1.30,
-        "Eu": 1.30,
-        "Gd": 1.30,
-        "Tb": 1.30,
-        "Dy": 1.30,
-        "Ho": 1.30,
-        "Er": 1.30,
-        "Tm": 1.30,
-        "Yb": 1.30,
-        "Lu": 1.30,
-        "Hf": 1.30,
-        "Ta": 1.30,
-        "W": 1.30,
-        "Re": 1.30,
-        "Os": 1.30,
-        "Ir": 1.30,
-        "Pt": 1.30,
-        "Au": 1.30,
-        "Hg": 1.30,
-        "Tl": 1.30,
-        "Pb": 1.30,
-        "Bi": 1.30,
-        "Po": 1.30,
-        "At": 1.30,
-        "Rn": 1.30,
-        "Fr": 1.30,
-        "Ra": 1.30,
-        "Ac": 1.30,
-        "Th": 1.30,
-        "Pa": 1.30,
-        "U": 1.30,
-        "Np": 1.30,
-        "Pu": 1.30,
-        "Am": 1.30,
-        "Cm": 1.30,
-        "Bk": 1.30,
-        "Cf": 1.30,
-        "Es": 1.30,
-        "Fm": 1.30,
-        "Md": 1.30,
-        "No": 1.30,
-        "Lr": 1.30,
-        "Rf": 1.30,
-        "Db": 1.30,
-        "Sg": 1.30,
-        "Bh": 1.30,
-        "Hs": 1.30,
-        "Mt": 1.30,
-    }
+    for i in range(0, natoms - 1):
+        for j in range(i, natoms):
+            if i != j:
+                # print(i,j)
+                a = np.array(pos[i])
+                b = np.array(pos[j])
+                dist = np.linalg.norm(a - b)
+                
+                if (
+                        elemdatabase.elementblock[labels[i]] != "d"
+                        and elemdatabase.elementblock[labels[i]] != "f"
+                        and elemdatabase.elementblock[labels[j]] != "d"
+                        and elemdatabase.elementblock[labels[j]] != "f"
+                    ):
+                    
+                    if (
+                            elemdatabase.elementgroup[labels[i]] == 1
+                            or elemdatabase.elementblock[labels[i]] == 2
+                            or elemdatabase.elementblock[labels[j]] == 1
+                            or elemdatabase.elementblock[labels[j]] == 2
+                        ):
+                        
+                        thres = (radii[i] + radii[j]) * 0.5
+                    else :
+                        thres = (radii[i] + radii[j]) * factor
+                        
+                elif (
+                        (elemdatabase.elementblock[labels[i]] == "d" or elemdatabase.elementblock[labels[i]] == "f" )
+                        and 
+                        (elemdatabase.elementblock[labels[j]] == "d" or elemdatabase.elementblock[labels[j]] == "f" )
+                    ):
+                        thres = (radii[i] + radii[j]) * 1.1  # factor for metal-metal bond. Temporary 1.1
+                        #print(labels[i], labels[j], radii[i] , radii[j], dist, thres)
 
+                elif (
+                        elemdatabase.elementblock[labels[i]] == "d"
+                        or elemdatabase.elementblock[labels[i]] == "f"
+                        or elemdatabase.elementblock[labels[j]] == "d"
+                        or elemdatabase.elementblock[labels[j]] == "f"
+                    ):
+                        factor_i = covalent_factor_for_metal[labels[i]]
+                        factor_j = covalent_factor_for_metal[labels[j]]
+
+                        if factor_i < factor_j  :
+                            new_factor = factor_i
+                        
+                        elif factor_i == factor_j :
+                            new_factor = factor_i
+
+                        else : 
+                            new_factor = factor_j
+                        #print(factor_i, factor_j, new_factor, labels[i], labels[j])
+                        thres = (radii[i] + radii[j]) * new_factor
+
+                if dist <= clash:
+                    status = 0  # invalid molecule
+                    print("GETCONEC: Distance", dist, "smaller than clash for atoms", i, j)
+                elif dist <= thres:
+                    conmat[i, j] = 1
+                    conmat[j, i] = 1
+                    if (
+                        elemdatabase.elementblock[labels[i]] == "d"
+                        or elemdatabase.elementblock[labels[i]] == "f"
+                        or elemdatabase.elementblock[labels[j]] == "d"
+                        or elemdatabase.elementblock[labels[j]] == "f"
+                    ):
+                        mconmat[i, j] = 1
+                        mconmat[j, i] = 1
+
+    for i in range(0, natoms):
+        connec[i] = np.sum(conmat[i, :])
+        mconnec[i] = np.sum(mconmat[i, :])
+
+    conmat = conmat.astype(int)
+    mconmat = mconmat.astype(int)
+    connec = connec.astype(int)
+    mconnec = mconnec.astype(int)
+    # return status, np.array(conmat), np.array(connec), np.array(mconmat), np.array(mconnec)
+    return status, conmat, connec, mconmat, mconnec
+
+####################################
+def getconec_version_2 (labels: list, pos: list, factor: float, radii="default") -> Tuple[int, list, list, list, list]:
+    status = 1  # good molecule, no clashes yet
+    clash = 0.3
+    natoms = len(labels)
+    conmat = np.zeros((natoms, natoms))
+    connec = np.zeros((natoms))
+    mconmat = np.zeros((natoms, natoms))
+    mconnec = np.zeros((natoms))
 
     # Sometimes argument radii np.ndarry, or list
     with warnings.catch_warnings():

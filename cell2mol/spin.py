@@ -2,11 +2,7 @@
 
 import numpy as np
 from cell2mol.elementdata import ElementData
-from cosymlib.shape.tools import shape_structure_references
-from cell2mol.tmcharge_common import getelementcount
-import ast #ast.literal_eval
-
-
+import ast 
 
 elemdatabase = ElementData()
 
@@ -241,7 +237,7 @@ def calcualte_relative_metal_radius_haptic_complexes (metal, debug=0):
         if g.hapticity == False :
             for a in g_atoms:
                 diff = round(get_dist(metal.coord, a.coord) - elemdatabase.CovalentRadius3[a.label], 3)
-                #print(a.label, a.coord, round(get_dist(metal.coord, a.coord),3), elemdatabase.CovalentRadius3[a.label], round(diff,3))
+                if debug >=2 : print(a.label, a.coord, round(get_dist(metal.coord, a.coord),3), elemdatabase.CovalentRadius3[a.label], round(diff,3))
                 diff_list_g.append(diff)         
                 diff_list_c.append(diff)                                         
         else : # for haptic group
@@ -281,7 +277,7 @@ def calcualte_relative_metal_radius (metal, debug=0):
     diff_list = []
     for a_label, a_coord in zip(metal.coordinating_atoms, metal.coordinating_atoms_sites): 
         diff = round(get_dist(metal.coord, a_coord) - elemdatabase.CovalentRadius3[a_label], 3)
-        #print(a_label, a_coord, round(get_dist(metal.coord, a_coord),3), elemdatabase.CovalentRadius3[a_label], round(diff,3))
+        if debug >=2 : print(a_label, a_coord, round(get_dist(metal.coord, a_coord),3), elemdatabase.CovalentRadius3[a_label], round(diff,3))
         diff_list.append(diff)
     
     average = round(np.average(diff_list), 3)    
@@ -292,7 +288,7 @@ def calcualte_relative_metal_radius (metal, debug=0):
     return rel
 
 ################################
-def generate_feature_vector (metal):
+def generate_feature_vector (metal: object):
     """ Generate feature vector for a given transition metal coordination complex
     Args:
         metal (obj): metal atom object
@@ -312,20 +308,19 @@ def generate_feature_vector (metal):
         dummy, rel = calcualte_relative_metal_radius_haptic_complexes (metal)
         hapticity = 1
 
-    print(f"{elem_nr=} {m_ox=} {d_elec=} {rel=} {hapticity=}\n")
-
     feature = np.array([[elem_nr, m_ox, d_elec, CN, geom_nr, rel, hapticity]])
     
     return feature
 
 ################################
-def get_posspin_v2 (d_elec: int, m_ox: int, geometry: str, metal: str) -> list:
-    """ Get possible spin states for a given transition metal coordination complex
+def get_posspin (d_elec: int, m_ox: int, geometry: str, metal: str, CN: int) -> list:
+    """ Get possible spin states for first row transition metal coordination complex
     Args:
         d_elec (int): number of d electrons
         m_ox (int): metal oxidation state
         geometry (str): coordination geometry of the complex
         metal (str): metal symbol
+        CN (int): coordination number of the complex
     Returns:
         posspin (list): list of possible spin states
     """
@@ -337,23 +332,26 @@ def get_posspin_v2 (d_elec: int, m_ox: int, geometry: str, metal: str) -> list:
         if m_ox == 0 :
             posspin = ["LS"]
         else :
-            if d_elec in [4, 5, 6]:
-                if d_elec == 4 :
-                    if geometry == "Octahedral":
-                        posspin = ["IS", "HS"]
-                    else :
-                        posspin = ["HS"]
-                else : 
-                    if geometry == "Square planar" or geometry == "Trigonal bipyramidal":
-                        posspin = ["IS", "HS"]                   
-                    elif metal =="Co" and m_ox == 3 and geometry == "Octahedral":
-                        posspin = ["LS"]
-                    else :
-                        posspin = ["LS", "IS", "HS"]
-            elif d_elec in [7, 8] :
-                if geometry == "Square planar": 
+            if d_elec == 4 :
+                if geometry == "Octahedral":
+                    posspin = ["IS", "HS"]
+                else :
+                    posspin = ["HS"]                 
+            elif d_elec in [5, 6] : 
+                if metal =="Co" and m_ox == 3 and geometry == "Octahedral":
                     posspin = ["LS"]
-                elif metal == "Ni" and m_ox == 3:
+                elif CN == 2 or CN > 6 :
+                    posspin = ["HS"]
+                elif geometry == "Square planar" or geometry == "Trigonal bipyramidal":
+                    posspin = ["IS", "HS"]                  
+                else :
+                    posspin = ["LS", "IS", "HS"]
+            elif d_elec in [7, 8] :
+                if metal == "Ni" and m_ox == 3:
+                    posspin = ["LS"]
+                elif CN == 2 or CN > 6 :
+                    posspin = ["IS"]
+                elif geometry == "Square planar": 
                     posspin = ["LS"]
                 else :
                     posspin = ["LS", "IS"]
@@ -419,44 +417,39 @@ def classify_spin_based_on_relative_length_simple (rel, length_thres, window, po
     return spin, ambiguous
 
 ################################
-def assign_ground_state_spin_empirical (d_elec: int, m_ox: int, geometry: str, metal: str, CN: int, rel: float, N: int) :
+def assign_ground_state_spin_empirical (met: object, N: int) :
     """ Assign ground state spin for a given transition metal coordination complex based on empirical rules
     
     Args:
-        d_elec (int): number of d electrons
-        m_ox (int): metal oxidation state
-        geometry (str): coordination geometry of the complex
-        metal (str): metal symbol
-        CN (int): coordination number
-        rel (float): relative metal radius
+        met (obj): metal atom object
         N (int): number of total electrons
     Returns:
         spin (str): ground state spin
         rule (bool): True if the spin state is assigned based on empirical rules
     """
+    metal = met.label
+    m_ox = met.totcharge
+    d_elec = count_d_elec (met.label, met.totcharge)
+    CN = met.coordination_number
+    geometry = met.geometry
+    rel = calcualte_relative_metal_radius (met)
 
-    posspin = get_posspin_v2 (d_elec, m_ox, geometry, metal)
-    print(posspin)
+    posspin = get_posspin (d_elec, m_ox, geometry, metal, CN)
+
     if len(posspin) == 1 :            
         spin = posspin[0]
         rule = True
         threshold = False
 
     elif len(posspin) > 1 :
-        if CN == 2 or CN > 6 :
-            spin = posspin[-1]  
-            rule = True
-            threshold = False            
-        else : 
-            rule = False
-            threshold = True        
-            # window = 0.05
-            length_thres = length_threshold_based_on_CN_geometry_average (CN, geometry, metal)
-            # spin, ambiguous = classify_spin_based_on_relative_length_simple (rel, length_thres, window, posspin)     
-            if rel < length_thres :
-                spin = posspin[0]
-            else :
-                spin = posspin[-1]          
+        rule = False
+        threshold = True        
+        length_thres = length_threshold_based_on_CN_geometry_average (CN, geometry, metal)
+
+        if rel < length_thres :
+            spin = posspin[0]
+        else :
+            spin = posspin[-1]          
     else :
         print("***Error*** No possible spin state", posspin)
         spin = "unknown"
@@ -466,154 +459,3 @@ def assign_ground_state_spin_empirical (d_elec: int, m_ox: int, geometry: str, m
     smul = decide_spin_multiplicity (spin, N)
     
     return smul, rule, threshold 
-
-################################
-def get_posspin_v1 (l, CN, posspin, preferred_spin):
-
-    if (l.count("C") + l.count("P")) / CN > 0.5 :
-        posspin = posspin[0] # lowest spin state
-    elif (l.count("F") + l.count("Cl") + l.count("Br") + l.count("I") )/ CN > 0.5 :
-        posspin =  posspin[-1] # highest spin state
-    else :
-        posspin = preferred_spin
-           
-    return posspin
-
-################################
-def predict_ground_state_spin_v1 (metal, elec, coord_sphere, geometry, CN, N, nitrosyl) :
-    
-    block = elemdatabase.elementblock[metal]
-    period = elemdatabase.elementperiod[metal]
-    
-    if block != "d" :
-        #print("Element is not transtion metal")
-        spin = "unknown"
-
-    elif block == "d" :
-        if nitrosyl > 0 : # TMC contains at least one nitrosyl(NO) ligand
-            spin = "LS"        
-        else :   
-            if period == 5 or period == 6 : # 4d or 5d TM ions
-                spin = "LS"           
-            elif period == 4 : # 3d TM ions
-                if elec in [0, 1, 9, 10]:
-                    spin = "LS"
-                elif elec in [2, 3]:
-                    spin = "IS"                
-                else :
-                    if CN < 4 or CN > 6 :
-                        if elec == 4 :
-                            spin = "HS"
-                        elif elec == 5 :
-                            spin = "HS"
-                        elif elec == 6 :
-                            spin = "HS"
-                        elif elec == 7 :
-                            spin = "IS"
-                        elif elec == 8 :
-                            spin = "IS"
-                    else :
-                        if elec == 4 :             
-                            posspin = ["IS", "HS"]
-                            if metal == "Cr" : # Cr(+2)
-                                if geometry == "Octahedron":
-                                    preferred_spin = "HS" 
-                                    spin = get_posspin_v1 (coord_sphere, CN, posspin, preferred_spin)
-                                else :
-                                    spin = "HS" 
-
-                            elif metal == "Mn" : # Mn(+3):
-                                if geometry == "Octahedron":
-                                    preferred_spin = "HS" 
-                                    spin = get_posspin_v1 (coord_sphere, CN, posspin, preferred_spin)                        
-                                else :
-                                    spin = "HS" 
-
-                        elif elec == 5 :
-                            posspin = ["LS", "IS", "HS"]
-
-                            if metal == "Mn": # Mn(+2)
-                                if geometry == "Octahedron":
-                                    preferred_spin = "HS" 
-                                    spin = get_posspin_v1 (coord_sphere, CN, posspin, preferred_spin)                   
-                                elif geometry == "Square":
-                                    spin = "IS"                  
-                                else :
-                                    spin = "HS" 
-
-                            elif metal == "Fe": # Fe(+3) 
-                                preferred_spin = "HS" 
-                                spin = get_posspin_v1 (coord_sphere, CN, posspin, preferred_spin)                                  
-
-                        elif elec == 6 :
-                            posspin = ["LS", "IS", "HS"]
-                            if metal == "Cr" : # Cr(0) 
-                                spin = "LS"   
-
-                            elif metal == "Mn" : # Mn(+1)
-                                spin = "LS"
-
-                            elif metal == "Fe" : # Fe(+2)
-                                if geometry == "Tetrahedron" :
-                                    spin = "HS"          
-                                elif geometry == "Square" or geometry == "Trigonal bipyramid":
-                                    preferred_spin = "HS" 
-                                    posspin = ["IS", "HS"]
-                                    spin = get_posspin_v1 (coord_sphere, CN, posspin, preferred_spin)
-                                elif geometry == "Octahedron":
-                                    preferred_spin = "LS" 
-                                    spin = get_posspin_v1 (coord_sphere, CN, posspin, preferred_spin)         
-                                else :
-                                    preferred_spin = "HS" 
-                                    spin = get_posspin_v1 (coord_sphere, CN, posspin, preferred_spin)
-
-                            elif metal == "Co" : # Co(+3)
-                                if geometry == "Square":    
-                                    spin = "IS" 
-                                elif geometry == "Octahedron":
-                                    spin="LS"
-                                else : 
-                                    preferred_spin = "LS" 
-                                    spin = get_posspin_v1 (coord_sphere, CN, posspin, preferred_spin)
-
-                        elif elec == 7 :
-                            posspin = ["LS", "IS"]
-                            if metal == "Co" : # Co(+2)
-                                if geometry == "Square":    
-                                    spin = "LS"                
-                                else :
-                                    preferred_spin = "IS" 
-                                    spin = get_posspin_v1 (coord_sphere, CN, posspin, preferred_spin)
-
-                            elif metal == "Ni" : # Ni(+3)
-                                spin = "LS"   
-
-
-                        elif elec == 8 : 
-                            posspin = ["LS", "IS"]
-                            if metal == "Fe": # Fe(0)
-                                spin = "LS"
-
-                            elif metal == "Co" : # Co(+1)
-                                if geometry == "Tetrahedron" :
-                                    spin = "IS"         
-                                elif geometry == "Square":    
-                                    spin = "LS"                           
-                                else :
-                                    preferred_spin = "LS" 
-                                    spin = get_posspin_v1 (coord_sphere, CN, posspin, preferred_spin)
-
-                            elif metal == "Ni" : # Ni(+2) 
-                                if geometry == "Tetrahedron" :
-                                     spin = "IS"      
-                                elif geometry == "Square"  :
-                                    spin = "LS"                  
-                                else :
-                                    preferred_spin = "IS" 
-                                    spin = get_posspin_v1 (coord_sphere, CN, posspin, preferred_spin)
-            else : 
-                spin = "unknown"                
-        
-    smul = decide_spin_multiplicity (spin, N)
-    
-    return smul

@@ -509,7 +509,7 @@ class AtomSite(GeometryObject):
         if covalent:
             for sp in self.species.keys():
                 try:
-                    t.append(ElementData().CovalentRadius2[sp])
+                    t.append(ElementData().CovalentRadius3[sp])
                 except:
                     pass
         else:
@@ -518,7 +518,7 @@ class AtomSite(GeometryObject):
                     t.append(ElementData().IonicRadius[sp + str(ch)])
                 except:
                     try:
-                        t.append(ElementData().CovalentRadius2[sp])
+                        t.append(ElementData().CovalentRadius3[sp])
                     except:
                         pass
         try:
