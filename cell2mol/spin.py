@@ -301,14 +301,9 @@ def generate_feature_vector (metal: object):
     CN = metal.coordination_number
     geom_nr = make_geom_list()[metal.geometry]
 
-    if metal.hapticity == False :
-        rel = calcualte_relative_metal_radius (metal)
-        hapticity = 0
-    else :
-        dummy, rel = calcualte_relative_metal_radius_haptic_complexes (metal)
-        hapticity = 1
+    rel = calcualte_relative_metal_radius (metal)
 
-    feature = np.array([[elem_nr, m_ox, d_elec, CN, geom_nr, rel, hapticity]])
+    feature = np.array([[elem_nr, m_ox, d_elec, CN, geom_nr, rel]])
     
     return feature
 

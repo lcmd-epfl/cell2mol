@@ -258,9 +258,11 @@ def assign_spin (cell: object, debug: int=0) -> object:
 
                 if period == 4:               
                     if met.hapticity == False: # 3d transition metal coordination complexes      
+                        if debug >= 1: print("3d transition metal coordination complexes")
+                        if debug >= 1: print(f"{mol.type=} {mol.formula=} {met.label=} OS={met.totcharge} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
                         # i) Assign spin multiplicity based on empirical rules
                         spin, rule, threshold  = assign_ground_state_spin_empirical(met, N)
-                        if debug >= 1: print(f"By empirical model {spin=} {rule=}, {threshold=}")
+                        if debug >= 1: print(f"By empirical model {spin=}")
                         # mol.magnetism(spin)
 
                         # ii) Predict spin multiplicity of metal based on Random forest model
@@ -277,15 +279,14 @@ def assign_spin (cell: object, debug: int=0) -> object:
                             predictions = rf.predict(feature)
                             spin_rf = predictions[0]
                             mol.magnetism(spin_rf)
+                            if debug >= 1: print(f"By ramdom forest model {spin_rf=}")
                         else :
                             print("Error: d_elec is not in the range of 0-10", d_elec)
+                        if debug >= 1: print("")
                     else : # 3d transition metal complexes with haptic ligands      
                         if N % 2 == 0:  mol.magnetism(1) 
                         else:           mol.magnetism(2)                         
-
-                    if debug >= 1: print(f"{mol.type=}, {mol.formula=}, {mol.spin=}")
-                    if debug >= 1: print(f"{met.label=} {met.hapticity=} {met.hapttype=} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
-
+                        
                     for lig in mol.ligandlist:
                         if count_N(lig) %2 == 0:    lig.magnetism(1) 
                         else:                       lig.magnetism(2) 
