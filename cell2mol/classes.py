@@ -296,11 +296,11 @@ class specie(object):
     
     ############
     def create_bonds(self, debug: int=0):
-        if not hasattr(self,"rdkit_mol"): self.parent.assign_charges()
+        if not hasattr(self,"rdkit_obj"): self.parent.assign_charges()
         for idx, atom in enumerate(self.atoms):
             # Security Check. Confirms that the labels are the same
-            #if debug >= 2: print("BUILD BONDS: atom", idx, a.label)
-            rdkitatom = self.rdkit_mol.GetAtomWithIdx(idx)
+            if debug >= 2: print("BUILD BONDS: atom", idx, atom.label)
+            rdkitatom = self.rdkit_obj.GetAtomWithIdx(idx)
             tmp = rdkitatom.GetSymbol()
             if atom.label != tmp: print("Error in Create Bonds. Atom labels do not coincide. GMOL vs. MOL:", atom.label, tmp)
             else:
@@ -313,9 +313,9 @@ class specie(object):
                     if (self.subtype == "ligand") and (bond_startatom >= self.natoms or bond_endatom >= self.natoms):
                         continue
                     else:
-                        if self.atoms[bond_endatom].label != self.rdkit_mol.GetAtomWithIdx(bond_endatom).GetSymbol():
+                        if self.atoms[bond_endatom].label != self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
                             if debug >= 1: 
-                                print("Error with Bond EndAtom", self.atoms[bond_endatom].label, self.rdkit_mol.GetAtomWithIdx(bond_endatom).GetSymbol())
+                                print("Error with Bond EndAtom", self.atoms[bond_endatom].label, self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
                         else:
                             if bond_endatom == idx:
                                 start = bond_endatom
@@ -1450,16 +1450,20 @@ class cell(object):
 
             # Adds Metal-Metal Bonds, with an arbitrary 0.5 order:
             if mol.iscomplex:
-                for idx, met1 in mol.metals:
-                    for jdx, met2 in mol.metals:
-                        if idx <= jdx: continue
-                        isconnected = met1.check_connectivity(met2, debug=debug)
-                        # isconnected = check_connectivity(met1, met2)
-                        if isconnected:
-                            newbond = bond(met1, met2, 0.5)
-                            met1.add_bond(newbond) 
-                            met2.add_bond(newbond) 
-
+                if len(mol.metals) > 1 :
+                    print(f"CELL.CREATE_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
+                    print(f"CELL.CREATE_BONDS: Metals: {mol.metals}")
+                    for idx, met1 in enumerate(mol.metals):
+                        for jdx, met2 in enumerate(mol.metals):
+                            if idx <= jdx: continue
+                            isconnected = met1.check_connectivity(met2, debug=debug)
+                            # isconnected = check_connectivity(met1, met2)
+                            if isconnected:
+                                newbond = bond(met1, met2, 0.5)
+                                met1.add_bond(newbond) 
+                                met2.add_bond(newbond) 
+                else :
+                    pass
 
                 # Fourth part : correction smiles of ligands
                 mol.smiles_with_H = [lig.smiles for lig in mol.ligands]
