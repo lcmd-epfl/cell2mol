@@ -557,6 +557,7 @@ def get_charge(ich: int, prot: object, allow: bool=True, debug: int=0):
 
     natoms = prot.natoms
     atnums = prot.atnums
+    if debug >= 2: print(f"*****get_charge******")
 
     ##########################
     # xyz2mol is called here #
@@ -572,7 +573,7 @@ def get_charge(ich: int, prot: object, allow: bool=True, debug: int=0):
 
     # Smiles are generated with rdkit
     smiles = Chem.MolToSmiles(mols[0])
-
+    print(f"{smiles=}")
     # Gets the resulting charges
     atom_charge = []
     total_charge = 0
@@ -910,7 +911,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
  
     for idx, mol in enumerate(moleclist):
         #if hasattr(mol,"totcharge") and hasattr(mol,"rdkit_mol"): continue 
-    
+        if debug >= 2: print(f"******************{idx=} {mol.formula=}******************")
         ###################################
         ### FOR SOLVENT AND COUNTERIONS ###
         ###################################
@@ -989,6 +990,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
         
                         if new_cs.corr_total_charge != cs.corr_total_charge:
                             if debug >= 1: print(f"PREPARE: WARNING: total charge obtained after correction {new_cs.corr_total_charge} while it should be {cs.corr_total_charge}")
+                            # TODO : This is a warning, but it should do somthing about it  (e.g. try to correct it)                     
                         else:
                             lig.set_charges(new_cs.corr_total_charge, new_cs.corr_atom_charges, new_cs.smiles, new_cs.rdkit_mol)
                             if debug >= 1: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={new_cs.corr_total_charge}") 
@@ -1017,6 +1019,10 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                 tmp_atcharge = np.zeros((mol.natoms))
                 tmp_smiles = []
                 for lig in mol.ligands:
+                    if debug >= 2: print(f"{lig.formula=}")
+                    if debug >= 2: print(f"{tmp_smiles=}")
+                    if debug >= 2: print(f"{lig.smiles=}")
+
                     tmp_smiles.append(lig.smiles)
                     parent_indices = lig.get_parent_indices("molecule")
                     for kdx, a in enumerate(parent_indices):

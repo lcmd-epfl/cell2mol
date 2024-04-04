@@ -617,8 +617,8 @@ def get_proto_mol(atoms):
     mol = Chem.MolFromSmarts("[#" + str(atoms[0]) + "]")
     rwMol = Chem.RWMol(mol)
     for i in range(1, len(atoms)):
-        print(f"XYZ2MOL.PROTO_MOL: doing {atoms[i]=}")
-        a = Chem.Atom(atoms[i])
+        #print(f"XYZ2MOL.PROTO_MOL: doing {atoms[i]=}")
+        a = Chem.Atom(int(atoms[i]))
         rwMol.AddAtom(a)
 
     mol = rwMol.GetMol()
@@ -829,7 +829,6 @@ def xyz2mol(
         mols - list of rdkit molobjects
 
     """
-
     AC = np.array(AC)
     mol = get_proto_mol(atoms)
     # Get atom connectivity (AC) matrix, list of atomic numbers, molecular charge,
