@@ -568,7 +568,7 @@ def get_charge(ich: int, prot: object, allow: bool=True, debug: int=0):
     # use_huckel false means that the xyz2mol adjacency will be generated based on atom distances and vdw radii.
     # instead of use_huckel, we provide the adjacency matrix 
 
-    mols = xyz2mol(atnums,prot.coords,prot.adjmat,prot.cov_factor,charge=ich,use_graph=True,allow_charged_fragments=allow,embed_chiral=True,use_huckel=False)
+    mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=ich, use_graph=True,allow_charged_fragments=allow,embed_chiral=True,use_huckel=False)
     if len(mols) > 1: print("WARNING: More than 1 mol received from xyz2mol for initcharge:", ich)
 
     # Smiles are generated with rdkit
@@ -583,7 +583,7 @@ def get_charge(ich: int, prot: object, allow: bool=True, debug: int=0):
         total_charge += a.GetFormalCharge()
 
     # Connectivity is checked
-    iscorrect = check_rdkit_mol_connectivity(mols[0], prot.natoms, ich, debug=debug)
+    iscorrect = check_rdkit_obj_connectivity(mols[0], prot.natoms, ich, debug=debug)
 
     # Charge_state is initiated
     ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, ich, allow, prot)
@@ -591,7 +591,7 @@ def get_charge(ich: int, prot: object, allow: bool=True, debug: int=0):
     return ch_state
 
 #######################################################
-def check_rdkit_mol_connectivity(mol: object, natoms: int, ich: int, debug: int=0): 
+def check_rdkit_obj_connectivity(mol: object, natoms: int, ich: int, debug: int=0): 
     # Here, the atom charge is retrieved, and the connectivity of each atom goes through 3 checks.
     # The variable iscorrect will track whether the overall generated structure is meaningful
     pt = Chem.GetPeriodicTable()  # Needed to retrieve the default valences in the 2nd and 3rd checks
@@ -910,7 +910,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
     idxtoallocate = 0
  
     for idx, mol in enumerate(moleclist):
-        #if hasattr(mol,"totcharge") and hasattr(mol,"rdkit_mol"): continue 
+        #if hasattr(mol,"totcharge") and hasattr(mol,"rdkit_obj"): continue 
         if debug >= 2: print(f"******************{idx=} {mol.formula=}******************")
         ###################################
         ### FOR SOLVENT AND COUNTERIONS ###
@@ -922,23 +922,26 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
     
             allocated = False
             for jdx, cs in enumerate(spec.possible_cs):
-                if final_charge_distribution[idxtoallocate] == cs.corr_total_charge and not allocated:   # If the charge in poscharges coincides with the one for this entry in final_distribution
-
+                # If the charge in poscharges coincides with the one for this entry in final_distribution
+                if final_charge_distribution[idxtoallocate] == cs.corr_total_charge and not allocated:   
                     ## Reorders the atoms to increase chance of perfectly reproducing the desired charge
                     ref_data, target_data = arrange_data_for_reorder(spec, mol)
+                    print(ref_data==target_data)
                     if debug >= 2: print(f"PREPARE: reordering with data: \n{ref_data=}\n{target_data=}")
                     dummy1, dummy2, map12 = reorder(ref_data, target_data, spec.coord, mol.coord)
+                    if debug >= 2: print(f"PREPARE: reordering with {dummy1}")
+                    if debug >= 2: print(f"PREPARE: reordering with {dummy2}")
                     if debug >= 2: print(f"PREPARE: reordering protonation with {map12}")
-                    prot = cs.protonation.reorder(map12)
+                    prot = cs.protonation.reorder(map12, debug=debug)
                     if debug >= 2: print(f"PREPARE: reordered protonation: \n{prot}")
                     ###############    
 
                     allocated = True 
                     idxtoallocate += 1
                     new_cs = get_charge(cs.corr_total_charge, prot, allow=cs.allow, debug=debug)
-    
+                    
                     if new_cs.corr_total_charge == cs.corr_total_charge:
-                        mol.set_charges(new_cs.corr_total_charge, new_cs.corr_atom_charges, new_cs.smiles, new_cs.rdkit_mol)
+                        mol.set_charges(new_cs.corr_total_charge, new_cs.corr_atom_charges, new_cs.smiles, new_cs.rdkit_obj)
                         if debug >= 2: print(f"PREPARE: Success doing molecule {idx}. Created Charge State with total_charge={new_cs.corr_total_charge}") 
                     else:
                         if debug >= 2: print(f"PREPARE: Error doing molecule {idx}. Created Charge State is different than Target {new_cs.corr_total_charge} vs {cs.corr_total_charge}")
@@ -970,7 +973,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                         if debug >= 2: print(f"PREPARE: reordering with data: \n{ref_data=}\n{target_data=}")
                         dummy1, dummy2, map12 = reorder(ref_data, target_data, spec.coord, lig.coord)
                         if debug >= 2: print(f"PREPARE: reordering protonation with {map12}")
-                        prot = cs.protonation.reorder(map12)
+                        prot = cs.protonation.reorder(map12, debug=debug)
                         if debug >= 2: print(f"PREPARE: reordered protonation: \n{prot}")
                         ###############    
 
@@ -992,7 +995,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
                             if debug >= 1: print(f"PREPARE: WARNING: total charge obtained after correction {new_cs.corr_total_charge} while it should be {cs.corr_total_charge}")
                             # TODO : This is a warning, but it should do somthing about it  (e.g. try to correct it)                     
                         else:
-                            lig.set_charges(new_cs.corr_total_charge, new_cs.corr_atom_charges, new_cs.smiles, new_cs.rdkit_mol)
+                            lig.set_charges(new_cs.corr_total_charge, new_cs.corr_atom_charges, new_cs.smiles, new_cs.rdkit_obj)
                             if debug >= 1: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={new_cs.corr_total_charge}") 
                             allocated = True 
 
@@ -1036,7 +1039,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
 
 #######################################################
 def correct_smiles_ligand(ligand: object):
-    ## Receives a ligand class object and constructs the smiles and the rdkit_mol object from scratch, using atoms and bond information
+    ## Receives a ligand class object and constructs the smiles and the rdkit_obj object from scratch, using atoms and bond information
 
     Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
     #### Creates an empty editable molecule
@@ -1141,11 +1144,11 @@ class protonation(object):
 
 #######################################################
 class charge_state(object):
-    def __init__(self, status, uncorr_total_charge, uncorr_atom_charges, rdkit_mol: object, smiles: str, charge_tried: int, allow: bool, protonation: object):
+    def __init__(self, status, uncorr_total_charge, uncorr_atom_charges, rdkit_obj: object, smiles: str, charge_tried: int, allow: bool, protonation: object):
         self.status                     = status
         self.uncorr_total_charge        = uncorr_total_charge
         self.uncorr_atom_charges        = uncorr_atom_charges
-        self.rdkit_mol                  = rdkit_mol
+        self.rdkit_obj                  = rdkit_obj
         self.smiles                     = smiles
         self.charge_tried               = charge_tried
         self.allow                      = allow

@@ -296,11 +296,11 @@ class specie(object):
     
     ############
     def create_bonds(self, debug: int=0):
-        if not hasattr(self,"rdkit_obj"): self.parent.assign_charges()
+        if not hasattr(self,"rdkit_obj"): self.get_parent("cell").assign_charges()
         for idx, atom in enumerate(self.atoms):
             # Security Check. Confirms that the labels are the same
             if debug >= 2: print("BUILD BONDS: atom", idx, atom.label)
-            rdkitatom = self.rdkit_obj.GetAtomWithIdx(idx)
+            rdkitatom = self.rdkit_obj.GetAtomWithIdx(idx)            
             tmp = rdkitatom.GetSymbol()
             if atom.label != tmp: print("Error in Create Bonds. Atom labels do not coincide. GMOL vs. MOL:", atom.label, tmp)
             else:
@@ -309,11 +309,12 @@ class specie(object):
                     bond_startatom = b.GetBeginAtomIdx()
                     bond_endatom   = b.GetEndAtomIdx()
                     bond_order     = b.GetBondTypeAsDouble()
-
+                    if debug >= 2: print("BUILD BONDS: bond", bond_startatom, bond_endatom, bond_order, self.atoms[bond_startatom].label, self.atoms[bond_endatom].label, self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
                     if (self.subtype == "ligand") and (bond_startatom >= self.natoms or bond_endatom >= self.natoms):
                         continue
                     else:
                         if self.atoms[bond_endatom].label != self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
+                            pass
                             if debug >= 1: 
                                 print("Error with Bond EndAtom", self.atoms[bond_endatom].label, self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
                         else:
@@ -326,7 +327,7 @@ class specie(object):
 
                             ## This has changed. Now there is a bond object, and we send the atom objects, not only the index
                             new_bond = bond(self.atoms[start], self.atoms[end], bond_order) 
-                        atom.add_bond(new_bond)
+                            atom.add_bond(new_bond)
 
     ############
     def print_xyz(self):
@@ -1422,6 +1423,7 @@ class cell(object):
         if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)  
         if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to create the spin
         for mol in self.moleclist:
+            print(f"CELL.CREATE_BONDS: Creating Bonds for molecule {mol.formula}")
             # First part
             if not mol.iscomplex: 
                 mol.create_bonds(debug=debug)          ### Creates bonds between molecule.atoms using the molecule.rdkit_object
