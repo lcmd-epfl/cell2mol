@@ -146,7 +146,7 @@ class specie(object):
         if hasattr(self,"totcharge"):      delattr(self,"totcharge")
         if hasattr(self,"atomic_charges"): delattr(self,"atomic")
         if hasattr(self,"smiles"):         delattr(self,"smiles")
-        if hasattr(self,"rdkit_mol"):      delattr(self,"rdkit_mol")
+        if hasattr(self,"rdkit_obj"):      delattr(self,"rdkit_obj")
         if hasattr(self,"poscharges"):     delattr(self,"poscharges") 
         for a in self.atoms:               
             a.reset_charge() 
@@ -296,7 +296,7 @@ class specie(object):
     
     ############
     def create_bonds(self, debug: int=0):
-        if not hasattr(self,"rdkit_obj"): self.get_parent("cell").assign_charges()
+        # if not hasattr(self,"rdkit_obj"): self.get_parent("cell").assign_charges()
         for idx, atom in enumerate(self.atoms):
             # Security Check. Confirms that the labels are the same
             if debug >= 2: print("BUILD BONDS: atom", idx, atom.label)
@@ -309,14 +309,16 @@ class specie(object):
                     bond_startatom = b.GetBeginAtomIdx()
                     bond_endatom   = b.GetEndAtomIdx()
                     bond_order     = b.GetBondTypeAsDouble()
-                    if debug >= 2: print("BUILD BONDS: bond", bond_startatom, bond_endatom, bond_order, self.atoms[bond_startatom].label, self.atoms[bond_endatom].label, self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
+                    if debug >= 2: print("BUILD BONDS: bond", bond_startatom, bond_endatom, bond_order, 
+                                         self.atoms[bond_startatom].label, self.atoms[bond_endatom].label, 
+                                         self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
                     if (self.subtype == "ligand") and (bond_startatom >= self.natoms or bond_endatom >= self.natoms):
                         continue
                     else:
                         if self.atoms[bond_endatom].label != self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
-                            pass
                             if debug >= 1: 
-                                print("Error with Bond EndAtom", self.atoms[bond_endatom].label, self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
+                                print("Error with Bond EndAtom", self.atoms[bond_endatom].label, 
+                                      self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
                         else:
                             if bond_endatom == idx:
                                 start = bond_endatom
@@ -480,7 +482,7 @@ class molecule(specie):
         if not hasattr(self,"smiles"): self.smiles = []
         if not self.iscomplex: return self.smiles
         for lig in self.ligands:
-            lig.smiles, lig.rdkit_mol = correct_smiles_ligand(lig)
+            lig.smiles, lig.rdkit_obj = correct_smiles_ligand(lig)
             self.smiles.append(lig.smiles)
 
 ###############
@@ -780,16 +782,21 @@ class bond(object):
         self.atom1      = atom1
         self.atom2      = atom2
         self.order      = bond_order
+        self.distance   = np.linalg.norm(np.array(atom1.coord) - np.array(atom2.coord))
 
     def __repr__(self):
+        to_print = ""
         to_print += f'------------- Cell2mol BOND Object --------------\n'
-        to_print += f' Version               = {self.version}\n'
-        to_print += f' Type                  = {self.type}\n'
+        to_print += f' Version                  = {self.version}\n'
+        to_print += f' Type                     = {self.type}\n'
         idx1 = self.atom1.get_parent_index("molecule")
         idx2 = self.atom2.get_parent_index("molecule")
-        to_print += f' Molecule Atom 1       = {idx1}\n'
-        to_print += f' Molecule Atom 2       = {idx2}\n'
-        to_print += f' Bond Order            = {self.order}\n'
+        to_print += f' Molecule Atom 1 label    = {self.atom1.label}\n'
+        to_print += f' Molecule Atom 2 label    = {self.atom2.label}\n'
+        to_print += f' Molecule Atom 1 index    = {idx1}\n'
+        to_print += f' Molecule Atom 2 index    = {idx2}\n'
+        to_print += f' Bond Order               = {self.order}\n'
+        to_print += f' Distance                 = {round(self.distance,3)}\n'
         to_print += '----------------------------------------------------\n'
         return to_print
 
@@ -1440,14 +1447,13 @@ class cell(object):
                         count = 0
                         for met in mol.metals: 
                             isconnected = at.check_connectivity(met, debug=debug)
-                            # isconnected = check_connectivity(at, met)
                             if isconnected: 
                                 newbond = bond(at, met, 0.5)
                                 at.add_bond(newbond)
                                 met.add_bond(newbond)
                                 count += 1 
                         if count != at.mconnec: 
-                            print(f"CELL.CREATE_BONDS: error creating bonds for atom: \n{atom}\n of ligand: \n{lig}\n")
+                            print(f"CELL.CREATE_BONDS: error creating bonds for atom: \n{at}\n of ligand: \n{lig}\n")
                             print(f"CELL.CREATE_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
 
             # Adds Metal-Metal Bonds, with an arbitrary 0.5 order:
@@ -1459,13 +1465,10 @@ class cell(object):
                         for jdx, met2 in enumerate(mol.metals):
                             if idx <= jdx: continue
                             isconnected = met1.check_connectivity(met2, debug=debug)
-                            # isconnected = check_connectivity(met1, met2)
                             if isconnected:
                                 newbond = bond(met1, met2, 0.5)
                                 met1.add_bond(newbond) 
                                 met2.add_bond(newbond) 
-                else :
-                    pass
 
                 # Fourth part : correction smiles of ligands
                 mol.smiles_with_H = [lig.smiles for lig in mol.ligands]
