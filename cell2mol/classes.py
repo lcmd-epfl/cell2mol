@@ -281,7 +281,7 @@ class specie(object):
             if not hasattr(self, "is_haptic"): self.get_hapticity()
             if not hasattr(self, "denticity"): self.get_denticity()
             self.protonation_states = get_protonation_states_specie(self, debug=debug)
-        else : 
+        else:
             if not hasattr(self,"is_haptic"): self.get_hapticity()
             self.protonation_states = get_protonation_states_specie(self, debug=debug)
         return self.protonation_states
@@ -290,8 +290,9 @@ class specie(object):
     def get_possible_cs(self, debug: int=0):
         ## Arranges a list of possible charge_states associated with this species, 
         ## which is later managed at the cell level to determine the good one
-        if not hasattr(self,"protonation_states"): self.get_protonation_states(debug=debug)
-        if self.protonation_states is not None:    self.possible_cs = get_possible_charge_state(self, debug=debug)  
+        if self.subtype == "ligand" or (self.subtype == "molecule" and not self.iscomplex):
+            if not hasattr(self,"protonation_states"): self.get_protonation_states(debug=debug)
+            self.possible_cs = get_possible_charge_state(self, debug=debug)  
         return self.possible_cs
     
     ############
