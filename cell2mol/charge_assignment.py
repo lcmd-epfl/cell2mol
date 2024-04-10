@@ -1133,12 +1133,39 @@ class protonation(object):
 
         self.radii = get_radii(labels)
         self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
+   
+    def reorder(self, map, debug: int=0):
+        if debug > 0: print("PROTONATION.REORDER. labels:", self.labels)
+        if debug > 0: print("PROTONATION.REORDER. received map:", map)
+
+        ## for protonation states with added atoms, the reorder map will have fewer items. Correct it here 
+        mapext = np.copy(map)
+        if self.added_atoms > 0 and len(map) < len(self.labels):
+            for ldx in range(0,self.added_atoms):
+                mapext = np.append(mapext,len(map)+ldx)
+            if debug > 0: print("PROTONATION.REORDER. extended map:", mapext)
+
+        assert len(mapext) == len(self.labels)
+        assert len(map)    == len(self.addedlist)
+        if len(map) > 0:
+            self.labels                     = list(np.array(self.labels)[mapext])
+            self.coords                     = list(np.array(self.coords)[mapext])
+            self.atnums                     = list(np.array(self.atnums)[mapext])
+            self.radii                      = list(np.array(self.radii)[mapext])
+            self.addedlist                  = list(np.array(self.addedlist)[map])
+            self.block                      = list(np.array(self.block)[map])
+            self.metal_electrons            = list(np.array(self.metal_electrons)[map])
+            self.elemlist                   = list(np.array(self.elemlist)[map])
+            self.typ                        = "Reordered"
+            self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
+        return self
 
     def __repr__(self):
         to_print = ""
         to_print += f'------------- Cell2mol Protonation ----------------\n'
         to_print += f' Status                          = {self.status}\n'
         to_print += f' Labels                          = {self.labels}\n'
+        to_print += f' Type                            = {self.typ}\n'
         to_print += f' Atoms added in positions        = {self.addedlist}\n'
         to_print += f' Atoms blocked (no atoms added)  = {self.block}\n'
         to_print += f'---------------------------------------------------\n'
