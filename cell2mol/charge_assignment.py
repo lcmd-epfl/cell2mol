@@ -1083,6 +1083,36 @@ def correct_smiles_ligand(ligand: object):
     
     return smiles, obj
 
+
+def reorder_protonation (prot, map, debug: int=0):
+    if debug > 0: print("PROTONATION.REORDER. labels:", prot.labels)
+    if debug > 0: print("PROTONATION.REORDER. received map:", map)
+
+    ## for protonation states with added atoms, the reorder map will have fewer items. Correct it here 
+    mapext = np.copy(map)
+    if prot.added_atoms > 0 and len(map) < len(prot.labels):
+        for ldx in range(0,prot.added_atoms):
+            mapext = np.append(mapext,len(map)+ldx)
+        if debug > 0: print("PROTONATION.REORDER. extended map:", mapext)
+
+    assert len(mapext) == len(prot.labels)
+    assert len(map)    == len(prot.addedlist)
+    if len(map) > 0:
+        reordered_labels                     = [prot.labels[i] for i in mapext]
+        reordered_coords                     = [prot.coords[i] for i in mapext]
+        reordered_addedlist                  = [prot.addedlist[i] for i in map]
+        reordered_block                      = [prot.block[i] for i in map]
+        reordered_metal_electrons            = [prot.metal_electrons[i] for i in map]
+        reordered_elemlist                   = [prot.elemlist[i] for i in map]
+
+
+    reordered_protonation = protonation(reordered_labels, reordered_coords, prot.cov_factor, prot.added_atoms,
+                                        reordered_addedlist, reordered_block, reordered_metal_electrons, reordered_elemlist, 
+                                        tmpsmiles=prot.tmpsmiles, os=prot.os, typ="Reordered", parent=prot.parent)
+    print("CREATED REORDERED PROTONATION", reordered_protonation)
+
+    return reordered_protonation
+
 #######################################################
 class protonation(object):
     def __init__(self, labels, coord, cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, tmpsmiles=" ", os=int(0), typ="Local", parent: object=None):
@@ -1103,31 +1133,6 @@ class protonation(object):
 
         self.radii = get_radii(labels)
         self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
-    
-    def reorder(self, map, debug: int=0):
-        if debug > 0: print("PROTONATION.REORDER. labels:", self.labels)
-        if debug > 0: print("PROTONATION.REORDER. received map:", map)
-
-        ## for protonation states with added atoms, the reorder map will have fewer items. Correct it here 
-        mapext = np.copy(map)
-        if self.added_atoms > 0 and len(map) < len(self.labels):
-            for ldx in range(0,self.added_atoms):
-                mapext = np.append(mapext,len(map)+ldx)
-            if debug > 0: print("PROTONATION.REORDER. extended map:", mapext)
-
-        assert len(mapext) == len(self.labels)
-        assert len(map)    == len(self.addedlist)
-        if len(map) > 0:
-            self.labels                     = list(np.array(self.labels)[mapext])
-            self.coords                     = list(np.array(self.coords)[mapext])
-            self.atnums                     = list(np.array(self.atnums)[mapext])
-            self.radii                      = list(np.array(self.radii)[mapext])
-            self.addedlist                  = list(np.array(self.addedlist)[map])
-            self.block                      = list(np.array(self.block)[map])
-            self.metal_electrons            = list(np.array(self.metal_electrons)[map])
-            self.elemlist                   = list(np.array(self.elemlist)[map])
-            self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
-        return self
 
     def __repr__(self):
         to_print = ""
