@@ -277,7 +277,7 @@ class specie(object):
             if not hasattr(self,"is_haptic"): self.get_hapticity()
             self.protonation_states = None
         elif self.subtype == "ligand" :
-            # if not hasattr(self,"groups"): self.split_ligand()
+            # if not hasattr(self,"groups"): self.split_ligand()76
             if not hasattr(self, "is_haptic"): self.get_hapticity()
             if not hasattr(self, "denticity"): self.get_denticity()
             self.protonation_states = get_protonation_states_specie(self, debug=debug)
