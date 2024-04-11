@@ -898,6 +898,96 @@ def arrange_data_for_reorder(reference: object, target: object, debug: int=0):
         ref_data.append(data)
     return ref_data, target_data
 
+#######################################################    
+def set_charges_create_bonds (specie, unique_indices, unique_species, final_charge_distribution, debug):
+        
+    spec = unique_species[specie.unique_index]
+    indices = [index for index, value in enumerate(unique_indices) if value == specie.unique_index]
+    target_charge = [final_charge_distribution[i] for i in indices][0] 
+    if debug > 1: print(spec, indices, target_charge)
+    
+    if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+        formula = specie.formula
+        charge_list = [cs.corr_total_charge for cs in spec.possible_cs]
+    
+    elif specie.subtype == "metal":
+        formula = specie.label
+        charge_list = spec.possible_cs
+    
+    if target_charge in charge_list:           
+        if debug > 1: print(f"Target charge {target_charge} of {formula} exists in {charge_list}." )
+    else:
+        if debug > 1: print(f"ERROR: Target charge {target_charge} of {formula} does not exist in {charge_list}." )
+        return None
+        
+    if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+        print(specie.formula)
+        specie.get_protonation_states(debug=debug)
+        specie.get_possible_cs(debug=debug)
+        formula = specie.formula
+        charge_list = [cs.corr_total_charge for cs in specie.possible_cs]        
+        
+        if target_charge in charge_list:
+            if debug > 1: print(f"Target charge {target_charge} of {formula} exists in {charge_list}.")
+            idx = charge_list.index(target_charge)
+            cs = specie.possible_cs[idx]
+            #prot = cs.protonation
+            specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
+            specie.create_bonds(debug=debug)
+        else:
+            if debug > 1: print(f"ERROR: Target charge {target_charge} of {formula} does not exist in {charge_list}." )
+            return None
+                    
+    elif specie.subtype == "metal":
+        print(specie.label)
+        specie.get_possible_cs(debug=debug)
+        formula = specie.label
+        charge_list = spec.possible_cs        
+
+        if target_charge in charge_list:
+            if debug > 1: print(f"Target charge {target_charge} of {formula} exists in {charge_list}." )
+            idx = charge_list.index(target_charge)
+            cs = specie.possible_cs[idx]
+            specie.set_charge(cs)         
+        else:
+            if debug > 1: print(f"ERROR: Target charge {target_charge} of {formula} does not exist in {charge_list}." )
+            return None  
+#######################################################
+def prepare_mols_v4 (moleclist: list, unique_indices: list, unique_species: list, final_charge_distribution: list, debug: int=0):
+    count = 0 
+    for mol in moleclist:
+        if mol.iscomplex == False:
+            set_charges_create_bonds(mol, unique_indices, unique_species, final_charge_distribution, debug)
+            count += 1
+        
+        elif mol.iscomplex:
+            tmp_atcharge = np.zeros((mol.natoms))
+            tmp_smiles = []
+            
+            for lig in mol.ligands:            
+                set_charges_create_bonds(lig, unique_indices, unique_species, final_charge_distribution, debug)
+                count += 1
+                 
+                tmp_smiles.append(lig.smiles)
+                parent_indices = lig.get_parent_indices("molecule")
+                for kdx, a in enumerate(parent_indices):
+                    tmp_atcharge[a] = lig.atomic_charges[kdx]
+                    
+            for met in mol.metals:        
+                set_charges_create_bonds(met, unique_indices, unique_species, final_charge_distribution, debug)
+                count += 1
+                parent_index = met.get_parent_index("molecule")
+                tmp_atcharge[parent_index] = met.charge     
+                
+            mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge, smiles=tmp_smiles)
+
+    if count != len(final_charge_distribution):
+        Warning = True
+    else:
+        Warning = False
+    
+    return moleclist, Warning
+
 #######################################################
 def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, selected_cs: list, final_charge_distribution: list, debug: int=0) -> Tuple[list, bool]:
     # The charge and connectivity of a given specie in the unit cell is only determined for one representative case. i

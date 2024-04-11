@@ -5,7 +5,7 @@ from cell2mol.connectivity import compare_atoms, compare_species, compare_metals
 from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
 from cell2mol.charge_assignment import get_protonation_states_specie, get_possible_charge_state, get_metal_poscharges
-from cell2mol.charge_assignment import balance_charge, prepare_unresolved, prepare_mols, correct_smiles_ligand
+from cell2mol.charge_assignment import balance_charge, prepare_unresolved, prepare_mols, correct_smiles_ligand, prepare_mols_v4
 from cell2mol.spin import assign_spin_metal, assign_spin_complexes
 from cell2mol.other import extract_from_list, compute_centroid, get_dist, get_angle
 from cell2mol.elementdata import ElementData
@@ -1421,12 +1421,15 @@ class cell(object):
             self.error_empty_distrib    = True
             return None
         else: # Only one possible charge distribution -> getcharge for the repeated species
+            self.error_multiple_distrib = False
+            self.error_empty_distrib    = False
             if debug >= 1:
                 print(f"\nFINAL Charge Distribution: {final_charge_distribution}\n")
                 print("#########################################")
                 print("Assigning Charges and Preparing Molecules")
                 print("#########################################")
-            self.moleclist, self.error_prepare_mols = prepare_mols(self.moleclist, self.unique_indices, self.unique_species, selected_cs, final_charge_distribution[0], debug=debug)
+            self.moleclist, self.error_prepare_mols =  prepare_mols_v4 (self.moleclist, self.unique_indices, self.unique_species, final_charge_distribution[0], debug=debug)
+            # self.moleclist, self.error_prepare_mols = prepare_mols(self.moleclist, self.unique_indices, self.unique_species, selected_cs, final_charge_distribution[0], debug=debug)
             if self.error_prepare_mols: return None # Error while preparing molecules
             
             return self.moleclist

@@ -144,7 +144,7 @@ def check_missingH(refmoleclist: list, debug: int=0):
                         if a.label == "C" and a.mconnec == 0:
                             bonded_atom_coord = []
                             for adj in a.adjacency:
-                                bonded_atom_coord.append(lig.coord[adj])
+                                bonded_atom_coord.append(lig.get_parent("molecule").coord[adj])
                             ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord)
                             if ismissingH:
                                 if debug >= 2: print("")
