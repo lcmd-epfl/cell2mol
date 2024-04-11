@@ -1044,13 +1044,18 @@ class metal(atom):
         if not self.check_parent("molecule"): return None
         mol = self.get_parent("molecule")
         self.groups = []
-        for group in mol.ligand.groups:
-            tmplabels = self.label.copy()
-            tmpcoord  = self.coord.copy()
-            tmplabels.append(group.labels)
-            tmpcoord.append(group.coord)
-            isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
-            if isgood and any(tmpadjnum) > 0: self.groups.append(group)
+        for lig in mol.ligands:
+            for group in lig.groups:
+                print(group)
+                tmplabels = []
+                tmpcoord  = []
+                tmplabels.append(self.label)
+                tmpcoord.append(self.coord)
+                tmplabels.extend(group.labels)
+                tmpcoord.extend(group.coord)
+                print(tmplabels, tmpcoord)
+                isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+                if isgood and any(tmpadjnum) > 0: self.groups.append(group)
         return self.groups
 
     #######################################################
@@ -1059,7 +1064,7 @@ class metal(atom):
         
         diff_list = []
         for group in self.groups:
-            if group.hapticity == False :
+            if group.is_haptic == False :
                 for atom in group.atoms:
                     diff = round(get_dist(self.coord, atom.coord) - elemdatabase.CovalentRadius3[atom.label], 3)
                     diff_list.append(diff)

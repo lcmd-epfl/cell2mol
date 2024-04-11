@@ -8,24 +8,31 @@ elemdatabase = ElementData()
 #######################################################
 ###     Define coordination geometry from groups    ### 
 #######################################################
-def get_coordination_geometry (coord_group: list, debug: int=0) -> object:
+def get_coordination_geometry (metal: object, coord_group: list, debug: int=0) -> object:
     
     symbols = []
     positions = []
     coord_haptic_type = []
+
+    symbols.append(metal.label)
+    positions.append(metal.coord)
+    
     for group in coord_group:
-        if group.hapticity == False:
+        if group.is_haptic == False:
             for atom in group.atoms:
                 symbols.append(atom.label)
                 positions.append(atom.coord)
                 if debug >= 2 : print(atom.label, atom.coord)
         else :
             haptic_center_coord = compute_centroid([atom.coord for atom in group.atoms])
-            symbols.append(str(group.hapttype))
+            symbols.append(str(group.haptic_type))
             positions.append(haptic_center_coord)      
             if debug >= 2 : print(f"mid point of {group.haptic_type=}", haptic_center_coord)      
             coord_haptic_type.append(group.haptic_type)             
     
+    print(f"{symbols=}")
+    print(f"{positions=}")
+
     posgeom_dev = shape_measure(symbols, positions, debug=debug)
 
     if len(posgeom_dev) > 0:
@@ -49,9 +56,10 @@ def get_coordination_geometry (coord_group: list, debug: int=0) -> object:
 def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:
     # Get shape measure of a set of coordinates
 
-    cn = len(symbols) # coordination number of metal center
+    cn = len(symbols)-1 # coordination number of metal center
     connectivity= [[1, i] for i in range(2, cn+2)]
-    
+    print(cn)
+    print(connectivity)
     geometry = Geometry(positions=positions, 
                         symbols=symbols, 
                         connectivity=connectivity)            
