@@ -1356,7 +1356,7 @@ class cell(object):
                 newmolec = molecule(mol.labels, mol.coord)
                 newmolec.origin = "cell.reconstruct"
                 newmolec.set_atoms(create_adjacencies=True, debug=debug)
-                newmolec.add_parent(self,mol.cell_indices) 
+                newmolec.add_parent(self, mol.cell_indices) 
                 newmolec.set_fractional_coord(mol.frac_coord)
                 if newmolec.iscomplex: newmolec.split_complex()
                 self.moleclist.append(newmolec)         

@@ -2,8 +2,11 @@ import numpy as np
 import itertools
 from cell2mol.cell_operations import translate
 from cell2mol.other import additem, absolute_value
-from cell2mol.connectivity import compare_species, count_species, split_species
+from cell2mol.connectivity import compare_species, count_species, split_species, arrange_data_for_reorder
+from cell2mol.hungarian import reorder
 from cell2mol.elementdata import ElementData
+from cell2mol.read_write import writexyz
+
 elemdatabase = ElementData()
 
 #######################################################
@@ -208,6 +211,9 @@ def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmolec
         moleclist.extend(finalmols)
         print(f"{finalmols=}")
         print(f"{remfrag=}")
+        for i, g in enumerate(finalmols):
+            if debug == 1: writexyz("/Users/ycho/cell2mol/cell2mol/test/YOBCUO/", f"reorder_molec_{i}.xyz", g.labels, g.coord)
+
         if len(remfrag) > 0: Warning = True;  print("FRAG_RECONSTRUCT. Remaining after Hydrogen reconstruction",remfrag)
         else:                Warning = False; print("FRAG_RECONSTRUCT. No remaining Molecules after Hydrogen reconstruction")
     elif len(remfrag) > 0 and len(Hlist) == 0:
@@ -221,6 +227,7 @@ def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmolec
     # The former were identified in the cell.get_moleclist() function, and have cell as parent. 
     # The latter have been constructed by merging fragments, and do not have cell as parent, but have the cell_indices stored in mol.cell_indices
     # Here we homogenize the situation by adding the cell_indices variable to all molecules
+    # TODO : why cell_indices is needed?
     for mol in moleclist:
         if not hasattr(mol,"cell_indices"): 
             if mol.check_parent("cell"):
@@ -466,6 +473,8 @@ def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: fl
 
 #######################################################
 def combine(tobemerged: list, references: list, cellvec: list, threshold_tmat: float, cov_factor: float, metal_factor: float, debug: int=0):
+    from cell2mol.classes import molecule
+
     goodlist = []   ## List of molecules coming from the two fragments received
     avglist = []    ## List of bigger fragments coming from the two fragments received
     badlist = []    ## List of fragments as they entered the function
@@ -488,12 +497,33 @@ def combine(tobemerged: list, references: list, cellvec: list, threshold_tmat: f
         found = False 
         for ref in references:
             if not found: 
-                issame = compare_species(newmolec, ref)
-                if issame:    ## Then is a molecule that appears in the reference list 
-                    found = True 
-                    newmolec.subtype = ref.subtype
-                    goodlist.append(newmolec)
-                    if debug >= 1: print(f"COMBINE: Fragment {newmolec.formula} added to goodlist with {newmolec.cell_indices=}")
+                if (newmolec.natoms == ref.natoms) and (newmolec.eleccount == ref.eleccount) and (newmolec.formula == ref.formula):
+                    dummy1, dummy2, map12 = reorder(ref.labels, newmolec.labels, ref.coord, newmolec.coord)
+                    
+                    reordered_labels = [newmolec.labels[i] for i in map12]
+                    reordered_coord  = [newmolec.coord[i] for i in map12]
+                    reordered_radii  = [newmolec.radii[i] for i in map12]
+                    reordered_frac_cood = [newmolec.frac_coord[i] for i in map12]
+                    reordered_cell_indices = [newmolec.cell_indices[i] for i in map12]
+
+                    reordered_newmolec = molecule(reordered_labels, reordered_coord, reordered_radii)
+                    reordered_newmolec.cell_indices = reordered_cell_indices
+                    reordered_newmolec.set_fractional_coord(reordered_frac_cood)
+                    reordered_newmolec.set_atoms(create_adjacencies=True, debug=2)
+                    if reordered_newmolec.iscomplex: 
+                        reordered_newmolec.split_complex()
+                        reordered_newmolec.get_hapticity(debug=debug)
+                        for lig in reordered_newmolec.ligands:
+                            lig.get_denticity(debug=debug)
+
+                    print(f"{reordered_newmolec=}")
+
+                    issame = compare_species(reordered_newmolec, ref, debug=2)
+                    if issame:    ## Then is a molecule that appears in the reference list 
+                        found = True 
+                        reordered_newmolec.subtype = ref.subtype
+                        goodlist.append(reordered_newmolec)
+                        if debug >= 1: print(f"COMBINE: Fragment {reordered_newmolec.formula} added to goodlist with {reordered_newmolec.cell_indices=}")
         if not found:        ## Then it is a fragment. A bigger one, but still a fragment
             newmolec.subtype = "Rec. Fragment"
             avglist.append(newmolec)
