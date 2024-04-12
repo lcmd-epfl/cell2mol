@@ -6,6 +6,7 @@ from scipy.sparse.csgraph import reverse_cuthill_mckee
 from typing import Tuple
 from cell2mol.other import inv
 from cell2mol.elementdata import ElementData
+from cell2mol.read_write import writexyz
 elemdatabase = ElementData()
 
 #######################################################
@@ -374,6 +375,12 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
         if debug == 1: print(mol2.formula)
         if debug == 2: print(mol1)
         if debug == 2: print(mol2)
+        if debug == 2: print(mol1.labels)
+        if debug == 2: print(mol2.labels)
+
+    if debug == 2: writexyz("/Users/ycho/cell2mol/cell2mol/test/YOBCUO/", "reorder_molec.xyz", mol1.labels, mol1.coord)
+    if debug == 2: writexyz("/Users/ycho/cell2mol/cell2mol/test/YOBCUO/", "ref.xyz", mol2.labels, mol2.coord)
+
     # a pair of species is compared on the basis of:
     # 1) the total number of atoms
     if (mol1.natoms != mol2.natoms): 
@@ -396,10 +403,16 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
     # 4) the number of adjacencies between each pair of element types
     if not hasattr(mol1,"adj_types"):     mol1.set_adj_types()
     if not hasattr(mol2,"adj_types"):     mol2.set_adj_types()
+    if debug == 2: print(f"{mol1.adj_types=}")
+    if debug == 2: print(f"{mol2.adj_types=}")
+    if debug == 2: np.save("/Users/ycho/cell2mol/cell2mol/test/YOBCUO/adj_types1.npy", mol1.adj_types)
+    if debug == 2: np.save("/Users/ycho/cell2mol/cell2mol/test/YOBCUO/adj_types2.npy", mol2.adj_types)
     for kdx, elem in enumerate(mol1.adj_types):
         for ldx, elem2 in enumerate(elem):
             if elem2 != mol2.adj_types[kdx, ldx]: 
                 if debug > 0: print(f"COMPARE_SPECIES. FALSE, different adjacency count")
+                if debug > 0: print(f"{kdx=} {ldx=} {elem=} {elem2=} {mol2.adj_types[kdx]=} {mol2.adj_types[kdx, ldx]=}")
+                if debug > 0: print(f"{mol1.labels[kdx]=} {mol1.labels[ldx]=} {mol2.labels[kdx]=} {mol2.labels[ldx]=}")
                 return False
 
     if check_coordinates:
@@ -411,4 +424,35 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
     return True
 
 #################################
-
+def arrange_data_for_reorder(reference: object, target: object, debug: int=0):
+    # To do the reorder, we create new tags that include as much information as possible.
+    # Ideally, we aim to include the label + the connectivity + the metal connectivity
+    t_totconnec = 0
+    t_totmconnec = 0
+    for a in target.atoms:
+        t_totconnec  += a.connec
+        t_totmconnec += a.mconnec
+    r_totconnec = 0
+    r_totmconnec = 0
+    for a in reference.atoms:
+        r_totconnec  += a.connec
+        r_totmconnec += a.mconnec
+    if t_totconnec == r_totconnec:   useconec = True
+    else:                            useconec = False
+    if t_totmconnec == r_totmconnec: usemconec = True
+    else:                            usemconec = False
+    # For target
+    target_data = []
+    for a in target.atoms:
+        data = a.label
+        if useconec:  data += str(a.connec)
+        if usemconec: data += str(a.mconnec)
+        target_data.append(data)
+    # For reference
+    ref_data = []
+    for a in reference.atoms:
+        data = a.label
+        if useconec:  data += str(a.connec)
+        if usemconec: data += str(a.mconnec)
+        ref_data.append(data)
+    return ref_data, target_data

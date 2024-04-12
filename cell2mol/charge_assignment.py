@@ -864,40 +864,6 @@ def prepare_unresolved(unique_indices: list, unique_species: list, distributions
 
     return list_molecules, list_indices, list_options
 
-#######################################################
-def arrange_data_for_reorder(reference: object, target: object, debug: int=0):
-    # To do the reorder, we create new tags that include as much information as possible.
-    # Ideally, we aim to include the label + the connectivity + the metal connectivity
-    t_totconnec = 0
-    t_totmconnec = 0
-    for a in target.atoms:
-        t_totconnec  += a.connec
-        t_totmconnec += a.mconnec
-    r_totconnec = 0
-    r_totmconnec = 0
-    for a in reference.atoms:
-        r_totconnec  += a.connec
-        r_totmconnec += a.mconnec
-    if t_totconnec == r_totconnec:   useconec = True
-    else:                            useconec = False
-    if t_totmconnec == r_totmconnec: usemconec = True
-    else:                            usemconec = False
-    # For target
-    target_data = []
-    for a in target.atoms:
-        data = a.label
-        if useconec:  data += str(a.connec)
-        if usemconec: data += str(a.mconnec)
-        target_data.append(data)
-    # For reference
-    ref_data = []
-    for a in reference.atoms:
-        data = a.label
-        if useconec:  data += str(a.connec)
-        if usemconec: data += str(a.mconnec)
-        ref_data.append(data)
-    return ref_data, target_data
-
 #######################################################    
 def set_charges_create_bonds (specie, unique_indices, unique_species, final_charge_distribution, debug):
         
