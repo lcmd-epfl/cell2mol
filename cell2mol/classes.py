@@ -754,6 +754,7 @@ class group(specie):
         # Other less common types of haptic ligands
         elif numC == 0 and numAs == 5:    self.haptic_type = ["h5-AsCp"];                                   self.is_haptic = True
         elif numC == 0 and numP == 5:     self.haptic_type = ["h5-Pentaphosphole"];                         self.is_haptic = True
+        elif numC == 1 and numP == 1:     self.haptic_type = ["h2-P=C"];                                    self.is_haptic = True
         return self.haptic_type 
 
     #######################################################

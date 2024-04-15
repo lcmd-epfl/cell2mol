@@ -211,6 +211,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
             if debug >= 2: print("        GET_PROTONATION_STATES: addressing group with hapticity:", g.haptic_type)
             if debug >= 2: print("        GET_PROTONATION_STATES: and parent indices:", parent_indices)
 
+
+
             if "h5-Cp" in g.haptic_type and not Selected_Hapticity:
                 Selected_Hapticity = True
                 tobeadded = 1
@@ -223,7 +225,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             tmp_added_atoms += 1
                         else: block[idx] = 1
 
-            elif "h7-Cicloheptatrienyl" in g.haptic_type and not Selected_Hapticity:
+            elif "h7-Cycloheptatrienyl" in g.haptic_type and not Selected_Hapticity:
                 Selected_Hapticity = True
                 tobeadded = 1
                 tmp_added_atoms = 0
@@ -313,6 +315,14 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         block[idx] = 1
 
             elif "h4-Enone" in g.haptic_type and not Selected_Hapticity:
+                if debug >= 2: print("        GET_PROTONATION_STATES: No action is required")
+                Selected_Hapticity = True
+                tobeadded = 0
+                for idx, a in enumerate(ligand.atoms):
+                    if idx in parent_indices and a.mconnec == 1:
+                        block[idx] = 1
+
+            elif "h2-P=C" in g.haptic_type and not Selected_Hapticity:
                 if debug >= 2: print("        GET_PROTONATION_STATES: No action is required")
                 Selected_Hapticity = True
                 tobeadded = 0
@@ -899,7 +909,8 @@ def set_charges_create_bonds (specie, unique_indices, unique_species, final_char
             cs = specie.possible_cs[idx]
             #prot = cs.protonation
             specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
-            specie.create_bonds(debug=debug)
+            # TODO : correct create_bonds
+            # specie.create_bonds(debug=debug)
         else:
             if debug > 1: print(f"ERROR: Target charge {target_charge} of {formula} does not exist in {charge_list}." )
             return None
@@ -1175,6 +1186,7 @@ class protonation(object):
         self.labels                     = labels
         self.coords                     = coord
         self.natoms                     = len(labels)
+        self.formula                    = labels2formula(labels)
         self.added_atoms                = added_atoms
         self.addedlist                  = addedlist
         self.block                      = block
