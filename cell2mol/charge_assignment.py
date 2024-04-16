@@ -1105,7 +1105,7 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
     return moleclist, Warning
 
 #######################################################
-def correct_smiles_ligand(ligand: object):
+def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
     ## Receives a ligand class object and constructs the smiles and the rdkit_obj object from scratch, using atoms and bond information
 
     Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
@@ -1121,16 +1121,30 @@ def correct_smiles_ligand(ligand: object):
                        
     # Sets bond information and hybridization
     for jdx, atom in enumerate(ligand.atoms):
+        if debug >=2: print(jdx, atom.label)
         nbonds = 0
         for b in atom.bonds:
-            nbonds += 1
-            if b.order== 1.0: btype = Chem.BondType.SINGLE
-            elif b.order == 2.0: btype = Chem.BondType.DOUBLE
-            elif b.order == 3.0: btype = Chem.BondType.TRIPLE
-            elif b.order == 1.5: 
-                btype = Chem.BondType.AROMATIC
-                rdkit_atom.SetIsAromatic(True)
-            if b.atom1 == jdx and b.atom2 > jdx: rwlig.AddBond(b.atom1, b.atom2, btype)
+            if debug >=1: print(b.atom1.label, b.atom2.label, b.order)
+            ismetal_1 = elemdatabase.elementblock[b.atom1.label] == "d" or elemdatabase.elementblock[b.atom1.label] == "f"
+            ismetal_2 = elemdatabase.elementblock[b.atom2.label] == "d" or elemdatabase.elementblock[b.atom2.label] == "f"
+            if ismetal_1 or ismetal_2:
+                pass
+            else:
+                begin_idx = b.atom1.get_parent_index("ligand")
+                end_idx = b.atom2.get_parent_index("ligand")
+                if debug >=2: print(begin_idx, end_idx)
+                nbonds += 1
+                if b.order== 1.0: 
+                    btype = Chem.BondType.SINGLE
+                elif b.order == 2.0: 
+                    btype = Chem.BondType.DOUBLE
+                elif b.order == 3.0: 
+                    btype = Chem.BondType.TRIPLE
+                elif b.order == 1.5: 
+                    btype = Chem.BondType.AROMATIC
+                    rdkit_atom.SetIsAromatic(True)
+
+                if begin_idx == jdx and end_idx > jdx: rwlig.AddBond(begin_idx, end_idx, btype)
 
         if nbonds == 1: hyb = Chem.HybridizationType.S
         elif nbonds == 2: hyb = Chem.HybridizationType.SP
@@ -1148,8 +1162,13 @@ def correct_smiles_ligand(ligand: object):
     Chem.AssignStereochemistry(obj, flagPossibleStereoCenters=True, force=True)
     Chem.AssignAtomChiralTagsFromStructure(obj, -1)
     
-    return smiles, obj
+    ## visulize a corrected rdkit object
+    if debug >=2:
+        from IPython.display import display
+        display(mol_with_atom_index(obj))
 
+    return smiles, obj
+#######################################################
 
 def reorder_protonation (prot, map, debug: int=0):
     if debug > 0: print("PROTONATION.REORDER. labels:", prot.labels)

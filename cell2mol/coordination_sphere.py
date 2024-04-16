@@ -8,7 +8,7 @@ elemdatabase = ElementData()
 #######################################################
 ###     Define coordination geometry from groups    ### 
 #######################################################
-def get_coordination_geometry (metal: object, coord_group: list, debug: int=0) -> object:
+def define_coordination_geometry (metal: object, coord_group: list, debug: int=0) -> object:
     
     symbols = []
     positions = []
@@ -24,9 +24,12 @@ def get_coordination_geometry (metal: object, coord_group: list, debug: int=0) -
                 positions.append(atom.coord)
                 if debug >= 2 : print(atom.label, atom.coord)
         else :
-            haptic_center_coord = compute_centroid([atom.coord for atom in group.atoms])
+            print(f"{group.haptic_type=}")
+            print(f"{[atom.coord for atom in group.atoms]}")
+            haptic_center_coord = compute_centroid(np.array([atom.coord for atom in group.atoms]))
             symbols.append(str(group.haptic_type))
-            positions.append(haptic_center_coord)      
+            print(haptic_center_coord)
+            positions.append(list(haptic_center_coord))      
             if debug >= 2 : print(f"mid point of {group.haptic_type=}", haptic_center_coord)      
             coord_haptic_type.append(group.haptic_type)             
     
@@ -49,8 +52,8 @@ def get_coordination_geometry (metal: object, coord_group: list, debug: int=0) -
         print(f"The type of hapticity : {coord_haptic_type}")
         print("")
 
-    return coordination_geometry
-    # return coordination_geometry, geom_deviation, coord_haptic_type
+    # return coordination_geometry
+    return coordination_geometry, geom_deviation
 
 #######################################################
 def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:

@@ -1,6 +1,6 @@
 import numpy as np
 from cell2mol.connectivity import get_adjacency_types, get_element_count, labels2electrons, labels2formula, get_adjmatrix
-from cell2mol.connectivity import get_metal_idxs, split_species, get_radii
+from cell2mol.connectivity import get_metal_idxs, split_species, get_radii, create_bonds_spicie
 from cell2mol.connectivity import compare_atoms, compare_species, compare_metals
 from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
@@ -9,7 +9,7 @@ from cell2mol.charge_assignment import balance_charge, prepare_unresolved, prepa
 from cell2mol.spin import assign_spin_metal, assign_spin_complexes
 from cell2mol.other import extract_from_list, compute_centroid, get_dist, get_angle
 from cell2mol.elementdata import ElementData
-from cell2mol.coordination_sphere import coordination_correction_for_haptic, coordination_correction_for_nonhaptic
+from cell2mol.coordination_sphere import coordination_correction_for_haptic, coordination_correction_for_nonhaptic, define_coordination_geometry
 elemdatabase = ElementData()
 import pickle
 
@@ -163,8 +163,8 @@ class specie(object):
             if not hasattr(self,"atoms"): self.set_atoms()
             for idx, a in enumerate(self.atoms):
                 a.set_charge(self.atomic_charges[idx])
-        if smiles is not None:      self.smiles = smiles
-        if rdkit_obj is not None:   self.rdkit_obj = rdkit_obj
+        if smiles is not None:          self.smiles = smiles
+        if rdkit_obj is not None:       self.rdkit_obj = rdkit_obj
 
     ############
     def set_atoms(self, atomlist=None, create_adjacencies: bool=False, debug: int=0):
@@ -297,40 +297,8 @@ class specie(object):
     
     ############
     def create_bonds(self, debug: int=0):
-        # if not hasattr(self,"rdkit_obj"): self.get_parent("cell").assign_charges()
-        for idx, atom in enumerate(self.atoms):
-            # Security Check. Confirms that the labels are the same
-            if debug >= 2: print("BUILD BONDS: atom", idx, atom.label)
-            rdkitatom = self.rdkit_obj.GetAtomWithIdx(idx)            
-            tmp = rdkitatom.GetSymbol()
-            if atom.label != tmp: print("Error in Create Bonds. Atom labels do not coincide. GMOL vs. MOL:", atom.label, tmp)
-            else:
-                # First part. Creates bond information
-                for b in rdkitatom.GetBonds():
-                    bond_startatom = b.GetBeginAtomIdx()
-                    bond_endatom   = b.GetEndAtomIdx()
-                    bond_order     = b.GetBondTypeAsDouble()
-                    if debug >= 2: print("BUILD BONDS: bond", bond_startatom, bond_endatom, bond_order, 
-                                         self.atoms[bond_startatom].label, self.atoms[bond_endatom].label, 
-                                         self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
-                    if (self.subtype == "ligand") and (bond_startatom >= self.natoms or bond_endatom >= self.natoms):
-                        continue
-                    else:
-                        if self.atoms[bond_endatom].label != self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
-                            if debug >= 1: 
-                                print("Error with Bond EndAtom", self.atoms[bond_endatom].label, 
-                                      self.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
-                        else:
-                            if bond_endatom == idx:
-                                start = bond_endatom
-                                end   = bond_startatom
-                            elif bond_startatom == idx:
-                                start = bond_startatom
-                                end   = bond_endatom
-
-                            ## This has changed. Now there is a bond object, and we send the atom objects, not only the index
-                            new_bond = bond(self.atoms[start], self.atoms[end], bond_order) 
-                            atom.add_bond(new_bond)
+        if not hasattr(self,"rdkit_obj"): self.get_parent("cell").assign_charges()
+        create_bonds_spicie(self, debug=debug)
 
     ############
     def print_xyz(self):
@@ -479,12 +447,13 @@ class molecule(specie):
         return self.haptic_type
 
     #######################################################
-    def correct_smiles(self):
-        if not hasattr(self,"smiles"): self.smiles = []
+    def correct_smiles(self, debug: int=0):
         if not self.iscomplex: return self.smiles
-        for lig in self.ligands:
-            lig.smiles, lig.rdkit_obj = correct_smiles_ligand(lig)
-            self.smiles.append(lig.smiles)
+        else:
+            self.smiles = []
+            for lig in self.ligands:
+                lig.smiles, lig.rdkit_obj = correct_smiles_ligand(lig, debug=debug)
+                self.smiles.append(lig.smiles)
 
 ###############
 ### LIGAND ####
@@ -1071,13 +1040,30 @@ class metal(atom):
                     diff_list.append(diff)
             else :
                 haptic_center_label = "C"
-                haptic_center_coord = compute_centroid([atom.coord for atom in group.atoms]) 
+                haptic_center_coord = compute_centroid(np.array([atom.coord for atom in group.atoms]))
                 diff = round(get_dist(self.coord, haptic_center_coord) - elemdatabase.CovalentRadius3[haptic_center_label], 3)
                 diff_list.append(diff)     
+        print(diff_list)
         average = round(np.average(diff_list), 3)    
+        print(average)
         self.rel_metal_radius = round(average/elemdatabase.CovalentRadius3[self.label], 3)
         
         return self.rel_metal_radius
+    
+    #######################################################
+    def get_coordination_geometry(self: object, debug: int = 0):
+        coord_group = self.get_connected_groups()
+        self.coord_nr = len(coord_group)
+        if debug >= 1: print(f"{coord_group=}")
+        if debug >= 1: print(f"{self.coord_nr=}")
+        
+        self.coord_geometry, self.geom_deviation = define_coordination_geometry(self, coord_group, debug = debug)
+        if debug >= 1: print(f"{self.coord_geometry=} {self.geom_deviation=}")
+        
+        self.rel_metal_radius = self.get_relative_metal_radius(debug = debug)
+        if debug >= 1: print(f"{self.rel_metal_radius=}")
+
+        return self.coord_geometry
 
     #######################################################
     def get_possible_cs(self, debug: int=0):
@@ -1228,12 +1214,13 @@ class cell(object):
 
         # If all good, then works with the reference molecules
         if isgood:
-           for ref in self.refmoleclist:
-               if ref.iscomplex: 
-                   ref.get_hapticity(debug=debug)                          ### Former "get_hapticity(ref)" function
-                   # ref.get_coordination_geometry(debug=debug)                ### Former "get_coordination_Geometry(ref)" function 
-                   for lig in ref.ligands:
-                       lig.get_denticity(debug=2)
+            for ref in self.refmoleclist:
+                if ref.iscomplex: 
+                    ref.get_hapticity(debug=debug)
+                    for lig in ref.ligands:
+                        lig.get_denticity(debug=2)
+                    for met in ref.metals:                         
+                        met.get_coordination_geometry(debug=debug)                ### Former "get_coordination_Geometry(ref)" function 
 
         if isgood: self.has_isolated_H = False
         else:      self.has_isolated_H = True
@@ -1440,7 +1427,7 @@ class cell(object):
         if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)  
         if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to create the spin
         for mol in self.moleclist:
-            print(f"CELL.CREATE_BONDS: Creating Bonds for molecule {mol.formula}")
+            if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Bonds for molecule {mol.formula}")
             # First part
             if not mol.iscomplex: 
                 mol.create_bonds(debug=debug)          ### Creates bonds between molecule.atoms using the molecule.rdkit_object
@@ -1463,14 +1450,14 @@ class cell(object):
                                 met.add_bond(newbond)
                                 count += 1 
                         if count != at.mconnec: 
-                            print(f"CELL.CREATE_BONDS: error creating bonds for atom: \n{at}\n of ligand: \n{lig}\n")
-                            print(f"CELL.CREATE_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
+                            if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for atom: \n{at}\n of ligand: \n{lig}\n")
+                            if debug >= 1: print(f"CELL.CREATE_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
 
             # Adds Metal-Metal Bonds, with an arbitrary 0.5 order:
             if mol.iscomplex:
                 if len(mol.metals) > 1 :
-                    print(f"CELL.CREATE_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
-                    print(f"CELL.CREATE_BONDS: Metals: {mol.metals}")
+                    if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
+                    if debug >= 1: print(f"CELL.CREATE_BONDS: Metals: {mol.metals}")
                     for idx, met1 in enumerate(mol.metals):
                         for jdx, met2 in enumerate(mol.metals):
                             if idx <= jdx: continue
@@ -1482,7 +1469,7 @@ class cell(object):
 
                 # Fourth part : correction smiles of ligands
                 mol.smiles_with_H = [lig.smiles for lig in mol.ligands]
-                mol.smiles = mol.correct_smiles()
+                mol.correct_smiles(debug=debug)
 
     #######################################################
     def assign_spin(self, debug: int=0) -> object:
@@ -1491,6 +1478,7 @@ class cell(object):
         for mol in self.moleclist:
             if mol.iscomplex:
                 for metal in mol.metals:
+                    metal.get_coordination_geometry(debug=debug)
                     metal.get_spin()
             mol.get_spin()
         return self.moleclist
