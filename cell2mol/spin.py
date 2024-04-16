@@ -2,7 +2,7 @@ import numpy as np
 import pickle
 import os
 from cell2mol import __file__
-from cell2mol.coordination_sphere import get_coordination_geometry, shape_structure_references_simplified
+from cell2mol.coordination_sphere import shape_structure_references_simplified
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
@@ -50,6 +50,7 @@ def assign_spin_complexes (mol:object) -> None:
             elif len(metals_idx_not_singlet) == 1 :      return metals_spin[metals_idx_not_singlet[0]]
             else :                                       return None          
 
+
 #######################################################
 def generate_feature_vector (metal: object, debug: int = 0) -> np.ndarray:
     """ Generate feature vector for a given transition metal coordination complex
@@ -58,24 +59,26 @@ def generate_feature_vector (metal: object, debug: int = 0) -> np.ndarray:
     Returns:
         feature (np.ndarray): feature vector
     """
+    print(f"******Generating feature vector for {metal.label}")
+
     elem_nr = elemdatabase.elementnr[metal.label]
     m_ox = metal.charge
-    valence_elec = metal.get_valence_elec (metal.charge)
-
+    valence_elec = metal.get_valence_elec(metal.charge)
+    print(f"{elem_nr=} {m_ox=} {valence_elec=}")
+    
     coord_group = metal.get_connected_groups()
-    coord_nr = len(coord_group)
-    print(f"{coord_group=}")
-    print(f"{coord_nr=}")
-    
-    coord_geometry = get_coordination_geometry(metal, coord_group, debug = debug)
-    geom_nr = make_geom_list()[coord_geometry]
+    coord_nr = metal.coord_nr
+    geom_nr = make_geom_list()[metal.coord_geometry]
+    print(f"{metal.coord_nr=} {metal.coord_geometry=} {geom_nr=}")
 
-    rel_metal_radius = metal.get_relative_metal_radius(debug = debug)
-    
+    rel_metal_radius = metal.rel_metal_radius
+    print(f"{metal.rel_metal_radius=}")
+
     coord_hapticty = [ group.is_haptic for group in coord_group ]
     if any(coord_hapticty) :    hapticity = 1
     else :                      hapticity = 0
-
+    print(f"{hapticity=}")
+    
     feature = np.array([[elem_nr, m_ox, valence_elec, coord_nr, geom_nr, rel_metal_radius, hapticity]])
     
     return feature

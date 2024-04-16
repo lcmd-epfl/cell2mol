@@ -456,3 +456,89 @@ def arrange_data_for_reorder(reference: object, target: object, debug: int=0):
         if usemconec: data += str(a.mconnec)
         ref_data.append(data)
     return ref_data, target_data
+
+#################################
+def mol_with_atom_index(mol):
+    for atom in mol.GetAtoms():
+        atom.SetAtomMapNum(atom.GetIdx())
+    return mol
+
+#################################
+def create_bonds_spicie (specie, debug: int=0):
+    from cell2mol.classes import bond
+    from IPython.display import display
+    
+    if debug >= 1: display(mol_with_atom_index(specie.rdkit_obj))
+
+    n_atoms = specie.natoms # e.g. 9 
+    n_atoms_rdkit = specie.rdkit_obj.GetNumAtoms() # e.g.10 
+    
+    if n_atoms == n_atoms_rdkit:
+        if debug >= 1: print(f"CREATE BONDS: Number of atoms in {specie.subtype} object and RDKit MOL are equal: {n_atoms} {n_atoms_rdkit}")
+        for idx, rdkit_atom in enumerate(specie.rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8
+            if debug >= 1: print(f"{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
+            if len(rdkit_atom.GetBonds()) == 0:
+                if debug >= 1: print(f"NO BONDS CREATED")
+            else:
+                for b in rdkit_atom.GetBonds():
+                    bond_startatom = b.GetBeginAtomIdx()
+                    bond_endatom   = b.GetEndAtomIdx()
+                    bond_order     = b.GetBondTypeAsDouble()
+                    if debug >= 2: 
+                        print(specie.atoms[bond_startatom].label, specie.rdkit_obj.GetAtomWithIdx(bond_startatom).GetSymbol(), ":", bond_startatom, ",", 
+                            specie.atoms[bond_endatom].label, specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol(), ":", bond_endatom, ",", bond_order)   
+                    if specie.atoms[bond_endatom].label != specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
+                        if debug >= 1: print("Error with Bond EndAtom", specie.atoms[bond_endatom].label, specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
+                    else:
+                        if bond_endatom == idx:
+                            start = bond_endatom
+                            end   = bond_startatom
+                        elif bond_startatom == idx:
+                            start = bond_startatom
+                            end   = bond_endatom      
+
+                        # create new bond object
+                        if debug >=1: print("BOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
+                        new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
+                        specie.atoms[idx].add_bond(new_bond)
+
+                if debug >=1: print("BONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
+    else:
+        if debug >= 1: print(f"CREATE BONDS: Number of atoms in {specie.subtype} object and RDKit MOL are different: {n_atoms} {n_atoms_rdkit}")
+        if debug >= 1: print([(i, atom.label) for i, atom in enumerate(specie.atoms)])
+        if debug >= 1: print([(i, atom.GetSymbol()) for i, atom in enumerate(specie.rdkit_obj.GetAtoms())])       
+        non_bonded_atoms = list(range(0, n_atoms_rdkit))[n_atoms:]
+        if debug >= 1: print("NON_BONDED_ATOMS", non_bonded_atoms)
+
+        for idx, rdkit_atom in enumerate(specie.rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+            if debug >= 1: print(f"{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
+            if len(rdkit_atom.GetBonds()) == 0:
+                if debug >= 1: print(f"NO BONDS CREATED")
+            else:
+                for b in rdkit_atom.GetBonds():
+                    bond_startatom = b.GetBeginAtomIdx()
+                    bond_endatom   = b.GetEndAtomIdx()
+                    bond_order     = b.GetBondTypeAsDouble()
+                    if debug >= 2: 
+                        print(specie.rdkit_obj.GetAtomWithIdx(bond_startatom).GetSymbol(), ":", bond_startatom, ",", 
+                                specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol(), ":", bond_endatom, ",", bond_order)   
+                    if bond_startatom in non_bonded_atoms or bond_endatom in non_bonded_atoms:
+                        if debug >= 1: print(f"NO BOND CREATED {bond_startatom=} or {bond_endatom=} is not in the specie.atoms. It belongs to {non_bonded_atoms=}.")
+                    else :
+                        if bond_endatom == idx:
+                            start = bond_endatom
+                            end   = bond_startatom
+                        elif bond_startatom == idx:
+                            start = bond_startatom
+                            end   = bond_endatom   
+
+                        # create new bond object
+                        if debug >=1: print("BOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
+                        new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
+                        specie.atoms[idx].add_bond(new_bond)
+                if idx not in non_bonded_atoms:
+                    if debug >=1: print("BONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
+                else :
+                    if debug >=1: print("NO BONDS")
+
+#################################
