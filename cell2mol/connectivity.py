@@ -4,7 +4,7 @@ from scipy import sparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
 from typing import Tuple
-from cell2mol.other import inv
+from cell2mol.other import inv, extract_from_list
 from cell2mol.elementdata import ElementData
 from cell2mol.read_write import writexyz
 elemdatabase = ElementData()
@@ -542,3 +542,47 @@ def create_bonds_spicie (specie, debug: int=0):
                     if debug >=1: print("NO BONDS")
 
 #################################
+
+def split_group(original_group, conn_idx, debug: int=2):
+    from cell2mol.classes import group
+    # Split the "group" to obtain the groups connected to a specific metal
+    splitted_groups = []
+    
+    print(f"GROUP.SPLIT_GROUP: {conn_idx=}")
+    conn_labels  = extract_from_list(conn_idx, original_group.labels, dimension=1)
+    conn_coord   = extract_from_list(conn_idx, original_group.coord, dimension=1)
+    conn_radii   = extract_from_list(conn_idx, original_group.radii, dimension=1)
+    conn_atoms   = extract_from_list(conn_idx, original_group.atoms, dimension=1)
+    print(f"GROUP.SPLIT_GROUP: {conn_labels=}")
+    print(f"GROUP.SPLIT_GROUP: {conn_coord=}")
+    print(f"GROUP.SPLIT_GROUP: {conn_radii=}")
+    # print(f"GROUP.SPLIT_GROUP: {conn_atoms=}")
+    cov_factor=original_group.get_parent("ligand").cov_factor
+    blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=cov_factor, debug=debug)      
+    print(f"blocklist={blocklist}")
+    ## Arranges Groups 
+    for b in blocklist:
+        print(f"GROUP.SPLIT_GROUP: block={b}")
+        gr_indices = extract_from_list(b, conn_idx, dimension=1)
+        # if debug > 0: print(f"GROUP.SPLIT_GROUP: {gr_indices=}")
+        gr_labels  = extract_from_list(b, conn_labels, dimension=1)
+        gr_coord   = extract_from_list(b, conn_coord, dimension=1)
+        gr_radii   = extract_from_list(b, conn_radii, dimension=1)
+        gr_atoms   = extract_from_list(b, conn_atoms, dimension=1)
+        # Create Group Object
+        newgroup = group(gr_labels, gr_coord, radii=gr_radii)
+        # For debugging
+        newgroup.origin = "split_group"
+        # Define the GROUP as parent of the group. Bottom-Up hierarchy
+        newgroup.add_parent(original_group.get_parent("ligand"), indices=gr_indices)
+        # Pass the GROUP atoms to the groud
+        newgroup.set_atoms(atomlist=gr_atoms)
+        # Inherit the adjacencies from molecule
+        newgroup.inherit_adjmatrix("ligand")
+        # Associate the Groups with the Metals
+        newgroup.get_connected_metals()
+        newgroup.get_closest_metal()
+        newgroup.get_denticity()
+        # Top-down hierarchy
+        splitted_groups.append(newgroup)
+    return splitted_groups

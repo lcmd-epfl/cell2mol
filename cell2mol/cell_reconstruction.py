@@ -227,7 +227,6 @@ def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmolec
     # The former were identified in the cell.get_moleclist() function, and have cell as parent. 
     # The latter have been constructed by merging fragments, and do not have cell as parent, but have the cell_indices stored in mol.cell_indices
     # Here we homogenize the situation by adding the cell_indices variable to all molecules
-    # TODO : why cell_indices is needed?
     for mol in moleclist:
         if not hasattr(mol,"cell_indices"): 
             if mol.check_parent("cell"):

@@ -274,6 +274,7 @@ class specie(object):
     def get_protonation_states(self, debug: int=0):
         # !!! WARNING. FUNCTION defined at the "specie" level, but will only do something for ligands and organic (iscomplex == False) molecules
         if self.subtype == "group": 
+            if not hasattr(self, "denticity"): self.get_denticity()
             if not hasattr(self,"is_haptic"): self.get_hapticity()
             self.protonation_states = None
         elif self.subtype == "ligand" :
@@ -1009,6 +1010,7 @@ class metal(atom):
 
     #######################################################
     def get_connected_groups(self, debug: int=0):
+        from cell2mol.connectivity import split_group
         # metal.groups will be used for the calculation of the relative metal radius 
         # and define the coordination geometry of the metal /hapicitiy/ hapttype    
         if not self.check_parent("molecule"): return None
@@ -1016,16 +1018,29 @@ class metal(atom):
         self.groups = []
         for lig in mol.ligands:
             for group in lig.groups:
-                print(group)
+                if debug > 1: print(group.formula)
                 tmplabels = []
                 tmpcoord  = []
                 tmplabels.append(self.label)
                 tmpcoord.append(self.coord)
                 tmplabels.extend(group.labels)
                 tmpcoord.extend(group.coord)
-                print(tmplabels, tmpcoord)
+                if debug > 1: print(tmplabels, tmpcoord)
                 isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
-                if isgood and any(tmpadjnum) > 0: self.groups.append(group)
+                # if isgood and any(tmpadjnum) > 0: self.groups.append(group)
+                if isgood:
+                    if debug > 1: print(group.formula, tmpadjmat, tmpadjnum)
+                    if all(tmpadjnum[1:]): 
+                        self.groups.append(group)
+                    elif any(tmpadjnum[1:]): 
+                        if debug > 1: print(f"Metal {self.label} is connected to {group.formula} but not all atoms are connected")
+                        conn_idx = [ idx for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
+                        splitted_groups = split_group(group, conn_idx, debug=debug)
+                        for g in splitted_groups:
+                            self.groups.append(g)
+                            if debug > 1: print(f"Metal {self.label} is connected to {g.formula}")
+                    else:
+                        if debug > 1: print(f"Metal {self.label} is not connected to {group.formula}")
         return self.groups
 
     #######################################################
