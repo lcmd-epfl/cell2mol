@@ -30,7 +30,6 @@ def cell2mol(newcell: object, reconstruction: bool=True, charge_assignment: bool
         #if not newcell.has_missing_H and not newcell.has_isolated_H and not newcell.is_fragmented:
         tini = time.time()
         if not newcell.is_fragmented:
-            # newcell.reset_charges()  # TODO: make reset_charges in the class cell
             newcell.assign_charges(debug=debug)
             newcell.create_bonds(debug=debug)
 
@@ -41,10 +40,10 @@ def cell2mol(newcell: object, reconstruction: bool=True, charge_assignment: bool
             elif newcell.error_multiple_distrib :  handle_error(5)
             elif newcell.error_empty_distrib :     handle_error(6)
             elif newcell.error_prepare_mols :        handle_error(7)
-            else :
+            else : 
                 if debug >= 1: print("Charge Assignment successfully finished.\n")
-                # TODO : Compare assigned charges with ML predicted charges
-                
+                newcell.predict_metal_ox(debug=debug) # predict metal oxidation state using Random Forest model
+
     if spin_assignment:
         tini = time.time()
         newcell.assign_spin(debug=debug)

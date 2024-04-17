@@ -6,8 +6,18 @@ from cell2mol.coordination_sphere import shape_structure_references_simplified
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
+
 #######################################################
-def assign_spin_metal (metal:object) -> None:
+def predict_ox_state (metal:object, debug: int=0) -> None:
+    feature = generate_feature_vector (metal, target_prop = "m_ox", debug=debug)
+    path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), "total_spin_3131.pkl")
+    ramdom_forest = pickle.load(open(path_rf, 'rb'))
+    predictions = ramdom_forest.predict(feature)
+    m_ox_rf = predictions[0]
+    return m_ox_rf
+
+#######################################################
+def assign_spin_metal (metal:object, debug: int=0) -> None:
     """ Assigns spin multiplicity of the transition metal.
     """
     valence_elec = metal.get_valence_elec(metal.charge)
@@ -19,7 +29,7 @@ def assign_spin_metal (metal:object) -> None:
         elif valence_elec in [2, 3] and metal.get_parent("molecule").is_haptic == False :         return (valence_elec + 1)
         elif valence_elec in [4, 5, 6, 7, 8] or (valence_elec in [2, 3] and metal.get_parent("molecule").is_haptic == True) :
             # Predict spin multiplicity of metal based on Random forest model
-            feature = generate_feature_vector (metal)
+            feature = generate_feature_vector (metal, target_prop="spin", debug=debug)
             path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), "total_spin_3131.pkl")
             ramdom_forest = pickle.load(open(path_rf, 'rb'))
             predictions = ramdom_forest.predict(feature)
@@ -52,34 +62,39 @@ def assign_spin_complexes (mol:object) -> None:
 
 
 #######################################################
-def generate_feature_vector (metal: object, debug: int = 0) -> np.ndarray:
+def generate_feature_vector (metal: object, target_prop: str, debug: int = 0) -> np.ndarray:
     """ Generate feature vector for a given transition metal coordination complex
     Args:
         metal (obj): metal atom object
     Returns:
         feature (np.ndarray): feature vector
     """
-    print(f"******Generating feature vector for {metal.label}")
+    if debug >=1: print(f"******Generating feature vector for {metal.label}")
 
     elem_nr = elemdatabase.elementnr[metal.label]
     m_ox = metal.charge
     valence_elec = metal.get_valence_elec(metal.charge)
-    print(f"{elem_nr=} {m_ox=} {valence_elec=}")
+    if debug >=1: print(f"{elem_nr=} {m_ox=} {valence_elec=}")
     
     coord_group = metal.get_connected_groups()
     coord_nr = metal.coord_nr
     geom_nr = make_geom_list()[metal.coord_geometry]
-    print(f"{metal.coord_nr=} {metal.coord_geometry=} {geom_nr=}")
+    if debug >=1: print(f"{metal.coord_nr=} {metal.coord_geometry=} {geom_nr=}")
 
     rel_metal_radius = metal.rel_metal_radius
-    print(f"{metal.rel_metal_radius=}")
+    if debug >=1: print(f"{metal.rel_metal_radius=}")
 
     coord_hapticty = [ group.is_haptic for group in coord_group ]
     if any(coord_hapticty) :    hapticity = 1
     else :                      hapticity = 0
-    print(f"{hapticity=}")
+    if debug >=1: print(f"{hapticity=}")
     
-    feature = np.array([[elem_nr, m_ox, valence_elec, coord_nr, geom_nr, rel_metal_radius, hapticity]])
+    if target_prop == "m_ox":
+        feature = np.array([[elem_nr, coord_nr, geom_nr, rel_metal_radius, hapticity]])
+        if debug >=1: print(f"{feature=}")
+    elif target_prop == "spin":
+        feature = np.array([[elem_nr, m_ox, valence_elec, coord_nr, geom_nr, rel_metal_radius, hapticity]])
+        if debug >=1: print(f"{feature=}")
     
     return feature
 

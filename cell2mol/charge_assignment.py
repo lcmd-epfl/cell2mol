@@ -858,8 +858,8 @@ def prepare_unresolved(unique_indices: list, unique_species: list, distributions
     # spec_tuple[0] is the subtype of the specie
     # spec_tuple[1] is the specie object
     # spec_tuple[2] is the molecule object to which the specie belongs
-    for idx, spec_tuple in enumerate(unique_species):  
-        if spec_tuple[0] == "metal": 
+    for idx, spec in enumerate(unique_species):  
+        if spec.subtype == "metal": 
             position = [jdx for jdx, uni in enumerate(unique_indices) if uni == idx]
             if debug >= 2: print(f"UNRESOLVED: found metal in positions={position} of the distribution")
             values = [distr[position[0]] for distr in distributions]
@@ -868,8 +868,8 @@ def prepare_unresolved(unique_indices: list, unique_species: list, distributions
             if debug >= 2: print(f"UNRESOLVED: options={options}\n")
 
             if len(options) > 1:
-                list_molecules.append(spec_tuple[2])
-                list_indices.append(spec_tuple[1].parent_index)
+                list_molecules.append(spec)
+                list_indices.append(spec.get_parent_index("molecule"))
                 list_options.append(options)
 
     return list_molecules, list_indices, list_options
@@ -909,8 +909,7 @@ def set_charges_create_bonds (specie, unique_indices, unique_species, final_char
             cs = specie.possible_cs[idx]
             #prot = cs.protonation
             specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
-            # TODO : correct create_bonds
-            # specie.create_bonds(debug=debug)
+
         else:
             if debug > 1: print(f"ERROR: Target charge {target_charge} of {formula} does not exist in {charge_list}." )
             return None
@@ -1060,7 +1059,6 @@ def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, se
         
                         if new_cs.corr_total_charge != cs.corr_total_charge:
                             if debug >= 1: print(f"PREPARE: WARNING: total charge obtained after correction {new_cs.corr_total_charge} while it should be {cs.corr_total_charge}")
-                            # TODO : This is a warning, but it should do somthing about it  (e.g. try to correct it)                     
                         else:
                             lig.set_charges(new_cs.corr_total_charge, new_cs.corr_atom_charges, new_cs.smiles, new_cs.rdkit_obj)
                             if debug >= 1: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={new_cs.corr_total_charge}") 
