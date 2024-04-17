@@ -6,7 +6,7 @@ from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstru
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
 from cell2mol.charge_assignment import get_protonation_states_specie, get_possible_charge_state, get_metal_poscharges
 from cell2mol.charge_assignment import balance_charge, prepare_unresolved, prepare_mols, correct_smiles_ligand, prepare_mols_v4
-from cell2mol.spin import assign_spin_metal, assign_spin_complexes
+from cell2mol.spin import assign_spin_metal, assign_spin_complexes, predict_ox_state
 from cell2mol.other import extract_from_list, compute_centroid, get_dist, get_angle
 from cell2mol.elementdata import ElementData
 from cell2mol.coordination_sphere import coordination_correction_for_haptic, coordination_correction_for_nonhaptic, define_coordination_geometry
@@ -1074,7 +1074,11 @@ class metal(atom):
     def get_spin(self):
         self.spin = assign_spin_metal(self)
 
-    ############
+    #######################################################
+    def predict_charge(self, debug: int=0):
+        self.charge_by_ML = predict_ox_state(self, debug=debug)
+    
+    #######################################################
     def reset_charge(self):
         atom.reset_charge(self)     ## First uses the generic atom class function for itself
         if hasattr(self,"poscharges"):   delattr(self,"poscharge") 
@@ -1482,7 +1486,16 @@ class cell(object):
                     metal.get_spin()
             mol.get_spin()
         return self.moleclist
-
+    #######################################################
+    def predict_metal_ox(self, debug: int=0):
+        if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)
+        if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to assign the spin
+        for mol in self.moleclist:
+            if mol.iscomplex:
+                for metal in mol.metals:     
+                    metal.predict_charge(debug=debug) 
+    #######################################################
+    
     def assess_errors(self):
         ### This function might be called to print the possible errors found in the unit cell, during reconstruction, and charge/spin assignment
         return None
