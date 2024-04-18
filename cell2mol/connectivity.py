@@ -27,32 +27,70 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
     if debug >= 2: print("ADD_ATOM: Metalist length", len(metalist))
     if debug >= 2: print("ADD_ATOM: Ligand Atoms", len(ligand.atoms))
     if debug >= 2: print("ADD_ATOM: site=", site)
+    if debug >= 2: print("ADD_ATOM: target ligand atom ", ligand.atoms[site].label)
     # It is adding the element (H, O, or whatever) at the vector formed by the closest TM atom and the "site"
     for idx, a in enumerate(ligand.atoms):
         if idx == site:
             apos = np.array(a.coord.copy())
             tgt  = a.get_closest_metal(metalist)
             if debug >= 2: print(f"ADD_ATOM: evaluating {apos=} and {tgt.coord=}")
-            ligand_idx = tgt.get_parent_index("ligand")
+            # ligand_idx = tgt.get_parent_index("ligand")
+            metal_idx = tgt.get_parent_index("molecule")
             dist = get_dist(apos, tgt.coord)
-            idealdist = a.radii + elemdatabase.CovalentRadius2[element]
-            addedHcoords = apos + (tgt.coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
-            newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])     # adds H at the position of the closest Metal Atom
+            idealdist = a.radii + elemdatabase.CovalentRadius3[element]
+            # addedHcoords = apos + (tgt.coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
+            # newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])     # adds H at the position of the closest Metal Atom
+            addedHcoords = point_along_vector(apos, tgt.coord, idealdist)
+            newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])
 
             # Evaluates the new adjacency matrix.
             dummy, tmpconmat, tmpconnec = get_adjmatrix(newlab, newcoord, ligand.cov_factor)
-            if debug >= 2: print(f"ADD_ATOM: received {tmpconnec[posadded]=}")
+            # if debug >= 2: print(f"ADD_ATOM: received {newlab=}")
+            # if debug >= 2: print(f"ADD_ATOM: received {tmpconmat=}")
+            # if debug >= 2: print(f"ADD_ATOM: received {tmpconnec=}")
+            # if debug >= 2: print(f"ADD_ATOM: received {tmpconnec[posadded]=}")
+            # newlab.append(tgt.label)
+            # newcoord.append(tgt.coord)
+            # if debug >= 2: writexyz("/Users/ycho/cell2mol/cell2mol/test/AFIBAU/", f"newcoord_with_H_new{addedHcoords[0]}.xyz", newlab, newcoord)
             # If no undesired adjacencies have been created, the coordinates are kept
             if tmpconnec[posadded] <= 1:
                 isadded = True
-                if debug >= 2: print(f"ADD_ATOM: Chosen Metal index {ligand_idx}. {element} is added at site {site}")
+                if debug >= 2: print(f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} is added at site {site}")
             # Otherwise, coordinates are reset
             else:
-                if debug >= 1: print(f"ADD_ATOM: Chosen Metal index {ligand_idx}. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
+                if debug >= 1: print(f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
                 isadded = False
                 newlab = labels.copy()
                 newcoord = coords.copy()
     return isadded, newlab, newcoord
+#######################################################
+def point_along_vector(point1, point2, distance):
+    """
+    Calculate the coordinates of a point along the vector between two points
+    with a specified distance from the first point.
+    
+    Args:
+    - point1: Coordinates of the first point (numpy array or list)
+    - point2: Coordinates of the second point (numpy array or list)
+    - distance: Distance from the first point to the new point (float)
+    
+    Returns:
+    - Coordinates of the new point (numpy array)
+    """
+    # Convert input to numpy arrays
+    point1 = np.array(point1)
+    point2 = np.array(point2)
+    
+    # Calculate the vector between the two points
+    vector = point2 - point1
+    
+    # Normalize the vector
+    normalized_vector = vector / np.linalg.norm(vector)
+    
+    # Calculate the coordinates of the new point
+    new_point = point1 + normalized_vector * distance
+    
+    return new_point
 
 #######################################################
 def find_closest_metal(atom: object, metalist: list, debug: int=0):
@@ -369,6 +407,9 @@ def compare_metals (at1, at2, check_coordinates: bool=False, debug: int=0):
 
 #################################
 def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
+    
+    elems = elemdatabase.elementnr.keys()
+
     if debug > 0: 
         print("COMPARE_SPECIES. Comparing:")
         if debug == 1: print(mol1.formula)
@@ -377,9 +418,6 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
         if debug == 2: print(mol2)
         if debug == 2: print(mol1.labels)
         if debug == 2: print(mol2.labels)
-
-    if debug == 2: writexyz("/Users/ycho/cell2mol/cell2mol/test/YOBCUO/", "reorder_molec.xyz", mol1.labels, mol1.coord)
-    if debug == 2: writexyz("/Users/ycho/cell2mol/cell2mol/test/YOBCUO/", "ref.xyz", mol2.labels, mol2.coord)
 
     # a pair of species is compared on the basis of:
     # 1) the total number of atoms
@@ -405,15 +443,19 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
     if not hasattr(mol2,"adj_types"):     mol2.set_adj_types()
     if debug == 2: print(f"{mol1.adj_types=}")
     if debug == 2: print(f"{mol2.adj_types=}")
-    if debug == 2: np.save("/Users/ycho/cell2mol/cell2mol/test/YOBCUO/adj_types1.npy", mol1.adj_types)
-    if debug == 2: np.save("/Users/ycho/cell2mol/cell2mol/test/YOBCUO/adj_types2.npy", mol2.adj_types)
-    for kdx, elem in enumerate(mol1.adj_types):
-        for ldx, elem2 in enumerate(elem):
-            if elem2 != mol2.adj_types[kdx, ldx]: 
+
+    count = 0
+    if debug == 2: print("kdx ldx elem1 - elem2 : reordered - reference")
+    for kdx, (elem, row1) in enumerate(zip(elems, mol1.adj_types)):
+        for ldx, (elem2, val1) in enumerate(zip(elems, row1)):
+            val2 = mol2.adj_types[kdx, ldx]
+            if val1 != val2: 
+                count += 1
                 if debug > 0: print(f"COMPARE_SPECIES. FALSE, different adjacency count")
-                if debug > 0: print(f"{kdx=} {ldx=} {elem=} {elem2=} {mol2.adj_types[kdx]=} {mol2.adj_types[kdx, ldx]=}")
-                if debug > 0: print(f"{mol1.labels[kdx]=} {mol1.labels[ldx]=} {mol2.labels[kdx]=} {mol2.labels[ldx]=}")
-                return False
+                if debug > 0: print(f"{kdx} {ldx} {elem} - {elem2} : {val1} - {val2}")
+                
+    if count > 0 : return False
+    else: return True
 
     if check_coordinates:
         # 5) Finally, the coordinates if the user wants it
@@ -580,9 +622,10 @@ def split_group(original_group, conn_idx, debug: int=2):
         # Inherit the adjacencies from molecule
         newgroup.inherit_adjmatrix("ligand")
         # Associate the Groups with the Metals
-        newgroup.get_connected_metals()
-        newgroup.get_closest_metal()
-        newgroup.get_denticity()
+        newgroup.get_connected_metals(debug=debug)
+        newgroup.get_closest_metal(debug=debug)
+        newgroup.get_hapticity(debug=debug)
+        newgroup.get_denticity(debug=debug)
         # Top-down hierarchy
         splitted_groups.append(newgroup)
     return splitted_groups

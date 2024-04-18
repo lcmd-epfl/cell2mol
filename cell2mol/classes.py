@@ -1,6 +1,6 @@
 import numpy as np
 from cell2mol.connectivity import get_adjacency_types, get_element_count, labels2electrons, labels2formula, get_adjmatrix
-from cell2mol.connectivity import get_metal_idxs, split_species, get_radii, create_bonds_spicie
+from cell2mol.connectivity import get_metal_idxs, split_species, get_radii, create_bonds_spicie, split_group
 from cell2mol.connectivity import compare_atoms, compare_species, compare_metals
 from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
@@ -278,7 +278,7 @@ class specie(object):
             if not hasattr(self,"is_haptic"): self.get_hapticity()
             self.protonation_states = None
         elif self.subtype == "ligand" :
-            # if not hasattr(self,"groups"): self.split_ligand()76
+            # if not hasattr(self,"groups"): self.split_ligand()
             if not hasattr(self, "is_haptic"): self.get_hapticity()
             if not hasattr(self, "denticity"): self.get_denticity()
             self.protonation_states = get_protonation_states_specie(self, debug=debug)
@@ -614,10 +614,21 @@ class ligand(specie):
             # Inherit the adjacencies from molecule
             newgroup.inherit_adjmatrix("ligand")
             # Associate the Groups with the Metals
-            newgroup.get_connected_metals()
-            newgroup.get_closest_metal()
-            # Top-down hierarchy
-            self.groups.append(newgroup)
+            newgroup.get_connected_metals(debug=debug)
+            newgroup.get_closest_metal(debug=debug)
+            newgroup.get_hapticity(debug=debug)
+            newgroup, conn_idx = newgroup.check_coordination(debug=debug)
+            if len(conn_idx) == len(newgroup.atoms):
+                print(f"LIGAND.SPLIT_LIGAND: group is found", newgroup)
+                newgroup.get_denticity(debug=debug)
+                # Top-down hierarchy
+                self.groups.append(newgroup)
+            else:
+                print(f"LIGAND.SPLIT_LIGAND: group is found", newgroup)
+                splitted_groups = split_group(newgroup, conn_idx, debug=debug)
+                for g in splitted_groups:
+                    self.groups.append(g)
+        print(f"LIGAND.SPLIT_LIGAND: final groups {self.groups=}")
         return self.groups
 
     #######################################################
@@ -729,13 +740,13 @@ class group(specie):
 
     #######################################################
     def check_coordination(self, debug: int=2):
-        from cell2mol.connectivity import add_atom
         if not hasattr(self,"is_haptic"): self.get_hapticity()
         if not hasattr(self,"atoms"):     self.set_atoms()
-        if self.is_haptic:                self = coordination_correction_for_haptic(self, debug=debug)
-        if self.is_haptic == False:       self = coordination_correction_for_nonhaptic(self, debug=debug)
+        if self.is_haptic:                self, conn_idx = coordination_correction_for_haptic(self, debug=debug)
+        if self.is_haptic == False:       self, conn_idx = coordination_correction_for_nonhaptic(self, debug=debug)
         self.checked_coordination = True
-
+        return self, conn_idx
+    
     #######################################################
     def get_denticity(self, debug: int=0):
         if not hasattr(self,"checked_coordination"): self.check_coordination(debug=debug) 
@@ -934,25 +945,34 @@ class atom(object):
         if exists:
             lig     = self.get_parent("ligand")
             lig_idx = self.get_parent_index("ligand")
-            met_idx = met.get_parent_index("ligand")
+            # met_idx = met.get_parent_index("ligand")
+            if debug > 0: print(f"ATOM.RESET_MCONN: resetting mconnec (and connec) for atom {self.label=} in ligadn {lig_idx=}")
+
             if debug > 0: print(f"ATOM.RESET_MCONN: updating ligand atoms and madjnum")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.madjnum=}") 
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.madjmat=}") 
+            if debug > 0: print(f"ATOM.RESET_MCONN: {lig.natoms=}")
+            if debug > 0: print(f"ATOM.RESET_MCONN: {lig.labels=}")
+            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.madjnum=} {len(lig.madjnum)}") 
+            # if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.madjmat=} {(lig.madjmat).shape}") # Nothing in madjmat of the ligand object, all zeros
+            if debug > 0: print(f"ATOM.RESET_MCONN: updating ligand atoms and adjnum")
+            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.adjnum=} {len(lig.adjnum)}") 
+            # if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.adjmat=} {(lig.adjmat).shape}")
             # Correct Ligand Data
             #lig.atoms[lig_idx].mconnec += diff           # Corrects data of atom object in ligand class
             #lig.atoms[lig_idx].connec  += diff           # Corrects data of atom object in ligand class
             lig.madjnum[lig_idx] += diff                    # Corrects data in metal_adjacency number of the ligand class
-            lig.madjmat[lig_idx,met_idx] += diff            # Corrects data in metal_adjacency matrix
-            lig.madjmat[met_idx,lig_idx] += diff            # Corrects data in metal_adjacency matrix
+            #lig.madjmat[lig_idx,met_idx] += diff            # Corrects data in metal_adjacency matrix
+            #lig.madjmat[met_idx,lig_idx] += diff            # Corrects data in metal_adjacency matrix
             lig.adjnum[lig_idx]  += diff                    # Corrects data in adjacency number of the ligand class
-            lig.adjmat[lig_idx,met_idx]  += diff            # Corrects data in adjacency matrix
-            lig.adjmat[met_idx,lig_idx]  += diff            # Corrects data in adjacency matrix
+            # lig.adjmat[lig_idx,met_idx]  += diff            # Corrects data in adjacency matrix
+            # lig.adjmat[met_idx,lig_idx]  += diff            # Corrects data in adjacency matrix
             # Correct Metal Data
             #met.mconnec += diff                             # Corrects data of metal object
             #met.connec  += diff                             # Corrects data of metal object
             # we should delete the adjacencies, but not a priority 
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.madjnum=}") 
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.madjmat=}") 
+            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.madjnum=}")
+            # if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.madjmat=}")
+            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.adjnum=}")  
+            # if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.adjmat=}")
             lig.get_connected_idx(debug=debug)
             lig.get_connected_atoms(debug=debug)
 
@@ -961,7 +981,15 @@ class atom(object):
             mol     = self.get_parent("molecule")
             mol_idx = self.get_parent_index("molecule")
             met_idx = met.get_parent_index("molecule")
+            if debug > 0: print(f"ATOM.RESET_MCONN: resetting mconnec (and connec) for atom {self.label=} in molecule {mol_idx=} with metal {met_idx=}")
             if debug > 0: print(f"ATOM.RESET_MCONN: updating molecule atoms and madjnum")
+            if debug > 0: print(f"ATOM.RESET_MCONN: {mol.natoms=}")
+            if debug > 0: print(f"ATOM.RESET_MCONN: {mol.labels=}")
+            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.madjnum=} {len(mol.madjnum)}") 
+            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.madjmat=} {(mol.madjmat).shape}") # Nothing in madjmat of the ligand object, all zeros
+            if debug > 0: print(f"ATOM.RESET_MCONN: updating molecule atoms and adjnum")
+            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.adjnum=} {len(mol.adjnum)}") 
+            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.adjmat=} {(mol.adjmat).shape}")
             # Correct Molecule Data
             #mol.atoms[mol_idx].mconnec += diff              # Corrects data of atom object in molecule class
             #mol.atoms[mol_idx].connec  += diff              # Corrects data of atom object in molecule class
@@ -971,7 +999,10 @@ class atom(object):
             mol.adjnum[mol_idx]  += diff                    # Corrects data in adjacency number of the molecule class
             mol.adjmat[mol_idx,met_idx]  += diff            # Corrects data in adjacency matrix
             mol.adjmat[met_idx,mol_idx]  += diff            # Corrects data in adjacency matrix
-
+            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.madjnum=}")
+            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.madjmat=}")
+            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.adjnum=}")
+            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.adjmat=}")
 ###############
 #### METAL ####
 ###############
@@ -1219,7 +1250,10 @@ class cell(object):
             # This must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex: newmolec.split_complex()
             self.refmoleclist.append(newmolec)
-            
+        
+        if debug >= 2: print(f"GETREFS: found {len(self.refmoleclist)} reference molecules")
+        if debug >= 2: print(f"GETREFS:", [ref.formula for ref in self.refmoleclist])
+        if debug >= 2: print(f"GETREFS: {self.refmoleclist}")
         # Checks for isolated atoms, and retrieves warning if there is any. Except if it is H, halogen (group 17) or alkalyne (group 2)
         isgood = True 
         for ref in self.refmoleclist:
@@ -1456,15 +1490,23 @@ class cell(object):
                 for lig in mol.ligands:
                     lig.create_bonds(debug=debug)      ### Creates bonds between ligand.atoms, which also belong to molecule.atoms, using the ligand.rdkit_object
                 
-            # Third Part. Adds Metal-Ligand Bonds, with an arbitrary 0.5 order:
+            # Third Part. Adds Metal-Ligand Bonds, with a zero order:
             if mol.iscomplex:
                 for lig in mol.ligands:
                     for at in lig.atoms:
                         count = 0
                         for met in mol.metals: 
                             isconnected = at.check_connectivity(met, debug=debug)
-                            if isconnected: 
-                                newbond = bond(at, met, 0.5)
+                            if isconnected:
+                                index_1 = at.get_parent_index("molecule")
+                                index_2 = met.get_parent_index("molecule")
+                                if index_1 < index_2 : 
+                                    bond_startatom = at
+                                    bond_endatom   = met
+                                else:
+                                    bond_startatom = met
+                                    bond_endatom   = at
+                                newbond = bond(bond_startatom, bond_endatom, 0)
                                 at.add_bond(newbond)
                                 met.add_bond(newbond)
                                 count += 1 
@@ -1472,7 +1514,7 @@ class cell(object):
                             if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for atom: \n{at}\n of ligand: \n{lig}\n")
                             if debug >= 1: print(f"CELL.CREATE_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
 
-            # Adds Metal-Metal Bonds, with an arbitrary 0.5 order:
+            # Adds Metal-Metal Bonds, with a zero order:
             if mol.iscomplex:
                 if len(mol.metals) > 1 :
                     if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
@@ -1482,7 +1524,15 @@ class cell(object):
                             if idx <= jdx: continue
                             isconnected = met1.check_connectivity(met2, debug=debug)
                             if isconnected:
-                                newbond = bond(met1, met2, 0.5)
+                                index_1 = met1.get_parent_index("molecule")
+                                index_2 = met2.get_parent_index("molecule")
+                                if index_1 < index_2 : 
+                                    bond_startatom = met1
+                                    bond_endatom   = met2
+                                else:
+                                    bond_startatom = met2
+                                    bond_endatom   = met1
+                                newbond = bond(bond_startatom, bond_endatom, 0)
                                 met1.add_bond(newbond) 
                                 met2.add_bond(newbond) 
 
@@ -1497,7 +1547,7 @@ class cell(object):
         for mol in self.moleclist:
             if mol.iscomplex:
                 for metal in mol.metals:
-                    metal.get_coordination_geometry(debug=debug)
+                    if not hasattr(metal,"coord_nr"): metal.get_coordination_geometry(debug=debug)
                     metal.get_spin()
             mol.get_spin()
         return self.moleclist
@@ -1507,7 +1557,8 @@ class cell(object):
         if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to assign the spin
         for mol in self.moleclist:
             if mol.iscomplex:
-                for metal in mol.metals:     
+                for metal in mol.metals:
+                    if not hasattr(metal,"coord_nr"): metal.get_coordination_geometry(debug=debug)     
                     metal.predict_charge(debug=debug) 
     #######################################################
     

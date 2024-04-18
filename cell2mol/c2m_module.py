@@ -42,7 +42,7 @@ def cell2mol(newcell: object, reconstruction: bool=True, charge_assignment: bool
             elif newcell.error_prepare_mols :        handle_error(7)
             else : 
                 if debug >= 1: print("Charge Assignment successfully finished.\n")
-                newcell.predict_metal_ox(debug=debug) # predict metal oxidation state using Random Forest model
+                # newcell.predict_metal_ox(debug=debug) # predict metal oxidation state using Random Forest model
 
     if spin_assignment:
         tini = time.time()

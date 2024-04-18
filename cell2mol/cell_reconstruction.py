@@ -514,9 +514,9 @@ def combine(tobemerged: list, references: list, cellvec: list, threshold_tmat: f
                         reordered_newmolec.get_hapticity(debug=debug)
                         for lig in reordered_newmolec.ligands:
                             lig.get_denticity(debug=debug)
-
+                        for met in reordered_newmolec.metals:                         
+                            met.get_coordination_geometry(debug=debug) 
                     print(f"{reordered_newmolec=}")
-
                     issame = compare_species(reordered_newmolec, ref, debug=2)
                     if issame:    ## Then is a molecule that appears in the reference list 
                         found = True 
@@ -579,6 +579,7 @@ def merge_fragments(frags: list, refs: list, cellvec: list, cov_factor: float=1.
                 newmolec.set_element_count()
                 newmolec.get_adjmatrix()
                 newmolec.get_centroid()
+                newmolec.get_metal_adjmatrix()
                 return newmolec
     return None
 

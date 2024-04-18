@@ -1,7 +1,7 @@
 import numpy as np
 from cosymlib import Geometry
 from cell2mol.other import *
-from cell2mol.connectivity import add_atom
+from cell2mol.connectivity import add_atom, split_group
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
@@ -317,7 +317,8 @@ def get_thres_from_two_atoms(label_i, label_j, factor=1.3, debug=0):
 def check_neighboring_atoms_mconnec (idx, group, metal, debug):
     
     atom = group.atoms[idx]
-    neighbors = [ group.atoms[j] for j in atom.adjacency ]
+    print(atom.label, atom.adjacency)
+    neighbors = [ group.get_parent("molecule").atoms[j] for j in atom.adjacency ]
     nb_dist_from_metal = [ get_dist(nb.coord, metal.coord) for nb in neighbors]
 
     neighbors_mconnec =[]
@@ -367,11 +368,13 @@ def check_neighboring_atoms_mconnec (idx, group, metal, debug):
     return isremoved
 
 #######################################################    
-def coordination_correction_for_nonhaptic(group, debug=1) -> list:
+def coordination_correction_for_nonhaptic(group: object, debug: int=1):
+
     if debug > 0: print("Entering COORD_CORR_NONHAPTIC:")
     if not hasattr(group,"metals"): group.get_connected_metals()
 
     ## First Correction (former verify_connectivity)
+    conn_idx = []
     for idx, atom in enumerate(group.atoms):
         if debug > 0: print(f"\tmconnec={atom.mconnec} in atom idx={idx}, label={atom.label}")
         isremoved = False
@@ -379,24 +382,24 @@ def coordination_correction_for_nonhaptic(group, debug=1) -> list:
         for met in group.metals:
             if isremoved: continue
             lig     = group.get_parent("ligand")
-            #lig_idx = group.get_parent_indices("ligand")
+            ligand_idx = atom.get_parent_index("ligand")
             if debug > 0: print(f"\tevaluating coordination with metal \n{met}")
-            isadded, newlab, newcoord = add_atom(lig.labels, lig.coord, idx, lig, list([met]), "H", debug=2)
+            isadded, newlab, newcoord = add_atom(lig.labels, lig.coord, ligand_idx, lig, list([met]), "H", debug=2)
             if isadded:
-                if debug > 0: print(f"\tconnectivity verified for atom {idx} with label {atom.label}")
+                if debug > 0: print(f"\tconnectivity verified for atom with label {atom.label} and ligand index {ligand_idx}")
+                conn_idx.append(idx)
             else:
-                iswrong = check_neighboring_atoms_mconnec(idx, group, met, debug)
-                if not iswrong:
-                    if debug > 0: print(f"\tconnectivity of neighboring atoms checked for atom {idx} with label {atom.label}")
-                else:
-                    if debug > 0: print(f"\tcorrecting mconnec of atom {idx} with label {atom.label}")
-                    isremoved = True
-                    ### Reset Connectivity of the atom and the parents
-                    atom.reset_mconnec(met, debug=debug)
-                    ### Remove the atom from the group
-                    group.remove_atom(idx, debug=debug)
+                if debug > 0: print(f"\tcorrecting mconnec of atom with label {atom.label} and ligand index {ligand_idx}")
+                isremoved = True
+                ### Reset Connectivity of the atom and the parents
+                atom.reset_mconnec(met, debug=debug)
+                met.get_coord_sphere()
+                met.get_coord_sphere_formula()
+                # Group will be redifined using split_group, so we don't need to remove the atom from group 
+                # group.remove_atom(idx, debug=debug)
+    conn_idx = sorted(list(set(conn_idx)))
+    return group, conn_idx
 
-    return group 
 
 #######################################################    
 def coordination_correction_for_haptic (group: object, debug: int=0):
@@ -413,28 +416,18 @@ def coordination_correction_for_haptic (group: object, debug: int=0):
     std_dev = round(np.std(ratio_list), 3)
     if debug >= 1 : print(f"{ratio_list=} {std_dev=}")
 
-    count = 0
+    conn_idx = []
     for idx, (atom, ratio) in enumerate(zip(group.atoms, ratio_list)) :
         if atom.label == "H" : 
             if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
             if debug >=1 : print(atom.label)
-            atom.reset_mconnec(metal, debug=debug)
-            group.remove_atom(idx, debug=debug)
-            count += 1          
+            atom.reset_mconnec(metal, debug=debug)  
         elif std_dev > 0.05 and ratio > 0.9 :
             if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to the long distance")
             if debug >=1 : print(atom.label)
             atom.reset_mconnec(metal, debug=debug) 
-            group.remove_atom(idx, debug=debug)
-            count += 1      
         else :
-            pass
-
-    
-    if count == 0 : return group
-    else :
-        # get group hapticity if there are any changes
-        group.get_hapticity()    
-        return group
-
+            conn_idx.append(idx)
+    conn_idx = sorted(list(set(conn_idx)))
+    return group, conn_idx
 #######################################################

@@ -9,8 +9,9 @@ elemdatabase = ElementData()
 
 #######################################################
 def predict_ox_state (metal:object, debug: int=0) -> None:
+    model = ""
     feature = generate_feature_vector (metal, target_prop = "m_ox", debug=debug)
-    path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), "total_spin_3131.pkl")
+    path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), model)
     ramdom_forest = pickle.load(open(path_rf, 'rb'))
     predictions = ramdom_forest.predict(feature)
     m_ox_rf = predictions[0]
