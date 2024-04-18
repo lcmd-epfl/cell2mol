@@ -1166,8 +1166,75 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
         display(mol_with_atom_index(obj))
 
     return smiles, obj
-#######################################################
 
+#######################################################
+def get_smiles_complex (mol: object, debug: int=0) -> Tuple[str, object]:
+    ## Receives a molecule class object and constructs the smiles and the rdkit_obj object from scratch, using atoms and bond information
+
+    Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
+    #### Creates an empty editable molecule
+    rwmol = Chem.RWMol()    
+    
+    # Adds atoms with their formal charge 
+    for jdx, atom in enumerate(mol.atoms):        
+        rdkit_atom = Chem.Atom(atom.atnum)
+        rdkit_atom.SetFormalCharge(int(atom.charge))
+        rdkit_atom.SetNoImplicit(True)
+        rwmol.AddAtom(rdkit_atom)
+                
+    # Sets bond information and hybridization
+    for jdx, atom in enumerate(mol.atoms):
+        nbonds = 0
+        for b in atom.bonds:
+            begin_idx = b.atom1.get_parent_index("molecule")
+            end_idx = b.atom2.get_parent_index("molecule")
+            nbonds += 1
+            if b.order== 1.0: 
+                btype = Chem.BondType.SINGLE
+            elif b.order == 2.0: 
+                btype = Chem.BondType.DOUBLE
+            elif b.order == 3.0: 
+                btype = Chem.BondType.TRIPLE
+            elif b.order == 1.5: 
+                btype = Chem.BondType.AROMATIC
+                rdkit_atom.SetIsAromatic(True)
+            elif b.order == 0.0:
+                btype = Chem.BondType.ZERO
+            if debug >=2: print(b.atom1.label, b.atom2.label, b.order, f"{begin_idx=} {end_idx=} {btype=}")
+            
+            if begin_idx == jdx and end_idx > jdx: 
+                rwmol.AddBond(begin_idx, end_idx, btype)
+                if debug >=2: print("AddBond:", b.atom1.label, b.atom2.label, b.order, f"{begin_idx=} {end_idx=} {btype=}")
+                
+        if nbonds == 1: hyb = Chem.HybridizationType.S
+        elif nbonds == 2: hyb = Chem.HybridizationType.SP
+        elif nbonds == 3: hyb = Chem.HybridizationType.SP2
+        elif nbonds == 4: hyb = Chem.HybridizationType.SP3
+        else: hyb = Chem.HybridizationType.UNSPECIFIED
+        rdkit_atom.SetHybridization(hyb)
+            
+    # Creates Molecule
+    obj = rwmol.GetMol()
+    smiles = Chem.MolToSmiles(obj)
+
+    # Chem.SanitizeMol(obj)
+    Chem.DetectBondStereochemistry(obj, -1)
+    Chem.AssignStereochemistry(obj, flagPossibleStereoCenters=True, force=True)
+    Chem.AssignAtomChiralTagsFromStructure(obj, -1)
+
+    ## visulize a corrected rdkit object
+    if debug >= 1:
+        from IPython.display import display
+        from rdkit.Chem.Draw import IPythonConsole
+        IPythonConsole.drawOptions.addAtomIndices = True
+        IPythonConsole.molSize = 300,300
+
+        print(f"{smiles=}")
+        display(obj)
+
+    return smiles, obj
+
+#######################################################
 def reorder_protonation (prot, map, debug: int=0):
     if debug > 0: print("PROTONATION.REORDER. labels:", prot.labels)
     if debug > 0: print("PROTONATION.REORDER. received map:", map)
