@@ -204,15 +204,15 @@ def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmolec
 
     # Reconstruct Hydrogens with remaining Fragments
     if len(remfrag) > 0 and len(Hlist) > 0:
-        print("FRAG_RECONSTRUCT.", len(fraglist), "molecules submitted to sequential with All")
-        for frag in fraglist:
-            print(frag.formula, frag.subtype, frag.labels)
+        print("FRAG_RECONSTRUCT.", len(fraglist), "fragments submitted to sequential with All")
+        if debug >= 2: 
+            for frag in fraglist:
+                print("FRAG_RECONSTRUCT.", frag.formula, frag.subtype, frag.labels)
+
         finalmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "All", debug)
         moleclist.extend(finalmols)
         print(f"{finalmols=}")
         print(f"{remfrag=}")
-        for i, g in enumerate(finalmols):
-            if debug == 1: writexyz("/Users/ycho/cell2mol/cell2mol/test/YOBCUO/", f"reorder_molec_{i}.xyz", g.labels, g.coord)
 
         if len(remfrag) > 0: Warning = True;  print("FRAG_RECONSTRUCT. Remaining after Hydrogen reconstruction",remfrag)
         else:                Warning = False; print("FRAG_RECONSTRUCT. No remaining Molecules after Hydrogen reconstruction")
@@ -353,13 +353,13 @@ def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: fl
             for i in range(0, len(list2)):
                 if i == Frag2_toallocate:   sublist.append(list2[i])
                 elif i != Frag2_toallocate: keeplist2.append(list2[i])
-                
-            print(f"sublist", len(sublist), [s.formula for s in sublist] )
-            print("list1", len(list1), [s.formula for s in list1])
-            print("list2", len(list2),[s.formula for s in list2])
-            print(f"keeplist1", len(keeplist1), [s.formula for s in keeplist1])
-            print(f"keeplist2", len(keeplist2), [s.formula for s in keeplist2])
-            print("")
+            if debug >= 2:    
+                print(f"sublist", len(sublist), [s.formula for s in sublist] )
+                print("list1", len(list1), [s.formula for s in list1])
+                print("list2", len(list2),[s.formula for s in list2])
+                print(f"keeplist1", len(keeplist1), [s.formula for s in keeplist1])
+                print(f"keeplist2", len(keeplist2), [s.formula for s in keeplist2])
+                print("")
         #################
         #  This part evaluates that the fragments that are going to be combined, can form one of the reference molecules. The resulting number of atoms is used.
         #################
@@ -373,9 +373,6 @@ def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: fl
             #  Here, the function "combine" is called. It will try cell translations of one fragment, and check whether it eventually combines with the second fragment into either a bigger fragment or a molecule
             #################
             goodlist, avglist, badlist = combine(sublist, refmoleclist, cellvec, threshold_tmat, factor, metal_factor, debug=debug)
-            print(f"{goodlist=}")
-            print(f"{avglist=}")
-            print(f"{badlist=}")
             
             #################
             #  This part handles the results of combine
@@ -516,8 +513,9 @@ def combine(tobemerged: list, references: list, cellvec: list, threshold_tmat: f
                             lig.get_denticity(debug=debug)
                         for met in reordered_newmolec.metals:                         
                             met.get_coordination_geometry(debug=debug) 
-                    print(f"{reordered_newmolec=}")
-                    issame = compare_species(reordered_newmolec, ref, debug=2)
+                    if debug >= 1: print(f"COMBINE: {reordered_newmolec.fomula=}")
+                    if debug >= 1: print(f"COMBINE: {reordered_newmolec=}")
+                    issame = compare_species(reordered_newmolec, ref, debug=debug)
                     if issame:    ## Then is a molecule that appears in the reference list 
                         found = True 
                         reordered_newmolec.subtype = ref.subtype

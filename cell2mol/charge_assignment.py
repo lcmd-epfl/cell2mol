@@ -174,7 +174,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         for i in range(len(specie.labels)):
             empty_list.append(int(0))
         empty_protonation = protonation(specie.labels, specie.coord, specie.cov_factor, int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=specie)
-        print("CREATED EMPTY PROTONATION", empty_protonation)
+        if debug >= 2: print("    CREATED EMPTY PROTONATION", empty_protonation)
         return list([empty_protonation])
 
     ## If specie.subtype == "ligand": 
@@ -210,8 +210,6 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
             Selected_Hapticity = False
             if debug >= 2: print("        GET_PROTONATION_STATES: addressing group with hapticity:", g.haptic_type)
             if debug >= 2: print("        GET_PROTONATION_STATES: and parent indices:", parent_indices)
-
-
 
             if "h5-Cp" in g.haptic_type and not Selected_Hapticity:
                 Selected_Hapticity = True
@@ -555,7 +553,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 if debug >= 2:  print(f"        GET_PROTONATION_STATES: Protonation SAVED with {added_atoms} atoms added to ligand. status={new_prot.status}")
             else:
                 if debug >= 2:  print(f"        GET_PROTONATION_STATES: Protonation DISCARDED. Steric Clashes found when adding atoms. status={new_prot.status}")
-    print(f"{protonation_states=}")            
+    if debug >= 2: print(f"        GET_PROTONATION_STATES:{protonation_states=}")            
     return protonation_states 
 
 #######################################################
@@ -567,7 +565,6 @@ def get_charge(ich: int, prot: object, allow: bool=True, debug: int=0):
 
     natoms = prot.natoms
     atnums = prot.atnums
-    if debug >= 2: print(f"*****get_charge******")
 
     ##########################
     # xyz2mol is called here #
@@ -583,7 +580,7 @@ def get_charge(ich: int, prot: object, allow: bool=True, debug: int=0):
 
     # Smiles are generated with rdkit
     smiles = Chem.MolToSmiles(mols[0])
-    print(f"{smiles=}")
+    if debug >= 2: print(f"GET_CHARGE. {smiles=}")
     # Gets the resulting charges
     atom_charge = []
     total_charge = 0
@@ -838,7 +835,7 @@ def balance_charge(unique_indices: list, unique_species: list, debug: int=0) -> 
 
             final_charge_distribution = []
             for idx, d in enumerate(alldistr):
-                print(f"{d=}")
+                if debug >= 2: print(f"BALANCE: distribution={d}")
                 final_charge = np.sum(d)
                 if final_charge == 0:
                     final_charge_distribution.append(d)
@@ -875,12 +872,12 @@ def prepare_unresolved(unique_indices: list, unique_species: list, distributions
     return list_molecules, list_indices, list_options
 
 #######################################################    
-def set_charges_create_bonds (specie, unique_indices, unique_species, final_charge_distribution, debug):
+def set_target_charge (specie, unique_indices, unique_species, final_charge_distribution, debug):
         
     spec = unique_species[specie.unique_index]
     indices = [index for index, value in enumerate(unique_indices) if value == specie.unique_index]
     target_charge = [final_charge_distribution[i] for i in indices][0] 
-    if debug > 1: print(spec, indices, target_charge)
+    if debug > 1: print("SET_TARGET_CHARGE:", spec, indices, target_charge)
     
     if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
         formula = specie.formula
@@ -891,49 +888,47 @@ def set_charges_create_bonds (specie, unique_indices, unique_species, final_char
         charge_list = spec.possible_cs
     
     if target_charge in charge_list:           
-        if debug > 1: print(f"Target charge {target_charge} of {formula} exists in {charge_list}." )
+        if debug > 1: print(f"SET_TARGET_CHARGE: Target charge {target_charge} of {formula} exists in {charge_list}." )
     else:
-        if debug > 1: print(f"ERROR: Target charge {target_charge} of {formula} does not exist in {charge_list}." )
+        if debug >= 1: print(f"SET_TARGET_CHARGE: ERROR!! Target charge {target_charge} of {formula} does not exist in {charge_list}." )
         return None
         
     if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
-        print(specie.formula)
+        if debug > 1: print("SET_TARGET_CHARGE:", specie.formula)
         specie.get_protonation_states(debug=debug)
         specie.get_possible_cs(debug=debug)
         formula = specie.formula
         charge_list = [cs.corr_total_charge for cs in specie.possible_cs]        
         
         if target_charge in charge_list:
-            if debug > 1: print(f"Target charge {target_charge} of {formula} exists in {charge_list}.")
+            if debug > 1: print(f"SET_TARGET_CHARGE: Target charge {target_charge} of {formula} exists in {charge_list}.")
             idx = charge_list.index(target_charge)
             cs = specie.possible_cs[idx]
-            #prot = cs.protonation
             specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
-
         else:
-            if debug > 1: print(f"ERROR: Target charge {target_charge} of {formula} does not exist in {charge_list}." )
+            if debug >= 1: print(f"SET_TARGET_CHARGE: ERROR!! Target charge {target_charge} of {formula} does not exist in {charge_list}." )
             return None
                     
     elif specie.subtype == "metal":
-        print(specie.label)
+        if debug > 1: print("SET_TARGET_CHARGE:", specie.label)
         specie.get_possible_cs(debug=debug)
         formula = specie.label
         charge_list = spec.possible_cs        
 
         if target_charge in charge_list:
-            if debug > 1: print(f"Target charge {target_charge} of {formula} exists in {charge_list}." )
+            if debug > 1: print(f"SET_TARGET_CHARGE: Target charge {target_charge} of {formula} exists in {charge_list}." )
             idx = charge_list.index(target_charge)
             cs = specie.possible_cs[idx]
             specie.set_charge(cs)         
         else:
-            if debug > 1: print(f"ERROR: Target charge {target_charge} of {formula} does not exist in {charge_list}." )
+            if debug >= 1: print(f"SET_TARGET_CHARGE: ERROR!! Target charge {target_charge} of {formula} does not exist in {charge_list}." )
             return None  
 #######################################################
 def prepare_mols_v4 (moleclist: list, unique_indices: list, unique_species: list, final_charge_distribution: list, debug: int=0):
     count = 0 
     for mol in moleclist:
         if mol.iscomplex == False:
-            set_charges_create_bonds(mol, unique_indices, unique_species, final_charge_distribution, debug)
+            set_target_charge(mol, unique_indices, unique_species, final_charge_distribution, debug)
             count += 1
         
         elif mol.iscomplex:
@@ -941,7 +936,7 @@ def prepare_mols_v4 (moleclist: list, unique_indices: list, unique_species: list
             tmp_smiles = []
             
             for lig in mol.ligands:            
-                set_charges_create_bonds(lig, unique_indices, unique_species, final_charge_distribution, debug)
+                set_target_charge(lig, unique_indices, unique_species, final_charge_distribution, debug)
                 count += 1
                  
                 tmp_smiles.append(lig.smiles)
@@ -950,7 +945,7 @@ def prepare_mols_v4 (moleclist: list, unique_indices: list, unique_species: list
                     tmp_atcharge[a] = lig.atomic_charges[kdx]
                     
             for met in mol.metals:        
-                set_charges_create_bonds(met, unique_indices, unique_species, final_charge_distribution, debug)
+                set_target_charge(met, unique_indices, unique_species, final_charge_distribution, debug)
                 count += 1
                 parent_index = met.get_parent_index("molecule")
                 tmp_atcharge[parent_index] = met.charge     
@@ -1119,10 +1114,9 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
                        
     # Sets bond information and hybridization
     for jdx, atom in enumerate(ligand.atoms):
-        if debug >=2: print(jdx, atom.label)
         nbonds = 0
         for b in atom.bonds:
-            if debug >=1: print(b.atom1.label, b.atom2.label, b.order)
+            # if debug >=2 : print(b.atom1.label, b.atom2.label, b.order)
             ismetal_1 = elemdatabase.elementblock[b.atom1.label] == "d" or elemdatabase.elementblock[b.atom1.label] == "f"
             ismetal_2 = elemdatabase.elementblock[b.atom2.label] == "d" or elemdatabase.elementblock[b.atom2.label] == "f"
             if ismetal_1 or ismetal_2:
@@ -1130,7 +1124,7 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
             else:
                 begin_idx = b.atom1.get_parent_index("ligand")
                 end_idx = b.atom2.get_parent_index("ligand")
-                if debug >=2: print(begin_idx, end_idx)
+                # if debug >=2: print(begin_idx, end_idx)
                 nbonds += 1
                 if b.order== 1.0: 
                     btype = Chem.BondType.SINGLE
@@ -1163,6 +1157,11 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
     ## visulize a corrected rdkit object
     if debug >=2:
         from IPython.display import display
+        from rdkit.Chem.Draw import IPythonConsole
+        IPythonConsole.drawOptions.addAtomIndices = True
+        IPythonConsole.molSize = 300,300
+
+        print(f"{ligand.formula=} {smiles=}")
         display(mol_with_atom_index(obj))
 
     return smiles, obj
@@ -1229,7 +1228,7 @@ def get_smiles_complex (mol: object, debug: int=0) -> Tuple[str, object]:
         IPythonConsole.drawOptions.addAtomIndices = True
         IPythonConsole.molSize = 300,300
 
-        print(f"{smiles=}")
+        print(f"{mol.formula=} {smiles=}")
         display(obj)
 
     return smiles, obj

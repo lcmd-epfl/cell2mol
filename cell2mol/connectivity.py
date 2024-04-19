@@ -300,9 +300,9 @@ def count_species(labels: list, pos: list, radii: list=None, indices: list=None,
 def split_species(labels: list, pos: list, radii: list=None, indices: list=None, cov_factor: float=1.3, debug: int=0) -> Tuple[bool, list]:
     ## Function that identifies connected groups of atoms from their atomic coordinates and labels.
     
-    if debug > 1:
-        print(f"{labels=}", len(labels))
-        print(f"{indices=}")
+    # if debug >= 2:
+    #     print(f"SPLIT_SPECIES: {labels=}", len(labels))
+    #     print(f"SPLIT_SPECIES: {indices=}")
 
     # Gets the covalent radii
     if radii is None:    radii = get_radii(labels)
@@ -412,12 +412,8 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
 
     if debug > 0: 
         print("COMPARE_SPECIES. Comparing:")
-        if debug == 1: print(mol1.formula)
-        if debug == 1: print(mol2.formula)
-        if debug == 2: print(mol1)
-        if debug == 2: print(mol2)
-        if debug == 2: print(mol1.labels)
-        if debug == 2: print(mol2.labels)
+        print(mol1.formula)
+        print(mol2.formula)
 
     # a pair of species is compared on the basis of:
     # 1) the total number of atoms
@@ -445,14 +441,14 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
     if debug == 2: print(f"{mol2.adj_types=}")
 
     count = 0
-    if debug == 2: print("kdx ldx elem1 - elem2 : reordered - reference")
+    # if debug > 0: print("COMPARE_SPECIES. kdx ldx elem1 - elem2 : reordered - reference")
     for kdx, (elem, row1) in enumerate(zip(elems, mol1.adj_types)):
         for ldx, (elem2, val1) in enumerate(zip(elems, row1)):
             val2 = mol2.adj_types[kdx, ldx]
             if val1 != val2: 
                 count += 1
                 if debug > 0: print(f"COMPARE_SPECIES. FALSE, different adjacency count")
-                if debug > 0: print(f"{kdx} {ldx} {elem} - {elem2} : {val1} - {val2}")
+                if debug > 0: print(f"COMPARE_SPECIES. {kdx} {ldx} {elem} - {elem2} : {val1} - {val2}")
                 
     if count > 0 : return False
     else: return True
@@ -508,29 +504,24 @@ def mol_with_atom_index(mol):
 #################################
 def create_bonds_spicie (specie, debug: int=0):
     from cell2mol.classes import bond
-    from IPython.display import display
-    
-    if debug >= 1: display(mol_with_atom_index(specie.rdkit_obj))
 
     n_atoms = specie.natoms # e.g. 9 
     n_atoms_rdkit = specie.rdkit_obj.GetNumAtoms() # e.g.10 
-    
+    if debug >= 1: print(f"CREATE_bonds_specie: {specie.formula=}, {specie.subtype=}")
+
     if n_atoms == n_atoms_rdkit:
-        if debug >= 1: print(f"CREATE BONDS: Number of atoms in {specie.subtype} object and RDKit MOL are equal: {n_atoms} {n_atoms_rdkit}")
+        if debug >= 2: print(f"\tNumber of atoms in {specie.subtype} object and RDKit object are equal: {n_atoms} {n_atoms_rdkit}")
         for idx, rdkit_atom in enumerate(specie.rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8
-            if debug >= 1: print(f"{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
+            if debug >= 2: print(f"\t{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
             if len(rdkit_atom.GetBonds()) == 0:
-                if debug >= 1: print(f"NO BONDS CREATED")
+                if debug >= 1: print(f"\tNO BONDS CREATED for {specie.atoms[idx].label} due to no bonds in {specie.subtype} RDKit object")
             else:
                 for b in rdkit_atom.GetBonds():
                     bond_startatom = b.GetBeginAtomIdx()
                     bond_endatom   = b.GetEndAtomIdx()
                     bond_order     = b.GetBondTypeAsDouble()
-                    if debug >= 2: 
-                        print(specie.atoms[bond_startatom].label, specie.rdkit_obj.GetAtomWithIdx(bond_startatom).GetSymbol(), ":", bond_startatom, ",", 
-                            specie.atoms[bond_endatom].label, specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol(), ":", bond_endatom, ",", bond_order)   
                     if specie.atoms[bond_endatom].label != specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
-                        if debug >= 1: print("Error with Bond EndAtom", specie.atoms[bond_endatom].label, specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
+                        if debug >= 1: print(f"\tError with Bond EndAtom", specie.atoms[bond_endatom].label, specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
                     else:
                         if bond_endatom == idx:
                             start = bond_endatom
@@ -540,32 +531,30 @@ def create_bonds_spicie (specie, debug: int=0):
                             end   = bond_endatom      
 
                         # create new bond object
-                        if debug >=1: print("BOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
+                        if debug >=2: print(f"\tBOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
                         new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
                         specie.atoms[idx].add_bond(new_bond)
 
-                if debug >=1: print("BONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
+                if debug >=2: print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
     else:
-        if debug >= 1: print(f"CREATE BONDS: Number of atoms in {specie.subtype} object and RDKit MOL are different: {n_atoms} {n_atoms_rdkit}")
-        if debug >= 1: print([(i, atom.label) for i, atom in enumerate(specie.atoms)])
-        if debug >= 1: print([(i, atom.GetSymbol()) for i, atom in enumerate(specie.rdkit_obj.GetAtoms())])       
+        if debug >= 1: print(f"\tNumber of atoms in {specie.subtype} object and RDKit object are different: {n_atoms} {n_atoms_rdkit}")
+        if debug >= 2: print(f"\t{[(i, atom.label) for i, atom in enumerate(specie.atoms)]}")
+        if debug >= 2: print(f"\t{[(i, atom.GetSymbol()) for i, atom in enumerate(specie.rdkit_obj.GetAtoms())]}")       
         non_bonded_atoms = list(range(0, n_atoms_rdkit))[n_atoms:]
-        if debug >= 1: print("NON_BONDED_ATOMS", non_bonded_atoms)
+        if debug >= 2: print(f"\tNON_BONDED_ATOMS", non_bonded_atoms)
 
         for idx, rdkit_atom in enumerate(specie.rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-            if debug >= 1: print(f"{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
+            if debug >= 2: print(f"\t{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
             if len(rdkit_atom.GetBonds()) == 0:
-                if debug >= 1: print(f"NO BONDS CREATED")
+                if debug >= 1: print(f"\tNO BONDS CREATED for {rdkit_atom.GetSymbol()} due to no bonds in {specie.subtype} RDKit object")
             else:
                 for b in rdkit_atom.GetBonds():
                     bond_startatom = b.GetBeginAtomIdx()
                     bond_endatom   = b.GetEndAtomIdx()
                     bond_order     = b.GetBondTypeAsDouble()
-                    if debug >= 2: 
-                        print(specie.rdkit_obj.GetAtomWithIdx(bond_startatom).GetSymbol(), ":", bond_startatom, ",", 
-                                specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol(), ":", bond_endatom, ",", bond_order)   
+  
                     if bond_startatom in non_bonded_atoms or bond_endatom in non_bonded_atoms:
-                        if debug >= 1: print(f"NO BOND CREATED {bond_startatom=} or {bond_endatom=} is not in the specie.atoms. It belongs to {non_bonded_atoms=}.")
+                        if debug >= 2: print(f"\tNO BOND CREATED {bond_startatom=} or {bond_endatom=} is not in the specie.atoms. It belongs to {non_bonded_atoms=}.")
                     else :
                         if bond_endatom == idx:
                             start = bond_endatom
@@ -575,38 +564,36 @@ def create_bonds_spicie (specie, debug: int=0):
                             end   = bond_endatom   
 
                         # create new bond object
-                        if debug >=1: print("BOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
+                        if debug >=2: print(f"\tBOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
                         new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
                         specie.atoms[idx].add_bond(new_bond)
                 if idx not in non_bonded_atoms:
-                    if debug >=1: print("BONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
+                    if debug >=2: print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
                 else :
-                    if debug >=1: print("NO BONDS")
+                    if debug >=1: print(f"\tNO BONDS for {rdkit_atom.GetSymbol()} with {specie.subtype} RDKit object index {idx} because it is an added atom")
 
 #################################
 
-def split_group(original_group, conn_idx, debug: int=2):
+def split_group(original_group, conn_idx, debug: int=0):
     from cell2mol.classes import group
     # Split the "group" to obtain the groups connected to a specific metal
     splitted_groups = []
     
-    print(f"GROUP.SPLIT_GROUP: {conn_idx=}")
+    if debug > 1: print(f"GROUP.SPLIT_GROUP: {conn_idx=}")
     conn_labels  = extract_from_list(conn_idx, original_group.labels, dimension=1)
     conn_coord   = extract_from_list(conn_idx, original_group.coord, dimension=1)
     conn_radii   = extract_from_list(conn_idx, original_group.radii, dimension=1)
     conn_atoms   = extract_from_list(conn_idx, original_group.atoms, dimension=1)
-    print(f"GROUP.SPLIT_GROUP: {conn_labels=}")
-    print(f"GROUP.SPLIT_GROUP: {conn_coord=}")
-    print(f"GROUP.SPLIT_GROUP: {conn_radii=}")
-    # print(f"GROUP.SPLIT_GROUP: {conn_atoms=}")
+    if debug > 1: print(f"GROUP.SPLIT_GROUP: {conn_labels=}")
+
     cov_factor=original_group.get_parent("ligand").cov_factor
     blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=cov_factor, debug=debug)      
-    print(f"blocklist={blocklist}")
+    if debug > 0: print(f"GROUP.SPLIT_GROUP: {blocklist=}")
+
     ## Arranges Groups 
     for b in blocklist:
-        print(f"GROUP.SPLIT_GROUP: block={b}")
+        if debug > 1: print(f"GROUP.SPLIT_GROUP: block={b}")
         gr_indices = extract_from_list(b, conn_idx, dimension=1)
-        # if debug > 0: print(f"GROUP.SPLIT_GROUP: {gr_indices=}")
         gr_labels  = extract_from_list(b, conn_labels, dimension=1)
         gr_coord   = extract_from_list(b, conn_coord, dimension=1)
         gr_radii   = extract_from_list(b, conn_radii, dimension=1)
