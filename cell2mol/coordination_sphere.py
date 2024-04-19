@@ -1,7 +1,7 @@
 import numpy as np
 from cosymlib import Geometry
 from cell2mol.other import *
-from cell2mol.connectivity import add_atom, split_group
+from cell2mol.connectivity import add_atom
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
@@ -22,19 +22,15 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
             for atom in group.atoms:
                 symbols.append(atom.label)
                 positions.append(atom.coord)
-                if debug >= 2 : print(atom.label, atom.coord)
+                #if debug >= 2 : print("DEFINE_coordination_geometry:", atom.label, atom.coord)
         else :
-            print(f"{group.haptic_type=}")
-            print(f"{[atom.coord for atom in group.atoms]}")
+            if debug >= 2 : print(f"DEFINE_coordination_geometry: {group.haptic_type=}")
+            #if debug >= 2 : print(f"DEFINE_coordination_geometry: {[atom.coord for atom in group.atoms]}")
             haptic_center_coord = compute_centroid(np.array([atom.coord for atom in group.atoms]))
             symbols.append(str(group.haptic_type))
-            print(haptic_center_coord)
             positions.append(list(haptic_center_coord))      
             if debug >= 2 : print(f"mid point of {group.haptic_type=}", haptic_center_coord)      
             coord_haptic_type.append(group.haptic_type)             
-    
-    print(f"{symbols=}")
-    print(f"{positions=}")
 
     posgeom_dev = shape_measure(symbols, positions, debug=debug)
 
@@ -45,12 +41,14 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
         coordination_geometry = "Undefined"
         geom_deviation = "Undefined"
 
-    if debug >= 1 :
-        print(f"The number of coordinating points (including the mid point of haptic ligands) : {len(coord_group)}")
-        print (f"{posgeom_dev}")
-        print(f"The most likely geometry : '{coordination_geometry}' with deviation value {geom_deviation}")
-        print(f"The type of hapticity : {coord_haptic_type}")
-        print("")
+    if debug >= 2 :
+        # for haptic ligands, it's the mid point of haptic ligands
+        print(f"DEFINE_coordination_geometry: The number of coordinating points: {len(coord_group)}")
+        print(f"DEFINE_coordination_geometry: {posgeom_dev}")
+        print(f"DEFINE_coordination_geometry: The type of hapticity : {coord_haptic_type}")
+    
+    if debug >= 1 : 
+        print(f"DEFINE_coordination_geometry: The most likely geometry is '{coordination_geometry}' with deviation value {geom_deviation}")
 
     # return coordination_geometry
     return coordination_geometry, geom_deviation
@@ -59,10 +57,13 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
 def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:
     # Get shape measure of a set of coordinates
 
+    if debug >= 2:print(f"SHAPE_MEASURE: {symbols=}")
+    if debug >= 2:print(f"SHAPE_MEASURE: {positions=}")
+
     cn = len(symbols)-1 # coordination number of metal center
     connectivity= [[1, i] for i in range(2, cn+2)]
-    print(cn)
-    print(connectivity)
+    if debug >= 2: print(f"SHAPE_MEASURE: coordination number of metal center {cn}")
+    if debug >= 2: print(f"SHAPE_MEASURE: connectivity of metal center(1) {connectivity}")
     geometry = Geometry(positions=positions, 
                         symbols=symbols, 
                         connectivity=connectivity)            
@@ -71,10 +72,6 @@ def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:
     ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)])
     
     posgeom_dev={}
-    if debug >= 2 :
-        for p, s in zip(symbols, positions):
-            print (p, s)
-        print("")
     
     for idx, rg in enumerate(ref_geom[:,0]):
         shp_measure = geometry.get_shape_measure(rg, central_atom=1)
@@ -306,10 +303,10 @@ def get_thres_from_two_atoms(label_i, label_j, factor=1.3, debug=0):
             else :                      new_factor = factor_j
 
             thres = round( (radii_i + radii_j) * new_factor, 3)
-            if debug >=2 :  print(f"{label_i} : {radii_i} ({factor_i}), {label_j} : {radii_j} ({factor_j}), {new_factor=}, {thres=}")
+            # if debug >=2 :  print(f"{label_i} : {radii_i} ({factor_i}), {label_j} : {radii_j} ({factor_j}), {new_factor=}, {thres=}")
     else :
         thres = round( (radii_i + radii_j) * factor , 3)
-        if debug >=2 :  print(f"{label_i} : {radii_i}, {label_j} : {radii_j}, {factor}, {thres=}")   
+        # if debug >=2 :  print(f"{label_i} : {radii_i}, {label_j} : {radii_j}, {factor}, {thres=}")   
     
     return thres
 
@@ -368,7 +365,7 @@ def check_neighboring_atoms_mconnec (idx, group, metal, debug):
     return isremoved
 
 #######################################################    
-def coordination_correction_for_nonhaptic(group: object, debug: int=1):
+def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
     if debug > 0: print("Entering COORD_CORR_NONHAPTIC:")
     if not hasattr(group,"metals"): group.get_connected_metals()
@@ -376,20 +373,21 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=1):
     ## First Correction (former verify_connectivity)
     conn_idx = []
     for idx, atom in enumerate(group.atoms):
-        if debug > 0: print(f"\tmconnec={atom.mconnec} in atom idx={idx}, label={atom.label}")
+        if debug > 0: print(f"\tCoordinating atom label={atom.label} with mconnec={atom.mconnec}, group index {idx}")
         isremoved = False
         ## Now there is an extra loop for each metal of the group. For bridging ligands
         for met in group.metals:
             if isremoved: continue
             lig     = group.get_parent("ligand")
             ligand_idx = atom.get_parent_index("ligand")
-            if debug > 0: print(f"\tevaluating coordination with metal \n{met}")
-            isadded, newlab, newcoord = add_atom(lig.labels, lig.coord, ligand_idx, lig, list([met]), "H", debug=2)
+            if debug > 0: print(f"\tevaluating coordination with metal {met.label}")
+            if debug > 1: print(f"\n{met}")
+            isadded, newlab, newcoord = add_atom(lig.labels, lig.coord, ligand_idx, lig, list([met]), "H", debug=debug)
             if isadded:
-                if debug > 0: print(f"\tconnectivity verified for atom with label {atom.label} and ligand index {ligand_idx}")
+                if debug > 0: print(f"\tconnectivity verified for atom {atom.label} with ligand index {ligand_idx}")
                 conn_idx.append(idx)
             else:
-                if debug > 0: print(f"\tcorrecting mconnec of atom with label {atom.label} and ligand index {ligand_idx}")
+                if debug > 0: print(f"\tcorrecting mconnec of atom {atom.label} with ligand index {ligand_idx}")
                 isremoved = True
                 ### Reset Connectivity of the atom and the parents
                 atom.reset_mconnec(met, debug=debug)
@@ -404,26 +402,27 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=1):
 #######################################################    
 def coordination_correction_for_haptic (group: object, debug: int=0):
 
+    if debug > 0: print("Entering COORD_CORR_HAPTIC:")
     ratio_list = []
     for idx, atom in enumerate(group.atoms):
         metal = atom.get_closest_metal()
         dist = get_dist(atom.coord, metal.coord)
         thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
         ratio_list.append(round(dist/thres,3))
-        if debug >= 1 : 
+        if debug >= 2 : 
             print(f"\tAtom {idx} :", atom.label, f"\tMetal :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
 
     std_dev = round(np.std(ratio_list), 3)
-    if debug >= 1 : print(f"{ratio_list=} {std_dev=}")
+    if debug >= 2 : print(f"\t{ratio_list=} {std_dev=}")
 
     conn_idx = []
     for idx, (atom, ratio) in enumerate(zip(group.atoms, ratio_list)) :
         if atom.label == "H" : 
-            if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
+            if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
             if debug >=1 : print(atom.label)
             atom.reset_mconnec(metal, debug=debug)  
         elif std_dev > 0.05 and ratio > 0.9 :
-            if debug >=1 : print("\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to the long distance")
+            if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to the long distance")
             if debug >=1 : print(atom.label)
             atom.reset_mconnec(metal, debug=debug) 
         else :

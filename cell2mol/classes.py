@@ -352,9 +352,10 @@ class molecule(specie):
         return to_print
 
     ############
-    def get_spin(self):
+    def get_spin(self, debug: int=0):   
         if self.iscomplex:  self.spin = assign_spin_complexes(self) 
         else :              self.spin = 1
+        if debug >=1: print(f"GET_SPIN: Spin multiplicity of the complex {self.formula} is assigned as {self.spin}\n")
         return self.spin
                 
     ############
@@ -368,7 +369,7 @@ class molecule(specie):
                 met.reset_charge()
 
     ############
-    def split_complex(self, debug: int=2):
+    def split_complex(self, debug: int=0):
         if not hasattr(self,"atoms"): self.set_atoms()
         if not self.iscomplex:        self.ligands = None; self.metals = None
         else: 
@@ -387,9 +388,8 @@ class molecule(specie):
             rest_indices = extract_from_list(rest_idx, self.indices, dimension=1)
             rest_radii   = extract_from_list(rest_idx, self.radii, dimension=1)
             rest_atoms   = extract_from_list(rest_idx, self.atoms, dimension=1)
-            if debug > 0: 
+            if debug >= 2: 
                 print(f"SPLIT COMPLEX: rest labels: {rest_labels}")
-                print(f"SPLIT COMPLEX: rest coord: {rest_coord}")
                 print(f"SPLIT COMPLEX: rest indices: {rest_indices}")
                 print(f"SPLIT COMPLEX: rest radii: {rest_radii}")
 
@@ -560,17 +560,17 @@ class ligand(specie):
     #######################################################
     def get_denticity(self, debug: int=0):
         if not hasattr(self,"groups"):      self.split_ligand(debug=debug)
-        if debug > 0: print(f"LIGAND.Get_denticity: checking connectivity of ligand {self.formula}")
-        if debug > 0: print(f"LIGAND.Get_denticity: initial connectivity is {len(self.connected_idx)}")
+        if debug > 1: print(f"LIGAND.Get_denticity: checking connectivity of ligand {self.formula}")
+        if debug > 1: print(f"LIGAND.Get_denticity: initial connectivity is {len(self.connected_idx)}")
         self.denticity = 0
         for g in self.groups:
             #if debug > 0: print(f"LIGAND.Get_denticity: checking denticity of group \n{g}\n{g.madjnum=}\n{g.madjmat=}")
             self.denticity += g.get_denticity(debug=debug)      ## A check is also performed at the group level
-        if debug > 0: print(f"LIGAND.Get_denticity: final connectivity is {self.denticity}")
+        if debug > 0: print(f"LIGAND.Get_denticity: final connectivity of ligand {self.formula} is {self.denticity}")
         return self.denticity 
 
     #######################################################
-    def split_ligand(self, debug: int=2):
+    def split_ligand(self, debug: int=0):
         # Split the "ligand to obtain the groups
         self.groups = []
         # Identify Connected and Unconnected atoms (to the metal)
@@ -578,27 +578,24 @@ class ligand(specie):
 
         ## Creates the list of variables
         conn_idx     = self.connected_idx
-        # if debug > 0: 
-        print(f"LIGAND.SPLIT_LIGAND: {self.indices=}")
-        # if debug > 0: 
-        print(f"LIGAND.SPLIT_LIGAND: {conn_idx=}")
+        if debug > 0: print(f"\nLIGAND.SPLIT_LIGAND: splitting {self.formula} into groups")
+        if debug >= 2:
+            print(f"LIGAND.SPLIT_LIGAND: {self.indices=}") 
+            print(f"LIGAND.SPLIT_LIGAND: {conn_idx=}")
         conn_labels  = extract_from_list(conn_idx, self.labels, dimension=1)
         conn_coord   = extract_from_list(conn_idx, self.coord, dimension=1)
         conn_radii   = extract_from_list(conn_idx, self.radii, dimension=1)
         conn_atoms   = extract_from_list(conn_idx, self.atoms, dimension=1)
-        print(f"LIGAND.SPLIT_LIGAND: {conn_labels=}")
-        print(f"LIGAND.SPLIT_LIGAND: {conn_coord=}")
-        print(f"LIGAND.SPLIT_LIGAND: {conn_radii=}")
-        # print(f"LIGAND.SPLIT_LIGAND: {conn_atoms=}")
+        if debug >= 2: print(f"LIGAND.SPLIT_LIGAND: {conn_labels=}")
+
         if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=self.cov_factor, debug=debug)
         else:                          blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, debug=debug)      
-        print(f"blocklist={blocklist}")
+        if debug >= 2: print(f"LIGAND.SPLIT_LIGAND: {blocklist=}")
         ## Arranges Groups 
         for b in blocklist:
-            # if debug > 0: 
-            print(f"LIGAND.SPLIT_LIGAND: block={b}")
+            if debug >= 2 : print(f"LIGAND.SPLIT_LIGAND: block={b}")
             gr_indices = extract_from_list(b, conn_idx, dimension=1)
-            # if debug > 0: print(f"LIGAND.SPLIT_LIGAND: {gr_indices=}")
+            # if debug > 1: print(f"LIGAND.SPLIT_LIGAND: {gr_indices=}")
             gr_labels  = extract_from_list(b, conn_labels, dimension=1)
             gr_coord   = extract_from_list(b, conn_coord, dimension=1)
             gr_radii   = extract_from_list(b, conn_radii, dimension=1)
@@ -619,16 +616,17 @@ class ligand(specie):
             newgroup.get_hapticity(debug=debug)
             newgroup, conn_idx = newgroup.check_coordination(debug=debug)
             if len(conn_idx) == len(newgroup.atoms):
-                print(f"LIGAND.SPLIT_LIGAND: group is found", newgroup)
+                if debug > 1 : print(f"LIGAND.SPLIT_LIGAND: new group is found")
                 newgroup.get_denticity(debug=debug)
                 # Top-down hierarchy
                 self.groups.append(newgroup)
             else:
-                print(f"LIGAND.SPLIT_LIGAND: group is found", newgroup)
+                if debug > 1 : print(f"enterting SPLIT_GROUP for the GROUP {newgroup.formula} with {conn_idx=}")
                 splitted_groups = split_group(newgroup, conn_idx, debug=debug)
                 for g in splitted_groups:
                     self.groups.append(g)
-        print(f"LIGAND.SPLIT_LIGAND: final groups {self.groups=}")
+        if debug > 0 : print(f"LIGAND.SPLIT_LIGAND: found groups {[ group.formula for group in self.groups]}")
+        if debug >= 2 : print(f"{self.groups}")
         return self.groups
 
     #######################################################
@@ -739,7 +737,7 @@ class group(specie):
         return self.haptic_type 
 
     #######################################################
-    def check_coordination(self, debug: int=2):
+    def check_coordination(self, debug: int=0):
         if not hasattr(self,"is_haptic"): self.get_hapticity()
         if not hasattr(self,"atoms"):     self.set_atoms()
         if self.is_haptic:                self, conn_idx = coordination_correction_for_haptic(self, debug=debug)
@@ -1089,25 +1087,29 @@ class metal(atom):
                 haptic_center_coord = compute_centroid(np.array([atom.coord for atom in group.atoms]))
                 diff = round(get_dist(self.coord, haptic_center_coord) - elemdatabase.CovalentRadius3[haptic_center_label], 3)
                 diff_list.append(diff)     
-        print(diff_list)
-        average = round(np.average(diff_list), 3)    
-        print(average)
+        average = round(np.average(diff_list), 3)   
+
+        if debug > 1: 
+            print(f"METAL.Get_relative_metal_radius: {diff_list=}")
+            print(f"METAL.Get_relative_metal_radius: {average=}") 
+
         self.rel_metal_radius = round(average/elemdatabase.CovalentRadius3[self.label], 3)
-        
+
         return self.rel_metal_radius
     
     #######################################################
     def get_coordination_geometry(self: object, debug: int = 0):
         coord_group = self.get_connected_groups()
         self.coord_nr = len(coord_group)
-        if debug >= 1: print(f"{coord_group=}")
-        if debug >= 1: print(f"{self.coord_nr=}")
+        if debug >= 1: print(f"\nMETAL.Get_coord_geometry: {self.label}")
+        if debug >= 2: print(f"METAL.Get_coord_geometry:\n{coord_group=}")
+        if debug >= 1: print(f"METAL.Get_coord_geometry: coord_nr={self.coord_nr}")
         
         self.coord_geometry, self.geom_deviation = define_coordination_geometry(self, coord_group, debug = debug)
-        if debug >= 1: print(f"{self.coord_geometry=} {self.geom_deviation=}")
+        if debug >= 2: print(f"METAL.Get_coord_geometry: {self.coord_geometry=} {self.geom_deviation=}")
         
         self.rel_metal_radius = self.get_relative_metal_radius(debug = debug)
-        if debug >= 1: print(f"{self.rel_metal_radius=}")
+        if debug >= 2: print(f"METAL.Get_coord_geometry: {self.rel_metal_radius=}")
 
         return self.coord_geometry
 
@@ -1117,8 +1119,9 @@ class metal(atom):
         return self.possible_cs
 
     #######################################################
-    def get_spin(self):
-        self.spin = assign_spin_metal(self)
+    def get_spin(self, debug: int=0):
+        self.spin = assign_spin_metal(self, debug=debug)
+        if debug >=1: print(f"GET_SPIN: Spin multiplicity of the metal {self.label} is assigned as {self.spin}")
 
     #######################################################
     def predict_charge(self, debug: int=0):
@@ -1158,7 +1161,7 @@ class cell(object):
     def get_unique_species(self, debug: int=0): 
         if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)  
         if self.is_fragmented: return None # Stopping. self.is_fragmented must be false to determine the charges of the cell
-
+        if debug >= 0: print(f"Getting unique species in cell")
         self.unique_species = []
         self.unique_indices = []
 
@@ -1172,7 +1175,7 @@ class cell(object):
             if not mol.iscomplex:
                 found = False
                 for ldx, typ in enumerate(typelist_mols):   # Molecules
-                    issame = compare_species(mol, typ[0], debug=debug)
+                    issame = compare_species(mol, typ[0], debug=0)
                     if issame :
                         found = True ; kdx = typ[1]
                         if debug >= 2: print(f"Molecule {idx} is the same with {ldx} in typelist")
@@ -1189,7 +1192,7 @@ class cell(object):
                 for jdx, lig in enumerate(mol.ligands):     # ligands
                     found = False
                     for ldx, typ in enumerate(typelist_ligs):
-                        issame = compare_species(lig, typ[0], debug=debug)
+                        issame = compare_species(lig, typ[0], debug=0)
                         if issame :
                             found = True ; kdx = typ[1]
                             if debug >= 2: print(f"ligand {jdx} is the same with {ldx} in typelist")
@@ -1204,7 +1207,7 @@ class cell(object):
                 for jdx, met in enumerate(mol.metals):      #  metals
                     found = False
                     for ldx, typ in enumerate(typelist_mets):
-                        issame = compare_metals(met, typ[0], debug=debug)
+                        issame = compare_metals(met, typ[0], debug=0)
                         if issame :
                             found = True ; kdx = typ[1]
                             if debug >= 2: print(f"Metal {jdx} is the same with {ldx} in typelist")
@@ -1233,6 +1236,11 @@ class cell(object):
 
     #######################################################
     def get_reference_molecules(self, ref_labels: list, ref_fracs: list, cov_factor: float=1.3, metal_factor: float=1.0, debug: int=0):
+        if debug >= 0:
+            print("#########################################")
+            print("  GETREFS: Generate reference molecules  ")
+            print("#########################################")
+
         # In the info file, the reference molecules only have fractional coordinates. We convert them to cartesian
         ref_pos = frac2cart_fromparam(ref_fracs, self.cellparam)
 
@@ -1251,9 +1259,9 @@ class cell(object):
             if newmolec.iscomplex: newmolec.split_complex()
             self.refmoleclist.append(newmolec)
         
-        if debug >= 2: print(f"GETREFS: found {len(self.refmoleclist)} reference molecules")
-        if debug >= 2: print(f"GETREFS:", [ref.formula for ref in self.refmoleclist])
-        if debug >= 2: print(f"GETREFS: {self.refmoleclist}")
+        if debug >= 0: print(f"GETREFS: found {len(self.refmoleclist)} reference molecules")
+        if debug >= 0: print(f"GETREFS:", [ref.formula for ref in self.refmoleclist])
+        if debug >= 0: print(f"GETREFS: {self.refmoleclist}")
         # Checks for isolated atoms, and retrieves warning if there is any. Except if it is H, halogen (group 17) or alkalyne (group 2)
         isgood = True 
         for ref in self.refmoleclist:
@@ -1263,17 +1271,18 @@ class cell(object):
                 if (group == 2 or group == 17) and label != "H": pass 
                 else:
                     isgood = False
-                    if debug >= 2: print(f"GETREFS: found ref molecule with only one atom {ref.labels}")
+                    if debug >= 0: print(f"GETREFS: found ref molecule with only one atom {ref.labels}")
 
         # If all good, then works with the reference molecules
         if isgood:
             for ref in self.refmoleclist:
+                if debug >= 0: print(f"GETREFS: working with {ref.formula}")
                 if ref.iscomplex: 
                     ref.get_hapticity(debug=debug)
                     for lig in ref.ligands:
-                        lig.get_denticity(debug=2)
+                        lig.get_denticity(debug=debug)
                     for met in ref.metals:                         
-                        met.get_coordination_geometry(debug=debug)                ### Former "get_coordination_Geometry(ref)" function 
+                        met.get_coordination_geometry(debug=debug)
 
         if isgood: self.has_isolated_H = False
         else:      self.has_isolated_H = True
@@ -1518,7 +1527,7 @@ class cell(object):
             if mol.iscomplex:
                 if len(mol.metals) > 1 :
                     if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: Metals: {mol.metals}")
+                    if debug >= 2: print(f"CELL.CREATE_BONDS: Metals: {mol.metals}")
                     for idx, met1 in enumerate(mol.metals):
                         for jdx, met2 in enumerate(mol.metals):
                             if idx <= jdx: continue
@@ -1544,16 +1553,22 @@ class cell(object):
     def assign_spin(self, debug: int=0) -> object:
         if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)  
         if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to assign the spin
+        
+        if debug >= 1:  
+            print("#########################################")
+            print("       Assigning Spin multiplicity       ")
+            print("#########################################")      
+        
         for mol in self.moleclist:
             if mol.iscomplex:
                 for metal in mol.metals:
-                    if not hasattr(metal,"coord_nr"): metal.get_coordination_geometry(debug=debug)
-                    metal.get_spin()
-            mol.get_spin()
+                    if not hasattr(metal,"coord_nr"): metal.get_coordination_geometry()
+                    metal.get_spin(debug=debug)
+            mol.get_spin(debug=debug)
         return self.moleclist
     #######################################################
     def predict_metal_ox(self, debug: int=0):
-        if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)
+        if not hasattr(self,"error_prepare_mols"): self.assign_charges()
         if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to assign the spin
         for mol in self.moleclist:
             if mol.iscomplex:

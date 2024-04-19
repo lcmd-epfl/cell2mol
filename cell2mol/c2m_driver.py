@@ -60,8 +60,10 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     ################################
     ### PREPARES THE CELL OBJECT ###
     ################################
-    print(f"INITIATING cell object from input") 
-
+    version = "2.0"
+    print(f"cell2mol version {version}")
+    print(f"INITIATING cell object from info path: {infopath}") 
+    print(f"Debug level: {debug}")  
     # Reads reference molecules from info file, as well as labels and coordinates
     labels, pos, ref_labels, ref_fracs, cellvec, cellparam = readinfo(infopath)
     # Initiates cell
@@ -69,7 +71,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     # Loads the reference molecules and checks_missing_H
     # TODO : reconstruct the unit cell without using reference molecules
     # TODO : reconstruct the unit cell using (only reconstruction of) reference molecules and Space group
-    newcell.get_reference_molecules(ref_labels, ref_fracs, debug=2) 
+    newcell.get_reference_molecules(ref_labels, ref_fracs, debug=debug) 
     newcell.assess_errors()
     newcell.save(ref_cell_fname)
     ######################
