@@ -1300,7 +1300,7 @@ class cell(object):
         if debug > 0: print(f"CELL.MOLECLIST passed initial checks")
         cov_factor = 1.3
 
-        if blocklist is None: blocklist = split_species(self.labels, self.coord, cov_factor=cov_factor)
+        if blocklist is None: blocklist = split_species(self.labels, self.coord, cov_factor=cov_factor, debug=debug)
 
         self.moleclist = []
         for b in blocklist:
@@ -1364,7 +1364,7 @@ class cell(object):
         if metal_factor is None: metal_factor = self.refmoleclist[0].metal_factor
 
         ## Get the fragments, which is the moleclist of a fragmented cell
-        fragments = self.get_moleclist().copy() 
+        fragments = self.get_moleclist(debug=debug).copy() 
         ## Classifies fragments
         for f in fragments:
             if not hasattr(f,"frac_coord"):       f.get_fractional_coord(self.cellvec)
