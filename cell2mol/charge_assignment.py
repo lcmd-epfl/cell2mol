@@ -389,8 +389,9 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         else:
                             # Checks for adjacent Atoms
                             list_of_adj_atoms = []
-                            for i in a.adjacency:
-                                list_of_adj_atoms.append(ligand.labels[i])
+                            for adj in a.adjacency:
+                                if debug >= 2: print(f"        GET_PROTONATION_STATES: {adj=}", ligand.get_parent("molecule").labels[adj])
+                                list_of_adj_atoms.append(ligand.get_parent("molecule").labels[adj])
                             numN = list_of_adj_atoms.count("N")
                             if numN == 2:  # triazole or tetrazole
                                 elemlist[idx] = "H"
