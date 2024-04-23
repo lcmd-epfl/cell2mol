@@ -506,6 +506,7 @@ def combine(tobemerged: list, references: list, cellvec: list, threshold_tmat: f
                     reordered_newmolec.cell_indices = reordered_cell_indices
                     reordered_newmolec.set_fractional_coord(reordered_frac_cood)
                     reordered_newmolec.set_atoms(create_adjacencies=True, debug=2)
+                    
                     if reordered_newmolec.iscomplex: 
                         reordered_newmolec.split_complex()
                         reordered_newmolec.get_hapticity(debug=debug)
@@ -515,6 +516,7 @@ def combine(tobemerged: list, references: list, cellvec: list, threshold_tmat: f
                             met.get_coordination_geometry(debug=debug) 
                     if debug >= 1: print(f"COMBINE: {reordered_newmolec.fomula=}")
                     if debug >= 1: print(f"COMBINE: {reordered_newmolec=}")
+
                     issame = compare_species(reordered_newmolec, ref, debug=debug)
                     if issame:    ## Then is a molecule that appears in the reference list 
                         found = True 

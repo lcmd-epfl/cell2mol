@@ -869,6 +869,8 @@ def prepare_unresolved(unique_indices: list, unique_species: list, distributions
                 list_indices.append(spec.get_parent_index("molecule"))
                 list_options.append(options)
 
+    # TODO: we use metal OS predicted by ML to select the best charge distribution
+    
     return list_molecules, list_indices, list_options
 
 #######################################################    
