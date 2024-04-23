@@ -8,6 +8,7 @@ from cell2mol.c2m_module import cell2mol
 from cell2mol.cif2info import cif_2_info
 from cell2mol.classes import cell
 from cell2mol.read_write import readinfo, prefiter_cif
+from cell2mol.other import handle_error
 
 # if __name__ != "__main__" and __name__ != "cell2mol.c2m_driver": sys.exit(1)
 if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
@@ -72,6 +73,12 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     # TODO : reconstruct the unit cell without using reference molecules
     # TODO : reconstruct the unit cell using (only reconstruction of) reference molecules and Space group
     newcell.get_reference_molecules(ref_labels, ref_fracs, debug=debug) 
+
+    ## Evaluates boolean variable self.has_isolated_H. If true, indicates a problem with the cif
+    if newcell.has_isolated_H:        handle_error(1)
+    newcell.check_missing_H(debug=debug)                                     
+    ## Evaluates boolean variable self.has_missing_H. If true, indicates a problem with the cif
+    if newcell.has_missing_H:         handle_error(2)
     newcell.assess_errors()
     newcell.save(ref_cell_fname)
     ######################

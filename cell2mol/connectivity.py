@@ -318,6 +318,8 @@ def split_species(labels: list, pos: list, radii: list=None, indices: list=None,
 
     # creates block matrix
     graph = csr_matrix(lap)
+    if debug >=2: print(f"SPILT_SPECIES: Laplacian {lap=}")
+    if debug >=2: print(f"SPILT_SPECIES: {graph=}")
     perm = reverse_cuthill_mckee(graph)
     gp1 = graph[perm, :]
     gp2 = gp1[:, perm]
