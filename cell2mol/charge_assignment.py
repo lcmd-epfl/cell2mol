@@ -202,7 +202,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     # Program runs sequentially for each group of the ligand
     for g in ligand.groups:
         parent_indices = g.get_parent_indices("ligand")
-
+        if debug >= 2: print(f"    GET_PROTONATION_STATES: Evaluating group {g.formula} with parent_indices {parent_indices}")
         ########################
         # Cases with Hapticity #
         ########################

@@ -1321,9 +1321,10 @@ class cell(object):
                 mol_frac_coord  = extract_from_list(b, self.frac_coord, dimension=1)
                 newmolec.set_fractional_coord(mol_frac_coord, debug=debug)
             # The split_complex must be below the frac_coord, so they are carried on to the ligands
-            if newmolec.iscomplex: 
-                if debug > 0: print(f"CELL.MOLECLIST: splitting complex")
-                newmolec.split_complex(debug=debug)
+            # if newmolec.iscomplex: 
+            #     if debug > 0: print(f"CELL.MOLECLIST: splitting complex")
+            #     newmolec.split_complex(debug=debug)
+            # Not needed here, as the reconstruction will take care of it
             self.moleclist.append(newmolec)
 
         return self.moleclist
