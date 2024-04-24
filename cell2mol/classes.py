@@ -1,13 +1,15 @@
 import numpy as np
+import os
 from cell2mol.connectivity import get_adjacency_types, get_element_count, labels2electrons, labels2formula, get_adjmatrix
 from cell2mol.connectivity import get_metal_idxs, split_species, get_radii, create_bonds_spicie, split_group
 from cell2mol.connectivity import compare_atoms, compare_species, compare_metals
 from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
 from cell2mol.charge_assignment import get_protonation_states_specie, get_possible_charge_state, get_metal_poscharges
-from cell2mol.charge_assignment import balance_charge, prepare_unresolved, prepare_mols, correct_smiles_ligand, prepare_mols_v4
+from cell2mol.charge_assignment import balance_charge, prepare_unresolved, prepare_mols, correct_smiles_ligand
 from cell2mol.spin import assign_spin_metal, assign_spin_complexes, predict_ox_state
 from cell2mol.other import extract_from_list, compute_centroid, get_dist, get_angle
+from cell2mol.other import handle_error
 from cell2mol.elementdata import ElementData
 from cell2mol.coordination_sphere import coordination_correction_for_haptic, coordination_correction_for_nonhaptic, define_coordination_geometry
 elemdatabase = ElementData()
@@ -1301,7 +1303,10 @@ class cell(object):
         cov_factor = 1.3
 
         if blocklist is None: blocklist = split_species(self.labels, self.coord, cov_factor=cov_factor, debug=debug)
-
+        if debug > 0: print(f"CELL.MOLECLIST: found {len(blocklist)} blocks")
+        if debug > 0: print(f"CELL.MOLECLIST: {blocklist=}")
+        if blocklist is None: return None
+        
         self.moleclist = []
         for b in blocklist:
             if debug > 0: print(f"CELL.MOLECLIST: doing block={b}")
@@ -1360,12 +1365,18 @@ class cell(object):
 
     #######################################################
     def reconstruct(self, cov_factor: float=None, metal_factor: float=None, debug: int=0):
-        if not hasattr(self,"refmoleclist"): print("CELL.RECONSTRUCT. CELL missing list of reference molecules"); return None
+        if not hasattr(self,"refmoleclist"): print("CELL.RECONSTRUCT. CELL missing list of reference molecules"); return
         if cov_factor is None:   cov_factor   = self.refmoleclist[0].cov_factor
         if metal_factor is None: metal_factor = self.refmoleclist[0].metal_factor
 
         ## Get the fragments, which is the moleclist of a fragmented cell
-        fragments = self.get_moleclist(debug=debug).copy() 
+        fragments = self.get_moleclist(debug=debug).copy()
+        if fragments is None: 
+            self.error_get_fragments = True  
+            return  # Stopping. self.error_get_fragments must be False to reconstruct the cell
+        else:
+            self.error_get_fragments = False
+
         ## Classifies fragments
         for f in fragments:
             if not hasattr(f,"frac_coord"):       f.get_fractional_coord(self.cellvec)
@@ -1412,7 +1423,8 @@ class cell(object):
                 if newmolec.iscomplex: newmolec.split_complex()
                 self.moleclist.append(newmolec)         
             return self.moleclist
-    
+        
+    #######################################################
     def reset_charge_assignment(self, debug: int=0):
         if not hasattr(self,"moleclist"): return None
         for mol in self.moleclist:
@@ -1437,7 +1449,7 @@ class cell(object):
         
         # (0) Makes sure the cell is reconstructed
         if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)  
-        if self.is_fragmented: return None # Stopping. self.is_fragmented must be false to determine the charges of the cell
+        if self.is_fragmented: return # Stopping. self.is_fragmented must be false to determine the charges of the cell
 
         # (1) Indentify unique chemical species
         if not hasattr(self,"unique_species"): self.get_unique_species(debug=debug)  
@@ -1449,7 +1461,7 @@ class cell(object):
             tmp = spec.get_possible_cs(debug=debug)
             if tmp is None: 
                 self.error_empty_poscharges = True
-                return None # Empty list of possible charges received. Stopping
+                return # Stopping. Empty list of possible charges received. 
             if spec.subtype != "metal":
                 selected_cs.append(list([cs.corr_total_charge for cs in spec.possible_cs]))
             else :
@@ -1465,12 +1477,14 @@ class cell(object):
             self.error_empty_distrib    = False
             pp_mols, pp_idx, pp_opt = prepare_unresolved(self.unique_indices, self.unique_species, final_charge_distribution, debug=debug)
             self.data_for_postproc(pp_mols, pp_idx, pp_opt)
-            return None
+            return # Stopping.
+        
         elif len(final_charge_distribution) == 0: # 
             if debug >= 1: print("No valid Distribution Found", final_charge_distribution)
             self.error_multiple_distrib = False
             self.error_empty_distrib    = True
-            return None
+            return # Stopping.
+        
         else: # Only one possible charge distribution -> getcharge for the repeated species
             self.error_multiple_distrib = False
             self.error_empty_distrib    = False
@@ -1479,16 +1493,17 @@ class cell(object):
                 print("#########################################")
                 print("Assigning Charges and Preparing Molecules")
                 print("#########################################")
-            self.moleclist, self.error_prepare_mols =  prepare_mols_v4 (self.moleclist, self.unique_indices, self.unique_species, final_charge_distribution[0], debug=debug)
-            # self.moleclist, self.error_prepare_mols = prepare_mols(self.moleclist, self.unique_indices, self.unique_species, selected_cs, final_charge_distribution[0], debug=debug)
-            if self.error_prepare_mols: return None # Error while preparing molecules
+            self.moleclist, self.error_prepare_mols =  prepare_mols (self.moleclist, self.unique_indices, self.unique_species, final_charge_distribution[0], debug=debug)
             
-            return self.moleclist
+            if self.error_prepare_mols: 
+                return # Stopping. Error while preparing molecules
+            else :
+                return self.moleclist
 
     #######################################################
     def create_bonds(self, debug: int=0):
         if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)  
-        if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to create the spin
+        if self.error_prepare_mols: return # Stopping. self.error_prepare_mols must be false to create the spin
         for mol in self.moleclist:
             if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Bonds for molecule {mol.formula}")
             # First part
@@ -1578,10 +1593,39 @@ class cell(object):
                     metal.predict_charge(debug=debug) 
     #######################################################
     
-    def assess_errors(self):
+    def assess_errors(self, ref=False):
         ### This function might be called to print the possible errors found in the unit cell, during reconstruction, and charge/spin assignment
-        return None
 
+        if ref:
+            print("-------------------------------")
+            print("Errors in Reference Molecules")
+            print("-------------------------------")
+            if self.has_isolated_H:             case = 1
+            elif self.has_missing_H:            case = 2
+            else :                              case = 0
+        else:
+            print("-------------------------------")
+            print("Errors in Unit Cell")
+            print("-------------------------------")
+            # Get reference molecules
+            if self.has_isolated_H:             case = 1
+            elif self.has_missing_H:            case = 2
+            # Reconstruct Cell
+            elif self.error_get_fragments:      case = 3
+            elif self.error_reconstruction:     case = 4
+            # Assign Charges
+            elif self.error_empty_poscharges :  case = 5
+            elif self.error_multiple_distrib :  case = 6
+            elif self.error_empty_distrib :     case = 7
+            elif self.error_prepare_mols :      case = 8   
+            # No errors
+            else :                              case = 0
+        
+        handle_error(case)
+        print("")
+        self.error_case = case
+
+    #######################################################
     def save(self, path):
         print(f"SAVING cell2mol CELL object to {path}")
         with open(path, "wb") as fil:

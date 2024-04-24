@@ -73,14 +73,10 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     # TODO : reconstruct the unit cell without using reference molecules
     # TODO : reconstruct the unit cell using (only reconstruction of) reference molecules and Space group
     newcell.get_reference_molecules(ref_labels, ref_fracs, debug=debug) 
-
-    ## Evaluates boolean variable self.has_isolated_H. If true, indicates a problem with the cif
-    if newcell.has_isolated_H:        handle_error(1)
-    newcell.check_missing_H(debug=debug)                                     
-    ## Evaluates boolean variable self.has_missing_H. If true, indicates a problem with the cif
-    if newcell.has_missing_H:         handle_error(2)
-    newcell.assess_errors()
+    if not newcell.has_isolated_H:  newcell.check_missing_H(debug=debug)                                     
+    newcell.assess_errors(ref=True)
     newcell.save(ref_cell_fname)
+    
     ######################
     ### CALLS CELL2MOL ###
     ######################
@@ -88,6 +84,14 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     cell = cell2mol(newcell, reconstruction=True, charge_assignment=True, spin_assignment=True, debug=debug)
     cell.assess_errors()
     cell.save(cell_fname)
-
     output.close()
+    sys.stdout = stdout
+
+    # Error handling
+    case = cell.error_case
+    error_fname = os.path.join(current_dir, f"error_{case}.out")
+    error = open(error_fname, "w")
+    sys.stdout = error
+    handle_error(case)
+    error.close()
     sys.stdout = stdout
