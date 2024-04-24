@@ -242,8 +242,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 issubstituted = False
                 for idx, a in enumerate(ligand.atoms):
                     if idx in parent_indices and a.mconnec == 1:
-                        for jdx in a.adjacency:
-                            if ligand.labels[jdx] != "As":
+                        for adj in a.adjacency:
+                            if ligand.get_parent("molecule").labels[adj] != "As":
                                 issubstituted = True
                 if issubstituted:  tobeadded = 0
                 else:              tobeadded = 1
@@ -265,8 +265,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 issubstituted = False
                 for idx, a in enumerate(ligand.atoms):
                     if idx in parent_indices and a.mconnec == 1:
-                        for jdx in a.adjacency:
-                            if ligand.labels[jdx] != "P":
+                        for adj in a.adjacency:
+                            if ligand.get_parent("molecule").labels[adj] != "P":
                                 issubstituted = True
                 if issubstituted: 
                     tobeadded = 0
@@ -412,7 +412,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         # CO
                         if "O" in ligand.labels: block[idx] = 1
                     # Added for amides
-                    elif (any(ligand.labels[i] == "O" for i in a.adjacency) and any(ligand.labels[i] == "N" for i in a.adjacency) and a.connec == 2 ):
+                    elif (any(ligand.get_parent("molecule").labels[adj] == "O" for adj in a.adjacency) and any(ligand.get_parent("molecule").labels[adj] == "N" for adj in a.adjacency) and a.connec == 2 ):
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
                     else:
@@ -927,7 +927,7 @@ def set_target_charge (specie, unique_indices, unique_species, final_charge_dist
             if debug >= 1: print(f"SET_TARGET_CHARGE: ERROR!! Target charge {target_charge} of {formula} does not exist in {charge_list}." )
             return None  
 #######################################################
-def prepare_mols_v4 (moleclist: list, unique_indices: list, unique_species: list, final_charge_distribution: list, debug: int=0):
+def prepare_mols (moleclist: list, unique_indices: list, unique_species: list, final_charge_distribution: list, debug: int=0):
     count = 0 
     for mol in moleclist:
         if mol.iscomplex == False:
@@ -960,144 +960,6 @@ def prepare_mols_v4 (moleclist: list, unique_indices: list, unique_species: list
     else:
         Warning = False
     
-    return moleclist, Warning
-
-#######################################################
-def prepare_mols(moleclist: list, unique_indices: list, unique_species: list, selected_cs: list, final_charge_distribution: list, debug: int=0) -> Tuple[list, bool]:
-    # The charge and connectivity of a given specie in the unit cell is only determined for one representative case. i
-    # For instance, if four molecules "A" are in the unit cell, only one is evaluated in the rest of the code. 
-    # This function ensures that all other "A" molecules in the unit cell end up having the same interpretation (charge and connectivity).
-    # In some cases, this might be a difficult job, since the connectivity (i.e. Lewis Structure) often depends on the atom ordering, which might change
-    # Thus, an Hungarian ordering is implemented.
-    
-    Warning = False
-    idxtoallocate = 0
- 
-    for idx, mol in enumerate(moleclist):
-        #if hasattr(mol,"totcharge") and hasattr(mol,"rdkit_obj"): continue 
-        if debug >= 2: print(f"******************{idx=} {mol.formula=}******************")
-        ###################################
-        ### FOR SOLVENT AND COUNTERIONS ###
-        ###################################
-        if mol.subtype == "molecule" and mol.iscomplex == False:
-            spec = unique_species[mol.unique_index]   # This is the reference specie
-            if debug >= 2: print(f"PREPARE: Doing molecule {idx} with unique_index: {mol.unique_index}")
-            if debug >= 2: print(f"PREPARE: Specie with poscharges: {spec.possible_cs}")
-    
-            allocated = False
-            for jdx, cs in enumerate(spec.possible_cs):
-                # If the charge in poscharges coincides with the one for this entry in final_distribution
-                if final_charge_distribution[idxtoallocate] == cs.corr_total_charge and not allocated:   
-                    ## Reorders the atoms to increase chance of perfectly reproducing the desired charge
-                    ref_data, target_data = arrange_data_for_reorder(spec, mol)
-                    print(ref_data==target_data)
-                    if debug >= 2: print(f"PREPARE: reordering with data: \n{ref_data=}\n{target_data=}")
-                    dummy1, dummy2, map12 = reorder(ref_data, target_data, spec.coord, mol.coord)
-                    if debug >= 2: print(f"PREPARE: reordering with {dummy1}")
-                    if debug >= 2: print(f"PREPARE: reordering with {dummy2}")
-                    if debug >= 2: print(f"PREPARE: reordering protonation with {map12}")
-                    prot = cs.protonation.reorder(map12, debug=debug)
-                    if debug >= 2: print(f"PREPARE: reordered protonation: \n{prot}")
-                    ###############    
-
-                    allocated = True 
-                    idxtoallocate += 1
-                    new_cs = get_charge(cs.corr_total_charge, prot, allow=cs.allow, debug=debug)
-                    
-                    if new_cs.corr_total_charge == cs.corr_total_charge:
-                        mol.set_charges(new_cs.corr_total_charge, new_cs.corr_atom_charges, new_cs.smiles, new_cs.rdkit_obj)
-                        if debug >= 2: print(f"PREPARE: Success doing molecule {idx}. Created Charge State with total_charge={new_cs.corr_total_charge}") 
-                    else:
-                        if debug >= 2: print(f"PREPARE: Error doing molecule {idx}. Created Charge State is different than Target {new_cs.corr_total_charge} vs {cs.corr_total_charge}")
-                        return None
-            if not allocated: Warning = False
-    
-        ###########################
-        ######  FOR LIGANDS  ######
-        ###########################
-        elif mol.subtype == "molecule" and mol.iscomplex:
-            if debug >= 2: print(f"PREPARE: Molecule {moleclist.index(mol)} has {len(mol.ligands)} ligands")
-    
-            for kdx, lig in enumerate(mol.ligands):
-                lig.check_coordination(debug=debug) # We need to correct the coordination sphere, as we did for reference molecules
-                spec = unique_species[lig.unique_index]   # This is the reference specie
-                if debug >= 2: print("")
-                if debug >= 2: print(f"PREPARE: Doing Ligand {kdx} with unique_index: {lig.unique_index}")
-                if debug >= 2: print(f"PREPARE: Ligand \n{lig}")
-                if debug >= 2: print(f"PREPARE: Match with unique specie \n{spec}")
-                if debug >= 2: print(f"PREPARE: Unique Specie has poscharges: \n{spec.possible_cs}")
-    
-                allocated = False
-                for jdx, cs in enumerate(spec.possible_cs):
-                    if debug >= 2: print(f"PREPARE: Evaluating protonation: \n{cs.protonation}")
-                    if final_charge_distribution[idxtoallocate] == cs.corr_total_charge and not allocated:   # If the charge in poscharges coincides with the one for this entry in final_distribution
-
-                        ## Reorder ##    
-                        ref_data, target_data = arrange_data_for_reorder(spec, lig)
-                        if debug >= 2: print(f"PREPARE: reordering with data: \n{ref_data=}\n{target_data=}")
-                        dummy1, dummy2, map12 = reorder(ref_data, target_data, spec.coord, lig.coord)
-                        if debug >= 2: print(f"PREPARE: reordering protonation with {map12}")
-                        prot = cs.protonation.reorder(map12, debug=debug)
-                        if debug >= 2: print(f"PREPARE: reordered protonation: \n{prot}")
-                        ###############    
-
-                        if lig.is_nitrosyl:
-                            if lig.NO_type == "Linear": NOcharge = 1   #NOcharge is the charge with which I need to run getcharge to make it work
-                            if lig.NO_type == "Bent":   NOcharge = 0
-                            new_cs = get_charge(NOcharge, prot, allow=cs.allow, debug=debug)
-                            #new_cs = get_charge(prot.labels, prot.coords, prot.adjmat, NOcharge, prot.cov_factor)
-                            if debug >= 2: print(f"PREPARE: Found Nitrosyl of type= {lig.NO_type}")
-                        else:
-                            target_charge = cs.corr_total_charge
-                            if debug >= 2: print(f"PREPARE: Sending getcharge with {prot.added_atoms=} and {cs.allow=} to obtain charge {target_charge=}")
-                            new_cs = get_charge(target_charge, prot, allow=cs.allow, debug=debug)
-                            #new_cs = get_charge(prot.labels, prot.coords, prot.adjmat, cs.corr_total_charge+prot.added_atoms, prot.cov_factor, cs.allow)
-                        if debug >= 2: print(f"PREPARE: Wanted charge {cs.corr_total_charge}, obtained: {new_cs.corr_total_charge}")
-                        if debug >= 2: print(f"PREPARE: smiles: {new_cs.smiles}")
-        
-                        if new_cs.corr_total_charge != cs.corr_total_charge:
-                            if debug >= 1: print(f"PREPARE: WARNING: total charge obtained after correction {new_cs.corr_total_charge} while it should be {cs.corr_total_charge}")
-                        else:
-                            lig.set_charges(new_cs.corr_total_charge, new_cs.corr_atom_charges, new_cs.smiles, new_cs.rdkit_obj)
-                            if debug >= 1: print(f"PREPARE: Success doing ligand {kdx}. Created Charge State with total_charge={new_cs.corr_total_charge}") 
-                            allocated = True 
-
-                if allocated: idxtoallocate += 1
-                else:         Warning = False
-
-            for kdx, met in enumerate(mol.metals):
-                spec = unique_species[met.unique_index]
-                if debug >= 2: print("")
-                # if debug >= 2: print(f"PREPARE: Metal {kdx}, label {met.label} is specie {specie}") # "specie" is not defined
-                if debug >= 2: print(f"PREPARE: Metal possible_css: {spec.possible_cs}")
-                allocated = False
-                for jdx, cs in enumerate(spec.possible_cs):
-                    if final_charge_distribution[idxtoallocate] == cs and not allocated:
-                        allocated = True
-                        met.set_charge(cs)
-
-                if allocated: idxtoallocate += 1
-                else:         Warning = False
-    
-            if not Warning:
-                # Now sets the charge for the final molecule, using metal and ligand data
-                if debug >= 2: print(f"PREPARE: Building Molecule {idx} From Ligand&Metal Information")
-                tmp_atcharge = np.zeros((mol.natoms))
-                tmp_smiles = []
-                for lig in mol.ligands:
-                    if debug >= 2: print(f"{lig.formula=}")
-                    if debug >= 2: print(f"{tmp_smiles=}")
-                    if debug >= 2: print(f"{lig.smiles=}")
-
-                    tmp_smiles.append(lig.smiles)
-                    parent_indices = lig.get_parent_indices("molecule")
-                    for kdx, a in enumerate(parent_indices):
-                        tmp_atcharge[a] = lig.atomic_charges[kdx]
-                for met in mol.metals:
-                    parent_index = met.get_parent_index("molecule")
-                    tmp_atcharge[parent_index] = met.charge
-                mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge, smiles=tmp_smiles)
-
     return moleclist, Warning
 
 #######################################################

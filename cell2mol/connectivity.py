@@ -221,7 +221,7 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
                 thres = (radii[i] + radii[j]) * cov_factor
                 if dist <= clash_threshold:
                     isgood = False # invalid molecule
-                    print("Adjacency Matrix: Distance", dist, "smaller than clash for atoms", i, j)
+                    print("Adjacency Matrix: Distance", round(dist, 3), "smaller than clash for atoms", i, j, labels[i], labels[j])
                 elif dist <= thres:
                     if not metal_only: 
                         adjmat[i, j] = 1
