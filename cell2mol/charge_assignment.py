@@ -417,7 +417,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         addedlist[idx] = 1
                     else:
                         mol = ligand.get_parent("molecule")
-                        iscarbene, tmp_element, tmp_added, tmp_metal = check_carbenes(a, ligand, mol)
+                        iscarbene, tmp_element, tmp_added, tmp_metal = check_carbenes(a, ligand)
                         if debug >= 2: print(f"        GET_PROTONATION_STATES: Evaluating as carbene and {iscarbene}")
                         if iscarbene:
                             # Carbene identified
@@ -698,7 +698,7 @@ def eval_chargelist(atom_charges: list, debug: int=0) -> Tuple[np.ndarray, np.nd
     return abstotal, abs_atcharge, zwitt
 
 #######################################################
-def check_carbenes(atom: object, ligand: object, molecule: object, debug: int=0) -> Tuple[bool, str, int, int]:
+def check_carbenes(atom: object, ligand: object, debug: int=0) -> Tuple[bool, str, int, int]:
     # Function that determines whether a given connected "atom" of a "ligand" of a "molecule" is a carbene
     # This function is in progress. Ideally, should be able to identify Fischer, Schrock and N-Heterocyclic Carbenes
     # The former two cases probably require rules that involve other ligands in the molecule, hence why the "molecule" is provided
@@ -709,7 +709,7 @@ def check_carbenes(atom: object, ligand: object, molecule: object, debug: int=0)
 
     # about Metal electrons: This variable is a way to contemplate cases in which the metal atom is actually contributing with electrons to the metal-ligand bond.
     # about Metal electrons: In reality, I'm not sure about how to use it correctly, and now is used without much chemical sense
-
+    
     iscarbene = False
     element = "H"
     addedlist = 0
@@ -718,8 +718,8 @@ def check_carbenes(atom: object, ligand: object, molecule: object, debug: int=0)
     # Initial attempt with Carbenes, but they are much more complex
     # Looks for Neighbouring N atoms
     list_of_coord_atoms = []
-    for i in atom.adjacency:
-        list_of_coord_atoms.append(ligand.labels[i])
+    for adj in atom.adjacency:
+        list_of_coord_atoms.append(ligand.get_parent("molecule").labels[adj])
     numN = list_of_coord_atoms.count("N")
 
     if numN == 2:  # it is an N-Heterocyclic carbenes
