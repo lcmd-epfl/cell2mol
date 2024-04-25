@@ -1291,7 +1291,7 @@ class cell(object):
         return self.refmoleclist
 
     #######################################################
-    def get_moleclist(self, blocklist=None, debug: int=0):
+    def get_moleclist(self, debug: int=0):
         if debug > 0: print(f"Entered CELL.MOLECLIST with debug={debug}")
         if not hasattr(self,"labels") or not hasattr(self,"coord"): 
             if debug > 0: print(f"CELL.MOLECLIST. Labels or coordinates not found. Returning None")
@@ -1302,10 +1302,13 @@ class cell(object):
         if debug > 0: print(f"CELL.MOLECLIST passed initial checks")
         cov_factor = 1.3
 
-        if blocklist is None: blocklist = split_species(self.labels, self.coord, cov_factor=cov_factor, debug=debug)
-        if blocklist is None: return None
-        if debug > 0: print(f"CELL.MOLECLIST: found {len(blocklist)} blocks")
-        if debug > 0: print(f"CELL.MOLECLIST: {blocklist=}")
+        blocklist = split_species(self.labels, self.coord, cov_factor=cov_factor, debug=debug)
+        
+        if blocklist is None: 
+            return None
+        else :
+            if debug > 0: print(f"CELL.MOLECLIST: found {len(blocklist)} blocks")
+            if debug > 0: print(f"CELL.MOLECLIST: {blocklist=}")
         
         self.moleclist = []
         for b in blocklist:
@@ -1370,7 +1373,8 @@ class cell(object):
         if metal_factor is None: metal_factor = self.refmoleclist[0].metal_factor
 
         ## Get the fragments, which is the moleclist of a fragmented cell
-        fragments = self.get_moleclist(debug=debug).copy()
+        fragments = self.get_moleclist(debug=debug)
+        
         if fragments is None: 
             self.error_get_fragments = True  
             return  # Stopping. self.error_get_fragments must be False to reconstruct the cell
