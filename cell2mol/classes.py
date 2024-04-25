@@ -1303,9 +1303,9 @@ class cell(object):
         cov_factor = 1.3
 
         if blocklist is None: blocklist = split_species(self.labels, self.coord, cov_factor=cov_factor, debug=debug)
+        if blocklist is None: return None
         if debug > 0: print(f"CELL.MOLECLIST: found {len(blocklist)} blocks")
         if debug > 0: print(f"CELL.MOLECLIST: {blocklist=}")
-        if blocklist is None: return None
         
         self.moleclist = []
         for b in blocklist:

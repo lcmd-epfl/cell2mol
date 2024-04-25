@@ -20,7 +20,9 @@ def cell2mol(newcell: object, reconstruction: bool=True, charge_assignment: bool
             else:
                 tend = time.time()
                 if debug >= 1: print(f"\nCell Reconstruction Finished Normally. Total execution time: {tend - tini:.2f} seconds")
-
+        else:
+            return newcell
+        
     if charge_assignment:
         tini = time.time()
 
@@ -36,6 +38,8 @@ def cell2mol(newcell: object, reconstruction: bool=True, charge_assignment: bool
                 tend = time.time()
                 if debug >= 1: print(f"Charge Assignment Finished Normally. Total execution time: {tend - tini:.2f} seconds")
                 # newcell.predict_metal_ox(debug=debug) # predict metal oxidation state using Random Forest model
+        else:
+            return newcell  
         
     if spin_assignment:
         if not newcell.error_prepare_mols:
@@ -43,5 +47,6 @@ def cell2mol(newcell: object, reconstruction: bool=True, charge_assignment: bool
             newcell.assign_spin(debug=debug)
             tend = time.time()
             if debug >= 1: print(f"\nTotal execution time for Spin Assignment: {tend - tini:.2f} seconds")
-
+        else:
+            return newcell
     return newcell
