@@ -9,6 +9,7 @@ from cell2mol.cif2info import cif_2_info
 from cell2mol.classes import cell
 from cell2mol.read_write import readinfo, prefiter_cif
 from cell2mol.other import handle_error
+import ase.io
 
 # if __name__ != "__main__" and __name__ != "cell2mol.c2m_driver": sys.exit(1)
 if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
@@ -67,8 +68,16 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     print(f"Debug level: {debug}")  
     # Reads reference molecules from info file, as well as labels and coordinates
     labels, pos, ref_labels, ref_fracs, cellvec, cellparam = readinfo(infopath)
+    atoms = ase.io.read(input_path)
+
+    # Get Cartesian coordinates
+    cartesian_coords = atoms.get_positions()
+
+    # Get atomic symbols (labels)
+    atomic_labels = atoms.get_chemical_symbols()
     # Initiates cell
-    newcell = cell(name, labels, pos, cellvec, cellparam)
+    # newcell = cell(name, labels, pos, cellvec, cellparam)
+    newcell = cell(name, atomic_labels, cartesian_coords, cellvec, cellparam)
     # Loads the reference molecules and checks_missing_H
     # TODO : reconstruct the unit cell without using reference molecules
     # TODO : reconstruct the unit cell using (only reconstruction of) reference molecules and Space group
