@@ -90,7 +90,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     # Loads the reference molecules and checks_missing_H
     # TODO : reconstruct the unit cell without using reference molecules
     # TODO : reconstruct the unit cell using (only reconstruction of) reference molecules and Space group
-    newcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=1.4, debug=debug) 
+    newcell.get_reference_molecules(ref_labels, ref_fracs, debug=debug) 
     ref_pos = frac2cart_fromparam(ref_fracs, cellparam)
     writexyz(current_dir, "Ref_All_{}.xyz".format(name), ref_labels, ref_pos)
     if not newcell.has_isolated_H:  newcell.check_missing_H(debug=debug)                                     
