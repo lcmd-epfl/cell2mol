@@ -122,6 +122,7 @@ def check_missingH(refmoleclist: list, debug: int=0):
                     if not hasattr(a,"adjacency"): continue 
                     if a.label == "C":
                         bonded_atom_coord = []
+                        print("Adjacency",a.adjacency)
                         for adj in a.adjacency:
                             bonded_atom_coord.append(ref.coord[adj])
                         ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord)
@@ -143,13 +144,14 @@ def check_missingH(refmoleclist: list, debug: int=0):
                     for kdx, a in enumerate(lig.atoms):
                         if a.label == "C" and a.mconnec == 0:
                             bonded_atom_coord = []
+                            print("Adjacency",a.adjacency)
                             for adj in a.adjacency:
                                 bonded_atom_coord.append(lig.get_parent("molecule").coord[adj])
                             ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord)
                             if ismissingH:
                                 if debug >= 2: print("")
                                 if debug >= 2: print(f"WARNING in Missing H function for: {ref.type}, {idx}, {jdx}, {lig.labels}")
-                                if debug >= 2: print(f"Atom {kdx} has missing H atoms")
+                                if debug >= 2: print(f"C Atom {kdx} has missing H atoms")
                                 if debug >= 2: print(report)
                                 Missing_H_in_C = True
 

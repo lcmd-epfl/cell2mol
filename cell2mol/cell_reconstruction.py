@@ -148,13 +148,13 @@ def classify_fragments(blocklist: list, refmoleclist: list, debug: int=0):
 
     ## Prepares Blocks
     for b in blocklist:
-        if debug > 2: print(f"CLASSIFY_FRAGMENTS, preparing block\n{b.formula}")
+        if debug >= 2: print(f"CLASSIFY_FRAGMENTS, preparing block\n{b.formula}")
         if not hasattr(b,"centroid"):         b.get_centroid()
         if not hasattr(b,"element_count"):    b.set_element_count()
         if not hasattr(b,"numH"):             b.numH = b.set_element_count()[4] + b.set_element_count()[3] #"Hidrogen + Deuterium atoms"
     ## Prepares Reference Molecules
     for ref in refmoleclist:
-        if debug > 2: print(f"CLASSIFY_FRAGMENTS, preparing reference\n{ref.formula}")
+        if debug >= 2: print(f"CLASSIFY_FRAGMENTS, preparing reference\n{ref.formula}")
         if not hasattr(ref,"element_count"):  ref.set_element_count()
         if not hasattr(ref,"numH"):           ref.numH = ref.set_element_count()[4] + ref.set_element_count()[3] #"Hidrogen + Deuterium atoms"
 
@@ -211,11 +211,12 @@ def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmolec
 
         finalmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "All", debug)
         moleclist.extend(finalmols)
-        print(f"{finalmols=}")
-        print(f"{remfrag=}")
+        print(f"FRAG_RECONSTRUCT. {moleclist=}")
+        print(f"FRAG_RECONSTRUCT. {remfrag=}")
 
-        if len(remfrag) > 0: Warning = True;  print("FRAG_RECONSTRUCT. Remaining after Hydrogen reconstruction",remfrag)
-        else:                Warning = False; print("FRAG_RECONSTRUCT. No remaining Molecules after Hydrogen reconstruction")
+        if len(remfrag) > 0:        Warning = True;  print("FRAG_RECONSTRUCT. Remaining after Hydrogen reconstruction",remfrag)
+        elif len(moleclist) == 0:   Warning = True; print("FRAG_RECONSTRUCT. No Molecules after Hydrogen reconstruction", moleclist)
+        else:                       Warning = False; print("FRAG_RECONSTRUCT. No remaining Molecules after Hydrogen reconstruction")
     elif len(remfrag) > 0 and len(Hlist) == 0:
         Warning = True
         print("FRAG_RECONSTRUCT. WARNING: There are remaining Fragments and no H in list")
@@ -505,6 +506,7 @@ def combine(tobemerged: list, references: list, cellvec: list, threshold_tmat: f
                     reordered_newmolec = molecule(reordered_labels, reordered_coord, reordered_radii)
                     reordered_newmolec.cell_indices = reordered_cell_indices
                     reordered_newmolec.set_fractional_coord(reordered_frac_cood)
+                    reordered_newmolec.set_adjacency_parameters(cov_factor, metal_factor)
                     reordered_newmolec.set_atoms(create_adjacencies=True, debug=2)
                     
                     if reordered_newmolec.iscomplex: 
