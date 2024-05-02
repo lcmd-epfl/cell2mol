@@ -325,6 +325,8 @@ class specie(object):
         if hasattr(self,'subtype'): to_print += f' Sub-Type                     = {self.subtype}\n'
         to_print += f' Number of Atoms              = {self.natoms}\n'
         to_print += f' Formula                      = {self.formula}\n'
+        to_print += f' Covalent Radii Factor        = {self.cov_factor}\n'
+        to_print += f' Metal Radii Factor           = {self.metal_factor}\n'
         if hasattr(self,"adjmat"):     to_print += f' Has Adjacency Matrix         = YES\n'
         else:                          to_print += f' Has Adjacency Matrix         = NO \n'
         if hasattr(self,"totcharge"):  to_print += f' Total Charge                 = {self.totcharge}\n'
@@ -416,6 +418,8 @@ class molecule(specie):
                 newligand.origin = "split_complex"
                 # Define the molecule as parent of the ligand. Bottom-Up hierarchy
                 newligand.add_parent(self, indices=lig_indices)
+                # Update the ligand with the covalent and metal factors 
+                newligand.set_adjacency_parameters(self.cov_factor, self.metal_factor)
                 # Pass the molecule atoms to the ligand
                 newligand.set_atoms(atomlist=lig_atoms)
                 # Inherit the adjacencies from molecule
@@ -1248,6 +1252,7 @@ class cell(object):
 
         # Get reference molecules
         blocklist = split_species(ref_labels, ref_pos, cov_factor=cov_factor)
+
         self.refmoleclist = []
         for b in blocklist:
             mol_labels       = extract_from_list(b, ref_labels, dimension=1)
@@ -1256,6 +1261,7 @@ class cell(object):
             newmolec         = molecule(mol_labels, mol_coord)
             newmolec.add_parent(self, indices=b)
             newmolec.set_fractional_coord(mol_frac_coord)
+            newmolec.set_adjacency_parameters(cov_factor, metal_factor)
             newmolec.set_atoms(create_adjacencies=True, debug=debug)
             # This must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex: newmolec.split_complex()
@@ -1270,7 +1276,7 @@ class cell(object):
             if ref.natoms == 1:
                 label = ref.atoms[0].label
                 group = elemdatabase.elementgroup[label]
-                if (group == 2 or group == 17) and label != "H": pass 
+                if (group == 1 or group == 2 or group == 17) and label != "H": pass 
                 else:
                     isgood = False
                     if debug >= 0: print(f"GETREFS: found ref molecule with only one atom {ref.labels}")
@@ -1291,7 +1297,7 @@ class cell(object):
         return self.refmoleclist
 
     #######################################################
-    def get_moleclist(self, debug: int=0):
+    def get_moleclist(self, cov_factor: float=1.3, metal_factor: float=1.0, debug: int=0):
         if debug > 0: print(f"Entered CELL.MOLECLIST with debug={debug}")
         if not hasattr(self,"labels") or not hasattr(self,"coord"): 
             if debug > 0: print(f"CELL.MOLECLIST. Labels or coordinates not found. Returning None")
@@ -1300,9 +1306,29 @@ class cell(object):
             if debug > 0: print(f"CELL.MOLECLIST. Empty labels or coordinates. Returning None")
             return None
         if debug > 0: print(f"CELL.MOLECLIST passed initial checks")
-        cov_factor = 1.3
-
-        blocklist = split_species(self.labels, self.coord, cov_factor=cov_factor, debug=debug)
+        
+        ions_idx = []
+        for ref in self.refmoleclist:
+            if ref.natoms == 1:
+                label = ref.atoms[0].label
+                ions_idx.extend([idx for idx, l in enumerate(self.labels) if l == label])
+                if debug > 0: print(f"CELL.MOLECLIST: {ions_idx=} with {label=}")        
+        
+        if len(ions_idx) > 0: 
+            cell_indices = [*range(0,len(self.labels),1)]
+            if debug > 0: print(f"CELL.MOLECLIST: found {len(ions_idx)} ions")
+            rest_idx  = list(idx for idx in cell_indices if idx not in ions_idx)
+            if debug > 0: print(f"CELL.MOLECLIST: {rest_idx=}")
+            rest_labels  = extract_from_list(rest_idx, self.labels, dimension=1)
+            rest_coord   = extract_from_list(rest_idx, self.coord, dimension=1)
+            rest_indices = extract_from_list(rest_idx, cell_indices, dimension=1)
+            if debug > 0: print(f"CELL.MOLECLIST: {rest_labels=}")
+            if debug > 0: print(f"CELL.MOLECLIST: {rest_coord=}")
+            if debug > 0: print(f"CELL.MOLECLIST: {rest_indices=}")
+            blocklist = split_species(rest_labels, rest_coord, indices=rest_indices, cov_factor=cov_factor, debug=debug)
+            for idx in ions_idx: blocklist.append([idx])    
+        else :
+            blocklist = split_species(self.labels, self.coord, cov_factor=cov_factor, debug=debug)
         
         if blocklist is None: 
             return None
@@ -1319,10 +1345,11 @@ class cell(object):
             newmolec    = molecule(mol_labels, mol_coord)
             # For debugging
             newmolec.origin = "cell.get_moleclist"
+            # Adds cell as parent of the molecule, with indices b
+            newmolec.add_parent(self, indices=b)            
+            newmolec.set_adjacency_parameters(cov_factor, metal_factor)
             # Creates The atom objects with adjacencies
             newmolec.set_atoms(create_adjacencies=True, debug=debug)
-            # Adds cell as parent of the molecule, with indices b
-            newmolec.add_parent(self, indices=b)
             # If fractional coordinates are available...
             if hasattr(self,"frac_coord"): 
                 assert len(self.frac_coord) == len(self.coord)
@@ -1373,7 +1400,7 @@ class cell(object):
         if metal_factor is None: metal_factor = self.refmoleclist[0].metal_factor
 
         ## Get the fragments, which is the moleclist of a fragmented cell
-        fragments = self.get_moleclist(debug=debug)
+        fragments = self.get_moleclist(cov_factor=cov_factor, metal_factor=metal_factor, debug=debug)
         
         if fragments is None: 
             self.error_get_fragments = True  
@@ -1385,6 +1412,9 @@ class cell(object):
         for f in fragments:
             if not hasattr(f,"frac_coord"):       f.get_fractional_coord(self.cellvec)
         molecules, fragments, hydrogens = classify_fragments(fragments, self.refmoleclist, debug=debug)
+        if debug > 0: print(f"CELL.RECONSTRUCT: {molecules=}")
+        if debug > 0: print(f"CELL.RECONSTRUCT: {fragments=}")
+        if debug > 0: print(f"CELL.RECONSTRUCT: {hydrogens=}")
 
         ## Determines if Reconstruction is necessary
         if len(fragments) > 0 or len(hydrogens) > 0: self.is_fragmented = True
@@ -1421,6 +1451,7 @@ class cell(object):
             for mol in reconstructed_molecules:
                 newmolec = molecule(mol.labels, mol.coord)
                 newmolec.origin = "cell.reconstruct"
+                newmolec.set_adjacency_parameters(cov_factor, metal_factor)
                 newmolec.set_atoms(create_adjacencies=True, debug=debug)
                 newmolec.add_parent(self, mol.cell_indices) 
                 newmolec.set_fractional_coord(mol.frac_coord)

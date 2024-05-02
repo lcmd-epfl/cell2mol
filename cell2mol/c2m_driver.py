@@ -7,9 +7,11 @@ from cell2mol.helper import parsing_arguments
 from cell2mol.c2m_module import cell2mol
 from cell2mol.cif2info import cif_2_info
 from cell2mol.classes import cell
-from cell2mol.read_write import readinfo, prefiter_cif
+from cell2mol.read_write import readinfo, prefiter_cif, writexyz
 from cell2mol.other import handle_error
 import ase.io
+from cell2mol.cell_operations import frac2cart_fromparam
+
 
 # if __name__ != "__main__" and __name__ != "cell2mol.c2m_driver": sys.exit(1)
 if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
@@ -75,17 +77,29 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
 
     # Get atomic symbols (labels)
     atomic_labels = atoms.get_chemical_symbols()
+
+    print("Checking atomic labels and coordinates")
+    print("Atomic labels:", len(atomic_labels), "from ase", len(labels), "from cif2cell")
+    print("Cartesian coordinates:", len(cartesian_coords),  "from ase",  len(pos), "from cif2cell", "\n")
+    if len(atomic_labels)==len(labels) and len(cartesian_coords)==len(pos): 
+        writexyz(current_dir, "Cell_{}.xyz".format(name), atomic_labels, cartesian_coords)
+    else: print("Atomic labels and coordinates are inconsistent")
     # Initiates cell
     # newcell = cell(name, labels, pos, cellvec, cellparam)
     newcell = cell(name, atomic_labels, cartesian_coords, cellvec, cellparam)
     # Loads the reference molecules and checks_missing_H
     # TODO : reconstruct the unit cell without using reference molecules
     # TODO : reconstruct the unit cell using (only reconstruction of) reference molecules and Space group
-    newcell.get_reference_molecules(ref_labels, ref_fracs, debug=debug) 
+    newcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=1.4, debug=debug) 
+    ref_pos = frac2cart_fromparam(ref_fracs, cellparam)
+    writexyz(current_dir, "Ref_All_{}.xyz".format(name), ref_labels, ref_pos)
     if not newcell.has_isolated_H:  newcell.check_missing_H(debug=debug)                                     
     newcell.assess_errors(ref=True)
     newcell.save(ref_cell_fname)
-    
+    for idx, ref in enumerate(newcell.refmoleclist):
+        writexyz(current_dir, "Ref_Molecule_{}_{}.xyz".format(name, idx), ref.labels, ref.coord)
+
+    # sys.exit(0) 
     ######################
     ### CALLS CELL2MOL ###
     ######################
