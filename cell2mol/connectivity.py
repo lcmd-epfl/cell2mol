@@ -218,10 +218,14 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
                 a = np.array(pos[i])
                 b = np.array(pos[j])
                 dist = np.linalg.norm(a - b)
+                if (elemdatabase.elementgroup[labels[i]] == 1 or elemdatabase.elementgroup[labels[j]] == 1 ) and (labels[i] != "H" and labels[j] != "H"):
+                    cov_factor = 0.6
+                else :
+                    cov_factor = 1.3
                 thres = (radii[i] + radii[j]) * cov_factor
                 if dist <= clash_threshold:
                     isgood = False # invalid molecule
-                    print("Adjacency Matrix: Distance", round(dist, 3), "smaller than clash for atoms", i, j, labels[i], labels[j])
+                    print("Adjacency Matrix: Distance", round(dist, 3), "smaller than clash for atoms", i, j, labels[i], labels[j], a, b, cov_factor)
                 elif dist <= thres:
                     if not metal_only: 
                         adjmat[i, j] = 1
