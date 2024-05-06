@@ -80,17 +80,19 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
 
     print("Checking atomic labels and coordinates")
     print("Atomic labels:", len(atomic_labels), "from ase", len(labels), "from cif2cell")
-    print("Cartesian coordinates:", len(cartesian_coords),  "from ase",  len(pos), "from cif2cell", "\n")
+    print("Cartesian coordinates:", len(cartesian_coords),  "from ase",  len(pos), "from cif2cell")
     if len(atomic_labels)==len(labels) and len(cartesian_coords)==len(pos): 
-        writexyz(current_dir, "Cell_{}.xyz".format(name), atomic_labels, cartesian_coords)
+        pass
     else: print("Atomic labels and coordinates are inconsistent")
+    writexyz(current_dir, "Cell_{}_ase.xyz".format(name), atomic_labels, cartesian_coords)
+    writexyz(current_dir, "Cell_{}_cif2cell.xyz".format(name), labels, pos)
     # Initiates cell
     # newcell = cell(name, labels, pos, cellvec, cellparam)
     newcell = cell(name, atomic_labels, cartesian_coords, cellvec, cellparam)
     # Loads the reference molecules and checks_missing_H
     # TODO : reconstruct the unit cell without using reference molecules
     # TODO : reconstruct the unit cell using (only reconstruction of) reference molecules and Space group
-    newcell.get_reference_molecules(ref_labels, ref_fracs,cov_factor=1.2, debug=debug) 
+    newcell.get_reference_molecules(ref_labels, ref_fracs,cov_factor=1.3, debug=debug) 
     ref_pos = frac2cart_fromparam(ref_fracs, cellparam)
     writexyz(current_dir, "Ref_All_{}.xyz".format(name), ref_labels, ref_pos)
     if not newcell.has_isolated_H:  newcell.check_missing_H(debug=debug)                                     
