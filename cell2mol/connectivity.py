@@ -7,6 +7,7 @@ from typing import Tuple
 from cell2mol.other import inv, extract_from_list
 from cell2mol.elementdata import ElementData
 from cell2mol.read_write import writexyz
+import os
 elemdatabase = ElementData()
 
 #######################################################
@@ -219,7 +220,9 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
                 b = np.array(pos[j])
                 dist = np.linalg.norm(a - b)
                 if (elemdatabase.elementgroup[labels[i]] == 1 or elemdatabase.elementgroup[labels[j]] == 1 ) and (labels[i] != "H" and labels[j] != "H"):
-                    cov_factor = 0.6
+                    cov_factor = 1.05
+                elif (elemdatabase.elementgroup[labels[i]] == 1 and elemdatabase.elementgroup[labels[j]] == 1 ) and (labels[i] == "H" or labels[j] == "H"):
+                    cov_factor = 1.05
                 else :
                     cov_factor = 1.3
                 thres = (radii[i] + radii[j]) * cov_factor
@@ -421,6 +424,7 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
         print(mol1.formula)
         print(mol2.formula)
 
+    
     # a pair of species is compared on the basis of:
     # 1) the total number of atoms
     if (mol1.natoms != mol2.natoms): 
@@ -439,7 +443,7 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
         if elem != mol2.element_count[kdx]: 
             if debug > 0: print(f"COMPARE_SPECIES. FALSE, different {elem} count:")
             return False       
-
+    # writexyz(os.getcwd(), f"reordered.xyz", mol1.labels, mol1.coord)
     # 4) the number of adjacencies between each pair of element types
     if not hasattr(mol1,"adj_types"):     mol1.set_adj_types()
     if not hasattr(mol2,"adj_types"):     mol2.set_adj_types()
@@ -447,7 +451,7 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
     if debug == 2: print(f"{mol2.adj_types=}")
 
     count = 0
-    # if debug > 0: print("COMPARE_SPECIES. kdx ldx elem1 - elem2 : reordered - reference")
+    if debug > 0: print("COMPARE_SPECIES. kdx ldx elem1 - elem2 : reordered - reference")
     for kdx, (elem, row1) in enumerate(zip(elems, mol1.adj_types)):
         for ldx, (elem2, val1) in enumerate(zip(elems, row1)):
             val2 = mol2.adj_types[kdx, ldx]

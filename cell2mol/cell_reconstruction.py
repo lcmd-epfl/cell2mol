@@ -196,7 +196,7 @@ def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmolec
         newmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "Heavy", debug)
         print(f"FRAG_RECONSTRUCT. {len(newmols)} molecules and {len(remfrag)} fragments out of SEQUENTIAL with Heavy")
         moleclist.extend(newmols)
-
+        print(f"FRAG_RECONSTRUCT. {remfrag=}")
         # After the first step, fraglist is made of the remaining molecules in the first step, and the list of H atoms
         fraglist = []
         fraglist.extend(remfrag)
@@ -210,16 +210,16 @@ def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmolec
             for frag in fraglist:
                 print("FRAG_RECONSTRUCT.", frag.formula, frag.subtype, frag.labels)
 
-        finalmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "All", debug)
+        finalmols, remfrag = sequential(fraglist, refmoleclist, cellvec, factor, metal_factor, "All", debug=2)
         moleclist.extend(finalmols)
         print(f"FRAG_RECONSTRUCT. {moleclist=}")
         print(f"FRAG_RECONSTRUCT. {remfrag=}")
-        # if len(remfrag) > 0:
-        #     for i, mol in enumerate(moleclist):
-        #         writexyz(os.getcwd(), f"moleclist_{i}.xyz", mol.labels, mol.coord)
+        if len(remfrag) > 0:
+            for i, mol in enumerate(moleclist):
+                writexyz(os.getcwd(), f"moleclist_{i}.xyz", mol.labels, mol.coord)
 
-        #     for i, rem in enumerate(remfrag):
-        #         writexyz(os.getcwd(), f"remfrag_{i}.xyz", rem.labels, rem.coord)
+            for i, rem in enumerate(remfrag):
+                writexyz(os.getcwd(), f"remfrag_{i}.xyz", rem.labels, rem.coord)
         if len(remfrag) > 0:        Warning = True;  print("FRAG_RECONSTRUCT. Remaining after Hydrogen reconstruction",remfrag)
         elif len(moleclist) == 0:   Warning = True; print("FRAG_RECONSTRUCT. No Molecules after Hydrogen reconstruction", moleclist)
         else:                       Warning = False; print("FRAG_RECONSTRUCT. No remaining Molecules after Hydrogen reconstruction")
@@ -253,7 +253,7 @@ def assign_subtype(mol: object, references: list) -> str:
     else:                  return "Other"
 
 #######################################################
-def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: float=1.3, metal_factor: float=1.0, typ: str="All", debug: int=1):
+def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: float=1.3, metal_factor: float=1.0, typ: str="All", debug: int=2):
     # Crappy function that controls the reconstruction process. It is called sequential because pairs of fragments are sent one by one. Ideally, a parallel version would be desirable.
     # Given a list of fragments(fragmentlist), a list of reference molecules(refmoleclist), and some other minor parameters, the function sends pairs of fragments and evaluates if they...
     # ...form a bigger fragment. If so, the bigger fragment is evaluated. If it coincides with one of the molecules in refmoleclist, than it means that it is a full molecule that requires no further work.
@@ -380,7 +380,10 @@ def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: fl
             #  Here, the function "combine" is called. It will try cell translations of one fragment, and check whether it eventually combines with the second fragment into either a bigger fragment or a molecule
             #################
             goodlist, avglist, badlist = combine(sublist, refmoleclist, cellvec, threshold_tmat, factor, metal_factor, debug=debug)
-            
+            if debug >=2 :
+                print("SEQUENTIAL: goodlist", len(goodlist), [g.formula for g in goodlist])
+                print("SEQUENTIAL: avglist", len(avglist), [a.formula for a in avglist])
+                print("SEQUENTIAL: badlist", len(badlist), [b.formula for b in badlist])
             #################
             #  This part handles the results of combine
             #################
@@ -522,7 +525,7 @@ def combine(tobemerged: list, references: list, cellvec: list, threshold_tmat: f
                             lig.get_denticity(debug=debug)
                         for met in reordered_newmolec.metals:                         
                             met.get_coordination_geometry(debug=debug) 
-                    if debug >= 1: print(f"COMBINE: {reordered_newmolec.fomula=}")
+                    if debug >= 1: print(f"COMBINE: {reordered_newmolec.formula=}")
                     if debug >= 1: print(f"COMBINE: {reordered_newmolec=}")
 
                     issame = compare_species(reordered_newmolec, ref, debug=debug)

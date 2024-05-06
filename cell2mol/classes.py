@@ -1454,9 +1454,9 @@ class cell(object):
         for f in fragments:
             if not hasattr(f,"frac_coord"):       f.get_fractional_coord(self.cellvec)
         molecules, fragments, hydrogens = classify_fragments(fragments, self.refmoleclist, debug=debug)
-        if debug > 0: print(f"CELL.RECONSTRUCT: {molecules=}")
-        if debug > 0: print(f"CELL.RECONSTRUCT: {fragments=}")
-        if debug > 0: print(f"CELL.RECONSTRUCT: {hydrogens=}")
+        if debug > 0: print(f"CELL.RECONSTRUCT: {len(molecules)} {molecules=}")
+        if debug > 0: print(f"CELL.RECONSTRUCT: {len(fragments)} {fragments=}")
+        if debug > 0: print(f"CELL.RECONSTRUCT: {len(hydrogens)} {hydrogens=}")
 
         ## Determines if Reconstruction is necessary
         if len(fragments) > 0 or len(hydrogens) > 0: self.is_fragmented = True
