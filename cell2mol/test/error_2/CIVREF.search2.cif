@@ -1,0 +1,152 @@
+
+#######################################################################
+#
+#                 Cambridge Crystallographic Data Centre
+#                                CCDC
+#
+#######################################################################
+#
+# If this CIF has been generated from an entry in the Cambridge
+# Structural Database, then it will include bibliographic, chemical,
+# crystal, experimental, refinement or atomic coordinate data resulting
+# from the CCDC's data processing and validation procedures.
+#
+#######################################################################
+
+data_CSD_CIF_CIVREF
+_audit_creation_date 2008-04-21
+_audit_creation_method CSD-ConQuest-V1
+_database_code_CSD CIVREF
+_database_code_depnum_ccdc_archive 'CCDC 662469'
+_chemical_formula_sum 'C16 H47 Mn1 N2 Na1 Si5'
+_chemical_formula_moiety
+;
+C16 H47 Mn1 N2 Na1 Si5
+;
+_journal_coden_Cambridge 182
+_journal_year 2008
+_journal_page_first 308
+_journal_name_full 'Chem.Commun. '
+loop_
+_publ_author_name
+"A.R.Kennedy"
+"J.Klett"
+"R.E.Mulvey"
+"S.Newton"
+"D.S.Wright"
+_chemical_name_systematic
+;
+bis(\m~2~-bis(trimethylsilyl)amido)-(trimethylsilylmethyl)-manganese(ii)-sodiu
+m(i)
+;
+_cell_volume   1431.781
+_exptl_crystal_colour 'colorless'
+_exptl_crystal_density_diffrn 1.127
+_exptl_crystal_description 'large needle'
+_diffrn_ambient_temperature 150
+#These two values have been output from a single CSD field.
+_refine_ls_R_factor_gt 0.0329
+_refine_ls_wR_factor_gt 0.0329
+_symmetry_cell_setting triclinic
+_symmetry_space_group_name_H-M 'P -1'
+_symmetry_Int_Tables_number 2
+loop_
+_symmetry_equiv_pos_site_id
+_symmetry_equiv_pos_as_xyz
+1 x,y,z
+2 -x,-y,-z
+_cell_length_a 10.2226(3)
+_cell_length_b 11.9296(3)
+_cell_length_c 12.0857(3)
+_cell_angle_alpha 97.180(1)
+_cell_angle_beta 100.700(1)
+_cell_angle_gamma 93.377(1)
+_cell_formula_units_Z 2
+loop_
+_atom_type_symbol
+_atom_type_radius_bond
+C 0.68
+H 0.23
+Mn 1.22
+N 0.68
+Na 1.45
+Si 1.20
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Mn1 Mn 0.78870(3) 0.26076(2) 0.74278(2)
+Na1 Na 0.94982(7) 0.04764(6) 0.74658(6)
+Si1 Si 0.64175(5) 0.52425(5) 0.75877(5)
+Si2 Si 0.83253(5) 0.20390(4) 0.98910(4)
+Si3 Si 0.66694(5) 0.02479(4) 0.81375(4)
+Si4 Si 0.85872(5) 0.20777(4) 0.50248(4)
+Si5 Si 1.09539(5) 0.26915(4) 0.69366(4)
+N1 N 0.79057(14) 0.13387(12) 0.85278(12)
+N2 N 0.93279(14) 0.21323(12) 0.64298(12)
+C1 C 0.6341(2) 0.3710(2) 0.7183(3)
+C2 C 0.7848(3) 0.5984(2) 0.7132(3)
+H1 H 0.86830 0.56810 0.74570
+H2 H 0.78930 0.67980 0.73990
+H3 H 0.77190 0.58610 0.63000
+C3 C 0.4871(2) 0.5870(2) 0.6923(2)
+H4 H 0.47540 0.57190 0.60930
+H5 H 0.49590 0.66900 0.71660
+H6 H 0.40940 0.55270 0.71640
+C4 C 0.6604(3) 0.5633(2) 0.9158(2)
+H7 H 0.58760 0.52380 0.94210
+H8 H 0.65710 0.64540 0.93380
+H9 H 0.74630 0.54130 0.95410
+C5 C 0.9334(2) 0.34066(16) 0.99061(17)
+H10 H 1.01830 0.32460 0.96790
+H11 H 0.95100 0.38310 1.06740
+H12 H 0.88360 0.38570 0.93730
+C6 C 0.6874(2) 0.2421(2) 1.0558(2)
+H13 H 0.63180 0.28930 1.00870
+H14 H 0.72010 0.28430 1.13180
+H15 H 0.63420 0.17290 1.06170
+C7 C 0.9388(2) 0.1217(2) 1.08939(19)
+C8 C 0.49735(19) 0.07488(18) 0.77125(19)
+H16 H 0.47990 0.13070 0.83230
+H17 H 0.42980 0.01030 0.75750
+H18 H 0.49340 0.10990 0.70170
+C9 C 0.6576(2) -0.06951(19) 0.92555(19)
+H19 H 0.74380 -0.10110 0.94610
+H20 H 0.58770 -0.13140 0.89600
+H21 H 0.63640 -0.02540 0.99300
+C10 C 0.7006(2) -0.07157(18) 0.68816(19)
+C11 C 0.6764(2) 0.1581(2) 0.47638(18)
+H22 H 0.66660 0.07820 0.48710
+H23 H 0.63450 0.16660 0.39840
+H24 H 0.63290 0.20360 0.53010
+C12 C 0.8726(2) 0.34674(18) 0.44780(18)
+H25 H 0.83220 0.40360 0.49360
+H26 H 0.82590 0.33860 0.36840
+H27 H 0.96700 0.37110 0.45280
+C13 C 0.9283(2) 0.1026(2) 0.40313(18)
+C14 C 1.1075(2) 0.42362(16) 0.74907(18)
+H28 H 1.07470 0.46610 0.68660
+H29 H 1.20080 0.44990 0.78200
+H30 H 1.05310 0.43580 0.80760
+C15 C 1.20965(19) 0.2510(2) 0.58936(17)
+H31 H 1.21320 0.17000 0.56450
+H32 H 1.29950 0.28470 0.62560
+H33 H 1.17610 0.28860 0.52340
+C16 C 1.1736(2) 0.19521(18) 0.81543(17)
+H34 H 0.603(3) 0.359(2) 0.640(3)
+H35 H 0.565(3) 0.338(3) 0.747(3)
+H36 H 0.887(2) 0.056(2) 1.100(2)
+H37 H 0.964(2) 0.171(2) 1.164(2)
+H38 H 1.013(3) 0.101(2) 1.061(2)
+H39 H 0.719(2) -0.032(2) 0.625(2)
+H40 H 0.776(2) -0.1151(17) 0.7104(16)
+H41 H 0.631(3) -0.123(2) 0.656(2)
+H42 H 0.921(2) 0.029(2) 0.425(2)
+H43 H 1.014(3) 0.123(2) 0.402(2)
+H44 H 0.879(2) 0.1022(19) 0.324(2)
+H45 H 1.124(2) 0.1931(17) 0.8716(18)
+H46 H 1.255(2) 0.2357(19) 0.8501(19)
+H47 H 1.193(2) 0.1198(19) 0.7901(18)
+#END
