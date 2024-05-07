@@ -113,31 +113,31 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     print(cell)
     print("*** Reference molecules ***")
     print(cell.refmoleclist)
-    print("*** Molecules ***")
-    for idx, mol in enumerate(cell.moleclist):
-        if mol.iscomplex:
-            print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.is_haptic=} {mol.totcharge=} {mol.spin=}") #\n   {mol.adjnum=}\n   {mol.madjnum=} \n   {mol.smiles=}")
-            # print(mol.adjnum)
-            for lig in mol.ligands:
-                print(f"|- {lig.subtype}({lig.type}) {lig.formula} {lig.is_haptic=} {lig.denticity=} {lig.totcharge=}")# \n   {lig.smiles=}")
-                # print(f"|- {lig.connected_idx}")
-                # print(lig.groups)
-                for group in lig.groups:
-                    print(f"|-- {group.subtype} ({group.type}) {group.formula} {group.is_haptic=} {group.denticity=} {group.closest_metal.label}")
-                    for met in group.metals:
-                        print(f"|--- {met.label} {met.mconnec=}")
-                print("")
-            for metal in mol.metals:
-                print(f"|# {metal.subtype}({metal.type}) {metal.label} {metal.coord_nr=} {metal.coord_geometry} {metal.charge=} {metal.spin=} {metal.coord_sphere_formula} {metal.mconnec=} {metal.connec=}")
-                # print(f"|# {metal.get_coord_sphere_formula()}")
-                # print(f"|# {metal.coord_sphere_formula}")
-                # print(f"|# {metal.mconnec=} {metal.connec=}")
-                # print(metal.metal_adjacency)
-                # for bond in metal.bonds:
-                    # print(f"|--- {bond}")
-        else:
-            print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.totcharge=} {mol.spin=}\n  {mol.smiles}")
-        print("")
+    # print("*** Molecules ***")
+    # for idx, mol in enumerate(cell.moleclist):
+    #     if mol.iscomplex:
+    #         print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.is_haptic=} {mol.totcharge=} {mol.spin=}") #\n   {mol.adjnum=}\n   {mol.madjnum=} \n   {mol.smiles=}")
+    #         # print(mol.adjnum)
+    #         for lig in mol.ligands:
+    #             print(f"|- {lig.subtype}({lig.type}) {lig.formula} {lig.is_haptic=} {lig.denticity=} {lig.totcharge=}")# \n   {lig.smiles=}")
+    #             # print(f"|- {lig.connected_idx}")
+    #             # print(lig.groups)
+    #             for group in lig.groups:
+    #                 print(f"|-- {group.subtype} ({group.type}) {group.formula} {group.is_haptic=} {group.denticity=} {group.closest_metal.label}")
+    #                 for met in group.metals:
+    #                     print(f"|--- {met.label} {met.mconnec=}")
+    #             print("")
+    #         for metal in mol.metals:
+    #             print(f"|# {metal.subtype}({metal.type}) {metal.label} {metal.coord_nr=} {metal.coord_geometry} {metal.charge=} {metal.spin=} {metal.coord_sphere_formula} {metal.mconnec=} {metal.connec=}")
+    #             # print(f"|# {metal.get_coord_sphere_formula()}")
+    #             # print(f"|# {metal.coord_sphere_formula}")
+    #             # print(f"|# {metal.mconnec=} {metal.connec=}")
+    #             # print(metal.metal_adjacency)
+    #             # for bond in metal.bonds:
+    #                 # print(f"|--- {bond}")
+    #     else:
+    #         print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.totcharge=} {mol.spin=}\n  {mol.smiles}")
+    #     print("")
     
     output.close()
     sys.stdout = stdout
