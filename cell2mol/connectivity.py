@@ -194,7 +194,11 @@ def get_radii(labels: list) -> np.ndarray:
     for l in labels:
         if l[-1].isdigit(): label = l[:-1]
         else: label = l
-        radii.append(elemdatabase.CovalentRadius3[label])
+
+        if elemdatabase.elementgroup[label] == 1 and label != "H":
+            radii.append(elemdatabase.CovalentRadius2[label])
+        else:
+            radii.append(elemdatabase.CovalentRadius3[label])
     return np.array(radii)
 
 ####################################
@@ -219,12 +223,12 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
                 a = np.array(pos[i])
                 b = np.array(pos[j])
                 dist = np.linalg.norm(a - b)
-                if (elemdatabase.elementgroup[labels[i]] == 1 or elemdatabase.elementgroup[labels[j]] == 1 ) and (labels[i] != "H" and labels[j] != "H"):
-                    cov_factor = 1.05
-                elif (elemdatabase.elementgroup[labels[i]] == 1 and elemdatabase.elementgroup[labels[j]] == 1 ) and (labels[i] == "H" or labels[j] == "H"):
-                    cov_factor = 1.05
-                else :
-                    cov_factor = 1.3
+                # if (elemdatabase.elementgroup[labels[i]] == 1 or elemdatabase.elementgroup[labels[j]] == 1 ) and (labels[i] != "H" and labels[j] != "H"):
+                #     cov_factor = 1.05
+                # elif (elemdatabase.elementgroup[labels[i]] == 1 and elemdatabase.elementgroup[labels[j]] == 1 ) and (labels[i] == "H" or labels[j] == "H"):
+                #     cov_factor = 1.05
+                # else :
+                #     cov_factor = 1.3
                 thres = (radii[i] + radii[j]) * cov_factor
                 if dist <= clash_threshold:
                     isgood = False # invalid molecule
