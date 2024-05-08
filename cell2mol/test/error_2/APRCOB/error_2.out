@@ -1,0 +1,2 @@
+Cell2mol terminated with error number 2. Message:
+We detected that H atoms are likely missing. This will cause errors in the charge prediction, so STOPPING pre-emptively.

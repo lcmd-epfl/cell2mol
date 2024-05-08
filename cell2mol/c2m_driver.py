@@ -11,7 +11,7 @@ from cell2mol.read_write import readinfo, prefiter_cif, writexyz
 from cell2mol.other import handle_error
 import ase.io
 from cell2mol.cell_operations import frac2cart_fromparam
-
+from cell2mol.cell_operations import cart2frac
 
 # if __name__ != "__main__" and __name__ != "cell2mol.c2m_driver": sys.exit(1)
 if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
@@ -73,7 +73,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     atoms = ase.io.read(input_path)
 
     # Get Cartesian coordinates
-    cartesian_coords = atoms.get_positions()
+    cartesian_coords = atoms.get_positions("center")
 
     # Get atomic symbols (labels)
     atomic_labels = atoms.get_chemical_symbols()
@@ -92,15 +92,16 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     # Loads the reference molecules and checks_missing_H
     # TODO : reconstruct the unit cell without using reference molecules
     # TODO : reconstruct the unit cell using (only reconstruction of) reference molecules and Space group
-    newcell.get_reference_molecules(ref_labels, ref_fracs,cov_factor=1.3, debug=debug) 
+    newcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=1.3, debug=debug) 
     ref_pos = frac2cart_fromparam(ref_fracs, cellparam)
     writexyz(current_dir, "Ref_All_{}.xyz".format(name), ref_labels, ref_pos)
+    writexyz(current_dir, "Ref_All_frac_{}.xyz".format(name), ref_labels, ref_fracs)
     if not newcell.has_isolated_H:  newcell.check_missing_H(debug=debug)                                     
     newcell.assess_errors(ref=True)
     newcell.save(ref_cell_fname)
     for idx, ref in enumerate(newcell.refmoleclist):
         writexyz(current_dir, "Ref_Molecule_{}_{}.xyz".format(name, idx), ref.labels, ref.coord)
-
+        writexyz(current_dir, "Ref_Molecule_{}_frac_{}.xyz".format(name, idx), ref.labels, cart2frac(ref.coord, cellvec))
     # sys.exit(0) 
     ######################
     ### CALLS CELL2MOL ###
