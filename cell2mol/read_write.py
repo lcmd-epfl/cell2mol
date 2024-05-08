@@ -3,6 +3,8 @@
 import numpy as np
 import pickle
 import sys
+import re
+from collections import defaultdict
 
 #######################
 def prefiter_cif(input_path):
@@ -340,3 +342,36 @@ def print_unit_cell(cell, output_dir):
         for mol in cell.moleclist:
             for a in mol.atoms:
                 print(a.label, a.coord[0], a.coord[1], a.coord[2], file=fil)
+
+############
+def extract_chemical_formula_moiety(file_path):
+    with open(file_path, 'r') as file:
+        cif_content = file.read()
+    
+    # Find the chemical formula moiety using regex
+    pattern = r"_chemical_formula_moiety\s+['\";]([^;'\"]+)['\";]"
+    match = re.search(pattern, cif_content)
+    if not match:
+        raise ValueError("Chemical formula moiety not found.")
+    formula = match.group(1).strip()
+    return formula
+
+def parse_formula_with_quantity(formula: str):
+    element_pattern = r"(\d*)\(?([A-Za-z0-9\s]+)\)?(\d*)(\d+[+-]?)"
+    moieties_info = []
+
+    for match in re.findall(element_pattern, formula):
+        quantity = int(match[0]) if match[0] else 1
+        elements = defaultdict(int)
+        for element, count in re.findall(r"([A-Z][a-z]*)(\d*)", match[1]):
+            elements[element] += int(count) if count else 1
+
+        charge_str = match[3]
+        charge = int(charge_str[:-1]) * (1 if charge_str.endswith("+") else -1)
+
+        moieties_info.append({
+            "elements": dict(elements),
+            "quantity": quantity,
+            "charge": charge
+        })
+    return moieties_info

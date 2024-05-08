@@ -1484,6 +1484,7 @@ class cell(object):
             if Warning:
                 self.is_fragmented = True
                 self.error_reconstruction = True 
+
             else :
                 self.is_fragmented = False
                 self.error_reconstruction = False 
