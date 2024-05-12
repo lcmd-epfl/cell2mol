@@ -3,7 +3,7 @@ from cell2mol.connectivity import split_species
 from cell2mol.other import extract_from_list
 from cell2mol.classes import molecule
 from cell2mol.cell_reconstruction import tmatgenerator
-from cell2mol.other import additem, absolute_value
+from cell2mol.other import additem, absolute_value, get_dist
 from cell2mol.connectivity import count_species
 from cell2mol.cell_operations import translate
 import itertools
@@ -85,7 +85,6 @@ def get_fragments (newcell, updated, indices_in_ref, cov_factor: float=1.3, meta
 def classify_fragments (fragments, newcell, debug: int=0):
     
     molecules = []
-    found_list = []
     remaining_fragments = []
 
     for frag in fragments:
@@ -100,16 +99,25 @@ def classify_fragments (fragments, newcell, debug: int=0):
                     frag.origin = "cell.classify_fragments"
                     molecules.append(frag)
                     found = True
-                    found_list.append(idx)
         
         if found == False:
             frag.subtype = "fragment"
             frag.origin = "cell.classify_fragments"
             remaining_fragments.append(frag)
-            
-    not_found_list = [i for i in range(len(newcell.refmoleclist)) if i not in found_list]  
-    
-    return molecules, found_list, remaining_fragments, not_found_list
+
+    rem_size = np.array([rem.natoms for rem in remaining_fragments])
+    order = np.argsort(rem_size)
+    descending_order = order[::-1]
+    remaining_fragments = [remaining_fragments[i] for i in descending_order]
+    for rem in remaining_fragments:
+        rem.get_centroid()
+        
+    if debug >=1 :
+        print("Remaining_fragments:", [rem.formula for rem in remaining_fragments])
+        print("Remaining_fragments:", [rem.natoms for rem in remaining_fragments])
+        print("Remaining_fragments:", [get_dist(rem.frac_centroid, [0.5, 0.5, 0.5]) for rem in remaining_fragments])    
+        
+    return molecules, remaining_fragments
 
 ######################################################
 def grouping_smaller_lists_for_target_sets(target_sets, smaller_lists, debug: int=0):
@@ -139,7 +147,7 @@ def grouping_smaller_lists_for_target_sets(target_sets, smaller_lists, debug: in
     if debug >=1 :
         # Print the grouped lists
         for i, group in enumerate(grouped_lists):
-            print(f"Group {i+1}: {group}")
+            print(f"Group {i}: {group}")
             
     return grouped_lists, grouped_lists_idx, target_idx_lists
 
@@ -207,8 +215,13 @@ def merge_fragments(frags: list, cell_vector: list, cov_factor: float=1.3, metal
         rec_ref_indices = []
         rec_ref_indices.extend(keep_frag.ref_indices)
         rec_ref_indices.extend(move_frag.ref_indices)
+
+        recfracs = []
+        recfracs.extend(keep_frag.frac_coord)
+        recfracs.extend(move_frag.frac_coord)
         
         numspecs  = count_species(reclabels, reccoord, cov_factor=cov_factor, debug=debug)
+        
         if debug > 0: print("MERGE_FRAGMENTS: count_species found", numspecs)
         if numspecs != 1: continue
         blocklist = split_species(reclabels, reccoord, cov_factor=cov_factor, debug=debug)
@@ -217,7 +230,9 @@ def merge_fragments(frags: list, cell_vector: list, cov_factor: float=1.3, metal
             if len(blocklist) != 1: continue
             if len(blocklist) == 1: 
                 newmolec = molecule(reclabels, reccoord)
+                newmolec.origin = "cell.reconstruct"
                 newmolec.ref_indices = rec_ref_indices
+                newmolec.set_fractional_coord(recfracs)
                 newmolec.set_adjacency_parameters(cov_factor, metal_factor)
                 newmolec.set_adj_types()
                 newmolec.set_element_count()
@@ -237,56 +252,66 @@ def combinations_and_rest(data, n):
 
 ######################################################
 # def find_molecules_from_remaining_fragments(remaining_fragments, indices_from_rem_frags, indices_of_target_ref):
-def find_molecule_from_subset_rem_frags(subset_remaining_fragments, target_ref, cell_vector, debug: int=0):
-    list_of_found_molecules = []    
+def fragments_reconstruct(subset_remaining_fragments, target_ref, cell_vector, debug: int=0):
     
+    list_of_found_molecules = []    
     final_remaining = subset_remaining_fragments.copy()
+    
+    count = 0
     while (len(final_remaining) > 0):
         print("final_remaining", [k.formula for k in final_remaining], [k.subtype for k in final_remaining])
-        results = list(combinations_and_rest(final_remaining, 2))
-    
-        for combo, rest in results:
-            print("Fragments TO BE MERGED", [k.formula for k in combo], [k.subtype for k in combo])
-            print("Rest fragments",[k.formula for k in rest],[k.subtype for k in rest])
-            found_molecule =[]
-            bigger_fragment = []
-            not_merged = []        
-            newmolec = merge_fragments(combo, cell_vector, debug=debug)
-            print(newmolec)
-            if newmolec is None: 
-                print("NOT MERGED", combo[0].formula, combo[1].formula)
-                not_merged.append(combo[0])
-                not_merged.append(combo[1])
-            else :
-                print("MERGED", newmolec.formula, newmolec.ref_indices)
-                small_set = set(sorted(newmolec.ref_indices))
-                print(f"{small_set=}")
-                if small_set.issubset(target_ref): 
-                    if sorted(small_set) == target_ref:
-                        newmolec.subtype = "molecule"
-                        newmolec.origin = "cell.reconstruct"
-                        found_molecule.append(newmolec)
-                    else :
-                        newmolec.subtype = "Rec. Fragment"
-                        newmolec.origin = "cell.reconstruct"
-                        bigger_fragment.append(newmolec)
+        
+        tobemerged = final_remaining[:2]
+        rest = final_remaining[2:]
+            
+        print("Fragments TO BE MERGED", [k.formula for k in tobemerged], [k.subtype for k in tobemerged])
+        print("Rest fragments",[k.formula for k in rest],[k.subtype for k in rest])
+        
+        found_molecule =[]
+        bigger_fragment = []
+        not_merged = []        
+        newmolec = merge_fragments_test(tobemerged, cell_vector, debug=debug)
+
+        if newmolec is None: 
+            print("NOT MERGED", tobemerged[0].formula, tobemerged[1].formula)
+            not_merged.append(tobemerged[0])
+            not_merged.append(tobemerged[1])
+
+        else :
+            print("MERGED", newmolec.formula)
+            small_set = set(newmolec.ref_indices)
+            print(f"{small_set=}")
+            if small_set.issubset(target_ref): 
+                if sorted(small_set) == target_ref:
+                    newmolec.subtype = "molecule"
+                    found_molecule.append(newmolec)
+                else :
+                    newmolec.subtype = "Rec. Fragment"
+                    bigger_fragment.append(newmolec)
+                    
+        print(f"{len(found_molecule)=}")
+        print(f"{len(bigger_fragment)=}")
+        print(f"{len(not_merged)=}")
+        
+        if len(not_merged) == 2:
+            final_remaining = []
+            final_remaining.append(tobemerged[0])
+            final_remaining.extend(rest)
+            final_remaining.append(tobemerged[1])
                         
-            print(f"{len(found_molecule)=}")
-            print(f"{len(bigger_fragment)=}")
-            print(f"{len(not_merged)=}")
+        elif len(found_molecule) == 1 :
+            list_of_found_molecules.append(newmolec)
+            final_remaining = []
+            final_remaining.extend(rest)
+        elif len(bigger_fragment) == 1 :
+            final_remaining = []
+            final_remaining.append(newmolec)
+            final_remaining.extend(rest)
+        
+        count +=1
+        
+        if len(final_remaining) == 0:
+            print(f"{count=}")
+            break
             
-            if len(not_merged) == 2:
-                #continue the process
-                pass    
-            elif len(found_molecule) == 1 :
-                list_of_found_molecules.append(newmolec)
-                final_remaining = []
-                final_remaining.extend(rest)
-            elif len(bigger_fragment) == 1 :
-                final_remaining = []
-                final_remaining.append(newmolec)
-                final_remaining.extend(rest)
-            
-            if len(final_remaining) == 0:
-                break
     return list_of_found_molecules, final_remaining
