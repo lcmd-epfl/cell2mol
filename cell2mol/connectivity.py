@@ -596,6 +596,7 @@ def split_group(original_group, conn_idx, debug: int=0):
     if debug > 1: print(f"GROUP.SPLIT_GROUP: {conn_idx=}")
     conn_labels  = extract_from_list(conn_idx, original_group.labels, dimension=1)
     conn_coord   = extract_from_list(conn_idx, original_group.coord, dimension=1)
+    conn_frac_coord   = extract_from_list(conn_idx, original_group.frac_coord, dimension=1)
     conn_radii   = extract_from_list(conn_idx, original_group.radii, dimension=1)
     conn_atoms   = extract_from_list(conn_idx, original_group.atoms, dimension=1)
     if debug > 1: print(f"GROUP.SPLIT_GROUP: {conn_labels=}")
@@ -607,13 +608,14 @@ def split_group(original_group, conn_idx, debug: int=0):
     ## Arranges Groups 
     for b in blocklist:
         if debug > 1: print(f"GROUP.SPLIT_GROUP: block={b}")
-        gr_indices = extract_from_list(b, conn_idx, dimension=1)
-        gr_labels  = extract_from_list(b, conn_labels, dimension=1)
-        gr_coord   = extract_from_list(b, conn_coord, dimension=1)
-        gr_radii   = extract_from_list(b, conn_radii, dimension=1)
-        gr_atoms   = extract_from_list(b, conn_atoms, dimension=1)
+        gr_indices      = extract_from_list(b, conn_idx, dimension=1)
+        gr_labels       = extract_from_list(b, conn_labels, dimension=1)
+        gr_coord        = extract_from_list(b, conn_coord, dimension=1)
+        gr_frac_coord   = extract_from_list(b, conn_frac_coord, dimension=1)
+        gr_radii        = extract_from_list(b, conn_radii, dimension=1)
+        gr_atoms        = extract_from_list(b, conn_atoms, dimension=1)
         # Create Group Object
-        newgroup = group(gr_labels, gr_coord, radii=gr_radii)
+        newgroup = group(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
         # For debugging
         newgroup.origin = "split_group"
         # Define the GROUP as parent of the group. Bottom-Up hierarchy
