@@ -304,7 +304,7 @@ class specie(object):
     
     ############
     def create_bonds(self, debug: int=0):
-        if not hasattr(self,"rdkit_obj"): self.get_parent("cell").assign_charges()
+        # if not hasattr(self,"rdkit_obj"): self.get_parent("cell").assign_charges()
         create_bonds_spicie(self, debug=debug)
 
     ############
@@ -1227,9 +1227,9 @@ class cell(object):
         typelist_mets = [] # temporary variable
 
         specs_found = -1
-        if self.subtype == "reference": moleculist = self.refmoleclist
-        else:                           moleculist = self.moleclist
-        for idx, mol in enumerate(moleculist):
+        if self.subtype == "reference": moleclist = self.refmoleclist
+        else:                           moleclist = self.moleclist
+        for idx, mol in enumerate(moleclist):
             if debug >= 2: print(f"Molecule {idx} formula={mol.formula}")
             if not mol.iscomplex:
                 found = False
@@ -1592,9 +1592,13 @@ class cell(object):
 
     #######################################################
     def create_bonds(self, debug: int=0):
-        if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)  
-        if self.error_prepare_mols: return # Stopping. self.error_prepare_mols must be false to create the spin
-        for mol in self.moleclist:
+        # if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)  
+        # if self.error_prepare_mols: return # Stopping. self.error_prepare_mols must be false to create the spin
+        
+        if self.subtype == "reference": moleclist = self.refmoleclist
+        else:                           moleclist = self.moleclist
+
+        for mol in moleclist:
             if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Bonds for molecule {mol.formula}")
             # First part
             if not mol.iscomplex: 
