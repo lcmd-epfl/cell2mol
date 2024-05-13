@@ -19,19 +19,21 @@ import pickle
 ####  CLASSES FOR CELL2MOL 2  ####
 ##################################
 class specie(object):
-    def __init__(self, labels: list, coord: list, radii: list=None) -> None:
+    def __init__(self, labels: list, coord: list, frac_coord: list, radii: list=None) -> None:
 
        # Sanity Checks
         assert len(labels) == len(coord)
+        assert len(coord) == len(frac_coord)
 
         # Optional Information
         if radii   is not None: self.radii   = radii
         else:                   self.radii   = get_radii(labels)
 
         self.type              = "specie"
-        self.version           = "0.1"
+        self.version           = "2.0"
         self.labels            = labels
         self.coord             = coord
+        self.frac_coord        = frac_coord
         self.formula           = labels2formula(labels)
         self.eleccount         = labels2electrons(labels)   ### Assuming neutral specie (so basically this is the sum of atomic numbers)
         self.natoms            = len(labels)
@@ -99,7 +101,9 @@ class specie(object):
     def get_centroid(self):
         from cell2mol.other import compute_centroid 
         self.centroid = compute_centroid(np.array(self.coord))
-        if hasattr(self,"frac_coord"): self.frac_centroid = compute_centroid(np.array(self.frac_coord)) # If fractional coordinates exists, then also computes their centroid
+        if hasattr(self,"frac_coord"): 
+            self.frac_centroid = compute_centroid(np.array(self.frac_coord)) 
+            # If fractional coordinates exists, then also computes their centroid
         return self.centroid
     
     ############
@@ -108,15 +112,15 @@ class specie(object):
         self.frac_coord = frac_coord 
 
     ############
-    def get_fractional_coord(self, cell_vector=None, debug: int=0) -> None:
-        if cell_vector is None:
-            if self.check_parent("cell"):
-                cell = self.get_parent("cell")
-                if hasattr(cell,"cellvec"): cell_vector = cell.cellvec.copy()
-            else:     print("SPECIE.GET_FRACTIONAL_COORD: get_fractional coordinates. Missing cell vector. Please provide it"); return None
-        if debug > 1: print(f"SPECIE.GET_FRACTIONAL_COORD: Using cell_vector:{cell_vector}")
-        self.frac_coord = cart2frac(self.coord, cell_vector)
-        return self.frac_coord
+    # def get_fractional_coord(self, cell_vector=None, debug: int=0) -> None:
+    #     if cell_vector is None:
+    #         if self.check_parent("cell"):
+    #             cell = self.get_parent("cell")
+    #             if hasattr(cell,"cellvec"): cell_vector = cell.cell_vector.copy()
+    #         else:     print("SPECIE.GET_FRACTIONAL_COORD: get_fractional coordinates. Missing cell vector. Please provide it"); return None
+    #     if debug > 1: print(f"SPECIE.GET_FRACTIONAL_COORD: Using cell_vector:{cell_vector}")
+    #     self.frac_coord = cart2frac(self.coord, cell_vector)
+    #     return self.frac_coord
 
     ############
     def get_atomic_numbers(self):
@@ -186,10 +190,10 @@ class specie(object):
                 ## For each l in labels, create an atom class object.
                 ismetal = elemdatabase.elementblock[l] == "d" or elemdatabase.elementblock[l] == "f"
                 if debug > 0: print(f"SPECIE.SET_ATOMS: {ismetal=}")
-                if ismetal: newatom = metal(l, self.coord[idx], radii=self.radii[idx])
-                else:       newatom = atom(l, self.coord[idx], radii=self.radii[idx])
+                if ismetal: newatom = metal(l, self.coord[idx], self.frac_coord[idx], radii=self.radii[idx])
+                else:       newatom = atom(l, self.coord[idx], self.frac_coord[idx],radii=self.radii[idx])
                 if debug > 0: print(f"SPECIE.SET_ATOMS: added atom to specie: {self.formula}")
-                newatom.add_parent(self,index=idx)
+                newatom.add_parent(self, index=idx)
                 self.atoms.append(newatom)
         
         if create_adjacencies:
@@ -340,9 +344,9 @@ class specie(object):
 ### MOLECULE ##
 ###############
 class molecule(specie):
-    def __init__(self, labels: list, coord: list, radii: list=None) -> None:
+    def __init__(self, labels: list, coord: list, frac_coord: list, radii: list=None) -> None:
         self.subtype = "molecule"
-        specie.__init__(self, labels, coord, radii)
+        specie.__init__(self, labels, coord, frac_coord, radii)
 
     def __repr__(self):
         to_print = ""
@@ -389,6 +393,7 @@ class molecule(specie):
             # Split the "rest" to obtain the ligands
             rest_labels  = extract_from_list(rest_idx, self.labels, dimension=1)
             rest_coord   = extract_from_list(rest_idx, self.coord, dimension=1)
+            rest_frac    = extract_from_list(rest_idx, self.frac_coord, dimension=1)
             rest_indices = extract_from_list(rest_idx, self.indices, dimension=1)
             rest_radii   = extract_from_list(rest_idx, self.radii, dimension=1)
             rest_atoms   = extract_from_list(rest_idx, self.atoms, dimension=1)
@@ -397,7 +402,6 @@ class molecule(specie):
                 print(f"SPLIT COMPLEX: rest indices: {rest_indices}")
                 print(f"SPLIT COMPLEX: rest radii: {rest_radii}")
 
-            if hasattr(self,"frac_coord"): rest_frac = extract_from_list(rest_idx, self.frac_coord, dimension=1)
             if debug > 0: print(f"SPLIT COMPLEX: splitting species with {len(rest_labels)} atoms in block")
             if hasattr(self,"cov_factor"): blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)
             else:                          blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)      
@@ -409,11 +413,12 @@ class molecule(specie):
                 lig_indices = extract_from_list(b, rest_indices, dimension=1)
                 lig_labels  = extract_from_list(b, rest_labels, dimension=1) 
                 lig_coord   = extract_from_list(b, rest_coord, dimension=1) 
+                lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
                 lig_radii   = extract_from_list(b, rest_radii, dimension=1) 
                 lig_atoms   = extract_from_list(b, rest_atoms, dimension=1) 
                 if debug > 0: print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
                 # Create Ligand Object
-                newligand   = ligand(lig_labels, lig_coord, radii=lig_radii)
+                newligand   = ligand(lig_labels, lig_coord, lig_frac_coord, radii=lig_radii)
                 # For debugging
                 newligand.origin = "split_complex"
                 # Define the molecule as parent of the ligand. Bottom-Up hierarchy
@@ -424,19 +429,15 @@ class molecule(specie):
                 newligand.set_atoms(atomlist=lig_atoms)
                 # Inherit the adjacencies from molecule
                 newligand.inherit_adjmatrix("molecule")
-                # If fractional coordinates are available...
-                if hasattr(self,"frac_coord"): 
-                    lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
-                    newligand.set_fractional_coord(lig_frac_coord)
                 # Add ligand to the list. Top-Down hierarchy
                 self.ligands.append(newligand)
 
             ## Arranges Metals
             for m in metal_idx:
                 ## We were creating the metal again, but it is already in the list of molecule.atoms
-                #newmetal    = metal(self.labels[m], self.coord[m], self.radii[m])
-                #newmetal.add_parent(self, index=self.indices[m])
-                #self.metals.append(newmetal)                            
+                # newmetal    = metal(self.labels[m], self.coord[m], self.frac_coord[m], self.radii[m])
+                # newmetal.add_parent(self, index=self.indices[m])
+                # self.metals.append(newmetal)                            
                 self.metals.append(self.atoms[m])                            
         return self.ligands, self.metals
 
@@ -466,9 +467,9 @@ class molecule(specie):
 ### LIGAND ####
 ###############
 class ligand(specie):
-    def __init__(self, labels: list, coord: list, radii: list=None) -> None:
+    def __init__(self, labels: list, coord: list, frac_coord: list, radii: list=None) -> None:
         self.subtype  = "ligand"
-        specie.__init__(self, labels, coord, radii)
+        specie.__init__(self, labels, coord, frac_coord, radii)
         self.evaluate_as_nitrosyl()
         
     #######################################################
@@ -588,10 +589,11 @@ class ligand(specie):
         if debug >= 2:
             print(f"LIGAND.SPLIT_LIGAND: {self.indices=}") 
             print(f"LIGAND.SPLIT_LIGAND: {connected_idx=}")
-        conn_labels  = extract_from_list(connected_idx, self.labels, dimension=1)
-        conn_coord   = extract_from_list(connected_idx, self.coord, dimension=1)
-        conn_radii   = extract_from_list(connected_idx, self.radii, dimension=1)
-        conn_atoms   = extract_from_list(connected_idx, self.atoms, dimension=1)
+        conn_labels     = extract_from_list(connected_idx, self.labels, dimension=1)
+        conn_coord      = extract_from_list(connected_idx, self.coord, dimension=1)
+        conn_frac_coord = extract_from_list(connected_idx, self.frac_coord, dimension=1)
+        conn_radii      = extract_from_list(connected_idx, self.radii, dimension=1)
+        conn_atoms      = extract_from_list(connected_idx, self.atoms, dimension=1)
         if debug >= 2: print(f"LIGAND.SPLIT_LIGAND: {conn_labels=}")
 
         if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=self.cov_factor, debug=debug)
@@ -602,12 +604,13 @@ class ligand(specie):
             if debug >= 2 : print(f"LIGAND.SPLIT_LIGAND: block={b}")
             gr_indices = extract_from_list(b, connected_idx, dimension=1, debug=debug)
             if debug > 1: print(f"LIGAND.SPLIT_LIGAND: {gr_indices=}")
-            gr_labels  = extract_from_list(b, conn_labels, dimension=1, debug=debug)
-            gr_coord   = extract_from_list(b, conn_coord, dimension=1)
-            gr_radii   = extract_from_list(b, conn_radii, dimension=1)
-            gr_atoms   = extract_from_list(b, conn_atoms, dimension=1)
+            gr_labels       = extract_from_list(b, conn_labels, dimension=1, debug=debug)
+            gr_coord        = extract_from_list(b, conn_coord, dimension=1)
+            gr_frac_coord   = extract_from_list(b, conn_frac_coord, dimension=1)
+            gr_radii        = extract_from_list(b, conn_radii, dimension=1)
+            gr_atoms        = extract_from_list(b, conn_atoms, dimension=1)
             # Create Group Object
-            newgroup = group(gr_labels, gr_coord, radii=gr_radii)
+            newgroup = group(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
             # For debugging
             newgroup.origin = "split_ligand"
             # Define the ligand as parent of the group. Bottom-Up hierarchy
@@ -651,9 +654,9 @@ class ligand(specie):
 #### GROUP ####
 ###############
 class group(specie):
-    def __init__(self, labels: list, coord: list, radii: list=None) -> None:
+    def __init__(self, labels: list, coord: list, frac_coord: list, radii: list=None) -> None:
         self.subtype = "group"
-        specie.__init__(self, labels, coord, radii)
+        specie.__init__(self, labels, coord, frac_coord, radii)
 
     #######################################################
     def __repr__(self):
@@ -765,7 +768,7 @@ class group(specie):
 class bond(object):
     def __init__(self, atom1: object, atom2: object, bond_order: int=1):
         self.type       = "bond"
-        self.version    = "0.1"
+        self.version    = "2.0"
         self.atom1      = atom1
         self.atom2      = atom2
         self.order      = bond_order
@@ -791,19 +794,21 @@ class bond(object):
 ### ATOM ######
 ###############
 class atom(object):
-    def __init__(self, label: str, coord: list, radii: float=None, frac_coord: list=None) -> None:
+    def __init__(self, label: str, coord: list, frac_coord: list=None, radii: float=None) -> None:
         self.type            = "atom"
-        self.version         = "0.1"
+        self.version         = "2.0"
         self.label           = label
         self.coord           = coord
         self.atnum           = elemdatabase.elementnr[label]
         self.block           = elemdatabase.elementblock[label]
         self.parents         = []
         self.parents_index   = []
+        self.formula         = label
 
+        if frac_coord is not None:        self.frac_coord = frac_coord
         if radii is None:                 self.radii = get_radii(label)
         else:                             self.radii = radii
-        if frac_coord is not None:        self.frac_coord = frac_coord
+        
 
         ############
     def add_parent(self, parent: object, index: int, overwrite: bool=True):
@@ -1053,9 +1058,9 @@ class atom(object):
 #### METAL ####
 ###############
 class metal(atom):
-    def __init__(self, label: str, coord: list, radii: float=None, frac_coord: list=None) -> None:
+    def __init__(self, label: str, coord: list, frac_coord: list=None, radii: float=None) -> None:
         self.subtype = "metal"
-        atom.__init__(self, label, coord, radii=radii, frac_coord=frac_coord)
+        atom.__init__(self, label, coord, frac_coord=frac_coord, radii=radii)
 
     #######################################################
     def get_valence_elec (self, m_ox: int):
@@ -1193,22 +1198,26 @@ class metal(atom):
 #### CELL ####
 ##############
 class cell(object):
-    def __init__(self, name: str, labels: list, pos: list, cellvec: list, cellparam: list) -> None:
-        self.version    = "0.1"
+    def __init__(self, name: str, labels: list, pos: list, frac_coord: list, cell_vector, cell_param) -> None:
+        self.version    = "2.0"
         self.type       = "cell"
-        self.subtype    = "cell"
         self.name       = name
         self.labels     = labels 
         self.coord      = pos
-        self.cellvec    = cellvec
-        self.cellparam  = cellparam
+        self.frac_coord = frac_coord
+        self.cell_vector = cell_vector
+        self.cell_param = cell_param
         self.natoms     = len(labels)
-        self.frac_coord = cart2frac(self.coord, self.cellvec)
+
+    #######################################################    
+    def get_subtype(self, subtype):
+        self.subtype    = subtype
         
     #######################################################
     def get_unique_species(self, debug: int=0): 
-        if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)  
-        if self.is_fragmented: return None # Stopping. self.is_fragmented must be false to determine the charges of the cell
+        #if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)  
+        #if self.is_fragmented: return None # Stopping. self.is_fragmented must be false to determine the charges of the cell
+        
         if debug >= 0: print(f"Getting unique species in cell")
         self.unique_species = []
         self.unique_indices = []
@@ -1218,7 +1227,9 @@ class cell(object):
         typelist_mets = [] # temporary variable
 
         specs_found = -1
-        for idx, mol in enumerate(self.moleclist):
+        if self.subtype == "reference": moleculist = self.refmoleclist
+        else:                           moleculist = self.moleclist
+        for idx, mol in enumerate(moleculist):
             if debug >= 2: print(f"Molecule {idx} formula={mol.formula}")
             if not mol.iscomplex:
                 found = False
@@ -1270,9 +1281,9 @@ class cell(object):
         return self.unique_species
 
     #######################################################
-    def get_fractional_coord(self):
-        self.frac_coord = cart2frac(self.coord, self.cellvec)
-        return self.frac_coord
+    # def get_fractional_coord(self):
+    #     self.frac_coord = cart2frac(self.coord, self.cellvec)
+    #     return self.frac_coord
 
     #######################################################
     def check_missing_H(self, debug: int=0):
@@ -1289,9 +1300,12 @@ class cell(object):
             print("  GETREFS: Generate reference molecules  ")
             print("#########################################")
 
-        # In the info file, the reference molecules only have fractional coordinates. We convert them to cartesian
-        ref_pos = frac2cart_fromparam(ref_fracs, self.cellparam)
-
+        # Convert fractional coordinates to cartesian
+        ref_pos = frac2cart_fromparam(ref_fracs, self.cell_param)
+        
+        # Define reference cell
+        refcell = cell(self.name, ref_labels, ref_pos, ref_fracs, self.cell_vector, self.cell_param)
+        refcell.get_subtype("reference")
         # Get reference molecules
         blocklist = split_species(ref_labels, ref_pos, cov_factor=cov_factor)
 
@@ -1299,12 +1313,14 @@ class cell(object):
         for b in blocklist:
             mol_labels       = extract_from_list(b, ref_labels, dimension=1)
             mol_coord        = extract_from_list(b, ref_pos, dimension=1)
-            mol_frac_coord   = extract_from_list(b, self.frac_coord, dimension=1)
-            newmolec         = molecule(mol_labels, mol_coord)
+            mol_frac_coord   = extract_from_list(b, ref_fracs, dimension=1)
+            newmolec         = molecule(mol_labels, mol_coord, mol_frac_coord)
             newmolec.add_parent(self, indices=b)
-            newmolec.set_fractional_coord(mol_frac_coord)
+            newmolec.add_parent(refcell, indices=b)
             newmolec.set_adjacency_parameters(cov_factor, metal_factor)
             newmolec.set_atoms(create_adjacencies=True, debug=debug)
+            for atom, idx in zip(newmolec.atoms, b):
+                atom.add_parent(refcell, index=idx)
             # This must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex: newmolec.split_complex()
             self.refmoleclist.append(newmolec)
@@ -1383,8 +1399,9 @@ class cell(object):
             if debug > 0: print(f"CELL.MOLECLIST: doing block={b}")
             mol_labels  = extract_from_list(b, self.labels, dimension=1)
             mol_coord   = extract_from_list(b, self.coord, dimension=1)
+            mol_frac_coord  = extract_from_list(b, self.frac_coord, dimension=1)
             # Creates Molecule Object
-            newmolec    = molecule(mol_labels, mol_coord)
+            newmolec    = molecule(mol_labels, mol_coord, mol_frac_coord)
             # For debugging
             newmolec.origin = "cell.get_moleclist"
             # Adds cell as parent of the molecule, with indices b
@@ -1392,11 +1409,6 @@ class cell(object):
             newmolec.set_adjacency_parameters(cov_factor, metal_factor)
             # Creates The atom objects with adjacencies
             newmolec.set_atoms(create_adjacencies=True, debug=debug)
-            # If fractional coordinates are available...
-            if hasattr(self,"frac_coord"): 
-                assert len(self.frac_coord) == len(self.coord)
-                mol_frac_coord  = extract_from_list(b, self.frac_coord, dimension=1)
-                newmolec.set_fractional_coord(mol_frac_coord, debug=debug)
             # The split_complex must be below the frac_coord, so they are carried on to the ligands
             # if newmolec.iscomplex: 
             #     if debug > 0: print(f"CELL.MOLECLIST: splitting complex")
@@ -1451,8 +1463,8 @@ class cell(object):
             self.error_get_fragments = False
 
         ## Classifies fragments
-        for f in fragments:
-            if not hasattr(f,"frac_coord"):       f.get_fractional_coord(self.cellvec)
+        # for f in fragments:
+        #     if not hasattr(f,"frac_coord"):       f.get_fractional_coord(self.cellvec)
         molecules, fragments, hydrogens = classify_fragments(fragments, self.refmoleclist, debug=debug)
         if debug > 0: print(f"CELL.RECONSTRUCT: {len(molecules)} {molecules=}")
         if debug > 0: print(f"CELL.RECONSTRUCT: {len(fragments)} {fragments=}")
@@ -1714,10 +1726,12 @@ class cell(object):
         to_print  = f'------------- Cell2mol CELL Object ----------------\n'
         to_print += f' Version               = {self.version}\n'
         to_print += f' Type                  = {self.type}\n'
+        if hasattr(self,'subtype'): to_print += f' Sub-Type              = {self.subtype}\n'
         to_print += f' Name (Refcode)        = {self.name}\n'
         to_print += f' Num Atoms             = {self.natoms}\n'
-        to_print += f' Cell Parameters a:c   = {self.cellparam[0:3]}\n'
-        to_print += f' Cell Parameters al:ga = {self.cellparam[3:6]}\n'
+        to_print += f' Cell Parameters a:c   = {self.cell_param[0:3]}\n'
+        to_print += f' Cell Parameters al:ga = {self.cell_param[3:6]}\n'
+        # to_print += f' Cell Vector           = {self.cell_vector}\n'
         if hasattr(self,"moleclist"):  
             to_print += f' # Molecules:          = {len(self.moleclist)}\n'
             to_print += f' With Formulae:                               \n'

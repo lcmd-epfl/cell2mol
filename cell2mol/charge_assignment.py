@@ -827,6 +827,7 @@ def balance_charge(unique_indices: list, unique_species: list, debug: int=0) -> 
 
         # Expands tmpdistr to include same species, generating alldistr:
         alldistr = []
+        final_charges= []
         for distr in tmpdistr:
             tmp = []
             for u in unique_indices:
@@ -837,14 +838,15 @@ def balance_charge(unique_indices: list, unique_species: list, debug: int=0) -> 
             final_charge_distribution = []
             for idx, d in enumerate(alldistr):
                 if debug >= 2: print(f"BALANCE: distribution={d}")
-                final_charge = np.sum(d)
-                if final_charge == 0:
+                charges_sum = np.sum(d)
+                if charges_sum == 0:
                     final_charge_distribution.append(d)
+                    final_charges.append(distr)
     elif iserror:
         if debug >= 1: print("Error found in BALANCE: one species has no possible charges")
         final_charge_distribution = []
 
-    return final_charge_distribution
+    return final_charge_distribution, final_charges
 
 #######################################################
 def prepare_unresolved(unique_indices: list, unique_species: list, distributions: list, debug: int=0):
