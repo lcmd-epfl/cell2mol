@@ -96,11 +96,12 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     refcell.assess_errors(mode="hydrogens")
     
     refcell.assign_charges(debug=debug)  
-    refcell.check_charge_neutrality(debug=debug) 
     refcell.assess_errors(mode="reference")
 
-    refcell.assign_spin(debug=debug)
-    refcell.create_bonds(debug=debug)
+    if refcell.error_case == 0:
+        refcell.check_charge_neutrality(debug=debug)
+        refcell.assign_spin(debug=debug)
+        refcell.create_bonds(debug=debug)
     
     refcell.save(ref_cell_fname)
 
@@ -109,63 +110,64 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     ### RECONSTRUCTS THE CELL OBJECT ###
     ####################################
 
-    newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
-    newcell.get_subtype("unit_cell")
-    newcell.get_reference_molecules(ref_labels, ref_fracs, debug=debug)
-    if not newcell.has_isolated_H:  
-        newcell.check_missing_H(debug=debug)                                     
-    newcell.assess_errors(mode="hydrogens")
-    # newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
+    if refcell.error_case == 0:
+        newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
+        newcell.get_subtype("unit_cell")
+        newcell.get_reference_molecules(ref_labels, ref_fracs, debug=debug)
+        if not newcell.has_isolated_H:  
+            newcell.check_missing_H(debug=debug)                                     
+        newcell.assess_errors(mode="hydrogens")
+        # newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
 
-    ref_molecule = Atoms(symbols=refcell.labels, scaled_positions=refcell.frac_coord, cell=cell_vector, pbc=True)
-    all_molecules, reconstructed_molecules = reconstuct(ref_molecule, newcell, refcell, cell_pos, cell_fracs, cell_vector, sym_ops, debug=0)    
+        ref_molecule = Atoms(symbols=refcell.labels, scaled_positions=refcell.frac_coord, cell=cell_vector, pbc=True)
+        all_molecules, reconstructed_molecules = reconstuct(ref_molecule, newcell, refcell, cell_pos, cell_fracs, cell_vector, sym_ops, debug=0)    
 
-    newcell.moleclist = []
-    all_molecules.extend(reconstructed_molecules)
+        newcell.moleclist = []
+        all_molecules.extend(reconstructed_molecules)
 
-    for mol in all_molecules:
-        newmolec = molecule(mol.labels, mol.coord, mol.frac_coord)
-        newmolec.origin = "cell.reconstruct"
-        newmolec.set_atoms(create_adjacencies=True, debug=debug)
-        newmolec.add_parent(newcell, mol.cell_indices)
-        newmolec.add_parent(refcell, mol.ref_indices) 
-        for atom, idx in zip(newmolec.atoms, mol.cell_indices):
-            atom.add_parent(newcell, index=idx)  
-        for atom, idx in zip(newmolec.atoms, mol.ref_indices):
-            atom.add_parent(refcell, index=idx)  
-        if newmolec.iscomplex: newmolec.split_complex()
-        newcell.moleclist.append(newmolec)  
+        for mol in all_molecules:
+            newmolec = molecule(mol.labels, mol.coord, mol.frac_coord)
+            newmolec.origin = "cell.reconstruct"
+            newmolec.set_atoms(create_adjacencies=True, debug=debug)
+            newmolec.add_parent(newcell, mol.cell_indices)
+            newmolec.add_parent(refcell, mol.ref_indices) 
+            for atom, idx in zip(newmolec.atoms, mol.cell_indices):
+                atom.add_parent(newcell, index=idx)  
+            for atom, idx in zip(newmolec.atoms, mol.ref_indices):
+                atom.add_parent(refcell, index=idx)  
+            if newmolec.iscomplex: newmolec.split_complex()
+            newcell.moleclist.append(newmolec)  
 
-    for mol in newcell.moleclist:
-        if mol.iscomplex: 
-            mol.get_hapticity(debug=debug)
-            for lig in mol.ligands:
-                lig.get_denticity(debug=debug)
-            for met in mol.metals:                         
-                met.get_coordination_geometry(debug=debug)
+        for mol in newcell.moleclist:
+            if mol.iscomplex: 
+                mol.get_hapticity(debug=debug)
+                for lig in mol.ligands:
+                    lig.get_denticity(debug=debug)
+                for met in mol.metals:                         
+                    met.get_coordination_geometry(debug=debug)
 
-    for mol in newcell.moleclist:
-        if not mol.iscomplex:
-            for ref in refcell.refmoleclist:
-                if not ref.iscomplex:
-                    compare_molecules(ref, mol, debug=debug)
-        else:
-            for ref in refcell.refmoleclist:
-                if ref.iscomplex:
-                    for lig in mol.ligands:
-                        for ref_lig in ref.ligands:
-                            compare_molecules(ref_lig, lig, debug=debug)
-                    for met in mol.metals:
-                        for ref_met in ref.metals:
-                            if ref_met.get_parent_index("reference") == met.get_parent_index("reference"):
-                                met.set_charge(ref_met.charge)
-                    prepare_mol(mol)
+        for mol in newcell.moleclist:
+            if not mol.iscomplex:
+                for ref in refcell.refmoleclist:
+                    if not ref.iscomplex:
+                        compare_molecules(ref, mol, debug=debug)
+            else:
+                for ref in refcell.refmoleclist:
+                    if ref.iscomplex:
+                        for lig in mol.ligands:
+                            for ref_lig in ref.ligands:
+                                compare_molecules(ref_lig, lig, debug=debug)
+                        for met in mol.metals:
+                            for ref_met in ref.metals:
+                                if ref_met.get_parent_index("reference") == met.get_parent_index("reference"):
+                                    met.set_charge(ref_met.charge)
+                        prepare_mol(mol)
 
-    newcell.check_charge_neutrality(debug=debug)
-    newcell.assess_errors(mode="unit_cell")
-    newcell.assign_spin(debug=debug)
-    newcell.create_bonds(debug=debug)
-    newcell.save(cell_fname)
+        newcell.check_charge_neutrality(debug=debug)
+        newcell.assess_errors(mode="unit_cell")
+        newcell.assign_spin(debug=debug)
+        newcell.create_bonds(debug=debug)
+        newcell.save(cell_fname)
     output.close()
     sys.stdout = stdout
 
