@@ -7,6 +7,7 @@ from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstru
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
 from cell2mol.charge_assignment import get_protonation_states_specie, get_possible_charge_state, get_metal_poscharges
 from cell2mol.charge_assignment import balance_charge, prepare_unresolved, prepare_mols, correct_smiles_ligand
+from cell2mol.new_charge_assignment import set_charge_state, prepare_mol, compare_molecules
 from cell2mol.spin import assign_spin_metal, assign_spin_complexes, predict_ox_state
 from cell2mol.other import extract_from_list, compute_centroid, get_dist, get_angle
 from cell2mol.other import handle_error
@@ -416,6 +417,7 @@ class molecule(specie):
                 lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
                 lig_radii   = extract_from_list(b, rest_radii, dimension=1) 
                 lig_atoms   = extract_from_list(b, rest_atoms, dimension=1) 
+                
                 if debug > 0: print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
                 # Create Ligand Object
                 newligand   = ligand(lig_labels, lig_coord, lig_frac_coord, radii=lig_radii)
@@ -423,6 +425,15 @@ class molecule(specie):
                 newligand.origin = "split_complex"
                 # Define the molecule as parent of the ligand. Bottom-Up hierarchy
                 newligand.add_parent(self, indices=lig_indices)
+
+                if self.check_parent("unit_cell"):
+                    cell_indices = [a.get_parent_index("unit_cell") for a in lig_atoms]
+                    newligand.add_parent(self.get_parent("unit_cell"), indices=cell_indices)
+
+                if self.check_parent("reference"):
+                    ref_indices = [a.get_parent_index("reference") for a in lig_atoms]
+                    newligand.add_parent(self.get_parent("reference"), indices=ref_indices)
+
                 # Update the ligand with the covalent and metal factors 
                 newligand.set_adjacency_parameters(self.cov_factor, self.metal_factor)
                 # Pass the molecule atoms to the ligand
@@ -1519,9 +1530,111 @@ class cell(object):
         if not hasattr(self,"moleclist"): return None
         for mol in self.moleclist:
             mol.reset_charge()
-        
+
     #######################################################
-    def assign_charges(self, debug: int=0) -> object:
+    def get_selected_cs(self, debug: int=0):
+        if not hasattr(self, "unique_species"): self.get_unique_species(debug=debug)  
+        
+        selected_cs = []
+        for specie in self.unique_species:
+            tmp = specie.get_possible_cs(debug=debug)
+            if tmp is None: 
+                self.error_empty_poscharges = True
+                return # Stopping. Empty list of possible charges received.
+            if specie.subtype != "metal":
+                selected_cs.append(list([cs.corr_total_charge for cs in specie.possible_cs]))
+            else :
+                selected_cs.append(specie.possible_cs)
+        self.error_empty_poscharges = False
+        return selected_cs 
+
+    #######################################################
+    def assign_charges (self, debug: int=0):
+        
+        if not hasattr(self,"unique_species"): self.get_unique_species(debug=debug)  
+        if debug >= 1: print(f"{len(self.unique_species)} Species (Metal or Ligand or Molecules) to Characterize")
+        
+        selected_cs = self.get_selected_cs(debug=debug)
+        if debug >= 1: print(f"Selected Charges: {selected_cs}")
+
+        final_charge_distribution, final_charges = balance_charge(self.unique_indices, self.unique_species, debug=debug)
+
+        if len(final_charge_distribution) > 1:
+            if debug >= 1: print("More than one Possible Distribution Found:", final_charge_distribution)
+            self.error_multiple_distrib = True
+            self.error_empty_distrib    = False
+            pp_mols, pp_idx, pp_opt = prepare_unresolved(self.unique_indices, self.unique_species, final_charge_distribution, debug=debug)
+            self.data_for_postproc(pp_mols, pp_idx, pp_opt)
+            return # Stopping.
+        
+        elif len(final_charge_distribution) == 0: # 
+            if debug >= 1: print("No valid Distribution Found", final_charge_distribution)
+            self.error_multiple_distrib = False
+            self.error_empty_distrib    = True
+            return # Stopping.
+        
+        else: # Only one possible charge distribution -> getcharge for the repeated species
+            self.error_multiple_distrib = False
+            self.error_empty_distrib    = False
+            
+            if debug >= 1:
+                print(f"\nFINAL Charge Distribution: {final_charge_distribution}\n")
+                print("#########################################")
+                print("Assigning Charges and Preparing Molecules")
+                print("#########################################")
+            
+            for specie, final_charge in zip(self.unique_species, final_charges[0]):
+                print(specie.unique_index, specie.formula)
+                if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+                    charge_list = [cs.corr_total_charge for cs in specie.possible_cs]
+                    idx = charge_list.index(final_charge)
+                    cs = specie.possible_cs[idx]
+                    specie.charge_state = cs
+                    # print(specie.charge_state.protonation)
+                    specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
+                elif specie.subtype == "metal" :
+                    charge_list = specie.possible_cs   
+                    idx = charge_list.index(final_charge)
+                    cs = specie.possible_cs[idx]
+                    specie.set_charge(cs) 
+
+            for idx, ref in enumerate(self.refmoleclist):
+                print(f"Molecule {idx}: {ref.formula}")
+                if ref.iscomplex:
+                    for jdx, lig in enumerate(ref.ligands):
+                        for specie in self.unique_species:
+                            if specie.subtype == "ligand":
+                                issame = compare_species(lig, specie)
+                                if issame:
+                                    set_charge_state(specie, lig, mode=1, debug=debug)
+                                    print(lig.formula, specie.formula, issame)    
+                    for met in ref.metals:
+                        for specie in self.unique_species:
+                            if specie.subtype == "metal":
+                                issame = compare_metals(met, specie)
+                                if issame:
+                                    met.set_charge(specie.charge)
+                                    print(met.formula, specie.formula, issame) 
+                    prepare_mol(ref)
+                else:
+                    for specie in self.unique_species:  
+                        if specie.subtype == "molecule":
+                            issame = compare_species(ref, specie)
+                            if issame:
+                                set_charge_state(specie, ref, mode=1, debug=debug)
+                                print(ref.formula, specie.formula, issame)
+
+    #######################################################
+    def check_charge_neutrality(self, debug: int=0):
+        if self.subtype == "reference": moleclist = self.refmoleclist
+        else:                           moleclist = self.moleclist
+        totcharge_list = [mol.totcharge for mol in moleclist]
+        if debug >= 1: print(f"Total Charge of the Cell: {sum(totcharge_list)}")    
+        if sum(totcharge_list) == 0: self.is_neutral = True
+        else:                        self.is_neutral = False    
+
+    #######################################################
+    def assign_charges_old (self, debug: int=0) -> object:
     #########
     # CHARGE#
     #########
@@ -1538,8 +1651,8 @@ class cell(object):
     ############
         
         # (0) Makes sure the cell is reconstructed
-        if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)  
-        if self.is_fragmented: return # Stopping. self.is_fragmented must be false to determine the charges of the cell
+        # if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)  
+        # if self.is_fragmented: return # Stopping. self.is_fragmented must be false to determine the charges of the cell
 
         # (1) Indentify unique chemical species
         if not hasattr(self,"unique_species"): self.get_unique_species(debug=debug)  
@@ -1661,21 +1774,24 @@ class cell(object):
 
     #######################################################
     def assign_spin(self, debug: int=0) -> object:
-        if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)  
-        if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to assign the spin
+        # if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)  
+        # if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to assign the spin
         
         if debug >= 1:  
             print("#########################################")
             print("       Assigning Spin multiplicity       ")
             print("#########################################")      
         
-        for mol in self.moleclist:
+        if self.subtype == "reference": moleclist = self.refmoleclist
+        else:                           moleclist = self.moleclist
+
+        for mol in moleclist:
             if mol.iscomplex:
                 for metal in mol.metals:
                     if not hasattr(metal,"coord_nr"): metal.get_coordination_geometry()
                     metal.get_spin(debug=debug)
             mol.get_spin(debug=debug)
-        return self.moleclist
+    
     #######################################################
     def predict_metal_ox(self, debug: int=0):
         if not hasattr(self,"error_prepare_mols"): self.assign_charges()
@@ -1687,31 +1803,40 @@ class cell(object):
                     metal.predict_charge(debug=debug) 
     #######################################################
     
-    def assess_errors(self, ref=False):
+    def assess_errors(self, mode):
         ### This function might be called to print the possible errors found in the unit cell, during reconstruction, and charge/spin assignment
 
-        if ref:
+        if mode == "hydrogens":
             print("-------------------------------")
             print("Errors in Reference Molecules")
             print("-------------------------------")
             if self.has_isolated_H:             case = 1
             elif self.has_missing_H:            case = 2
             else :                              case = 0
-        else:
+        elif mode == "reference":
+            if self.has_isolated_H:             case = 1
+            elif self.has_missing_H:            case = 2
+            elif self.error_empty_poscharges :  case = 5
+            elif self.error_multiple_distrib :  case = 6
+            elif self.error_empty_distrib :     case = 7
+            elif not self.is_neutral:           case = 9
+            else :                              case = 0
+        elif mode == "unit_cell":
             print("-------------------------------")
             print("Errors in Unit Cell")
             print("-------------------------------")
             # Get reference molecules
-            if self.has_isolated_H:             case = 1
-            elif self.has_missing_H:            case = 2
+            # if self.has_isolated_H:             case = 1
+            # elif self.has_missing_H:            case = 2
             # Reconstruct Cell
-            elif self.error_get_fragments:      case = 3
-            elif self.error_reconstruction:     case = 4
+            # elif self.error_get_fragments:      case = 3
+            # elif self.error_reconstruction:     case = 4
             # Assign Charges
-            elif self.error_empty_poscharges :  case = 5
-            elif self.error_multiple_distrib :  case = 6
-            elif self.error_empty_distrib :     case = 7
-            elif self.error_prepare_mols :      case = 8   
+            # elif self.error_empty_poscharges :  case = 5
+            # elif self.error_multiple_distrib :  case = 6
+            # elif self.error_empty_distrib :     case = 7
+            # elif self.error_prepare_mols :      case = 8 
+            if not self.is_neutral:             case = 9  
             # No errors
             else :                              case = 0
         

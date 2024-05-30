@@ -97,5 +97,6 @@ def handle_error(case: int):
     if case == 6: print("More than one valid possible charge distribution found")
     if case == 7: print("No valid possible charge distribution found")
     if case == 8: print("Error while preparing molecules")
+    if case == 9: print("The charge neutralization failed.")
     if case == 0: print("No Errors Found")
     #sys.exit(1)
