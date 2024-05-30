@@ -1629,7 +1629,7 @@ class cell(object):
         if self.subtype == "reference": moleclist = self.refmoleclist
         else:                           moleclist = self.moleclist
         totcharge_list = [mol.totcharge for mol in moleclist]
-        if debug >= 1: print(f"Total Charge of the Cell: {sum(totcharge_list)}")    
+        if debug >= 1: print(f"Total Charge of the Cell ({self.subtype}): {sum(totcharge_list)} {totcharge_list=}")    
         if sum(totcharge_list) == 0: self.is_neutral = True
         else:                        self.is_neutral = False    
 
@@ -1794,9 +1794,12 @@ class cell(object):
     
     #######################################################
     def predict_metal_ox(self, debug: int=0):
-        if not hasattr(self,"error_prepare_mols"): self.assign_charges()
-        if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to assign the spin
-        for mol in self.moleclist:
+        # if not hasattr(self,"error_prepare_mols"): self.assign_charges()
+        # if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to assign the spin
+        if self.subtype == "reference": moleclist = self.refmoleclist
+        else:                           moleclist = self.moleclist
+        
+        for mol in moleclist:
             if mol.iscomplex:
                 for metal in mol.metals:
                     if not hasattr(metal,"coord_nr"): metal.get_coordination_geometry(debug=debug)     
@@ -1814,6 +1817,9 @@ class cell(object):
             elif self.has_missing_H:            case = 2
             else :                              case = 0
         elif mode == "reference":
+            print("-------------------------------")
+            print("Errors in Reference Molecules")
+            print("-------------------------------")
             if self.has_isolated_H:             case = 1
             elif self.has_missing_H:            case = 2
             elif self.error_empty_poscharges :  case = 5
