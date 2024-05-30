@@ -127,7 +127,7 @@ def print_output(moleclist):
                 # print(f"|- {lig.connected_idx}")
                 # print(lig.groups)
                 for group in lig.groups:
-                    print(f"|-- {group.subtype} ({group.type}) {group.formula} {group.is_haptic=} {group.denticity=} {group.closest_metal.label}")
+                    print(f"|-- {group.subtype} ({group.type}) {group.formula} {group.is_haptic=} {group.denticity=} {group.closest_metal.label=}")
                     for met in group.metals:
                         print(f"|--- {met.label} {met.mconnec=}")
                 print("")
@@ -138,7 +138,7 @@ def print_output(moleclist):
                 # print(f"|# {metal.mconnec=} {metal.connec=}")
                 # print(metal.metal_adjacency)
                 # for bond in metal.bonds:
-                    # print(f"|--- {bond}")
+                #     print(f"|--- {bond}")
         else:
             print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.totcharge=} {mol.spin=}\n  {mol.smiles}")
         print("")

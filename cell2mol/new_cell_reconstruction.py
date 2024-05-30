@@ -354,32 +354,35 @@ def reconstuct (reference, newcell, refcell, cell_pos, cell_fracs, cell_vector, 
         
         print(len(all_found))
         print(len(all_found) == len(cell_pos))
-    
-        # #### make blocks and get fragments ####
-        fragments = get_fragments (newcell, updated, indices_in_ref, refcell, debug=0)    
-        molecules, remaining_fragments = classify_fragments(fragments, newcell, debug=0)
-        all_molecules.extend(molecules)
-    
-        # Grouping remaining fragments for reconstruction
-        grouped_lists = [[] for _ in range(len(newcell.refmoleclist))]
+        print(f"{updated=}")
+        print(f"{indices_in_ref=}")
         
-        for i, ref in enumerate(newcell.refmoleclist):
-            target_set = set(ref.get_parent_indices("reference"))
-            for j, rem_frag in enumerate(remaining_fragments):
-                small_set = set(rem_frag.ref_indices)
-                if small_set.issubset(target_set):
-                    if debug >=1 : print(f"{j} {rem_frag.formula} is a subset of target_set {i} {ref.formula}")
-                    grouped_lists[i].append(rem_frag)
-    
-        for i, group in enumerate(grouped_lists):
-            if len(group) > 0:
-                print(f"target_ref: {newcell.refmoleclist[i].formula}")
-                print(f"Group {i}: {[rem.formula for rem in group]}")
-                    
-                target_ref = newcell.refmoleclist[i].get_parent_indices("reference")
-                list_of_found_molecules, final_remaining = fragments_reconstruct(group, target_ref, cell_vector, newcell, refcell, debug=0)
-                print(f"{list_of_found_molecules=}")
-                reconstructed_molecules.extend(list_of_found_molecules)
+        if len(updated) > 0 :
+            # #### make blocks and get fragments ####
+            fragments = get_fragments (newcell, updated, indices_in_ref, refcell, debug=0)    
+            molecules, remaining_fragments = classify_fragments(fragments, newcell, debug=0)
+            all_molecules.extend(molecules)
+        
+            # Grouping remaining fragments for reconstruction
+            grouped_lists = [[] for _ in range(len(newcell.refmoleclist))]
+            
+            for i, ref in enumerate(newcell.refmoleclist):
+                target_set = set(ref.get_parent_indices("reference"))
+                for j, rem_frag in enumerate(remaining_fragments):
+                    small_set = set(rem_frag.ref_indices)
+                    if small_set.issubset(target_set):
+                        if debug >=1 : print(f"{j} {rem_frag.formula} is a subset of target_set {i} {ref.formula}")
+                        grouped_lists[i].append(rem_frag)
+        
+            for i, group in enumerate(grouped_lists):
+                if len(group) > 0:
+                    print(f"target_ref: {newcell.refmoleclist[i].formula}")
+                    print(f"Group {i}: {[rem.formula for rem in group]}")
+                        
+                    target_ref = newcell.refmoleclist[i].get_parent_indices("reference")
+                    list_of_found_molecules, final_remaining = fragments_reconstruct(group, target_ref, cell_vector, newcell, refcell, debug=0)
+                    print(f"{list_of_found_molecules=}")
+                    reconstructed_molecules.extend(list_of_found_molecules)
                 
     if len(all_found) == len(cell_pos):
         print("Reconstructed successfully")
