@@ -52,7 +52,8 @@ def get_possible_charge_state(spec: object, debug: int=0):
             if   spec.NO_type == "Linear": possible_cs = charge_states[2]      ## When Nitrosyl, we sistematically get the correct charge_distribution in [2] (charge = 1)and [0] (charge = 0)for Linear and Bent respectively
             elif spec.NO_type == "Bent":   possible_cs = charge_states[0]       
         else: 
-            if ([spec.labels[i] for i in spec.madjnum if i >=1 ]) == ['S', 'S']:
+            spec.get_connected_atoms()
+            if [a.label for a in spec.connected_atoms] == ['S', 'S'] :
                 possible_cs = [charge_states[0], charge_states[3]] # charge 0 and 2
             else :
                 possible_cs = select_charge_distr(charge_states, debug=debug)   ## For ligands other than nitrosyl

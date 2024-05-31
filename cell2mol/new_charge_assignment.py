@@ -67,26 +67,26 @@ def set_charge_state(reference, target, mode, debug: int=0):
         
         if mode == 1:
             # For "reference" cell
-            target.get_protonation_states(debug=debug)
-            prot = target.protonation_states[0]
-            cs = get_charge(reference.charge_state.uncorr_total_charge, prot)
+            # target.get_protonation_states(debug=debug)
+            # prot = target.protonation_states[0]
+            # cs = get_charge(reference.charge_state.uncorr_total_charge, prot)
 
-            if len(target.protonation_states) != 1 :
-                if debug >=1 : print(f"WARNING: {target.protonation_states=}")
+            # if len(target.protonation_states) != 1 :
+            #     if debug >=1 : print(f"WARNING: {target.protonation_states=}")
             
-            # ref_data, target_data = arrange_data_for_reorder(reference, target)
-            # if debug >=2 : print(ref_data, target_data)
-            # dummy1, dummy2, map12 = reorder(ref_data, target_data, reference.coord, target.coord)
+            ref_data, target_data = arrange_data_for_reorder(reference, target)
+            if debug >=2 : print(ref_data, target_data)
+            dummy1, dummy2, map12 = reorder(ref_data, target_data, reference.coord, target.coord)
         
-            # if np.array_equal(map12, np.arange(len(target_data))):
-            #     if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} No need to reorder")
-            #     # temp_prot.coords = target.coord
-            #     cs = get_charge(reference.charge_state.uncorr_total_charge, temp_prot)               
-            # else:
-            #     reordered_prot = temp_prot.reorder(map12)
-            #     # reordered_prot.coords = target.coord
-            #     if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {map12=}")
-            #     cs = get_charge(reference.charge_state.uncorr_total_charge, reordered_prot)
+            if np.array_equal(map12, np.arange(len(target_data))):
+                if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} No need to reorder")
+                # temp_prot.coords = target.coord
+                cs = get_charge(reference.charge_state.uncorr_total_charge, temp_prot)               
+            else:
+                reordered_prot = temp_prot.reorder(map12)
+                # reordered_prot.coords = target.coord
+                if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {map12=}")
+                cs = get_charge(reference.charge_state.uncorr_total_charge, reordered_prot)
         
         elif mode == 2:
             print(f"{temp_prot.labels=} {len(temp_prot.labels)=} {len(temp_prot.coords)=} {len(temp_prot.block)=} {temp_prot.added_atoms=}")
