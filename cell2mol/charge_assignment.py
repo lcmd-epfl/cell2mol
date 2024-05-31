@@ -44,14 +44,18 @@ def get_possible_charge_state(spec: object, debug: int=0):
         for ich in target_charges:
             ch_state = get_charge(ich, prot)    ## Protonation is passed to the ch_state object (ch_state.protonation)
             charge_states.append(ch_state)
-            if debug >= 2: print(f"    POSCHARGE: charge 0 with smiles {ch_state.smiles}")
+            if debug >= 2: print(f"    POSCHARGE: charge {ich} with smiles {ch_state.smiles}")
 
     ### After collecting charge states, then best ones are selected 
     if spec.subtype == "ligand":
         if spec.is_nitrosyl:
-            if   spec.NO_type == "Linear": possible_cs = charge_states[2]      ## When Nitrosyl, we sistematically get the correct charge_distribution in [2] and [0] for Linear and Bent respectively
-            elif spec.NO_type == "Bent":   possible_cs = charge_states[0]
-        else: possible_cs = select_charge_distr(charge_states, debug=debug)     ## For ligands other than nitrosyl
+            if   spec.NO_type == "Linear": possible_cs = charge_states[2]      ## When Nitrosyl, we sistematically get the correct charge_distribution in [2] (charge = 1)and [0] (charge = 0)for Linear and Bent respectively
+            elif spec.NO_type == "Bent":   possible_cs = charge_states[0]       
+        else: 
+            if ([spec.labels[i] for i in spec.madjnum if i >=1 ]) == ['S', 'S']:
+                possible_cs = [charge_states[0], charge_states[3]] # charge 0 and 2
+            else :
+                possible_cs = select_charge_distr(charge_states, debug=debug)   ## For ligands other than nitrosyl
     else:     possible_cs = select_charge_distr(charge_states, debug=debug)     ## For organic molecules
 
     ### Return possible charge states
@@ -1021,15 +1025,16 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
     Chem.AssignStereochemistry(obj, flagPossibleStereoCenters=True, force=True)
     Chem.AssignAtomChiralTagsFromStructure(obj, -1)
     
+    if debug >= 1: print(f"{ligand.formula=} {smiles=}")
     ## visulize a corrected rdkit object
-    if debug >=2:
-        from IPython.display import display
-        from rdkit.Chem.Draw import IPythonConsole
-        IPythonConsole.drawOptions.addAtomIndices = True
-        IPythonConsole.molSize = 300,300
+    # if debug >=2:
+    #     from IPython.display import display
+    #     from rdkit.Chem.Draw import IPythonConsole
+    #     IPythonConsole.drawOptions.addAtomIndices = True
+    #     IPythonConsole.molSize = 300,300
 
-        print(f"{ligand.formula=} {smiles=}")
-        display(mol_with_atom_index(obj))
+    #     print(f"{ligand.formula=} {smiles=}")
+    #     display(mol_with_atom_index(obj))
 
     return smiles, obj
 

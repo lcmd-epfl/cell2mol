@@ -14,12 +14,14 @@ def compare_molecules(ref, mol, debug: int=0):
     if (ref.natoms == mol.natoms) & (ref.formula == mol.formula):
         if (sorted(ref.get_parent_indices("reference")) == sorted(mol.get_parent_indices("reference"))):
             print("Matched", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
+            # set_charge_state_simple(ref, mol, debug=debug)
             set_charge_state(ref, mol, mode=2, debug=debug) 
 
 ######################################################
-def set_charge_state(reference, target, mode, debug: int=0):
-    
+def set_charge_state_simple (reference, target, debug: int=0):
+
     final_charge = reference.totcharge
+    print("SET_CHARGE_STATE:", reference.charge_state)
 
     if target.subtype == "molecule" and target.iscomplex == False:
         if debug >=1 : print(f"({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie")
@@ -29,27 +31,65 @@ def set_charge_state(reference, target, mode, debug: int=0):
         cs = get_charge(final_charge, empty_prot)
     
     elif target.subtype == "ligand":
-        if debug >=1 : print(f"({target.subtype}) {target.formula} {final_charge=} Ligand")
+        if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Ligand")
+        target.get_protonation_states(debug=debug)
+        prot = target.protonation_states[0]
+        cs = get_charge(reference.charge_state.uncorr_total_charge, prot)
+
+        if len(target.protonation_states) != 1 :
+            if debug >=1 : print("WARNING:", target.protonation_states)
+
+    target.charge_state = cs
+    if final_charge != cs.corr_total_charge:
+        print(f"WARNING: {target.formula=} {final_charge=} {cs.corr_total_charge=} final_charge != cs.corr_total_charge")
+
+    target.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
+    print(f"SET_CHARGE_STATE. {target.formula=} {target.totcharge=} {target.smiles=}")
+
+######################################################
+def set_charge_state(reference, target, mode, debug: int=0):
+
+    final_charge = reference.totcharge
+    print("SET_CHARGE_STATE:", reference.charge_state)
+
+    if target.subtype == "molecule" and target.iscomplex == False:
+        if debug >=1 : print(f"({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie")
+        empty_list = [int(0)]*len(target.labels)
+        empty_prot = protonation(target.labels, target.coord, target.cov_factor, 
+                                int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=target)
+        cs = get_charge(final_charge, empty_prot)
+    
+    elif target.subtype == "ligand":
+        if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Ligand")
         prot = reference.charge_state.protonation
         temp_prot = copy.deepcopy(prot)
         temp_prot.parent = target
+        
         if mode == 1:
             # For "reference" cell
-            ref_data, target_data = arrange_data_for_reorder(reference, target)
-            if debug >=2 : print(ref_data, target_data)
-            dummy1, dummy2, map12 = reorder(ref_data, target_data, reference.coord, target.coord)
+            target.get_protonation_states(debug=debug)
+            prot = target.protonation_states[0]
+            cs = get_charge(reference.charge_state.uncorr_total_charge, prot)
+
+            if len(target.protonation_states) != 1 :
+                if debug >=1 : print(f"WARNING: {target.protonation_states=}")
+            
+            # ref_data, target_data = arrange_data_for_reorder(reference, target)
+            # if debug >=2 : print(ref_data, target_data)
+            # dummy1, dummy2, map12 = reorder(ref_data, target_data, reference.coord, target.coord)
         
-            if np.array_equal(map12, np.arange(len(target_data))):
-                if debug >=1 : print(f"({target.subtype}) {target.formula} {final_charge=} No need to reorder")
-                temp_prot.coords = target.coord
-                cs = get_charge(final_charge, temp_prot)               
-            else:
-                reordered_prot = temp_prot.reorder(map12)
-                reordered_prot.coords = target.coord
-                if debug >=1 : print(f"({target.subtype}) {target.formula} {final_charge=} Reordered {map12=}")
-                cs = get_charge(final_charge, reordered_prot)
+            # if np.array_equal(map12, np.arange(len(target_data))):
+            #     if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} No need to reorder")
+            #     # temp_prot.coords = target.coord
+            #     cs = get_charge(reference.charge_state.uncorr_total_charge, temp_prot)               
+            # else:
+            #     reordered_prot = temp_prot.reorder(map12)
+            #     # reordered_prot.coords = target.coord
+            #     if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {map12=}")
+            #     cs = get_charge(reference.charge_state.uncorr_total_charge, reordered_prot)
         
         elif mode == 2:
+            print(f"{temp_prot.labels=} {len(temp_prot.labels)=} {len(temp_prot.coords)=} {len(temp_prot.block)=} {temp_prot.added_atoms=}")
             # For "unit" cell
             ref_data = reference.get_parent_indices("reference")
             target_data = target.get_parent_indices("reference")
@@ -57,12 +97,15 @@ def set_charge_state(reference, target, mode, debug: int=0):
             sorted_indices = sorted(range(len(ref_data)), key=lambda i: index_map[ref_data[i]])            
             
             reordered_prot = temp_prot.reorder(sorted_indices)
-            reordered_prot.coords = target.coord
-            if debug >=1 : print(f"({target.subtype}) {target.formula} {final_charge=} Reordered {sorted_indices=}")
-            cs = get_charge(final_charge, reordered_prot)
+            # reordered_prot.coords = target.coord
+            if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {sorted_indices=}")
+            cs = get_charge(reference.charge_state.uncorr_total_charge , reordered_prot)
 
     target.charge_state = cs
+    if final_charge != cs.corr_total_charge:
+        print(f"WARNING: {target.formula=} {final_charge=} {cs.corr_total_charge=} final_charge != cs.corr_total_charge")
     target.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
+    print(f"{target.formula=} {target.totcharge=} {target.smiles=}")
 
 ######################################################
 def get_charge(charge: int, prot: object, allow: bool=True, debug: int=0): 
@@ -123,7 +166,7 @@ def print_output(moleclist):
             print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.is_haptic=} {mol.totcharge=} {mol.spin=}") #\n   {mol.adjnum=}\n   {mol.madjnum=} \n   {mol.smiles=}")
             # print(mol.adjnum)
             for lig in mol.ligands:
-                print(f"|- {lig.subtype}({lig.type}) {lig.formula} {lig.is_haptic=} {lig.denticity=} {lig.totcharge=}")# \n   {lig.smiles=}")
+                print(f"|- {lig.subtype}({lig.type}) {lig.formula} {lig.is_haptic=} {lig.denticity=} {lig.totcharge=} {lig.smiles=}")
                 # print(f"|- {lig.connected_idx}")
                 # print(lig.groups)
                 for group in lig.groups:
