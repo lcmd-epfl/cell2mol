@@ -7,7 +7,7 @@ from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstru
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
 from cell2mol.charge_assignment import get_protonation_states_specie, get_possible_charge_state, get_metal_poscharges
 from cell2mol.charge_assignment import balance_charge, prepare_unresolved, prepare_mols, correct_smiles_ligand
-from cell2mol.new_charge_assignment import set_charge_state, prepare_mol, compare_molecules
+from cell2mol.new_charge_assignment import set_charge_state, set_charge_state_simple, prepare_mol, compare_molecules
 from cell2mol.spin import assign_spin_metal, assign_spin_complexes, predict_ox_state
 from cell2mol.other import extract_from_list, compute_centroid, get_dist, get_angle
 from cell2mol.other import handle_error
@@ -1597,6 +1597,9 @@ class cell(object):
                     idx = charge_list.index(final_charge)
                     cs = specie.possible_cs[idx]
                     specie.set_charge(cs) 
+            for specie in self.unique_species:
+                if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+                    print(specie.formula, specie.charge_state, specie.totcharge, specie.smiles)
 
             for idx, ref in enumerate(self.refmoleclist):
                 print(f"Molecule {idx}: {ref.formula}")
@@ -1606,7 +1609,8 @@ class cell(object):
                             if specie.subtype == "ligand":
                                 issame = compare_species(lig, specie)
                                 if issame:
-                                    set_charge_state(specie, lig, mode=1, debug=debug)
+                                    set_charge_state_simple(specie, lig, debug=debug)
+                                    set_charge_state (specie, lig, mode=1, debug=debug)
                                     print(lig.formula, specie.formula, issame)    
                     for met in ref.metals:
                         for specie in self.unique_species:
@@ -1621,7 +1625,8 @@ class cell(object):
                         if specie.subtype == "molecule":
                             issame = compare_species(ref, specie)
                             if issame:
-                                set_charge_state(specie, ref, mode=1, debug=debug)
+                                set_charge_state_simple(specie, ref, debug=debug)
+                                set_charge_state (specie, ref, mode=1, debug=debug)
                                 print(ref.formula, specie.formula, issame)
 
     #######################################################
@@ -1825,7 +1830,6 @@ class cell(object):
             elif self.error_empty_poscharges :  case = 5
             elif self.error_multiple_distrib :  case = 6
             elif self.error_empty_distrib :     case = 7
-            elif not self.is_neutral:           case = 9
             else :                              case = 0
         elif mode == "unit_cell":
             print("-------------------------------")

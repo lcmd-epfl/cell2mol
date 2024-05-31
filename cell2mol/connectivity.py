@@ -518,7 +518,7 @@ def mol_with_atom_index(mol):
 #################################
 def create_bonds_spicie (specie, debug: int=0):
     from cell2mol.classes import bond
-
+    if debug >= 1: print(f"CREATE_bonds_specie: {specie.formula=}, {specie.subtype=} {specie.smiles=}")
     n_atoms = specie.natoms # e.g. 9 
     n_atoms_rdkit = specie.rdkit_obj.GetNumAtoms() # e.g.10 
     if debug >= 1: print(f"CREATE_bonds_specie: {specie.formula=}, {specie.subtype=}")
