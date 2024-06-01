@@ -103,7 +103,7 @@ def classify_fragments (fragments, newcell, debug: int=0):
     
     molecules = []
     remaining_fragments = []
-
+    hydrogens = []
     for frag in fragments:
         found = False
         for idx, ref in enumerate(newcell.refmoleclist):
@@ -120,8 +120,11 @@ def classify_fragments (fragments, newcell, debug: int=0):
         if found == False:
             frag.subtype = "fragment"
             frag.origin = "cell.classify_fragments"
+            # if (frag.natoms == 1) and (frag.set_element_count()[4] + frag.set_element_count()[3] == 1): 
+            #     hydrogens.append(frag) # # Hydrogen or Deuterium 
+            # else:    
+            #     remaining_fragments.append(frag)
             remaining_fragments.append(frag)
-
     rem_size = np.array([rem.natoms for rem in remaining_fragments])
     order = np.argsort(rem_size)
     descending_order = order[::-1]
@@ -133,7 +136,8 @@ def classify_fragments (fragments, newcell, debug: int=0):
         print("Remaining_fragments:", [rem.formula for rem in remaining_fragments])
         print("Remaining_fragments:", [rem.natoms for rem in remaining_fragments])
         print("Remaining_fragments:", [get_dist(rem.frac_centroid, [0.5, 0.5, 0.5]) for rem in remaining_fragments])    
-        
+        print("Hydrogens:", [h.formula for h in hydrogens])
+    # return molecules, remaining_fragments, hydrogens
     return molecules, remaining_fragments
 
 ######################################################
@@ -269,14 +273,14 @@ def merge_fragments (frags: list, cell_vector: list, cov_factor: float=1.3, meta
 def fragments_reconstruct (subset_remaining_fragments, target_ref, cell_vector, debug: int=0):
     
     list_of_found_molecules = []    
-    final_remaining = subset_remaining_fragments.copy()
+    remaining_frag = subset_remaining_fragments.copy()
     
     count = 0
-    while (len(final_remaining) > 0):
-        print("final_remaining", [k.formula for k in final_remaining], [k.subtype for k in final_remaining])
+    while (len(remaining_frag) > 0):
+        print("remaining_frag", [k.formula for k in remaining_frag], [k.subtype for k in remaining_frag])
         
-        tobemerged = final_remaining[:2]
-        rest = final_remaining[2:]
+        tobemerged = remaining_frag[:2]
+        rest = remaining_frag[2:]
             
         print("Fragments TO BE MERGED", [k.formula for k in tobemerged], [k.subtype for k in tobemerged])
         print("Rest fragments",[k.formula for k in rest],[k.subtype for k in rest])
@@ -308,89 +312,171 @@ def fragments_reconstruct (subset_remaining_fragments, target_ref, cell_vector, 
         print(f"{len(not_merged)=}")
         
         if len(not_merged) == 2:
-            final_remaining = []
-            final_remaining.append(tobemerged[0])
-            final_remaining.extend(rest)
-            final_remaining.append(tobemerged[1])
+            remaining_frag = []
+            remaining_frag.append(tobemerged[0])
+            remaining_frag.extend(rest)
+            remaining_frag.append(tobemerged[1])
                         
         elif len(found_molecule) == 1 :
             list_of_found_molecules.append(newmolec)
-            final_remaining = []
-            final_remaining.extend(rest)
+            remaining_frag = []
+            remaining_frag.extend(rest)
+
+            if len(remaining_frag) == 0:
+                print("All fragments are reconstructed successfully", [k.formula for k in list_of_found_molecules])
+                print(f"{count=}")
+                break
+
         elif len(bigger_fragment) == 1 :
-            final_remaining = []
-            final_remaining.append(newmolec)
-            final_remaining.extend(rest)
-        
+            remaining_frag = []
+            remaining_frag.append(newmolec)
+            remaining_frag.extend(rest)
+            if len(remaining_frag) == 1:
+                print("Bigger fragments are remained", [k.formula for k in remaining_frag])
+                print(f"{count=}")
+                break        
+
         count +=1
         
-        if len(final_remaining) == 0:
-            print(f"{count=}")
-            break
             
-    return list_of_found_molecules, final_remaining
+    return list_of_found_molecules, remaining_frag
+
+
+######################################################
+def get_updated_indices (new, cell_pos, cell_fracs, all_found, debug: int=0):
+
+    # new structure : ase atoms object by applying symmetry operations to the reference structure
+    # Find the indices of the atoms in the unit cell that have the same cartisian coordinates as the atoms in the new structure
     
+    found_indices, found_rows = find_row_indices(cell_pos, new.positions)
+    print(len(found_indices), len(found_rows))
+
+    updated = [i for i in found_indices if i not in all_found]
+
+    new_fracs = new.get_scaled_positions()
+    new_labels =  new.get_chemical_symbols()
+    
+    indices_in_ref = [ find_row_index_from_matrix(new_fracs, cell_fracs[u]) for u in updated ]
+    if debug >= 2:
+        print("Get indices in reference")
+        print(f"{len(updated)=} {updated=}")
+        print(f"{len(indices_in_ref)=} {indices_in_ref=}")
+    
+    if -1 in indices_in_ref:
+        if debug >= 2: print("Remove -1 indices")
+        for j, i in enumerate(indices_in_ref):
+            if i == -1:
+                    print(f"Cannot find the {j}th atom of the new structure based on fractional coordinates from the unit cell.")
+                    print(f"Its fractional coord disagrees with the fractional coord of the {updated[j]}th atom of the unit cell.")
+                    # print(f"{cell_pos[updated[j]]=} {cell_fracs[updated[j]]=}")
+            # else :
+                # print(new_labels[i], np.allclose(new.positions[i], cell_pos[updated[j]]), np.allclose(new_fracs[i], cell_fracs[updated[j]]))
+
+        indices_to_remove = [i for i, x in enumerate(indices_in_ref) if x == -1]
+        indices_in_ref = [x for x in indices_in_ref if x != -1]
+        if debug >= 2: print(f"{indices_to_remove=}")
+
+        # Remove corresponding elements from 'updated' starting from the highest index
+        for index in sorted(indices_to_remove, reverse=True):
+            if index < len(updated):  # Check if index is valid for 'updated'
+                updated.pop(index)
+        
+        if debug >= 2:
+            print("After removing -1 indices")
+            print(f"{len(updated)=} {updated=}")
+            print(f"{len(indices_in_ref)=} {indices_in_ref=}")
+    
+    return updated, indices_in_ref
+
 ######################################################
 def reconstuct (reference, newcell, cell_pos, cell_fracs, cell_vector, sym_ops, debug: int=0):
 
     new_structures = apply_symmetry_operations_reference(reference, cell_vector, sym_ops)
-    
+    print(f"Number of symmetry operations: {len(new_structures)}")
+
     all_found = []
     all_molecules = []
     reconstructed_molecules = []
-    
+
+    remaining_fragments = [[] for _ in range(len(newcell.refmoleclist))]
+
     for idx, new in enumerate(new_structures):
         print(f"Applying symmetry operations to reference {idx}")
-        found_indices, found_rows = find_row_indices(cell_pos, new.positions)
-        print(len(found_indices), len(found_rows))
-        
-        updated = [i for i in found_indices if i not in all_found]
-    
-        new_fracs = new.get_scaled_positions()
-        new_labels =  new.get_chemical_symbols()
-        indices_in_ref = [ find_row_index_from_matrix(new_fracs, cell_fracs[u]) for u in updated ]
+
+        updated, indices_in_ref = get_updated_indices(new, cell_pos, cell_fracs, all_found, debug=debug)
         all_found.extend(updated)
-        
         print(len(all_found))
         print(len(all_found) == len(cell_pos))
-        print(f"{updated=}")
-        print(f"{indices_in_ref=}")
-        
+
         if len(updated) > 0 :
             # #### make blocks and get fragments ####
-            fragments = get_fragments (newcell, updated, indices_in_ref, debug=0)    
-            molecules, remaining_fragments = classify_fragments(fragments, newcell, debug=0)
+            initial_fragments = get_fragments (newcell, updated, indices_in_ref, debug=0)    
+            molecules, fragments = classify_fragments(initial_fragments, newcell, debug=0)
             all_molecules.extend(molecules)
-        
-            # Grouping remaining fragments for reconstruction
-            grouped_lists = [[] for _ in range(len(newcell.refmoleclist))]
             
+            # Grouping fragments for each reference molecule
+            fragments_of_new = [[] for _ in range(len(newcell.refmoleclist))]
+
             for i, ref in enumerate(newcell.refmoleclist):
                 target_set = set(ref.get_parent_indices("reference"))
-                for j, rem_frag in enumerate(remaining_fragments):
-                    small_set = set(rem_frag.ref_indices)
+                for j, frag in enumerate(fragments):
+                    small_set = set(frag.ref_indices)
                     if small_set.issubset(target_set):
-                        if debug >=1 : print(f"{j} {rem_frag.formula} is a subset of target_set {i} {ref.formula}")
-                        grouped_lists[i].append(rem_frag)
-        
-            for i, group in enumerate(grouped_lists):
-                if len(group) > 0:
+                        if debug >=1 : print(f"{j} {frag.formula} is a subset of target_set {i} {ref.formula}")
+                        fragments_of_new[i].append(frag)
+            
+            print(f"symmetry operations: {idx}")
+            for i, (ref, frag_list) in enumerate(zip(newcell.refmoleclist, fragments_of_new)):
+                print(f"Reference {i}: {ref.formula} target : {ref.get_parent_indices('reference')}")
+                print(f"\tFragments formula    : {[frag.formula for frag in frag_list]}")
+                print(f"\tFragments ref_indices: {[frag.ref_indices for frag in frag_list]}")
+
+            # Reconstructing fragments within one new structure
+            for i, frag_list in enumerate(fragments_of_new):
+                if len(frag_list) > 1:
                     print(f"target_ref: {newcell.refmoleclist[i].formula}")
-                    print(f"Group {i}: {[rem.formula for rem in group]}")
-                        
+                    print(f"Fragments formula {i}: {[frag.formula for frag in frag_list]}")
                     target_ref = newcell.refmoleclist[i].get_parent_indices("reference")
-                    list_of_found_molecules, final_remaining = fragments_reconstruct(group, target_ref, cell_vector, debug=0)
-                    print(f"{list_of_found_molecules=}")
-                    reconstructed_molecules.extend(list_of_found_molecules)
-                
+                    list_of_found_molecules, remaining_frag = fragments_reconstruct(frag_list, target_ref, cell_vector, debug=0)
+                    print(f"symmetry operations: {idx} {list_of_found_molecules=}")
+                    print(f"symmetry operations: {idx} {remaining_frag=}")
+                    if len(list_of_found_molecules) > 0:
+                        reconstructed_molecules.extend(list_of_found_molecules)
+                    if len(remaining_frag) > 0:
+                        remaining_fragments[i].extend(remaining_frag)
+                        print(f"symmetry operations: {idx} {remaining_fragments[i]=}")
+
+    final_remaining_fragments = []
     if len(all_found) == len(cell_pos):
-        print("Reconstructed successfully")
-        newcell.error_reconstruction = False
+        for i, rem_frag_list in enumerate(remaining_fragments):
+            if len(rem_frag_list) > 1:
+                print(f"target_ref: {newcell.refmoleclist[i].formula}")
+                print(f"Fragments formula {i}: {[rem.formula for rem in rem_frag_list]}")
+                target_ref = newcell.refmoleclist[i].get_parent_indices("reference")
+                list_of_found_molecules, final_remaining = fragments_reconstruct(rem_frag_list, target_ref, cell_vector, debug=0)
+                print(f"{list_of_found_molecules=}")
+                print(f"{final_remaining=}")
+                if len(list_of_found_molecules) > 0:
+                    reconstructed_molecules.extend(list_of_found_molecules)
+                if len(final_remaining) > 0:
+                    final_remaining_fragments.extend(final_remaining)
+        
+        if len(final_remaining_fragments) == 0:
+            newcell.is_fragmented = False
+            newcell.error_reconstruction = False
+            print("All fragments are reconstructed successfully")
+        else:
+            newcell.is_fragmented = True        
+            newcell.error_reconstruction = True
+            print("Final Remaining Fragments")
+            for rem in final_remaining_fragments:
+                print(rem.formula)
     else:
         print("Error in reconstruction!!")
+        newcell.is_fragmented = True
         newcell.error_reconstruction = True
-        
-    return all_molecules, reconstructed_molecules
+
+    return all_molecules, reconstructed_molecules, final_remaining_fragments
 
 ######################################################
 def get_moleclist (newcell, refcell, all_molecules, debug):
