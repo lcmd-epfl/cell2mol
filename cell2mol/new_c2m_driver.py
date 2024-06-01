@@ -8,7 +8,7 @@ from cell2mol.other import handle_error
 from cell2mol.cell_operations import frac2cart_fromparam
 from ase.io import read
 from cell2mol.charge_assignment import balance_charge
-from cell2mol.new_charge_assignment import print_output, compare_molecules, prepare_mol
+from cell2mol.new_charge_assignment import print_output, compare_molecules, prepare_mol, get_unique_indices, assign_charge_state_for_unique_species
 from ase import Atoms
 from cell2mol.new_cell_reconstruction import *
 import copy
@@ -94,92 +94,70 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     if not refcell.has_isolated_H:  
         refcell.check_missing_H(debug=debug)                                     
     refcell.assess_errors(mode="hydrogens")
-    
-    refcell.assign_charges(debug=debug)  
-    refcell.assess_errors(mode="reference")
 
     if refcell.error_case == 0:
-        refcell.check_charge_neutrality(debug=debug)
-        refcell.assign_spin(debug=debug)
-        refcell.create_bonds(debug=debug)
-    
-    refcell.save(ref_cell_fname)
-
-
-    ####################################
-    ### RECONSTRUCTS THE CELL OBJECT ###
-    ####################################
-
-    if refcell.error_case == 0:
+        # Define new cell object for the unit cell
         newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
         newcell.get_subtype("unit_cell")
-        newcell.get_reference_molecules(ref_labels, ref_fracs, debug=debug)
+        
+        # Get reference molecules
+        newcell.get_reference_molecules(refcell.labels, refcell.frac_coord, debug=debug)
         if not newcell.has_isolated_H:  
             newcell.check_missing_H(debug=debug)                                     
         newcell.assess_errors(mode="hydrogens")
-        # newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
+        
+        # if newcell.error_case == 0: # Omit this condition 
+        #since newcell.error_case with mode="hydrogens" is same as refcell.error_case with mode="hydrogens"
 
-        ref_molecule = Atoms(symbols=refcell.labels, scaled_positions=refcell.frac_coord, cell=cell_vector, pbc=True)
-        all_molecules, reconstructed_molecules = reconstuct(ref_molecule, newcell, refcell, cell_pos, cell_fracs, cell_vector, sym_ops, debug=0)    
-
-        newcell.moleclist = []
+        # Reconstruction of the unit cell
+        reference = Atoms(symbols=refcell.labels, scaled_positions=refcell.frac_coord, cell=cell_vector, pbc=True)
+        all_molecules, reconstructed_molecules = reconstuct(reference, newcell, cell_pos, cell_fracs, cell_vector, sym_ops, debug=0)    
         all_molecules.extend(reconstructed_molecules)
 
-        for mol in all_molecules:
-            newmolec = molecule(mol.labels, mol.coord, mol.frac_coord)
-            newmolec.origin = "cell.reconstruct"
-            newmolec.set_atoms(create_adjacencies=True, debug=debug)
-            newmolec.add_parent(newcell, mol.cell_indices)
-            newmolec.add_parent(refcell, mol.ref_indices) 
-            for atom, idx in zip(newmolec.atoms, mol.cell_indices):
-                atom.add_parent(newcell, index=idx)  
-            for atom, idx in zip(newmolec.atoms, mol.ref_indices):
-                atom.add_parent(refcell, index=idx)  
-            if newmolec.iscomplex: newmolec.split_complex()
-            newcell.moleclist.append(newmolec)  
-
-        for mol in newcell.moleclist:
-            if mol.iscomplex: 
-                mol.get_hapticity(debug=debug)
-                for lig in mol.ligands:
-                    lig.get_denticity(debug=debug)
-                for met in mol.metals:                         
-                    met.get_coordination_geometry(debug=debug)
-
-        for mol in newcell.moleclist:
-            if not mol.iscomplex:
-                for ref in refcell.refmoleclist:
-                    if not ref.iscomplex:
-                        compare_molecules(ref, mol, debug=debug)
+        if not newcell.error_reconstruction :
+            # Get moleclist for the unit cell
+            newcell = get_moleclist(newcell, refcell, all_molecules, debug=debug)
+            refcell.get_unique_species(debug=debug)
+            print("refcell.unique_species", [specie.formula for specie in refcell.unique_species], refcell.unique_indices)
+            selected_cs = refcell.get_selected_cs(debug=debug)
+            if selected_cs is None:
+                newcell.error_empty_poscharges = True
             else:
-                for ref in refcell.refmoleclist:
-                    if ref.iscomplex:
-                        for lig in mol.ligands:
-                            for ref_lig in ref.ligands:
-                                compare_molecules(ref_lig, lig, debug=debug)
-                        for met in mol.metals:
-                            for ref_met in ref.metals:
-                                if ref_met.get_parent_index("reference") == met.get_parent_index("reference"):
-                                    met.set_charge(ref_met.charge)
-                        prepare_mol(mol)
+                newcell.error_empty_poscharges = False
+            print("selected_cs for reference cell")
+            for specie, select in zip(refcell.unique_species, selected_cs):
+                print(specie.possible_cs, select)
+            for specie, idx in zip(refcell.species_list, refcell.unique_indices):
+                print(specie.formula, specie.unique_index, idx)
 
-        newcell.check_charge_neutrality(debug=debug)
-        newcell.assess_errors(mode="unit_cell")
-        newcell.assign_spin(debug=debug)
-        newcell.create_bonds(debug=debug)
+            newcell = get_unique_indices(newcell, refcell.species_list, debug=debug)
+            print("newcell.unique_indices", newcell.unique_indices)
+            for specie, idx in zip(newcell.species_list, newcell.unique_indices):
+                print(specie.formula, specie.unique_index, idx)
+            
+            newcell.unique_species = copy.deepcopy(refcell.unique_species)
+
+            final_charge_distribution, final_charges = balance_charge(newcell.unique_indices, refcell.unique_species, debug=debug)
+            # print("final_charge_distribution", final_charge_distribution)
+            # print("final_charges", final_charges)
+            newcell.assign_charges(debug=debug)
+            newcell.assess_errors(mode="unit_cell")
+            newcell.check_charge_neutrality(debug=debug)
+            if newcell.error_case == 0 and newcell.is_neutral:
+                newcell.assign_spin(debug=debug)
+                newcell.create_bonds(debug=debug)
+                
+                refcell.unique_species = assign_charge_state_for_unique_species(refcell.unique_species, final_charges[0], debug=debug)
+                refcell.assign_charges_for_refcell(debug=debug)
+                refcell.assign_spin(debug=debug)
+                refcell.create_bonds(debug=debug)
+        # Save cell object
         newcell.save(cell_fname)
+    
+    # Save reference cell object
+    refcell.save(ref_cell_fname)
+    
     output.close()
-    sys.stdout = stdout
-
-    surmmary = open(surmmary_fname, "w")
-    sys.stdout = surmmary
-    print("*** Reference molecules ***")
-    print(refcell)
-    print_output(refcell.refmoleclist)
-    print("***Unit cell molecules ***")
-    print(newcell)
-    print_output(newcell.moleclist)
-    surmmary.close()
     sys.stdout = stdout
 
     # Error handling
@@ -190,12 +168,32 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     handle_error(case)
     error.close()
     sys.stdout = stdout
-
-    # Error handling
-    case = newcell.error_case
-    error_fname = os.path.join(current_dir, f"unitcell_error_{case}.out")
-    error = open(error_fname, "w")
-    sys.stdout = error
-    handle_error(case)
-    error.close()
+    
+    # Summary
+    surmmary = open(surmmary_fname, "w")
+    sys.stdout = surmmary
+    print("*** Reference molecules ***")
+    print(refcell)
+    print_output(refcell.refmoleclist)
+    surmmary.close()
     sys.stdout = stdout
+
+
+    if newcell.error_case == 0:
+        # Error handling
+        case = newcell.error_case
+        error_fname = os.path.join(current_dir, f"unitcell_error_{case}.out")
+        error = open(error_fname, "w")
+        sys.stdout = error
+        handle_error(case)
+        error.close()
+        sys.stdout = stdout
+
+        # Summary
+        surmmary = open(surmmary_fname, "a")
+        sys.stdout = surmmary
+        print("***Unit cell molecules ***")
+        print(newcell)
+        print_output(newcell.moleclist)
+        surmmary.close()
+        sys.stdout = stdout

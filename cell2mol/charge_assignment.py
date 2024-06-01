@@ -52,11 +52,11 @@ def get_possible_charge_state(spec: object, debug: int=0):
             if   spec.NO_type == "Linear": possible_cs = charge_states[2]      ## When Nitrosyl, we sistematically get the correct charge_distribution in [2] (charge = 1)and [0] (charge = 0)for Linear and Bent respectively
             elif spec.NO_type == "Bent":   possible_cs = charge_states[0]       
         else: 
-            spec.get_connected_atoms()
-            if [a.label for a in spec.connected_atoms] == ['S', 'S'] :
-                possible_cs = [charge_states[0], charge_states[3]] # charge 0 and 2
-            else :
-                possible_cs = select_charge_distr(charge_states, debug=debug)   ## For ligands other than nitrosyl
+            # spec.get_connected_atoms()
+            # if [a.label for a in spec.connected_atoms] == ['S', 'S'] :
+            #     possible_cs = [charge_states[0], charge_states[3]] # charge 0 and 2
+            # else :
+            possible_cs = select_charge_distr(charge_states, debug=debug)   ## For ligands other than nitrosyl
     else:     possible_cs = select_charge_distr(charge_states, debug=debug)     ## For organic molecules
 
     ### Return possible charge states
@@ -359,15 +359,20 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         needs_nonlocal = True
                         non_local_groups += 1
                         if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
-                    elif a.connec > 1:
-                        block[idx] = 1
+                    elif a.connec >= 1:
+                        # block[idx] = 1
+                        elemlist[idx] = "H"
+                        addedlist[idx] = 1
+
                 # Sulfur and Selenium
                 elif a.label == "S" or a.label == "Se":
                     if a.connec == 1:
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
                     elif a.connec > 1:
-                        block[idx] = 1
+                    #     block[idx] = 1
+                        elemlist[idx] = "H"
+                        addedlist[idx] = 1
                 # Hydrides
                 elif a.label == "H":
                     if a.connec == 0:
@@ -390,7 +395,9 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             addedlist[idx] = 1
                     else:
                         # nitrogen with at least 3 adjacencies doesnt need H
-                        if a.connec >= 3: block[idx] = 1
+                        if a.connec >= 3: 
+                            elemlist[idx] = "H"
+                            addedlist[idx] = 1
                         else:
                             # Checks for adjacent Atoms
                             list_of_adj_atoms = []

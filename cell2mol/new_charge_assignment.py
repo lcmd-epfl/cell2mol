@@ -7,15 +7,106 @@ from cell2mol.charge_assignment import check_rdkit_obj_connectivity, arrange_dat
 from rdkit import Chem
 
 ######################################################
+def assign_charge_state_for_unique_species(unique_species, final_charges_tuple, debug: int=0):
+    
+    for specie, final_charge in zip(unique_species, final_charges_tuple):
+        print(specie.unique_index, specie.formula)
+        if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+            charge_list = [cs.corr_total_charge for cs in specie.possible_cs]
+            idx = charge_list.index(final_charge)
+            cs = specie.possible_cs[idx]
+            specie.charge_state = cs
+            # print(specie.charge_state.protonation)
+            specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
+        elif specie.subtype == "metal" :
+            charge_list = specie.possible_cs   
+            idx = charge_list.index(final_charge)
+            cs = specie.possible_cs[idx]
+            specie.set_charge(cs) 
+    for specie in unique_species:
+        if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+            print(specie.formula, specie.charge_state, specie.totcharge, specie.smiles)
+    return unique_species
+######################################################
+def get_unique_indices(newcell, reference_species_list, debug: int=0):
+    
+    newcell.unique_indices = []
+    newcell.species_list = []
+    for mol in newcell.moleclist:
+        if not mol.iscomplex:
+            for ref in reference_species_list:
+                if (ref.subtype == "molecule") and not ref.iscomplex:
+                    issame = compare_molecules(ref, mol, debug=debug)
+                    if issame:
+                        mol.unique_index = ref.unique_index 
+                        if debug >= 1: print(f"Matched {mol.formula} {ref.formula} {mol.unique_index} {ref.unique_index}")
+                        newcell.unique_indices.append(mol.unique_index)
+                        newcell.species_list.append(mol)
+        else:
+            for ref in reference_species_list:
+                if ref.subtype == "ligand":
+                    for lig in mol.ligands:
+                        issame = compare_molecules(ref, lig, debug=debug)
+                        if issame: 
+                            lig.unique_index = ref.unique_index
+                            if debug >= 1: print(f"Matched {lig.formula} {ref.formula} {lig.unique_index} {ref.unique_index}")
+                            newcell.unique_indices.append(lig.unique_index)
+                            newcell.species_list.append(lig)
+                if ref.subtype == "metal":
+                    for met in mol.metals:
+                        if ref.get_parent_index("reference") == met.get_parent_index("reference"):
+                            met.unique_index = ref.unique_index
+                            if debug >= 1: print(f"Matched {met.formula} {ref.formula} {met.unique_index} {ref.unique_index}")
+                            newcell.unique_indices.append(met.unique_index)
+                            newcell.species_list.append(met)
 
+    return newcell
+######################################################
+def get_unique_indices_old (newcell, refcell, debug: int=0):
+    
+    newcell.unique_indices = []
+    for mol in newcell.moleclist:
+        if not mol.iscomplex:
+            for ref in newcell.refmoleclist:
+                if not ref.iscomplex:
+                    issame = compare_molecules(ref, mol, debug=debug)
+                    if issame:
+                        mol.unique_index = ref.unique_index 
+                        if debug >= 1: print(f"Matched {mol.formula} {ref.formula} {ref.unique_index}")
+                        newcell.unique_indices.append(mol.unique_index)
+        else:
+            for ref in newcell.refmoleclist:
+                if ref.iscomplex:
+                    for lig in mol.ligands:
+                        for ref_lig in ref.ligands:
+                            issame = compare_molecules(ref_lig, lig, debug=debug)
+                            if issame: 
+                                lig.unique_index = ref_lig.unique_index
+                                if debug >= 1: print(f"Matched {lig.formula} {ref_lig.formula} {ref_lig.unique_index}")
+                                newcell.unique_indices.append(lig.unique_index)
 
+                    for met in mol.metals:
+                        for ref_met in ref.metals:
+                            if ref_met.get_parent_index("reference") == met.get_parent_index("reference"):
+                                met.unique_index = ref_met.unique_index
+                                if debug >= 1: print(f"Matched {met.formula} {ref_met.formula} {ref_met.unique_index}")
+                                newcell.unique_indices.append(met.unique_index)
+
+    return newcell
 ######################################################
 def compare_molecules(ref, mol, debug: int=0):
     if (ref.natoms == mol.natoms) & (ref.formula == mol.formula):
         if (sorted(ref.get_parent_indices("reference")) == sorted(mol.get_parent_indices("reference"))):
             print("Matched", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
+            issame = True
+            # mol.unique_index = ref.unique_index
             # set_charge_state_simple(ref, mol, debug=debug)
-            set_charge_state(ref, mol, mode=2, debug=debug) 
+            # set_charge_state(ref, mol, mode=2, debug=debug) 
+        else:
+            issame = False
+    else : 
+        issame = False
+    return issame
 
 ######################################################
 def set_charge_state_simple (reference, target, debug: int=0):
@@ -161,12 +252,19 @@ def prepare_mol (mol):
 
 ######################################################
 def print_output(moleclist):
+    
     for idx, mol in enumerate(moleclist):
         if mol.iscomplex:
-            print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.is_haptic=} {mol.totcharge=} {mol.spin=}") #\n   {mol.adjnum=}\n   {mol.madjnum=} \n   {mol.smiles=}")
+            if hasattr(mol, "totcharge") and hasattr(mol, "spin"):
+                print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.is_haptic=} {mol.totcharge=} {mol.spin=}") #\n   {mol.adjnum=}\n   {mol.madjnum=} \n   {mol.smiles=}")
+            else:
+                print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.is_haptic=}") # {mol.totcharge=} {mol.spin=}") #\n   {mol.adjnum=}\n   {mol.madjnum=} \n   {mol.smiles=}")
             # print(mol.adjnum)
             for lig in mol.ligands:
-                print(f"|- {lig.subtype}({lig.type}) {lig.formula} {lig.is_haptic=} {lig.denticity=} {lig.totcharge=} {lig.smiles=}")
+                if hasattr(lig, "totcharge") and hasattr(lig, "smiles"):
+                    print(f"|- {lig.subtype}({lig.type}) {lig.formula} {lig.is_haptic=} {lig.denticity=} {lig.totcharge=} {lig.smiles=}")
+                else :
+                    print(f"|- {lig.subtype}({lig.type}) {lig.formula} {lig.is_haptic=} {lig.denticity=}")# {lig.totcharge=} {lig.smiles=}")
                 # print(f"|- {lig.connected_idx}")
                 # print(lig.groups)
                 for group in lig.groups:
@@ -175,7 +273,10 @@ def print_output(moleclist):
                         print(f"|--- {met.label} {met.mconnec=}")
                 print("")
             for metal in mol.metals:
-                print(f"|# {metal.subtype}({metal.type}) {metal.label} {metal.coord_nr=} {metal.coord_geometry} {metal.charge=} {metal.spin=} {metal.get_coord_sphere_formula()} {metal.mconnec=} {metal.connec=}")
+                if hasattr(metal, "charge") and hasattr(metal, "spin"):
+                    print(f"|# {metal.subtype}({metal.type}) {metal.label} {metal.coord_nr=} {metal.coord_geometry} {metal.get_coord_sphere_formula()} {metal.mconnec=} {metal.connec=} {metal.charge=} {metal.spin=}")
+                else :
+                    print(f"|# {metal.subtype}({metal.type}) {metal.label} {metal.coord_nr=} {metal.coord_geometry} {metal.get_coord_sphere_formula()} {metal.mconnec=} {metal.connec=}") #{metal.charge=} {metal.spin=} 
                 # print(f"|# {metal.get_coord_sphere_formula()}")
                 # print(f"|# {metal.coord_sphere_formula}")
                 # print(f"|# {metal.mconnec=} {metal.connec=}")
@@ -183,5 +284,8 @@ def print_output(moleclist):
                 # for bond in metal.bonds:
                 #     print(f"|--- {bond}")
         else:
-            print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.totcharge=} {mol.spin=}\n  {mol.smiles}")
+            if hasattr(mol, "totcharge") and hasattr(mol, "spin"):
+                print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.totcharge=} {mol.spin=}\n  {mol.smiles}")
+            else :
+                print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula}") #{mol.totcharge=} {mol.spin=}\n  {mol.smiles}")
         print("")
