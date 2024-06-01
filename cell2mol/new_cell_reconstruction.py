@@ -62,7 +62,7 @@ def find_row_index_from_matrix (matrix, query_row):
     return -1
 
 ######################################################
-def get_fragments (newcell, updated, indices_in_ref, refcell, cov_factor: float=1.3, metal_factor: float=1.0, debug: int=0):
+def get_fragments (newcell, updated, indices_in_ref, cov_factor: float=1.3, metal_factor: float=1.0, debug: int=0):
                    
     updated_labels  = extract_from_list(updated, newcell.labels, dimension=1)
     updated_coord   = extract_from_list(updated, newcell.coord, dimension=1)
@@ -89,7 +89,6 @@ def get_fragments (newcell, updated, indices_in_ref, refcell, cov_factor: float=
         
         # Adds cell as parent of the molecule, with indices
         newmolec.add_parent(newcell, indices=cell_indices)        
-        newmolec.add_parent(refcell, indices=ref_indices)     
         newmolec.set_fractional_coord(mol_frac_coord)
         newmolec.set_adjacency_parameters(cov_factor=cov_factor, metal_factor=metal_factor)
         newmolec.set_atoms(create_adjacencies=True, debug=debug)
@@ -267,7 +266,7 @@ def merge_fragments (frags: list, cell_vector: list, cov_factor: float=1.3, meta
     return None
 
 ######################################################
-def fragments_reconstruct (subset_remaining_fragments, target_ref, cell_vector, newcell, refcell, debug: int=0):
+def fragments_reconstruct (subset_remaining_fragments, target_ref, cell_vector, debug: int=0):
     
     list_of_found_molecules = []    
     final_remaining = subset_remaining_fragments.copy()
@@ -332,7 +331,7 @@ def fragments_reconstruct (subset_remaining_fragments, target_ref, cell_vector, 
     return list_of_found_molecules, final_remaining
     
 ######################################################
-def reconstuct (reference, newcell, refcell, cell_pos, cell_fracs, cell_vector, sym_ops, debug: int=0):
+def reconstuct (reference, newcell, cell_pos, cell_fracs, cell_vector, sym_ops, debug: int=0):
 
     new_structures = apply_symmetry_operations_reference(reference, cell_vector, sym_ops)
     
@@ -359,7 +358,7 @@ def reconstuct (reference, newcell, refcell, cell_pos, cell_fracs, cell_vector, 
         
         if len(updated) > 0 :
             # #### make blocks and get fragments ####
-            fragments = get_fragments (newcell, updated, indices_in_ref, refcell, debug=0)    
+            fragments = get_fragments (newcell, updated, indices_in_ref, debug=0)    
             molecules, remaining_fragments = classify_fragments(fragments, newcell, debug=0)
             all_molecules.extend(molecules)
         
@@ -380,13 +379,43 @@ def reconstuct (reference, newcell, refcell, cell_pos, cell_fracs, cell_vector, 
                     print(f"Group {i}: {[rem.formula for rem in group]}")
                         
                     target_ref = newcell.refmoleclist[i].get_parent_indices("reference")
-                    list_of_found_molecules, final_remaining = fragments_reconstruct(group, target_ref, cell_vector, newcell, refcell, debug=0)
+                    list_of_found_molecules, final_remaining = fragments_reconstruct(group, target_ref, cell_vector, debug=0)
                     print(f"{list_of_found_molecules=}")
                     reconstructed_molecules.extend(list_of_found_molecules)
                 
     if len(all_found) == len(cell_pos):
         print("Reconstructed successfully")
+        newcell.error_reconstruction = False
     else:
         print("Error in reconstruction!!")
-    
+        newcell.error_reconstruction = True
+        
     return all_molecules, reconstructed_molecules
+
+######################################################
+def get_moleclist (newcell, refcell, all_molecules, debug):
+    # Get moleclist for the unit cell
+    newcell.moleclist = []
+
+    for mol in all_molecules:
+        newmolec = molecule(mol.labels, mol.coord, mol.frac_coord)
+        newmolec.origin = "cell.reconstruct"
+        newmolec.set_atoms(create_adjacencies=True, debug=debug)
+        newmolec.add_parent(newcell, mol.cell_indices)
+        newmolec.add_parent(refcell, mol.ref_indices) 
+        for atom, idx in zip(newmolec.atoms, mol.cell_indices):
+            atom.add_parent(newcell, index=idx)  
+        for atom, idx in zip(newmolec.atoms, mol.ref_indices):
+            atom.add_parent(refcell, index=idx)  
+        if newmolec.iscomplex: newmolec.split_complex()
+        newcell.moleclist.append(newmolec)  
+
+    for mol in newcell.moleclist:
+        if mol.iscomplex: 
+            mol.get_hapticity(debug=debug)
+            for lig in mol.ligands:
+                lig.get_denticity(debug=debug)
+            for met in mol.metals:                         
+                met.get_coordination_geometry(debug=debug)
+    
+    return newcell

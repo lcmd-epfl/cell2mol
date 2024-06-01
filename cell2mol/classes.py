@@ -1232,7 +1232,7 @@ class cell(object):
         if debug >= 0: print(f"Getting unique species in cell")
         self.unique_species = []
         self.unique_indices = []
-
+        self.species_list = []
         typelist_mols = [] # temporary variable  
         typelist_ligs = [] # temporary variable
         typelist_mets = [] # temporary variable
@@ -1256,7 +1256,7 @@ class cell(object):
                     if debug >= 2: print(f"New molecule found with: formula={mol.formula} and added in position {kdx}")
                 self.unique_indices.append(kdx)
                 mol.unique_index = kdx
-
+                self.species_list.append(mol)
             else:
                 if not hasattr(mol,"ligands"): mol.split_complex(debug=debug)
                 for jdx, lig in enumerate(mol.ligands):     # ligands
@@ -1273,7 +1273,7 @@ class cell(object):
                         if debug >= 2: print(f"New ligand found with: formula {lig.formula} added in position {kdx}")
                     self.unique_indices.append(kdx)
                     lig.unique_index = kdx
-
+                    self.species_list.append(lig)
                 for jdx, met in enumerate(mol.metals):      #  metals
                     found = False
                     for ldx, typ in enumerate(typelist_mets):
@@ -1288,7 +1288,7 @@ class cell(object):
                         if debug >= 2: print(f"New Metal Center found with: labels {met.label} and added in position {kdx}")
                     self.unique_indices.append(kdx)
                     met.unique_index = kdx
-
+                    self.species_list.append(met)
         return self.unique_species
 
     #######################################################
@@ -1540,25 +1540,26 @@ class cell(object):
             tmp = specie.get_possible_cs(debug=debug)
             if tmp is None: 
                 self.error_empty_poscharges = True
-                return # Stopping. Empty list of possible charges received.
+                return None # Stopping. Empty list of possible charges received.
             if specie.subtype != "metal":
                 selected_cs.append(list([cs.corr_total_charge for cs in specie.possible_cs]))
             else :
                 selected_cs.append(specie.possible_cs)
         self.error_empty_poscharges = False
-        return selected_cs 
+        return selected_cs
 
     #######################################################
     def assign_charges (self, debug: int=0):
         
-        if not hasattr(self,"unique_species"): self.get_unique_species(debug=debug)  
-        if debug >= 1: print(f"{len(self.unique_species)} Species (Metal or Ligand or Molecules) to Characterize")
+        # if not hasattr(self,"unique_species"): self.get_unique_species(debug=debug)  
+        # if debug >= 1: print(f"{len(self.unique_species)} Species (Metal or Ligand or Molecules) to Characterize")
         
-        selected_cs = self.get_selected_cs(debug=debug)
-        if debug >= 1: print(f"Selected Charges: {selected_cs}")
+        # selected_cs = self.get_selected_cs(debug=debug)
+        # if debug >= 1: print(f"Selected Charges: {selected_cs=}")
 
         final_charge_distribution, final_charges = balance_charge(self.unique_indices, self.unique_species, debug=debug)
-
+        print("final_charge_distribution", final_charge_distribution)
+        print("final_charges", final_charges)
         if len(final_charge_distribution) > 1:
             if debug >= 1: print("More than one Possible Distribution Found:", final_charge_distribution)
             self.error_multiple_distrib = True
@@ -1602,14 +1603,13 @@ class cell(object):
                     print(specie.formula, specie.charge_state, specie.totcharge, specie.smiles)
 
             for idx, ref in enumerate(self.refmoleclist):
-                print(f"Molecule {idx}: {ref.formula}")
+                print(f"Refenrence Molecule {idx}: {ref.formula}")
                 if ref.iscomplex:
                     for jdx, lig in enumerate(ref.ligands):
                         for specie in self.unique_species:
                             if specie.subtype == "ligand":
                                 issame = compare_species(lig, specie)
                                 if issame:
-                                    set_charge_state_simple(specie, lig, debug=debug)
                                     set_charge_state (specie, lig, mode=1, debug=debug)
                                     print(lig.formula, specie.formula, issame)    
                     for met in ref.metals:
@@ -1625,18 +1625,76 @@ class cell(object):
                         if specie.subtype == "molecule":
                             issame = compare_species(ref, specie)
                             if issame:
-                                set_charge_state_simple(specie, ref, debug=debug)
                                 set_charge_state (specie, ref, mode=1, debug=debug)
                                 print(ref.formula, specie.formula, issame)
+
+            for idx, mol in enumerate(self.moleclist):
+                print(f"Unit cell Molecule {idx}: {mol.formula}")
+                if not mol.iscomplex:
+                    for ref in self.refmoleclist:
+                        if not ref.iscomplex :
+                            issame = compare_molecules(ref, mol, debug=debug)
+                            if issame:
+                                set_charge_state (ref, mol, mode=2, debug=debug)
+                                print(mol.formula, ref.formula, issame) 
+                else:
+                    for ref in self.refmoleclist:
+                        if ref.iscomplex:
+                            for lig in mol.ligands:
+                                for ref_lig in ref.ligands:
+                                    issame = compare_molecules(ref_lig, lig, debug=debug)
+                                    if issame:
+                                        set_charge_state (ref_lig, lig, mode=2, debug=debug)
+                                        print(lig.formula, ref_lig.formula, issame)                                     
+                            for met in mol.metals:
+                                for ref_met in ref.metals:
+                                    if ref_met.get_parent_index("reference") == met.get_parent_index("reference"):
+                                        met.set_charge(ref_met.charge)
+                            prepare_mol(mol)
+
+    def assign_charges_for_refcell(self, debug: int=0):
+        for idx, ref in enumerate(self.refmoleclist):
+            print(f"Refenrence Molecule {idx}: {ref.formula}")
+            if ref.iscomplex:
+                for jdx, lig in enumerate(ref.ligands):
+                    for specie in self.unique_species:
+                        if specie.subtype == "ligand":
+                            issame = compare_species(lig, specie)
+                            if issame:
+                                set_charge_state (specie, lig, mode=1, debug=debug)
+                                print(lig.formula, specie.formula, issame)    
+                for met in ref.metals:
+                    for specie in self.unique_species:
+                        if specie.subtype == "metal":
+                            issame = compare_metals(met, specie)
+                            if issame:
+                                met.set_charge(specie.charge)
+                                print(met.formula, specie.formula, issame) 
+                prepare_mol(ref)
+            else:
+                for specie in self.unique_species:  
+                    if specie.subtype == "molecule":
+                        issame = compare_species(ref, specie)
+                        if issame:
+                            set_charge_state (specie, ref, mode=1, debug=debug)
+                            print(ref.formula, specie.formula, issame)
 
     #######################################################
     def check_charge_neutrality(self, debug: int=0):
         if self.subtype == "reference": moleclist = self.refmoleclist
         else:                           moleclist = self.moleclist
-        totcharge_list = [mol.totcharge for mol in moleclist]
-        if debug >= 1: print(f"Total Charge of the Cell ({self.subtype}): {sum(totcharge_list)} {totcharge_list=}")    
-        if sum(totcharge_list) == 0: self.is_neutral = True
-        else:                        self.is_neutral = False    
+        totcharge_list =[]
+        for mol in moleclist:
+            if not hasattr(mol,"totcharge"): 
+                if debug >= 1: print(f"CELL.CHECK_CHARGE_NEUTRALITY: Charges not assigned yet")
+                self.is_neutral = None
+            else:
+                totcharge_list.append(mol.totcharge)
+
+        if len(totcharge_list) !=0 :
+            if debug >= 1: print(f"Total Charge of the Cell ({self.subtype}): {sum(totcharge_list)} {totcharge_list=}")    
+            if sum(totcharge_list) == 0: self.is_neutral = True
+            else:                        self.is_neutral = False    
 
     #######################################################
     def assign_charges_old (self, debug: int=0) -> object:
@@ -1821,17 +1879,18 @@ class cell(object):
             if self.has_isolated_H:             case = 1
             elif self.has_missing_H:            case = 2
             else :                              case = 0
-        elif mode == "reference":
+        elif mode == "unit_cell":
             print("-------------------------------")
             print("Errors in Reference Molecules")
             print("-------------------------------")
             if self.has_isolated_H:             case = 1
             elif self.has_missing_H:            case = 2
+            elif self.error_reconstruction:     case = 4
             elif self.error_empty_poscharges :  case = 5
             elif self.error_multiple_distrib :  case = 6
             elif self.error_empty_distrib :     case = 7
             else :                              case = 0
-        elif mode == "unit_cell":
+        elif mode == "neutrality":
             print("-------------------------------")
             print("Errors in Unit Cell")
             print("-------------------------------")
