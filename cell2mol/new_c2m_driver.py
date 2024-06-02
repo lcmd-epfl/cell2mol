@@ -156,13 +156,16 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     # Summary
     surmmary = open(surmmary_fname, "w")
     sys.stdout = surmmary
+    print(name)
     print("*** Reference molecules ***")
     print(refcell)
     print_output(refcell.refmoleclist)
+    
+    if hasattr(newcell, "moleclist"):
+        print("***Unit cell molecules ***")
+        print(newcell)
+        print_output(newcell.moleclist)
 
-    print("***Unit cell molecules ***")
-    print(newcell)
-    print_output(newcell.moleclist)
     surmmary.close()
     sys.stdout = stdout
 
@@ -176,11 +179,12 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     sys.stdout = stdout
 
     # Error handling
-    case = newcell.error_case
-    error_fname = os.path.join(current_dir, f"unitcell_error_{case}.out")
-    error = open(error_fname, "w")
-    sys.stdout = error
-    handle_error(case)
-    error.close()
-    sys.stdout = stdout
+    if hasattr(newcell, "error_case"):
+        case = newcell.error_case
+        error_fname = os.path.join(current_dir, f"unitcell_error_{case}.out")
+        error = open(error_fname, "w")
+        sys.stdout = error
+        handle_error(case)
+        error.close()
+        sys.stdout = stdout
 

@@ -379,7 +379,6 @@ def parse_formula_with_quantity(formula: str):
 ######################################################
 def print_output(moleclist):
     
-    print(moleclist[0].get_parent("reference").name)
     for idx, mol in enumerate(moleclist):
         if mol.iscomplex:
             if hasattr(mol, "totcharge") and hasattr(mol, "spin"):
