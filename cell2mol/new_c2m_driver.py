@@ -111,7 +111,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
 
         # Reconstruction of the unit cell
         reference = Atoms(symbols=refcell.labels, scaled_positions=refcell.frac_coord, cell=cell_vector, pbc=True)
-        all_molecules, reconstructed_molecules = reconstuct(reference, newcell, cell_pos, cell_fracs, cell_vector, sym_ops, debug=debug)    
+        all_molecules, reconstructed_molecules, final_remaining_fragments = reconstuct(reference, newcell, cell_pos, cell_fracs, cell_vector, sym_ops, debug=debug)    
         # all_molecules.extend(reconstructed_molecules)
         exit()
         if not newcell.error_reconstruction :
