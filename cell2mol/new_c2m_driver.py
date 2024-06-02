@@ -4,11 +4,11 @@ from ase.io import read
 from cell2mol.helper import parsing_arguments
 from cell2mol.cif2info import cif_2_info
 from cell2mol.classes import cell
-from cell2mol.read_write import readinfo, prefiter_cif, writexyz
+from cell2mol.read_write import readinfo, prefiter_cif, print_output, writexyz
 from cell2mol.new_c2m_module import cell2mol
 from cell2mol.other import handle_error
 from cell2mol.cell_operations import frac2cart_fromparam
-from cell2mol.new_charge_assignment import print_output, assign_charge_state_for_unique_species, balance_charge
+from cell2mol.new_charge_assignment import assign_charge_state_for_unique_species, balance_charge
 
 if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     
@@ -123,9 +123,15 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     error.close()
     sys.stdout = stdout
 
-    exit()
+
     ##########################################
-    if refcell.error_case == 0:
+    if refcell.error_case != 0:
+        sys.exit(1)
+    else:
+        reconstruction = True
+        charge_assignment = True
+        spin_assignment = True
+
         # Define new cell object for the unit cell
         newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
         newcell.get_subtype("unit_cell")
@@ -136,54 +142,49 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
             newcell.check_missing_H(debug=debug)                                     
         newcell.assess_errors(mode="hydrogens")
 
-        print(f"ENTERING cell2mol with debug={debug}")
-        newcell = cell2mol(newcell, refcell, sym_ops, reconstruction=True, charge_assignment=True, spin_assignment=True, debug=debug)        
+        print(f"ENTERING cell2mol with {debug=}")
+        print(f"with mode {reconstruction=} {charge_assignment=} {spin_assignment=}")
+
+        newcell = cell2mol(newcell, refcell, sym_ops, reconstruction, charge_assignment, spin_assignment, debug=debug)        
         newcell.assess_errors(mode="unit_cell")
         
         # Save cell object
         newcell.save(cell_fname)
 
-    if newcell.error_case == 0:          
-        final_charge_distribution, final_charges = balance_charge(newcell.unique_indices, refcell.unique_species, debug=debug)
-        refcell.unique_species = assign_charge_state_for_unique_species(refcell.unique_species, final_charges[0], debug=debug)
-        refcell.assign_charges_for_refcell(debug=debug)
-        refcell.assign_spin(debug=debug)
-        refcell.create_bonds(debug=debug)
-    
-        # Update reference cell object
-        refcell.save(ref_cell_fname)
+        if newcell.error_case == 0 and charge_assignment :          
+            final_charge_distribution, final_charges = balance_charge(newcell.unique_indices, refcell.unique_species, debug=debug)
+            refcell.unique_species = assign_charge_state_for_unique_species(refcell.unique_species, final_charges[0], debug=debug)
+            refcell.assign_charges_for_refcell(debug=debug)
+            refcell.assign_spin(debug=debug)
+            refcell.create_bonds(debug=debug)
+        
+            # Update reference cell object
+            refcell.save(ref_cell_fname)
 
-    
     output.close()
     sys.stdout = stdout
     
-    # Summary
-    surmmary = open(surmmary_fname, "w")
-    sys.stdout = surmmary
-    print("*** Reference molecules ***")
-    print(refcell)
-    print_output(refcell.refmoleclist)
+    try:
+        # Summary
+        surmmary = open(surmmary_fname, "w")
+        sys.stdout = surmmary
+        print("*** Reference molecules ***")
+        print(refcell)
+        print_output(refcell.refmoleclist)
 
-    print("***Unit cell molecules ***")
-    print(newcell)
-    print_output(newcell.moleclist)
-    surmmary.close()
-    sys.stdout = stdout
+        print("***Unit cell molecules ***")
+        print(newcell)
+        print_output(newcell.moleclist)
+        surmmary.close()
+        sys.stdout = stdout
 
-    # Error handling
-    case = refcell.error_case
-    error_fname = os.path.join(current_dir, f"refcell_error_{case}.out")
-    error = open(error_fname, "w")
-    sys.stdout = error
-    handle_error(case)
-    error.close()
-    sys.stdout = stdout
-
-    case = newcell.error_case
-    error_fname = os.path.join(current_dir, f"unitcell_error_{case}.out")
-    error = open(error_fname, "w")
-    sys.stdout = error
-    handle_error(case)
-    error.close()
-    sys.stdout = stdout
-
+        # Error handling
+        case = newcell.error_case
+        error_fname = os.path.join(current_dir, f"unitcell_error_{case}.out")
+        error = open(error_fname, "w")
+        sys.stdout = error
+        handle_error(case)
+        error.close()
+        sys.stdout = stdout
+    except:
+        sys.exit(1)
