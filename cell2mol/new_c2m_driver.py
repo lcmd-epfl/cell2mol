@@ -102,29 +102,6 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     # Save reference cell object
     refcell.save(ref_cell_fname)
 
-    output.close()
-    sys.stdout = stdout
-    
-    # Summary
-    surmmary = open(surmmary_fname, "w")
-    sys.stdout = surmmary
-    print("*** Reference molecules ***")
-    print(refcell)
-    print_output(refcell.refmoleclist)
-    surmmary.close()
-    sys.stdout = stdout
-
-    # Error handling
-    case = refcell.error_case
-    error_fname = os.path.join(current_dir, f"refcell_error_{case}.out")
-    error = open(error_fname, "w")
-    sys.stdout = error
-    handle_error(case)
-    error.close()
-    sys.stdout = stdout
-
-    output = open(output_fname, "a")
-    sys.stdout = error
     ##########################################
     if refcell.error_case != 0:
         sys.exit(1)
@@ -175,27 +152,38 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     output.close()
     sys.stdout = stdout
     
-    try:
-        # Summary
-        surmmary = open(surmmary_fname, "w")
-        sys.stdout = surmmary
-        print("*** Reference molecules ***")
-        print(refcell)
-        print_output(refcell.refmoleclist)
 
-        print("***Unit cell molecules ***")
-        print(newcell)
-        print_output(newcell.moleclist)
-        surmmary.close()
-        sys.stdout = stdout
+    # Summary
+    surmmary = open(surmmary_fname, "w")
+    sys.stdout = surmmary
+    print("*** Reference molecules ***")
+    print(refcell)
+    print_output(refcell.refmoleclist)
 
-        # Error handling
-        case = newcell.error_case
-        error_fname = os.path.join(current_dir, f"unitcell_error_{case}.out")
-        error = open(error_fname, "w")
-        sys.stdout = error
-        handle_error(case)
-        error.close()
-        sys.stdout = stdout
-    except:
-        sys.exit(1)
+    print("***Unit cell molecules ***")
+    print(newcell)
+    print_output(newcell.moleclist)
+    surmmary.close()
+    sys.stdout = stdout
+
+    # Error handling
+    case = refcell.error_case
+    error_fname = os.path.join(current_dir, f"refcell_error_{case}.out")
+    error = open(error_fname, "w")
+    sys.stdout = error
+    handle_error(case)
+    error.close()
+    sys.stdout = stdout
+
+    output = open(output_fname, "a")
+    sys.stdout = output
+
+    # Error handling
+    case = newcell.error_case
+    error_fname = os.path.join(current_dir, f"unitcell_error_{case}.out")
+    error = open(error_fname, "w")
+    sys.stdout = error
+    handle_error(case)
+    error.close()
+    sys.stdout = stdout
+
