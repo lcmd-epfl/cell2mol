@@ -595,29 +595,27 @@ def reconstuct (refcell, newcell, sym_ops, debug: int=0):
     print("reconstructed_molecules", len(reconstructed_molecules), [mol.formula for mol in reconstructed_molecules])
 
     if len(all_found) == len(cell_pos):
+        newcell.error_get_fragments = False
         num_rem_frags = 0
         for rem_frag_list in remaining_fragments:
             num_rem_frags += len(rem_frag_list) 
         
         if num_rem_frags == 0 :
             print("All fragments are reconstructed successfully")
-            newcell.is_fragmented = False
             newcell.error_reconstruction = False
         else:
             print(f"There are {num_rem_frags} remaining fragments.")
             final_remaining_fragments, reconstructed_molecules = final_remaining_reconstruction(remaining_fragments, newcell, cell_vector, reconstructed_molecules, debug=0)
             if len(final_remaining_fragments) == 0:
                 print("All fragments are reconstructed successfully")
-                newcell.is_fragmented = False
                 newcell.error_reconstruction = False
             else :
                 print("Error in reconstruction!!")
-                newcell.is_fragmented = True
                 newcell.error_reconstruction = True
                 print("final remaining fragments", len(final_remaining_fragments), [mol.formula for mol in final_remaining_fragments])    
     else:
-        print("Error in reconstruction!!")
-        newcell.is_fragmented = True
+        print("Error in getting fragments and reconstruction!!")
+        newcell.error_get_fragments = True
         newcell.error_reconstruction = True          
         for i, pos in enumerate(cell_pos):
             if i not in all_found:
