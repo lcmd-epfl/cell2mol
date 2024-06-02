@@ -17,6 +17,8 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
             # Cell Reconstruction
             all_molecules, reconstructed_molecules = reconstuct(refcell, newcell, sym_ops, debug=debug)    
             all_molecules.extend(reconstructed_molecules)                                       
+            # Get moleclist for the unit cell
+            newcell = get_moleclist(newcell, refcell, all_molecules, debug=debug)
 
             if newcell.error_get_fragments:     return newcell
             elif newcell.error_reconstruction:  return newcell
@@ -30,9 +32,6 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
         tini = time.time()
 
         if not newcell.error_reconstruction:
-            # Get moleclist for the unit cell
-            newcell = get_moleclist(newcell, refcell, all_molecules, debug=debug)
-            
             # Get unique species for the reference cell
             refcell.get_unique_species(debug=debug)
             print("refcell.unique_species", [specie.formula for specie in refcell.unique_species], refcell.unique_indices)
