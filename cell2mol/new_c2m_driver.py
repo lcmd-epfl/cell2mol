@@ -123,14 +123,15 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     error.close()
     sys.stdout = stdout
 
-
+    output = open(output_fname, "a")
+    sys.stdout = error
     ##########################################
     if refcell.error_case != 0:
         sys.exit(1)
     else:
         reconstruction = True
-        charge_assignment = True
-        spin_assignment = True
+        charge_assignment = False
+        spin_assignment = False
 
         # Define new cell object for the unit cell
         newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
@@ -143,23 +144,33 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
         newcell.assess_errors(mode="hydrogens")
 
         print(f"ENTERING cell2mol with {debug=}")
-        print(f"with mode {reconstruction=} {charge_assignment=} {spin_assignment=}")
 
         newcell = cell2mol(newcell, refcell, sym_ops, reconstruction, charge_assignment, spin_assignment, debug=debug)        
-        newcell.assess_errors(mode="unit_cell")
-        
-        # Save cell object
-        newcell.save(cell_fname)
+        newcell.assess_errors(mode="reconstruction")
+        """
+        if newcell.error_case == 0 and reconstruction :
+            reconstruction = False
+            charge_assignment = True
+            newcell = cell2mol(newcell, refcell, sym_ops, reconstruction, charge_assignment, spin_assignment, debug=debug)        
+            newcell.assess_errors(mode="charge_assignment")
 
-        if newcell.error_case == 0 and charge_assignment :          
-            final_charge_distribution, final_charges = balance_charge(newcell.unique_indices, refcell.unique_species, debug=debug)
-            refcell.unique_species = assign_charge_state_for_unique_species(refcell.unique_species, final_charges[0], debug=debug)
-            refcell.assign_charges_for_refcell(debug=debug)
-            refcell.assign_spin(debug=debug)
-            refcell.create_bonds(debug=debug)
-        
-            # Update reference cell object
-            refcell.save(ref_cell_fname)
+            if newcell.error_case == 0 and charge_assignment : 
+                reconstruction = False
+                charge_assignment = False
+                spin_assignment = True
+                newcell = cell2mol(newcell, refcell, sym_ops, reconstruction, charge_assignment, spin_assignment, debug=debug)
+
+                final_charge_distribution, final_charges = balance_charge(newcell.unique_indices, refcell.unique_species, debug=debug)
+                refcell.unique_species = assign_charge_state_for_unique_species(refcell.unique_species, final_charges[0], debug=debug)
+                refcell.assign_charges_for_refcell(debug=debug)
+                refcell.assign_spin(debug=debug)
+                refcell.create_bonds(debug=debug)
+            
+                # Update reference cell object
+                refcell.save(ref_cell_fname)
+        """
+        # Save unit cell object
+        newcell.save(cell_fname)
 
     output.close()
     sys.stdout = stdout
