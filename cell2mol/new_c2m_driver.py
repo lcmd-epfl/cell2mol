@@ -175,9 +175,6 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     error.close()
     sys.stdout = stdout
 
-    output = open(output_fname, "a")
-    sys.stdout = output
-
     # Error handling
     case = newcell.error_case
     error_fname = os.path.join(current_dir, f"unitcell_error_{case}.out")
