@@ -12,14 +12,15 @@ from itertools import combinations
 from cell2mol.read_write import writexyz
 import pickle
 ######################################################
-def apply_symmetry_operations_reference (reference, cell_vector, sym_ops, normalize=True):
-    
-    # reference : ase atoms object
+def apply_symmetry_operations_reference (refcell, cell_vector, sym_ops, normalize=True):
     
     new_structures = []
-    ref_labels = reference.get_chemical_symbols()
-    fractional_coords = reference.get_scaled_positions()
+    ref_labels = refcell.labels
+    fractional_coords = np.array(refcell.frac_coord)
     
+    # reference : ase atoms object
+    reference = Atoms(symbols=ref_labels, scaled_positions=fractional_coords, cell=cell_vector, pbc=True)
+
     for rot, trans in zip(sym_ops[0], sym_ops[1]):
         transformed_positions = np.dot(fractional_coords, rot.T)
         transformed_positions += np.array(trans)       
@@ -443,7 +444,7 @@ def get_updated_indices(sp_idx, new, cell_labels, cell_pos, cell_fracs, debug: i
     for jdx, (n_l, n_p, n_f) in enumerate(zip(new_labels, new_pos, new_fracs)):
         for kdx, (l, p, f) in enumerate(zip(cell_labels, cell_pos, cell_fracs)):
             if n_l == l and np.allclose(n_p, p, atol=1e-5, rtol=1e-3) and np.allclose(n_f, f, atol=1e-5, rtol=1e-3):
-                if debug > 2: 
+                if debug >= 2: 
                     print(f"symmtry operation {sp_idx}:", f"atom of new (index: {jdx})", n_l, n_p, n_f, \
                           f"is the same as the atom of the unit cell (index: {kdx})", l, p, f)
                 indices_lists.append((jdx, kdx))
@@ -518,14 +519,14 @@ def sort_remaining_fragments_list (original_remaining_fragments):
     return remaining_fragments
 
 ######################################################
-def reconstuct (reference, newcell, sym_ops, debug: int=0):
+def reconstuct (refcell, newcell, sym_ops, debug: int=0):
     
     cell_labels = newcell.labels
     cell_pos = newcell.coord
     cell_fracs = newcell.frac_coord
     cell_vector = newcell.cell_vector
 
-    new_structures = apply_symmetry_operations_reference(reference, cell_vector, sym_ops)
+    new_structures = apply_symmetry_operations_reference(refcell, cell_vector, sym_ops)
     print(f"Number of symmetry operations: {len(new_structures)}")
 
     all_found = []
@@ -536,6 +537,7 @@ def reconstuct (reference, newcell, sym_ops, debug: int=0):
     for idx, new in enumerate(new_structures):
         print(f"Applying symmetry operations to reference {idx}")
         indices_lists = get_updated_indices(idx, new, cell_labels, cell_pos, cell_fracs, debug=debug)
+        print(f"{len(indices_lists)=}")
 
         updated_lists = [i for i in indices_lists if i[1] not in all_found]   
         updated_ref_indices = [i[0] for i in updated_lists]
@@ -617,7 +619,10 @@ def reconstuct (reference, newcell, sym_ops, debug: int=0):
         print("Error in reconstruction!!")
         newcell.is_fragmented = True
         newcell.error_reconstruction = True          
-
+        for i, pos in enumerate(cell_pos):
+            if i not in all_found:
+                print(f"Cannot find the {i}th atom of the unit cell based on cartesian coordinates from the new structure.  ")
+                print(f"{i} {cell_labels[i]=} {cell_pos[i]=} {cell_fracs[i]=}")
     return all_molecules, reconstructed_molecules
 
 ######################################################
