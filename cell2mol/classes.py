@@ -1652,6 +1652,7 @@ class cell(object):
                                         met.set_charge(ref_met.charge)
                             prepare_mol(mol)
 
+    #######################################################
     def assign_charges_for_refcell(self, debug: int=0):
         for idx, ref in enumerate(self.refmoleclist):
             print(f"Refenrence Molecule {idx}: {ref.formula}")
@@ -1885,29 +1886,30 @@ class cell(object):
             print("-------------------------------")
             if self.has_isolated_H:             case = 1
             elif self.has_missing_H:            case = 2
+            elif self.error_get_fragments:      case = 3
             elif self.error_reconstruction:     case = 4
             elif self.error_empty_poscharges :  case = 5
             elif self.error_multiple_distrib :  case = 6
             elif self.error_empty_distrib :     case = 7
             else :                              case = 0
-        elif mode == "neutrality":
-            print("-------------------------------")
-            print("Errors in Unit Cell")
-            print("-------------------------------")
-            # Get reference molecules
-            # if self.has_isolated_H:             case = 1
-            # elif self.has_missing_H:            case = 2
-            # Reconstruct Cell
-            # elif self.error_get_fragments:      case = 3
-            # elif self.error_reconstruction:     case = 4
-            # Assign Charges
-            # elif self.error_empty_poscharges :  case = 5
-            # elif self.error_multiple_distrib :  case = 6
-            # elif self.error_empty_distrib :     case = 7
-            # elif self.error_prepare_mols :      case = 8 
-            if not self.is_neutral:             case = 9  
-            # No errors
-            else :                              case = 0
+        # elif mode == "neutrality":
+        #     print("-------------------------------")
+        #     print("Errors in Unit Cell")
+        #     print("-------------------------------")
+        #     # Get reference molecules
+        #     # if self.has_isolated_H:             case = 1
+        #     # elif self.has_missing_H:            case = 2
+        #     # Reconstruct Cell
+        #     # elif self.error_get_fragments:      case = 3
+        #     # elif self.error_reconstruction:     case = 4
+        #     # Assign Charges
+        #     # elif self.error_empty_poscharges :  case = 5
+        #     # elif self.error_multiple_distrib :  case = 6
+        #     # elif self.error_empty_distrib :     case = 7
+        #     # elif self.error_prepare_mols :      case = 8 
+        #     if not self.is_neutral:             case = 9  
+        #     # No errors
+        #     else :                              case = 0
         
         handle_error(case)
         print("")
