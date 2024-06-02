@@ -1880,9 +1880,18 @@ class cell(object):
             if self.has_isolated_H:             case = 1
             elif self.has_missing_H:            case = 2
             else :                              case = 0
-        elif mode == "unit_cell":
+        elif mode == "reconstruction":
             print("-------------------------------")
             print("Errors in Reference Molecules")
+            print("-------------------------------")
+            if self.has_isolated_H:             case = 1
+            elif self.has_missing_H:            case = 2
+            elif self.error_get_fragments:      case = 3
+            elif self.error_reconstruction:     case = 4
+            else :                              case = 0
+        elif mode == "charge_assignment":
+            print("-------------------------------")
+            print("Errors in charge assignment")
             print("-------------------------------")
             if self.has_isolated_H:             case = 1
             elif self.has_missing_H:            case = 2
