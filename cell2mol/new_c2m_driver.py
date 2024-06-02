@@ -124,7 +124,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
 
         newcell = cell2mol(newcell, refcell, sym_ops, reconstruction, charge_assignment, spin_assignment, debug=debug)        
         newcell.assess_errors(mode="reconstruction")
-        """
+    
         if newcell.error_case == 0 and reconstruction :
             reconstruction = False
             charge_assignment = True
@@ -145,7 +145,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
             
                 # Update reference cell object
                 refcell.save(ref_cell_fname)
-        """
+    
         # Save unit cell object
         newcell.save(cell_fname)
 
