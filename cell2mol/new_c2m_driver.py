@@ -111,9 +111,9 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
 
         # Reconstruction of the unit cell
         reference = Atoms(symbols=refcell.labels, scaled_positions=refcell.frac_coord, cell=cell_vector, pbc=True)
-        all_molecules, reconstructed_molecules, final_remaining_fragments = reconstuct(reference, newcell, cell_pos, cell_fracs, cell_vector, sym_ops, debug=debug)    
-        # all_molecules.extend(reconstructed_molecules)
-        exit()
+        all_molecules, reconstructed_molecules = reconstuct(reference, newcell, sym_ops, debug=debug)    
+        all_molecules.extend(reconstructed_molecules)
+
         if not newcell.error_reconstruction :
             # Get moleclist for the unit cell
             newcell = get_moleclist(newcell, refcell, all_molecules, debug=debug)
@@ -152,6 +152,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
                 refcell.assign_spin(debug=debug)
                 refcell.create_bonds(debug=debug)
         # Save cell object
+        
         newcell.save(cell_fname)
     
     # Save reference cell object
