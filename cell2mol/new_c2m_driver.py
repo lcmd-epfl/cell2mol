@@ -101,6 +101,28 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     
     # Save reference cell object
     refcell.save(ref_cell_fname)
+
+    output.close()
+    sys.stdout = stdout
+    
+    # Summary
+    surmmary = open(surmmary_fname, "w")
+    sys.stdout = surmmary
+    print("*** Reference molecules ***")
+    print(refcell)
+    print_output(refcell.refmoleclist)
+    surmmary.close()
+    sys.stdout = stdout
+
+    # Error handling
+    case = refcell.error_case
+    error_fname = os.path.join(current_dir, f"refcell_error_{case}.out")
+    error = open(error_fname, "w")
+    sys.stdout = error
+    handle_error(case)
+    error.close()
+    sys.stdout = stdout
+
     exit()
     ##########################################
     if refcell.error_case == 0:
