@@ -1882,7 +1882,7 @@ class cell(object):
             else :                              case = 0
         elif mode == "reconstruction":
             print("-------------------------------")
-            print("Errors in Reference Molecules")
+            print("Errors in reconstruction")
             print("-------------------------------")
             if self.has_isolated_H:             case = 1
             elif self.has_missing_H:            case = 2
