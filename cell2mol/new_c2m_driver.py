@@ -70,7 +70,15 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     # Read cif file
     atoms = read(input_path)
     cell_labels = atoms.get_chemical_symbols()
-    cell_pos = atoms.positions
+    
+    wrap_keywords = {
+        'pbc': True,                  # Periodic boundary conditions
+        'center': (0.5, 0.5, 0.5),    # Center the positions in the unit cell
+        # 'pretty_translation': True,   # Use pretty translation (minimizing jumps in the trajectory)
+        # 'eps': 1e-5                   # Epsilon for numerical precision
+        }
+
+    cell_pos = atoms.get_positions(wrap=True, **wrap_keywords)
     cell_fracs = atoms.get_scaled_positions()
     cell_vector = atoms.cell.array
     # cell_parameters = atoms.cell.cellpar()
@@ -110,8 +118,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
         #since newcell.error_case with mode="hydrogens" is same as refcell.error_case with mode="hydrogens"
 
         # Reconstruction of the unit cell
-        reference = Atoms(symbols=refcell.labels, scaled_positions=refcell.frac_coord, cell=cell_vector, pbc=True)
-        all_molecules, reconstructed_molecules = reconstuct(reference, newcell, sym_ops, debug=debug)    
+        all_molecules, reconstructed_molecules = reconstuct(refcell, newcell, sym_ops, debug=debug)    
         all_molecules.extend(reconstructed_molecules)
 
         if not newcell.error_reconstruction :
