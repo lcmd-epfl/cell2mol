@@ -2,11 +2,67 @@ import numpy as np
 from cell2mol.hungarian import reorder
 import copy
 from cell2mol.xyz2mol import xyz2mol
-from cell2mol.connectivity import compare_species, compare_metals
 from cell2mol.charge_assignment import check_rdkit_obj_connectivity, arrange_data_for_reorder, charge_state, protonation
 from rdkit import Chem
+import itertools
 
+#######################################################
+def balance_charge(unique_indices: list, unique_species: list, debug: int=0) -> list:
+
+    # Function to Select the Best Charge Distribution for the unique species.
+    # It accepts multiple charge options for each molecule/ligand/metal (poscharge, etc...).
+    # NO: It should select the best one depending on whether the final metal charge makes sense or not.
+    # In some cases, can accept metal oxidation state = 0, if no other makes sense
+
+    iserror = False
+    iterlist = []
+    for idx, spec in enumerate(unique_species):
+        toadd = []
+        if spec.subtype == "metal":
+            for tch in spec.possible_cs:
+                toadd.append(tch)
+        else :   
+            if len(spec.possible_cs) == 1:
+                toadd.append(spec.possible_cs[0].corr_total_charge)
+            elif len(spec.possible_cs) > 1:
+                for tch in spec.possible_cs:
+                    toadd.append(tch.corr_total_charge)   
+            elif len(spec.possible_cs) == 0:
+                iserror = True
+                toadd.append("-")
+        iterlist.append(toadd)
+
+    if debug >= 2: print("BALANCE: iterlist", iterlist)
+    if debug >= 2: print("BALANCE: unique_indices", unique_indices)
+
+    if not iserror:
+        tmpdistr = list(itertools.product(*iterlist))
+        if debug >= 2: print("BALANCE: tmpdistr", tmpdistr)
+
+        # Expands tmpdistr to include same species, generating alldistr:
+        alldistr = []
+        final_charges= []
+        for distr in tmpdistr:
+            tmp = []
+            for u in unique_indices:
+                tmp.append(distr[u])
+            alldistr.append(tmp)
+            if debug >= 2: print("BALANCE: alldistr added:", tmp)
+
+            final_charge_distribution = []
+            for idx, d in enumerate(alldistr):
+                if debug >= 2: print(f"BALANCE: distribution={d}")
+                charges_sum = np.sum(d)
+                if charges_sum == 0:
+                    final_charge_distribution.append(d)
+                    final_charges.append(distr)
+    elif iserror:
+        if debug >= 1: print("Error found in BALANCE: one species has no possible charges")
+        final_charge_distribution = []
+
+    return final_charge_distribution, final_charges
 ######################################################
+
 def assign_charge_state_for_unique_species(unique_species, final_charges_tuple, debug: int=0):
     
     for specie, final_charge in zip(unique_species, final_charges_tuple):
