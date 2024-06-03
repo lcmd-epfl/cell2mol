@@ -1,13 +1,17 @@
 import numpy as np
 import os
 from cell2mol.connectivity import get_adjacency_types, get_element_count, labels2electrons, labels2formula, get_adjmatrix
-from cell2mol.connectivity import get_metal_idxs, split_species, get_radii, create_bonds_spicie, split_group
-from cell2mol.connectivity import compare_atoms, compare_species, compare_metals
+from cell2mol.connectivity import get_metal_idxs, split_species, get_radii, split_group
+from cell2mol.connectivity import compare_atoms, compare_species, compare_metals, compare_reference_indices
 from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
+
 from cell2mol.charge_assignment import get_protonation_states_specie, get_possible_charge_state, get_metal_poscharges
-from cell2mol.charge_assignment import balance_charge, prepare_unresolved, prepare_mols, correct_smiles_ligand
-from cell2mol.new_charge_assignment import set_charge_state, set_charge_state_simple, prepare_mol, compare_molecules
+from cell2mol.charge_assignment import prepare_unresolved, prepare_mols, correct_smiles_ligand
+
+from cell2mol.new_charge_assignment import set_charge_state, prepare_mol, balance_charge
+from cell2mol.new_charge_assignment import create_bonds_specie, create_metal_ligand_bonds, create_metal_metal_bonds
+
 from cell2mol.spin import assign_spin_metal, assign_spin_complexes, predict_ox_state
 from cell2mol.other import extract_from_list, compute_centroid, get_dist, get_angle
 from cell2mol.other import handle_error
@@ -304,11 +308,6 @@ class specie(object):
         return self.possible_cs
     
     ############
-    def create_bonds(self, debug: int=0):
-        # if not hasattr(self,"rdkit_obj"): self.get_parent("cell").assign_charges()
-        create_bonds_spicie(self, debug=debug)
-
-    ############
     def print_xyz(self):
         print(self.natoms)
         print("")
@@ -464,15 +463,6 @@ class molecule(specie):
                 for entry in lig.haptic_type:
                     if entry not in self.haptic_type: self.haptic_type.append(entry)
         return self.haptic_type
-
-    #######################################################
-    def correct_smiles(self, debug: int=0):
-        if not self.iscomplex: return self.smiles
-        else:
-            self.smiles = []
-            for lig in self.ligands:
-                lig.smiles, lig.rdkit_obj = correct_smiles_ligand(lig, debug=debug)
-                self.smiles.append(lig.smiles)
 
 ###############
 ### LIGAND ####
@@ -646,7 +636,7 @@ class ligand(specie):
                 for g in splitted_groups:
                     self.groups.append(g)
         if debug > 0 : print(f"LIGAND.SPLIT_LIGAND: found groups {[ group.formula for group in self.groups]}")
-        if debug >= 2 : print(f"{self.groups}")
+        if debug > 2 : print(f"{self.groups}")
         return self.groups
 
     #######################################################
@@ -1166,7 +1156,7 @@ class metal(atom):
         coord_group = self.get_connected_groups()
         self.coord_nr = len(coord_group)
         if debug >= 1: print(f"\nMETAL.Get_coord_geometry: {self.label}")
-        if debug >= 2: print(f"METAL.Get_coord_geometry:\n{coord_group=}")
+        if debug > 2 : print(f"METAL.Get_coord_geometry:\n{coord_group=}")
         if debug >= 1: print(f"METAL.Get_coord_geometry: coord_nr={self.coord_nr}")
         
         self.coord_geometry, self.geom_deviation = define_coordination_geometry(self, coord_group, debug = debug)
@@ -1229,7 +1219,7 @@ class cell(object):
         #if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)  
         #if self.is_fragmented: return None # Stopping. self.is_fragmented must be false to determine the charges of the cell
         
-        if debug >= 0: print(f"Getting unique species in cell")
+        if debug >= 0: print(f"Getting unique species in {self.subtype}")
         self.unique_species = []
         self.unique_indices = []
         self.species_list = []
@@ -1360,7 +1350,7 @@ class cell(object):
                         lig.get_denticity(debug=debug)
                     for met in ref.metals:                         
                         met.get_coordination_geometry(debug=debug)
-
+                        met.get_coord_sphere_formula()
         if isgood: self.has_isolated_H = False
         else:      self.has_isolated_H = True
         return self.refmoleclist
@@ -1535,18 +1525,20 @@ class cell(object):
     def get_selected_cs(self, debug: int=0):
         if not hasattr(self, "unique_species"): self.get_unique_species(debug=debug)  
         
-        selected_cs = []
+        self.selected_cs = []
         for specie in self.unique_species:
             tmp = specie.get_possible_cs(debug=debug)
             if tmp is None: 
-                self.error_empty_poscharges = True
-                return None # Stopping. Empty list of possible charges received.
+                self.selected_cs.append(None)
             if specie.subtype != "metal":
-                selected_cs.append(list([cs.corr_total_charge for cs in specie.possible_cs]))
+                self.selected_cs.append(list([cs.corr_total_charge for cs in specie.possible_cs]))
             else :
-                selected_cs.append(specie.possible_cs)
-        self.error_empty_poscharges = False
-        return selected_cs
+                self.selected_cs.append(specie.possible_cs)
+        
+        if None in self.selected_cs:
+            self.error_empty_poscharges = True
+        else :
+            self.error_empty_poscharges = False
 
     #######################################################
     def assign_charges (self, debug: int=0):
@@ -1633,7 +1625,7 @@ class cell(object):
                 if not mol.iscomplex:
                     for ref in self.refmoleclist:
                         if not ref.iscomplex :
-                            issame = compare_molecules(ref, mol, debug=debug)
+                            issame = compare_reference_indices(ref, mol, debug=debug)
                             if issame:
                                 set_charge_state (ref, mol, mode=2, debug=debug)
                                 print(mol.formula, ref.formula, issame) 
@@ -1642,7 +1634,7 @@ class cell(object):
                         if ref.iscomplex:
                             for lig in mol.ligands:
                                 for ref_lig in ref.ligands:
-                                    issame = compare_molecules(ref_lig, lig, debug=debug)
+                                    issame = compare_reference_indices(ref_lig, lig, debug=debug)
                                     if issame:
                                         set_charge_state (ref_lig, lig, mode=2, debug=debug)
                                         print(lig.formula, ref_lig.formula, issame)                                     
@@ -1771,7 +1763,7 @@ class cell(object):
     def create_bonds(self, debug: int=0):
         # if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)  
         # if self.error_prepare_mols: return # Stopping. self.error_prepare_mols must be false to create the spin
-        
+
         if self.subtype == "reference": moleclist = self.refmoleclist
         else:                           moleclist = self.moleclist
 
@@ -1779,62 +1771,46 @@ class cell(object):
             if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Bonds for molecule {mol.formula}")
             # First part
             if not mol.iscomplex: 
-                mol.create_bonds(debug=debug)          ### Creates bonds between molecule.atoms using the molecule.rdkit_object
-            
+                result = create_bonds_specie(mol, debug=debug)          ### Creates bonds between molecule.atoms using the molecule.rdkit_object
+                if result == False:
+                    if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for molecule {mol.formula}")
+                    self.error_create_bonds = True
+                    return # Exit the function entirely if creating bonds fails for a non-complex molecule
+                else :
+                    if debug >= 1: print(f"CELL.CREATE_BONDS: Bonds created for molecule {mol.formula}")
+
             # Second part
             if mol.iscomplex:
                 for lig in mol.ligands:
-                    lig.create_bonds(debug=debug)      ### Creates bonds between ligand.atoms, which also belong to molecule.atoms, using the ligand.rdkit_object
-                
-            # Third Part. Adds Metal-Ligand Bonds, with a zero order:
-            if mol.iscomplex:
-                for lig in mol.ligands:
-                    for at in lig.atoms:
-                        count = 0
-                        for met in mol.metals: 
-                            isconnected = at.check_connectivity(met, debug=debug)
-                            if isconnected:
-                                index_1 = at.get_parent_index("molecule")
-                                index_2 = met.get_parent_index("molecule")
-                                if index_1 < index_2 : 
-                                    bond_startatom = at
-                                    bond_endatom   = met
-                                else:
-                                    bond_startatom = met
-                                    bond_endatom   = at
-                                newbond = bond(bond_startatom, bond_endatom, 0)
-                                at.add_bond(newbond)
-                                met.add_bond(newbond)
-                                count += 1 
-                        if count != at.mconnec: 
-                            if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for atom: \n{at}\n of ligand: \n{lig}\n")
-                            if debug >= 1: print(f"CELL.CREATE_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
+                    result = create_bonds_specie(lig, debug=debug)      ### Creates bonds between ligand.atoms, which also belong to molecule.atoms, using the ligand.rdkit_object
+                    if result == False:
+                        if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for ligand {lig.formula}")
+                        self.error_create_bonds = True
+                        return # Exit the function entirely if creating bonds fails for any ligand
+                    
+                    else :
+                        if debug >= 1: print(f"CELL.CREATE_BONDS: Bonds created for molecule {lig.formula}")
 
-            # Adds Metal-Metal Bonds, with a zero order:
             if mol.iscomplex:
-                if len(mol.metals) > 1 :
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
-                    if debug >= 2: print(f"CELL.CREATE_BONDS: Metals: {mol.metals}")
-                    for idx, met1 in enumerate(mol.metals):
-                        for jdx, met2 in enumerate(mol.metals):
-                            if idx <= jdx: continue
-                            isconnected = met1.check_connectivity(met2, debug=debug)
-                            if isconnected:
-                                index_1 = met1.get_parent_index("molecule")
-                                index_2 = met2.get_parent_index("molecule")
-                                if index_1 < index_2 : 
-                                    bond_startatom = met1
-                                    bond_endatom   = met2
-                                else:
-                                    bond_startatom = met2
-                                    bond_endatom   = met1
-                                newbond = bond(bond_startatom, bond_endatom, 0)
-                                met1.add_bond(newbond) 
-                                met2.add_bond(newbond) 
+                # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
+                create_metal_ligand_bonds(mol, debug=debug)
+                create_metal_metal_bonds(mol, debug=debug)
 
                 # Fourth part : correction smiles of ligands
                 mol.smiles_with_H = [lig.smiles for lig in mol.ligands]
-                mol.correct_smiles(debug=debug)
+                mol.smiles = []
+                for lig in mol.ligands:
+                    result = correct_smiles_ligand(lig, debug=debug)
+                    if result == False:
+                        if debug >= 1: print(f"CELL.CREATE_BONDS: error correcting smiles for ligand {lig.formula}")
+                        self.error_create_bonds = True
+                        return # Exit the function entirely 
+                    else :
+                        if debug >= 1: print(f"CELL.CREATE_BONDS: Smiles corrected for ligand {lig.formula}")
+                        mol.smiles.append(lig.smiles)    
+        
+        self.error_create_bonds = False
+                
 
     #######################################################
     def assign_spin(self, debug: int=0) -> object:
@@ -1852,7 +1828,9 @@ class cell(object):
         for mol in moleclist:
             if mol.iscomplex:
                 for metal in mol.metals:
-                    if not hasattr(metal,"coord_nr"): metal.get_coordination_geometry()
+                    if not hasattr(metal,"coord_nr"): 
+                        metal.get_coordination_geometry()
+                        metal.get_coord_sphere_formula()
                     metal.get_spin(debug=debug)
             mol.get_spin(debug=debug)
     
@@ -1866,7 +1844,9 @@ class cell(object):
         for mol in moleclist:
             if mol.iscomplex:
                 for metal in mol.metals:
-                    if not hasattr(metal,"coord_nr"): metal.get_coordination_geometry(debug=debug)     
+                    if not hasattr(metal,"coord_nr"): 
+                        metal.get_coordination_geometry(debug=debug)
+                        metal.get_coord_sphere_formula()     
                     metal.predict_charge(debug=debug) 
     #######################################################
     
@@ -1875,10 +1855,18 @@ class cell(object):
 
         if mode == "hydrogens":
             print("-------------------------------")
-            print("Errors in Reference Molecules")
+            print("Errors in hydrogens")
             print("-------------------------------")
             if self.has_isolated_H:             case = 1
             elif self.has_missing_H:            case = 2
+            else :                              case = 0
+        elif mode == "unique_species":
+            print("-------------------------------")
+            print("Errors in unique species")
+            print("-------------------------------")
+            if self.has_isolated_H:             case = 1
+            elif self.has_missing_H:            case = 2
+            elif self.error_empty_poscharges:   case = 5
             else :                              case = 0
         elif mode == "reconstruction":
             print("-------------------------------")
@@ -1900,6 +1888,7 @@ class cell(object):
             elif self.error_empty_poscharges :  case = 5
             elif self.error_multiple_distrib :  case = 6
             elif self.error_empty_distrib :     case = 7
+            elif self.error_create_bonds :      case = 8
             else :                              case = 0
         # elif mode == "neutrality":
         #     print("-------------------------------")

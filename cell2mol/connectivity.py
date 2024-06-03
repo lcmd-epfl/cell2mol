@@ -474,7 +474,18 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
             if (mol1.coord[idx][1] !=  mol2.coord[idx][1]): return False
             if (mol1.coord[idx][2] !=  mol2.coord[idx][2]): return False
     return True
-
+#################################
+def compare_reference_indices (ref, mol, debug: int=0):
+    if (ref.natoms == mol.natoms) & (ref.formula == mol.formula):
+        if (sorted(ref.get_parent_indices("reference")) == sorted(mol.get_parent_indices("reference"))):
+            if debug >= 2: 
+                print("Matched", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
+            issame = True
+        else:
+            issame = False
+    else : 
+        issame = False
+    return issame
 #################################
 def arrange_data_for_reorder(reference: object, target: object, debug: int=0):
     # To do the reorder, we create new tags that include as much information as possible.
@@ -516,78 +527,6 @@ def mol_with_atom_index(mol):
     return mol
 
 #################################
-def create_bonds_spicie (specie, debug: int=0):
-    from cell2mol.classes import bond
-    if debug >= 1: print(f"CREATE_bonds_specie: {specie.formula=}, {specie.subtype=} {specie.smiles=}")
-    n_atoms = specie.natoms # e.g. 9 
-    n_atoms_rdkit = specie.rdkit_obj.GetNumAtoms() # e.g.10 
-    if debug >= 1: print(f"CREATE_bonds_specie: {specie.formula=}, {specie.subtype=}")
-
-    if n_atoms == n_atoms_rdkit:
-        if debug >= 2: print(f"\tNumber of atoms in {specie.subtype} object and RDKit object are equal: {n_atoms} {n_atoms_rdkit}")
-        for idx, rdkit_atom in enumerate(specie.rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8
-            if debug >= 2: print(f"\t{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
-            if len(rdkit_atom.GetBonds()) == 0:
-                if debug >= 1: print(f"\tNO BONDS CREATED for {specie.atoms[idx].label} due to no bonds in {specie.subtype} RDKit object")
-            else:
-                for b in rdkit_atom.GetBonds():
-                    bond_startatom = b.GetBeginAtomIdx()
-                    bond_endatom   = b.GetEndAtomIdx()
-                    bond_order     = b.GetBondTypeAsDouble()
-                    if specie.atoms[bond_endatom].label != specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
-                        if debug >= 1: print(f"\tError with Bond EndAtom", specie.atoms[bond_endatom].label, specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
-                    else:
-                        if bond_endatom == idx:
-                            start = bond_endatom
-                            end   = bond_startatom
-                        elif bond_startatom == idx:
-                            start = bond_startatom
-                            end   = bond_endatom      
-
-                        # create new bond object
-                        if debug >=2: print(f"\tBOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
-                        new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
-                        specie.atoms[idx].add_bond(new_bond)
-
-                if debug >=2: print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
-    else:
-        if debug >= 1: print(f"\tNumber of atoms in {specie.subtype} object and RDKit object are different: {n_atoms} {n_atoms_rdkit}")
-        if debug >= 2: print(f"\t{[(i, atom.label) for i, atom in enumerate(specie.atoms)]}")
-        if debug >= 2: print(f"\t{[(i, atom.GetSymbol()) for i, atom in enumerate(specie.rdkit_obj.GetAtoms())]}")       
-        non_bonded_atoms = list(range(0, n_atoms_rdkit))[n_atoms:]
-        if debug >= 2: print(f"\tNON_BONDED_ATOMS", non_bonded_atoms)
-
-        for idx, rdkit_atom in enumerate(specie.rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-            if debug >= 2: print(f"\t{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
-            if len(rdkit_atom.GetBonds()) == 0:
-                if debug >= 1: print(f"\tNO BONDS CREATED for {rdkit_atom.GetSymbol()} due to no bonds in {specie.subtype} RDKit object")
-            else:
-                for b in rdkit_atom.GetBonds():
-                    bond_startatom = b.GetBeginAtomIdx()
-                    bond_endatom   = b.GetEndAtomIdx()
-                    bond_order     = b.GetBondTypeAsDouble()
-  
-                    if bond_startatom in non_bonded_atoms or bond_endatom in non_bonded_atoms:
-                        if debug >= 2: print(f"\tNO BOND CREATED {bond_startatom=} or {bond_endatom=} is not in the specie.atoms. It belongs to {non_bonded_atoms=}.")
-                    else :
-                        if bond_endatom == idx:
-                            start = bond_endatom
-                            end   = bond_startatom
-                        elif bond_startatom == idx:
-                            start = bond_startatom
-                            end   = bond_endatom   
-
-                        # create new bond object
-                        if debug >=2: print(f"\tBOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
-                        new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
-                        specie.atoms[idx].add_bond(new_bond)
-                if idx not in non_bonded_atoms:
-                    if debug >=2: print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
-                else :
-                    if debug >=1: print(f"\tNO BONDS for {rdkit_atom.GetSymbol()} with {specie.subtype} RDKit object index {idx} because it is an added atom")
-
-#################################
-
 def split_group(original_group, conn_idx, debug: int=0):
     from cell2mol.classes import group
     # Split the "group" to obtain the groups connected to a specific metal

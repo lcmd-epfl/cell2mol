@@ -1,16 +1,14 @@
-import ase
 import numpy as np
-import itertools
-import ase
 from ase import Atoms
 from cell2mol.classes import molecule
 from cell2mol.cell_reconstruction import tmatgenerator
-from cell2mol.other import additem, absolute_value, get_dist, extract_from_list
-from cell2mol.connectivity import split_species, count_species
+from cell2mol.other import get_dist, extract_from_list
+from cell2mol.connectivity import split_species, count_species, compare_reference_indices
 from cell2mol.cell_operations import translate
 from itertools import combinations
-from cell2mol.read_write import writexyz
-import pickle
+# from cell2mol.read_write import writexyz
+# import pickle
+
 ######################################################
 def apply_symmetry_operations_reference (refcell, cell_vector, sym_ops, normalize=True):
     
@@ -444,7 +442,7 @@ def get_updated_indices(sp_idx, new, cell_labels, cell_pos, cell_fracs, debug: i
     for jdx, (n_l, n_p, n_f) in enumerate(zip(new_labels, new_pos, new_fracs)):
         for kdx, (l, p, f) in enumerate(zip(cell_labels, cell_pos, cell_fracs)):
             if n_l == l and np.allclose(n_p, p, atol=1e-5, rtol=1e-3) and np.allclose(n_f, f, atol=1e-5, rtol=1e-3):
-                if debug >= 2: 
+                if debug > 2: 
                     print(f"symmtry operation {sp_idx}:", f"atom of new (index: {jdx})", n_l, n_p, n_f, \
                           f"is the same as the atom of the unit cell (index: {kdx})", l, p, f)
                 indices_lists.append((jdx, kdx))
@@ -535,7 +533,7 @@ def reconstuct (refcell, newcell, sym_ops, debug: int=0):
     remaining_fragments = [[] for _ in range(len(newcell.refmoleclist))]
 
     for idx, new in enumerate(new_structures):
-        print(f"Applying symmetry operations to reference {idx}")
+        print(f"\nApplying symmetry operations to reference {idx}")
         indices_lists = get_updated_indices(idx, new, cell_labels, cell_pos, cell_fracs, debug=debug)
         print(f"{len(indices_lists)=}")
 
@@ -647,7 +645,7 @@ def final_remaining_reconstruction(remaining_fragments, newcell, cell_vector, re
     return final_remaining_fragments, reconstructed_molecules
 
 ######################################################
-def get_moleclist (newcell, refcell, all_molecules, debug):
+def get_moleclist (newcell, refcell, all_molecules, debug: int=0):
     # Get moleclist for the unit cell
     newcell.moleclist = []
 
@@ -671,5 +669,57 @@ def get_moleclist (newcell, refcell, all_molecules, debug):
                 lig.get_denticity(debug=debug)
             for met in mol.metals:                         
                 met.get_coordination_geometry(debug=debug)
-    
+                met.get_coord_sphere_formula()
     return newcell
+
+######################################################
+def get_unique_indices(newcell, reference_species_list, debug: int=0):
+    
+    newcell.unique_indices = []
+    newcell.species_list = []
+    for mol in newcell.moleclist:
+        if not mol.iscomplex:
+            for ref in reference_species_list:
+                if (ref.subtype == "molecule") and not ref.iscomplex:
+                    issame = compare_reference_indices(ref, mol, debug=debug)
+                    if issame:
+                        mol.unique_index = ref.unique_index 
+                        if debug >= 1: print(f"Matched {mol.formula} {ref.formula} {mol.unique_index} {ref.unique_index}")
+                        newcell.unique_indices.append(mol.unique_index)
+                        newcell.species_list.append(mol)
+        else:
+            for ref in reference_species_list:
+                if ref.subtype == "ligand":
+                    for lig in mol.ligands:
+                        issame = compare_reference_indices(ref, lig, debug=debug)
+                        if issame: 
+                            lig.unique_index = ref.unique_index
+                            if debug >= 1: print(f"Matched {lig.formula} {ref.formula} {lig.unique_index} {ref.unique_index}")
+                            newcell.unique_indices.append(lig.unique_index)
+                            newcell.species_list.append(lig)
+                if ref.subtype == "metal":
+                    for met in mol.metals:
+                        if ref.get_parent_index("reference") == met.get_parent_index("reference"):
+                            met.unique_index = ref.unique_index
+                            if debug >= 1: print(f"Matched {met.formula} {ref.formula} {met.unique_index} {ref.unique_index}")
+                            newcell.unique_indices.append(met.unique_index)
+                            newcell.species_list.append(met)
+
+    return newcell
+
+# ######################################################
+# def assign_equivalent_indices (refcell, unique_species, species_list, unique_indices, debug: int=0):
+    
+#     for idx, specie in enumerate(refcell.species_list):
+#         specie.equivalent_index = idx
+#     for idx, specie in enumerate(species_list):
+#         found = False
+#         for unique_spec in unique_species:
+#             if (specie.subtype == unique_spec.subtype) and (specie.unique_index == unique_spec.unique_index):
+#                 issame = compare_reference_indices(specie, unique_spec, debug=debug)
+#                 if issame:
+#                     found = True
+#                     specie.equivalent_index = idx
+#                 if found :
+#                     specie.equivalent_index = idx
+                

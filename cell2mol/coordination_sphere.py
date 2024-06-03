@@ -381,7 +381,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
             lig     = group.get_parent("ligand")
             ligand_idx = atom.get_parent_index("ligand")
             if debug > 0: print(f"\tevaluating coordination with metal {met.label}")
-            if debug > 1: print(f"\n{met}")
+            if debug > 2: print(f"\n{met}")
             isadded, newlab, newcoord = add_atom(lig.labels, lig.coord, ligand_idx, lig, list([met]), "H", debug=debug)
             if isadded:
                 if debug > 0: print(f"\tconnectivity verified for atom {atom.label} with ligand index {ligand_idx}")
