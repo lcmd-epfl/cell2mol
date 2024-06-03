@@ -90,7 +90,8 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     ##########################################
     ### PREPARES THE REFERENCE CELL OBJECT ###
     ##########################################
-
+    cov_factor = 1.3
+    metal_factor = 1.0
     # Get reference molecules
     # labels, pos, ref_labels, ref_fracs, cellvec, cell_param = readinfo(infopath)
     # labels, pos, and cellvec will not be used
@@ -104,17 +105,25 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
 
     if not refcell.has_isolated_H:  
         refcell.check_missing_H(debug=debug)                                     
-        refcell.assess_errors(mode="hydrogens")
+    else:
+        while refcell.has_isolated_H :
+            # Increase covalent factor for H atoms
+            cov_factor += 0.05
+            refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=cov_factor, debug=debug)
+        if debug >= 1:
+            print(f"Covalent factor increases: {cov_factor=}")
+        refcell.check_missing_H(debug=debug)
+    refcell.assess_errors(mode="hydrogens")
 
-        if refcell.error_case == 0:
-            # Get unique species for the reference cell
-            refcell.get_unique_species(debug=debug) # Get unique_species, unique_indices, and species_list
-            if debug >= 1:
-                print(f"refcell.unique_species {[specie.formula for specie in refcell.unique_species]} {refcell.unique_indices=}")
-                print(f"refcell.species_list {[specie.formula for specie in refcell.species_list]}\n")
-            # Get possible charge states for the unique species in the reference cell
-            refcell.get_selected_cs(debug=debug)
-            refcell.assess_errors(mode="unique_species")
+    if refcell.error_case == 0:
+        # Get unique species for the reference cell
+        refcell.get_unique_species(debug=debug) # Get unique_species, unique_indices, and species_list
+        if debug >= 1:
+            print(f"refcell.unique_species {[specie.formula for specie in refcell.unique_species]} {refcell.unique_indices=}")
+            print(f"refcell.species_list {[specie.formula for specie in refcell.species_list]}\n")
+        # Get possible charge states for the unique species in the reference cell
+        refcell.get_selected_cs(debug=debug)
+        refcell.assess_errors(mode="unique_species")
 
     # Save reference cell object
     refcell.save(ref_cell_fname)
@@ -132,7 +141,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
         newcell.get_subtype("unit_cell")
         
         # Get reference molecules
-        newcell.get_reference_molecules(refcell.labels, refcell.frac_coord, debug=-1)
+        newcell.get_reference_molecules(refcell.labels, refcell.frac_coord, cov_factor=cov_factor, debug=-1)
         if not newcell.has_isolated_H:  
             newcell.check_missing_H(debug=-1)                                     
 

@@ -273,7 +273,7 @@ def merge_fragments (frags: list, cell_vector: list, cov_factor: float=1.3, meta
                 return newmolec
     return None
 ######################################################
-def merge_elements(fragments, target_ref, cell_vector, full: bool=False, debug: int=0):
+def merge_elements(fragments, target_ref, cell_vector, cov_factor: float=1.3, metal_factor: float=1.0, full: bool=False, debug: int=0):
     # Start an infinite loop to handle dynamic list updates
 
     while True:
@@ -298,7 +298,7 @@ def merge_elements(fragments, target_ref, cell_vector, full: bool=False, debug: 
             else:
                 print("Fragments TO BE MERGED", [k.formula for k in comb], [k.subtype for k in comb], idx_comb)  
                 
-                newmolec = merge_fragments(comb, cell_vector, full=full, debug=debug)
+                newmolec = merge_fragments(comb, cell_vector, cov_factor=cov_factor, metal_factor=metal_factor, full=full, debug=debug)
 
                 if newmolec is None: 
                     print(f"\tNOT MERGED {[k.formula for k in comb]}")
@@ -326,13 +326,13 @@ def merge_elements(fragments, target_ref, cell_vector, full: bool=False, debug: 
     return fragments         
 
 ######################################################
-def fragments_reconstruct (subset_remaining_fragments, target_ref, cell_vector, full: bool=False, debug: int=0):
+def fragments_reconstruct (subset_remaining_fragments, target_ref, cell_vector, cov_factor: float=1.3, metal_factor: float=1.0, full: bool=False, debug: int=0):
 
     list_of_found_molecules = []
     list_of_bigger_fragments = []    
     remaining_frag = subset_remaining_fragments.copy()
     
-    fragments = merge_elements(remaining_frag, target_ref, cell_vector, full=full, debug=debug)
+    fragments = merge_elements(remaining_frag, target_ref, cell_vector, cov_factor=cov_factor, metal_factor=metal_factor, full=full, debug=debug)
 
     for newmolec in fragments:
         small_set = set(newmolec.ref_indices)
@@ -352,79 +352,6 @@ def fragments_reconstruct (subset_remaining_fragments, target_ref, cell_vector, 
     return list_of_found_molecules, list_of_bigger_fragments
 
 ######################################################
-def fragments_reconstruct_old (subset_remaining_fragments, target_ref, cell_vector, debug: int=0):
-    
-    list_of_found_molecules = []    
-    remaining_frag = subset_remaining_fragments.copy()
-    
-    count = 0
-    while (len(remaining_frag) > 0):
-        print("remaining_frag", [k.formula for k in remaining_frag], [k.subtype for k in remaining_frag])
-        
-        tobemerged = remaining_frag[:2]
-        rest = remaining_frag[2:]
-            
-        print("Fragments TO BE MERGED", [k.formula for k in tobemerged], [k.subtype for k in tobemerged])
-        print("Rest fragments",[k.formula for k in rest],[k.subtype for k in rest])
-        
-        found_molecule =[]
-        bigger_fragment = []
-        not_merged = []        
-        newmolec = merge_fragments(tobemerged, cell_vector, debug=debug)
-
-        if newmolec is None: 
-            print("NOT MERGED", tobemerged[0].formula, tobemerged[1].formula)
-            not_merged.append(tobemerged[0])
-            not_merged.append(tobemerged[1])
-
-        else :
-            print("MERGED", newmolec.formula)
-            small_set = set(newmolec.ref_indices)
-            print(f"{small_set=}")
-            if small_set.issubset(target_ref): 
-                if sorted(small_set) == target_ref:
-                    newmolec.subtype = "molecule"
-                    found_molecule.append(newmolec)
-                else :
-                    newmolec.subtype = "Rec. Fragment"
-                    bigger_fragment.append(newmolec)
-                    
-        print(f"{len(found_molecule)=}")
-        print(f"{len(bigger_fragment)=}")
-        print(f"{len(not_merged)=}")
-        
-        if len(not_merged) == 2:
-            remaining_frag = []
-            remaining_frag.append(tobemerged[0])
-            remaining_frag.extend(rest)
-            remaining_frag.append(tobemerged[1])
-                        
-        elif len(found_molecule) == 1 :
-            list_of_found_molecules.append(newmolec)
-            remaining_frag = []
-            remaining_frag.extend(rest)
-
-            if len(remaining_frag) == 0:
-                print("All fragments are reconstructed successfully", [k.formula for k in list_of_found_molecules])
-                print(f"{count=}")
-                break
-
-        elif len(bigger_fragment) == 1 :
-            remaining_frag = []
-            remaining_frag.append(newmolec)
-            remaining_frag.extend(rest)
-            if len(remaining_frag) == 1:
-                print("Bigger fragments are remained", [k.formula for k in remaining_frag])
-                print(f"{count=}")
-                break        
-
-        count +=1
-        
-            
-    return list_of_found_molecules, remaining_frag
-
-######################################################
-
 def get_updated_indices(sp_idx, new, cell_labels, cell_pos, cell_fracs, debug: int=0):
     """
     sp_idx : index of the symmetry operation
@@ -568,6 +495,9 @@ def reconstuct (refcell, newcell, sym_ops, debug: int=0):
     cell_fracs = newcell.frac_coord
     cell_vector = newcell.cell_vector
 
+    cov_factor = refcell.refmoleclist[0].cov_factor
+    metal_factor = refcell.refmoleclist[0].metal_factor
+
     new_structures = apply_symmetry_operations_reference(refcell, cell_vector, sym_ops)
     print(f"Number of symmetry operations: {len(new_structures)}")
 
@@ -593,7 +523,7 @@ def reconstuct (refcell, newcell, sym_ops, debug: int=0):
 
         if len(updated_cell) > 0 :
             # #### make blocks and get fragments ####
-            initial_fragments = get_fragments (newcell, updated_cell, updated_ref_indices, debug=0)    
+            initial_fragments = get_fragments (newcell, updated_cell, updated_ref_indices, cov_factor=cov_factor, metal_factor=metal_factor, debug=0)    
             molecules, fragments = classify_fragments(initial_fragments, newcell, debug=0)
             all_molecules.extend(molecules)
             
@@ -620,7 +550,7 @@ def reconstuct (refcell, newcell, sym_ops, debug: int=0):
                     print(f"target_ref: {newcell.refmoleclist[i].formula}")
                     print(f"Fragments formula {i}: {[frag.formula for frag in frag_list]}")
                     target_ref = newcell.refmoleclist[i].get_parent_indices("reference")
-                    list_of_found_molecules, remaining_frag = fragments_reconstruct (frag_list, target_ref, cell_vector, debug=0)
+                    list_of_found_molecules, remaining_frag = fragments_reconstruct (frag_list, target_ref, cell_vector, cov_factor=cov_factor, metal_factor=metal_factor, debug=0)
                     print(f"symmetry operations: {idx} {[mol.formula for mol in list_of_found_molecules]=}")
                     print(f"symmetry operations: {idx} {[frag.formula for frag in remaining_frag]=}")
                     if len(list_of_found_molecules) > 0:
@@ -647,7 +577,7 @@ def reconstuct (refcell, newcell, sym_ops, debug: int=0):
             newcell.error_reconstruction = False
         else:
             print(f"There are {num_rem_frags} remaining fragments.")
-            final_remaining_fragments, reconstructed_molecules = final_remaining_reconstruction(remaining_fragments, newcell, cell_vector, reconstructed_molecules, debug=0)
+            final_remaining_fragments, reconstructed_molecules = final_remaining_reconstruction(remaining_fragments, newcell, cell_vector, reconstructed_molecules, cov_factor=cov_factor, metal_factor=metal_factor, debug=0)
             if len(final_remaining_fragments) == 0:
                 print("All fragments are reconstructed successfully")
                 newcell.error_reconstruction = False
@@ -667,7 +597,7 @@ def reconstuct (refcell, newcell, sym_ops, debug: int=0):
     return all_molecules, reconstructed_molecules
 
 ######################################################
-def final_remaining_reconstruction(remaining_fragments, newcell, cell_vector, reconstructed_molecules, debug: int=0):
+def final_remaining_reconstruction(remaining_fragments, newcell, cell_vector, reconstructed_molecules, cov_factor: float=1.3, metal_factor: float=1.0, debug: int=0):
     
     # Reconstructing remaining fragments within the whole new cell
     final_remaining_fragments = []
@@ -676,7 +606,7 @@ def final_remaining_reconstruction(remaining_fragments, newcell, cell_vector, re
             print(f"target_ref: {newcell.refmoleclist[i].formula}")
             print(f"Fragments formula {i}: {[rem.formula for rem in rem_frag_list]}")
             target_ref = newcell.refmoleclist[i].get_parent_indices("reference")
-            list_of_found_molecules, final_remaining = fragments_reconstruct(rem_frag_list, target_ref, cell_vector, full=True, debug=debug)
+            list_of_found_molecules, final_remaining = fragments_reconstruct(rem_frag_list, target_ref, cell_vector, cov_factor=cov_factor, metal_factor=metal_factor, full=True, debug=debug)
             print(f"{[mol.formula for mol in list_of_found_molecules]=}")
             print(f"{[frag.formula for frag in final_remaining]=}")
             if len(list_of_found_molecules) > 0:
@@ -690,12 +620,16 @@ def final_remaining_reconstruction(remaining_fragments, newcell, cell_vector, re
 
 ######################################################
 def get_moleclist (newcell, refcell, all_molecules, debug: int=0):
+    cov_factor = refcell.refmoleclist[0].cov_factor
+    metal_factor = refcell.refmoleclist[0].metal_factor
+
     # Get moleclist for the unit cell
     newcell.moleclist = []
 
     for mol in all_molecules:
         newmolec = molecule(mol.labels, mol.coord, mol.frac_coord)
         newmolec.origin = "cell.reconstruct"
+        newmolec.set_adjacency_parameters(cov_factor, metal_factor)
         newmolec.set_atoms(create_adjacencies=True, debug=debug)
         newmolec.add_parent(newcell, mol.cell_indices)
         newmolec.add_parent(refcell, mol.ref_indices) 
