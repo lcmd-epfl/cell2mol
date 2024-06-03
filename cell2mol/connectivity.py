@@ -11,7 +11,7 @@ import os
 elemdatabase = ElementData()
 
 #######################################################
-def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: list, element: str="H", debug: int=0) -> Tuple[bool, list, list]:
+def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: list, element: str="H", removed_idx: list=None, debug: int=0) -> Tuple[bool, list, list]:
     from cell2mol.other import get_dist
     # This function adds one atom of a given "element" to a given "site=atom index" of a "ligand".
     # It does so at the position of the closest "metal" atom to the "site"
@@ -34,7 +34,7 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
         if idx == site:
             apos = np.array(a.coord.copy())
             tgt  = a.get_closest_metal(metalist)
-            if debug >= 2: print(f"ADD_ATOM: evaluating {apos=} and {tgt.coord=}")
+            if debug >= 2: print(f"ADD_ATOM: evaluating atom position={apos} and metal position={tgt.coord}")
             # ligand_idx = tgt.get_parent_index("ligand")
             metal_idx = tgt.get_parent_index("molecule")
             dist = get_dist(apos, tgt.coord)
@@ -50,19 +50,31 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
             # if debug >= 2: print(f"ADD_ATOM: received {tmpconmat=}")
             # if debug >= 2: print(f"ADD_ATOM: received {tmpconnec=}")
             # if debug >= 2: print(f"ADD_ATOM: received {tmpconnec[posadded]=}")
-            # newlab.append(tgt.label)
-            # newcoord.append(tgt.coord)
-            # if debug >= 2: writexyz("/Users/ycho/cell2mol/cell2mol/test/AFIBAU/", f"newcoord_with_H_new{addedHcoords[0]}.xyz", newlab, newcoord)
+            newlab_with_metal = newlab.copy()
+            newcoord_with_metal = newcoord.copy()
+            newlab_with_metal.append(tgt.label)
+            newcoord_with_metal.append(tgt.coord)
             # If no undesired adjacencies have been created, the coordinates are kept
             if tmpconnec[posadded] <= 1:
                 isadded = True
                 if debug >= 2: print(f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} is added at site {site}")
             # Otherwise, coordinates are reset
-            else:
-                if debug >= 1: print(f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
-                isadded = False
-                newlab = labels.copy()
-                newcoord = coords.copy()
+            elif tmpconnec[posadded] > 1 and removed_idx is not None and len(removed_idx) > 0 :
+                set1 = set([i for i, c in enumerate(tmpconmat[posadded]) if c != 0 ])
+                set2 = set(removed_idx)
+                if debug >= 1: print(f"ADD_ATOM: {element} is connected with ligand atoms with indices {set1}. previously removed indices {set2}")
+                result = list(set1 - set2)
+                print(f"ADD_ATOM: {element} is connected with ligand atoms with indices {result=}. ")
+                if len(result) <= 1:
+                    isadded = True
+                    if debug >= 2: print(f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} is added at site {site} after previously removing atom {removed_idx}")
+                else:
+                    if debug >= 1: print(f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
+                    if debug > 2: writexyz(os.getcwd(), f"target_atom_{a.label}_{apos[0]}_newcoord_with_H_new{addedHcoords[0]}.xyz", newlab_with_metal, newcoord_with_metal)
+                    isadded = False
+                    newlab = labels.copy()
+                    newcoord = coords.copy()
+
     return isadded, newlab, newcoord
 #######################################################
 def point_along_vector(point1, point2, distance):

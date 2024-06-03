@@ -173,7 +173,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     if   specie.subtype == "group":                                 return None
     elif specie.subtype == "molecule" and specie.iscomplex == True: return None
     elif specie.subtype == "molecule" and specie.iscomplex == False: 
-        if debug >= 2: print(f"    POSCHARGE: doing empty PROTONATION for this specie")
+        if debug >= 2: print(f"\nPOSCHARGE: doing empty PROTONATION for this specie {specie.formula} ({specie.subtype})")
         #empty_list = list([np.zeros((len(specie.labels)))])
         empty_list = []
         for i in range(len(specie.labels)):
@@ -204,6 +204,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     metal_electrons = np.zeros((natoms)).astype(int)  # It will remain as such
     elemlist        = np.empty((natoms)).astype(str)
 
+    if debug >= 2: print(f"\nPOSCHARGE: doing PROTONATION for this specie {specie.formula} ({specie.subtype})")
     # Program runs sequentially for each group of the ligand
     for g in ligand.groups:
         parent_indices = g.get_parent_indices("ligand")
@@ -359,7 +360,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         needs_nonlocal = True
                         non_local_groups += 1
                         if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
-                    elif a.connec >= 1:
+                    elif a.connec > 1:
                         block[idx] = 1
                         # elemlist[idx] = "H"
                         # addedlist[idx] = 1
@@ -370,7 +371,10 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
                     elif a.connec > 1:
-                        block[idx] = 1
+                        needs_nonlocal = True
+                        non_local_groups += 1
+                        if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")                        
+                        # block[idx] = 1
                         # elemlist[idx] = "H"
                         # addedlist[idx] = 1
                 # Hydrides
@@ -396,7 +400,9 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                     else:
                         # nitrogen with at least 3 adjacencies doesnt need H
                         if a.connec >= 3:
-                            block[idx] = 1 
+                            block[idx] = 1
+                            # needs_nonlocal = True
+                            # non_local_groups += 1 
                             # elemlist[idx] = "H"
                             # addedlist[idx] = 1
                         else:
@@ -414,7 +420,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                                 non_local_groups += 1
                                 if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
                 # Phosphorous
-                elif (a.connec == 3) and a.label == "P": block[idx] = 1
+                elif (a.connec >= 3) and a.label == "P": 
+                    block[idx] = 1
                 # Case of Carbon (Simple CX vs. Carbenes)
                 elif a.label == "C":
                     if ligand.natoms == 2:
@@ -479,9 +486,11 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     ############################
     
     if not needs_nonlocal:
+        if debug >= 2: print(f"\nPOSCHARGE: doing Local PROTONATION for this specie {specie.formula} ({specie.subtype})")
         new_prot = protonation(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, parent=specie) 
         protonation_states.append(new_prot)
     else:
+        if debug >= 2: print(f"\nPOSCHARGE: doing Non-local PROTONATION for this specie {specie.formula} ({specie.subtype})")
         # Generate the new adjacency matrix after local elements have been added to be sent to xyz2mol
         local_labels = newlab.copy()
         local_coords  = newcoord.copy()
@@ -514,7 +523,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
             combinations.sort(key=sum)
         else:
             combinations = [0,1]
-
+        count = 0   
         for com in combinations:
             newlab = local_labels.copy()
             newcoord = local_coords.copy()
@@ -537,7 +546,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             elemlist[jdx] = "H"
                             addedlist[jdx] = 1
                             mol = ligand.get_parent("molecule")
-                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx])
+                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], debug=debug)
                             if isadded:
                                 added_atoms += addedlist[jdx]
                                 if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
@@ -549,7 +558,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             elemlist[jdx] = "H"
                             addedlist[jdx] = 1
                             mol = ligand.get_parent("molecule")
-                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx])
+                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], debug=debug)
                             if isadded:
                                 added_atoms += addedlist[jdx]
                                 if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
@@ -560,9 +569,13 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                     toallocate += 1
 
             smi = " "
-        
-            new_prot = protonation(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, os, typ="Non-local", parent=specie) 
+            new_prot = protonation(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, os, typ="Non-local", parent=specie)
+            count+=1
             if new_prot.status == 1 and new_prot.added_atoms == os+local_added_atoms:
+                print(f"{new_prot.added_atoms=}")
+                print(f"{os=}")
+                print(f"{local_added_atoms=}")
+                print(f"{elemlist=}")
                 protonation_states.append(new_prot)
                 if debug >= 2:  print(f"        GET_PROTONATION_STATES: Protonation SAVED with {added_atoms} atoms added to ligand. status={new_prot.status}")
             else:

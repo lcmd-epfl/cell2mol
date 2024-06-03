@@ -466,3 +466,4 @@ def print_output(moleclist):
             else :
                 print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula}") #{mol.totcharge=} {mol.spin=}\n  {mol.smiles}")
         print("")
+

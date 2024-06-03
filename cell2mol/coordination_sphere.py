@@ -370,31 +370,52 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
     if debug > 0: print("Entering COORD_CORR_NONHAPTIC:")
     if not hasattr(group,"metals"): group.get_connected_metals()
 
+
+    # Pair each atom with its index in the original list
+    indexed_atoms = list(enumerate(group.atoms))
+
+    # Sort the indexed list of atoms, prioritizing hydrogen atoms
+    sorted_indexed_atoms = sorted(indexed_atoms, key=lambda x: (x[1].label != "H", x[1].label))
+
+    # Extract the sorted atoms and their original indices into separate lists
+    sorted_atoms = [atom[1] for atom in sorted_indexed_atoms]
+    original_indices = [atom[0] for atom in sorted_indexed_atoms]
+
+    # Update the group's atoms list to the sorted atoms
+    group.atoms = sorted_atoms
+
     ## First Correction (former verify_connectivity)
     conn_idx = []
-    for idx, atom in enumerate(group.atoms):
-        if debug > 0: print(f"\tCoordinating atom label={atom.label} with mconnec={atom.mconnec}, group index {idx}")
+    good_atoms = []
+    removed_idx = []
+    for idx, atom in zip(original_indices, sorted_atoms):
+        if debug > 0: print(f"\tCoordinating atom label={atom.label} with mconnec={atom.mconnec}, original group index {idx}")
         isremoved = False
         ## Now there is an extra loop for each metal of the group. For bridging ligands
+
         for met in group.metals:
             if isremoved: continue
             lig     = group.get_parent("ligand")
             ligand_idx = atom.get_parent_index("ligand")
             if debug > 0: print(f"\tevaluating coordination with metal {met.label}")
             if debug > 2: print(f"\n{met}")
-            isadded, newlab, newcoord = add_atom(lig.labels, lig.coord, ligand_idx, lig, list([met]), "H", debug=debug)
+            isadded, newlab, newcoord = add_atom(lig.labels, lig.coord, ligand_idx, lig, list([met]), "H", removed_idx, debug=debug)
+            if debug >= 2:print(f"{removed_idx=}")
             if isadded:
-                if debug > 0: print(f"\tconnectivity verified for atom {atom.label} with ligand index {ligand_idx}")
+                if debug > 0: print(f"\tConnectivity verified for atom {atom.label} with ligand index {ligand_idx}")
                 conn_idx.append(idx)
+                good_atoms.append(atom)
             else:
-                if debug > 0: print(f"\tcorrecting mconnec of atom {atom.label} with ligand index {ligand_idx}")
+                if debug > 0: print(f"\tCORRECT mconnec of atom {atom.label} with ligand index {ligand_idx}")
                 isremoved = True
+                removed_idx.append(ligand_idx)
                 ### Reset Connectivity of the atom and the parents
                 atom.reset_mconnec(met, debug=debug)
                 met.get_coord_sphere()
                 met.get_coord_sphere_formula()
                 # Group will be redifined using split_group, so we don't need to remove the atom from group 
                 # group.remove_atom(idx, debug=debug)
+
     conn_idx = sorted(list(set(conn_idx)))
     return group, conn_idx
 
