@@ -4,7 +4,7 @@ from ase.io import read
 from cell2mol.helper import parsing_arguments
 from cell2mol.cif2info import cif_2_info
 from cell2mol.classes import cell
-from cell2mol.read_write import readinfo, prefiter_cif, print_output, writexyz
+from cell2mol.read_write import readinfo, prefiter_cif, print_output, writexyz, get_wyckoff_positions
 from cell2mol.new_c2m_module import cell2mol
 from cell2mol.other import handle_error
 from cell2mol.cell_operations import frac2cart_fromparam
@@ -39,21 +39,23 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     if os.path.exists(input_path):    
         ## If the input is a .cif file, then it is converted to a .info file using cif_2_info from cif2cell
         if extension == ".cif":
-            # Pre-filtering of the .cif file
-            prefiter_cif(input_path)
-            errorpath    = os.path.join(current_dir, "cif2cell.err")
-            infopath     = os.path.join(current_dir, "{}.info".format(name))
-            # if error exist : sys.exit(1)
-            # Create .info file 
-            cif_2_info(input_path, infopath, errorpath)
-            # Checks errors in cif_2_info
-            with open(errorpath, 'r') as err:
-                for line in err.readlines():
-                    if "Error" in line: sys.exit(1)
-
+            pass
+            # try:
+            #     errorpath    = os.path.join(current_dir, "cif2cell.err")
+            #     infopath     = os.path.join(current_dir, "{}.info".format(name))
+            #     # if error exist : sys.exit(1)
+            #     # Create .info file 
+            #     cif_2_info(input_path, infopath, errorpath)
+            #     # Checks errors in cif_2_info
+            #     with open(errorpath, 'r') as err:
+            #         for line in err.readlines():
+            #             if "Error" in line: sys.exit(1)
+            # except:
+            #     pass
         ## If the input is an .info file, then is used directly
         elif extension == ".info": infopath = input_path
         else:                      sys.exit(1)
+
 
     output = open(output_fname, "w")
     sys.stdout = output 
@@ -62,6 +64,12 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     print(f"cell2mol version {version}")
     print(f"INITIATING cell object from input path: {input_path}") 
     print(f"Debug level: {debug}")  
+    
+    # Pre-filtering of the .cif file
+    # if not prefiter_cif(input_path):
+    #     output.close()
+    #     sys.stdout = stdout        
+    #     sys.exit(1)
 
     # Read cif file
     atoms = read(input_path)
@@ -77,7 +85,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     cell_pos = atoms.get_positions(wrap=True, **wrap_keywords)
     cell_fracs = atoms.get_scaled_positions()
     cell_vector = atoms.cell.array
-    # cell_parameters = atoms.cell.cellpar()
+    cell_param = atoms.cell.cellpar()
     space_group = atoms.info['spacegroup']
     sym_ops = space_group.get_op()
 
@@ -86,8 +94,9 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     ##########################################
 
     # Get reference molecules
-    labels, pos, ref_labels, ref_fracs, cellvec, cell_param = readinfo(infopath)
+    # labels, pos, ref_labels, ref_fracs, cellvec, cell_param = readinfo(infopath)
     # labels, pos, and cellvec will not be used
+    ref_labels, ref_fracs = get_wyckoff_positions(input_path)
     ref_pos = frac2cart_fromparam(ref_fracs, cell_param)
     
     # Create reference cell object
@@ -97,8 +106,18 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
 
     if not refcell.has_isolated_H:  
         refcell.check_missing_H(debug=debug)                                     
-    refcell.assess_errors(mode="hydrogens")
-    
+        refcell.assess_errors(mode="hydrogens")
+
+        if refcell.error_case == 0:
+            # Get unique species for the reference cell
+            refcell.get_unique_species(debug=debug) # Get unique_species, unique_indices, and species_list
+            if debug >= 1:
+                print(f"refcell.unique_species {[specie.formula for specie in refcell.unique_species]} {refcell.unique_indices=}\n")
+                print(f"refcell.species_list {[specie.formula for specie in refcell.species_list]}")
+            # Get possible charge states for the unique species in the reference cell
+            refcell.get_selected_cs(debug=debug)
+            refcell.assess_errors(mode="unique_species")
+
     # Save reference cell object
     refcell.save(ref_cell_fname)
 
@@ -115,10 +134,9 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
         newcell.get_subtype("unit_cell")
         
         # Get reference molecules
-        newcell.get_reference_molecules(refcell.labels, refcell.frac_coord, debug=debug)
+        newcell.get_reference_molecules(refcell.labels, refcell.frac_coord, debug=-1)
         if not newcell.has_isolated_H:  
-            newcell.check_missing_H(debug=debug)                                     
-        newcell.assess_errors(mode="hydrogens")
+            newcell.check_missing_H(debug=-1)                                     
 
         print(f"ENTERING cell2mol with {debug=}")
 

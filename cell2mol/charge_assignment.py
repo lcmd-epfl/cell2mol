@@ -14,7 +14,7 @@ elemdatabase = ElementData()
 #############################
 ### Loads Rdkit & xyz2mol ###
 #############################
-
+import rdkit
 from rdkit import Chem
 from rdkit.Chem.Draw.MolDrawing import DrawingOptions  # Only needed if modifying defaults
 DrawingOptions.bondLineWidth = 2.2
@@ -360,9 +360,9 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         non_local_groups += 1
                         if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
                     elif a.connec >= 1:
-                        # block[idx] = 1
-                        elemlist[idx] = "H"
-                        addedlist[idx] = 1
+                        block[idx] = 1
+                        # elemlist[idx] = "H"
+                        # addedlist[idx] = 1
 
                 # Sulfur and Selenium
                 elif a.label == "S" or a.label == "Se":
@@ -370,9 +370,9 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
                     elif a.connec > 1:
-                    #     block[idx] = 1
-                        elemlist[idx] = "H"
-                        addedlist[idx] = 1
+                        block[idx] = 1
+                        # elemlist[idx] = "H"
+                        # addedlist[idx] = 1
                 # Hydrides
                 elif a.label == "H":
                     if a.connec == 0:
@@ -395,9 +395,10 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             addedlist[idx] = 1
                     else:
                         # nitrogen with at least 3 adjacencies doesnt need H
-                        if a.connec >= 3: 
-                            elemlist[idx] = "H"
-                            addedlist[idx] = 1
+                        if a.connec >= 3:
+                            block[idx] = 1 
+                            # elemlist[idx] = "H"
+                            # addedlist[idx] = 1
                         else:
                             # Checks for adjacent Atoms
                             list_of_adj_atoms = []
@@ -979,7 +980,7 @@ def prepare_mols (moleclist: list, unique_indices: list, unique_species: list, f
 #######################################################
 def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
     ## Receives a ligand class object and constructs the smiles and the rdkit_obj object from scratch, using atoms and bond information
-
+     
     Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
     #### Creates an empty editable molecule
     rwlig = Chem.RWMol()    
@@ -1028,23 +1029,31 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
     obj = rwlig.GetMol()
     smiles = Chem.MolToSmiles(obj)
     
-    Chem.SanitizeMol(obj)
-    Chem.DetectBondStereochemistry(obj, -1)
-    Chem.AssignStereochemistry(obj, flagPossibleStereoCenters=True, force=True)
-    Chem.AssignAtomChiralTagsFromStructure(obj, -1)
-    
-    if debug >= 1: print(f"{ligand.formula=} {smiles=}")
-    ## visulize a corrected rdkit object
-    # if debug >=2:
-    #     from IPython.display import display
-    #     from rdkit.Chem.Draw import IPythonConsole
-    #     IPythonConsole.drawOptions.addAtomIndices = True
-    #     IPythonConsole.molSize = 300,300
+    try:
+        Chem.SanitizeMol(obj)
+        Chem.DetectBondStereochemistry(obj, -1)
+        Chem.AssignStereochemistry(obj, flagPossibleStereoCenters=True, force=True)
+        Chem.AssignAtomChiralTagsFromStructure(obj, -1)
+        
+        if debug >= 1: print(f"{ligand.formula=} Before correction: {ligand.smiles=} / After correction: {smiles=}")
+        ligand.smiles = smiles
+        ligand.rdkit_obj = obj
+        
+        ## visulize a corrected rdkit object
+        # if debug >=2:
+        #     from IPython.display import display
+        #     from rdkit.Chem.Draw import IPythonConsole
+        #     IPythonConsole.drawOptions.addAtomIndices = True
+        #     IPythonConsole.molSize = 300,300
 
-    #     print(f"{ligand.formula=} {smiles=}")
-    #     display(mol_with_atom_index(obj))
+        #     print(f"{ligand.formula=} {smiles=}")
+        #     display(mol_with_atom_index(obj))
+        return True
 
-    return smiles, obj
+    except rdkit.Chem.rdchem.AtomValenceException as e:
+        print(f"Failed to process molecule: {e}")
+        return False
+
 
 #######################################################
 def get_smiles_complex (mol: object, debug: int=0) -> Tuple[str, object]:

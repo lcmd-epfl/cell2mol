@@ -7,23 +7,74 @@ import re
 from collections import defaultdict
 
 #######################
+def get_wyckoff_positions(file_path):
+    # Open and read the CIF file
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    # Flags and storage for parsing
+    start_parsing = False
+    data = []
+
+    # Iterate through each line
+    for line in lines:
+        # Check if line contains the loop declaration for atomic sites
+        if '_atom_site_fract_z' in line:
+            start_parsing = True
+            continue
+
+        # Stop parsing if another loop starts or if data is done
+        if 'loop_' in line and start_parsing:
+            break
+
+        # Parse the atomic position data
+        if start_parsing:
+            if line.strip():  # Check for non-empty line
+                parts = line.split()
+                if len(parts) >= 4:  # Ensure there are enough parts to parse
+                    # Clean and extract the coordinates before parentheses
+                    x = parts[2].split('(')[0]
+                    y = parts[3].split('(')[0]
+                    z = parts[4].split('(')[0]
+                    # Append label, type, and cleaned fractional coordinates
+                    data.append((parts[0], parts[1], float(x), float(y), float(z)))
+
+    # Now 'data' is a list of tuples, each containing:
+    # (Label, Element, Fractional_x, Fractional_y, Fractional_z)    
+    # for entry in data:
+    #     print(f"{entry[0]} {entry[1]} {entry[2]} {entry[3]} {entry[4]}")
+
+    ref_labels = [entry[1] for entry in data]
+    ref_fracs = [[entry[2], entry[3], entry[4]] for entry in data]
+
+    # print(f"{len(ref_labels)=} {ref_labels}=")
+    # print(f"{len(ref_fracs)=} {ref_fracs}=")
+
+    return ref_labels, ref_fracs
+
+#######################
 def prefiter_cif(input_path):
 
     with open(input_path, 'r') as ciffile:
         file_content = ciffile.read()
-        if 'radical' in file_content:                   
-            sys.exit(0)
-        elif '_atom_site_fract_x' not in file_content:  
-            sys.exit(0)
+        if 'radical' in file_content:
+            print("Radical found in cif file. STOPPING")                   
+            return False
+        elif '_atom_site_fract_x' not in file_content:
+            print("No fractional coordinates found in cif file. STOPPING")  
+            return False
         elif '?' in file_content:
             if "_diffrn_ambient_temperature ?" not in file_content and "_chemical_melting_point ?" not in file_content:
-                sys.exit(0)
+                print("Disorder found in cif file. STOPPING")
+                return False
             else:
                 num_greps = file_content.count('?')
-                if num_greps > 1:                      
-                    sys.exit(0)
+                if num_greps > 1:
+                    print("Disorder found in cif file. STOPPING")                      
+                    return False
         else:
-            pass
+            print("Cif file is ready for processing")
+            return True
 #######################
 def save_binary(variable, pathfile, backup: bool=False):
     try:
@@ -400,9 +451,9 @@ def print_output(moleclist):
                 print("")
             for metal in mol.metals:
                 if hasattr(metal, "charge") and hasattr(metal, "spin"):
-                    print(f"|# {metal.subtype}({metal.type}) {metal.label} {metal.coord_nr=} {metal.coord_geometry} {metal.get_coord_sphere_formula()} {metal.mconnec=} {metal.connec=} {metal.charge=} {metal.spin=}")
+                    print(f"|# {metal.subtype}({metal.type}) {metal.label} {metal.coord_nr=} {metal.coord_geometry=} {metal.coord_sphere_formula=} {metal.mconnec=} {metal.connec=} {metal.charge=} {metal.spin=}")
                 else :
-                    print(f"|# {metal.subtype}({metal.type}) {metal.label} {metal.coord_nr=} {metal.coord_geometry} {metal.get_coord_sphere_formula()} {metal.mconnec=} {metal.connec=}") #{metal.charge=} {metal.spin=} 
+                    print(f"|# {metal.subtype}({metal.type}) {metal.label} {metal.coord_nr=} {metal.coord_geometry=} {metal.coord_sphere_formula=} {metal.mconnec=} {metal.connec=}") #{metal.charge=} {metal.spin=} 
                 # print(f"|# {metal.get_coord_sphere_formula()}")
                 # print(f"|# {metal.coord_sphere_formula}")
                 # print(f"|# {metal.mconnec=} {metal.connec=}")

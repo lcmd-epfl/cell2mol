@@ -76,93 +76,33 @@ def assign_charge_state_for_unique_species(unique_species, final_charges_tuple, 
             specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
         elif specie.subtype == "metal" :
             charge_list = specie.possible_cs   
-            idx = charge_list.index(final_charge)
+            # idx = charge_list.index(final_charge)
             cs = specie.possible_cs[idx]
             specie.set_charge(cs) 
     for specie in unique_species:
         if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
             print(specie.formula, specie.charge_state, specie.totcharge, specie.smiles)
     return unique_species
-######################################################
-def get_unique_indices(newcell, reference_species_list, debug: int=0):
-    
-    newcell.unique_indices = []
-    newcell.species_list = []
-    for mol in newcell.moleclist:
-        if not mol.iscomplex:
-            for ref in reference_species_list:
-                if (ref.subtype == "molecule") and not ref.iscomplex:
-                    issame = compare_molecules(ref, mol, debug=debug)
-                    if issame:
-                        mol.unique_index = ref.unique_index 
-                        if debug >= 1: print(f"Matched {mol.formula} {ref.formula} {mol.unique_index} {ref.unique_index}")
-                        newcell.unique_indices.append(mol.unique_index)
-                        newcell.species_list.append(mol)
-        else:
-            for ref in reference_species_list:
-                if ref.subtype == "ligand":
-                    for lig in mol.ligands:
-                        issame = compare_molecules(ref, lig, debug=debug)
-                        if issame: 
-                            lig.unique_index = ref.unique_index
-                            if debug >= 1: print(f"Matched {lig.formula} {ref.formula} {lig.unique_index} {ref.unique_index}")
-                            newcell.unique_indices.append(lig.unique_index)
-                            newcell.species_list.append(lig)
-                if ref.subtype == "metal":
-                    for met in mol.metals:
-                        if ref.get_parent_index("reference") == met.get_parent_index("reference"):
-                            met.unique_index = ref.unique_index
-                            if debug >= 1: print(f"Matched {met.formula} {ref.formula} {met.unique_index} {ref.unique_index}")
-                            newcell.unique_indices.append(met.unique_index)
-                            newcell.species_list.append(met)
 
-    return newcell
 ######################################################
-def get_unique_indices_old (newcell, refcell, debug: int=0):
-    
-    newcell.unique_indices = []
-    for mol in newcell.moleclist:
-        if not mol.iscomplex:
-            for ref in newcell.refmoleclist:
-                if not ref.iscomplex:
-                    issame = compare_molecules(ref, mol, debug=debug)
-                    if issame:
-                        mol.unique_index = ref.unique_index 
-                        if debug >= 1: print(f"Matched {mol.formula} {ref.formula} {ref.unique_index}")
-                        newcell.unique_indices.append(mol.unique_index)
-        else:
-            for ref in newcell.refmoleclist:
-                if ref.iscomplex:
-                    for lig in mol.ligands:
-                        for ref_lig in ref.ligands:
-                            issame = compare_molecules(ref_lig, lig, debug=debug)
-                            if issame: 
-                                lig.unique_index = ref_lig.unique_index
-                                if debug >= 1: print(f"Matched {lig.formula} {ref_lig.formula} {ref_lig.unique_index}")
-                                newcell.unique_indices.append(lig.unique_index)
-
-                    for met in mol.metals:
-                        for ref_met in ref.metals:
-                            if ref_met.get_parent_index("reference") == met.get_parent_index("reference"):
-                                met.unique_index = ref_met.unique_index
-                                if debug >= 1: print(f"Matched {met.formula} {ref_met.formula} {ref_met.unique_index}")
-                                newcell.unique_indices.append(met.unique_index)
-
-    return newcell
-######################################################
-def compare_molecules(ref, mol, debug: int=0):
-    if (ref.natoms == mol.natoms) & (ref.formula == mol.formula):
-        if (sorted(ref.get_parent_indices("reference")) == sorted(mol.get_parent_indices("reference"))):
-            print("Matched", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
-            issame = True
-            # mol.unique_index = ref.unique_index
-            # set_charge_state_simple(ref, mol, debug=debug)
-            # set_charge_state(ref, mol, mode=2, debug=debug) 
-        else:
-            issame = False
-    else : 
-        issame = False
-    return issame
+def print_possible_and_selected_cs (newcell, refcell, debug: int=0):
+    if debug >= 1:
+        print(f"\npossible charge states and charge of selected charge state for unique species")
+        for idx, (specie, select) in enumerate(zip(refcell.unique_species, refcell.selected_cs)):
+            print(f"Unique {specie.unique_index=} {specie.formula=}")
+            print(f"charge of selected charge state={select}\n{specie.possible_cs=}\n")
+        
+        print(f"species list in the reference and their unique indices")
+        for specie, idx in zip(refcell.species_list, refcell.unique_indices):
+            print(f"\t{specie.formula=} {specie.unique_index=}")
+            if idx != specie.unique_index:
+                print(f"WARNING: {specie.formula=} {specie.unique_index=} {idx=} from refcell unique indices")
+        
+        print(f"species list in the unit cell and their unique indices")
+        for specie, idx in zip(newcell.species_list, newcell.unique_indices):
+            print(f"\t{specie.formula=} {specie.unique_index=}")
+            if idx != specie.unique_index:
+                print(f"WARNING: {specie.formula=} {specie.unique_index=} {idx=} from newcell unique indices")
 
 ######################################################
 def set_charge_state_simple (reference, target, debug: int=0):
@@ -200,43 +140,44 @@ def set_charge_state(reference, target, mode, debug: int=0):
     print("SET_CHARGE_STATE:", reference.charge_state)
 
     if target.subtype == "molecule" and target.iscomplex == False:
-        if debug >=1 : print(f"({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie")
+        if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie")
         empty_list = [int(0)]*len(target.labels)
         empty_prot = protonation(target.labels, target.coord, target.cov_factor, 
                                 int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=target)
         cs = get_charge(final_charge, empty_prot)
     
     elif target.subtype == "ligand":
-        if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Ligand")
+        if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Ligand")
         prot = reference.charge_state.protonation
         temp_prot = copy.deepcopy(prot)
         temp_prot.parent = target
         
         if mode == 1:
             # For "reference" cell
-            # target.get_protonation_states(debug=debug)
-            # prot = target.protonation_states[0]
-            # cs = get_charge(reference.charge_state.uncorr_total_charge, prot)
-
+            target.get_protonation_states(debug=debug)
+            target.get_possible_cs(debug=debug)
+            charge_list = [cs.corr_total_charge for cs in target.possible_cs]
+            idx = charge_list.index(final_charge)
+            cs = target.possible_cs[idx]
             # if len(target.protonation_states) != 1 :
             #     if debug >=1 : print(f"WARNING: {target.protonation_states=}")
             
-            ref_data, target_data = arrange_data_for_reorder(reference, target)
-            if debug >=2 : print(ref_data, target_data)
-            dummy1, dummy2, map12 = reorder(ref_data, target_data, reference.coord, target.coord)
+            # ref_data, target_data = arrange_data_for_reorder(reference, target)
+            # if debug >=2 : print(ref_data, target_data)
+            # dummy1, dummy2, map12 = reorder(ref_data, target_data, reference.coord, target.coord)
         
-            if np.array_equal(map12, np.arange(len(target_data))):
-                if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} No need to reorder")
-                # temp_prot.coords = target.coord
-                cs = get_charge(reference.charge_state.uncorr_total_charge, temp_prot)               
-            else:
-                reordered_prot = temp_prot.reorder(map12)
-                # reordered_prot.coords = target.coord
-                if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {map12=}")
-                cs = get_charge(reference.charge_state.uncorr_total_charge, reordered_prot)
+            # if np.array_equal(map12, np.arange(len(target_data))):
+            #     if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} No need to reorder")
+            #     # temp_prot.coords = target.coord
+            #     cs = get_charge(reference.charge_state.uncorr_total_charge, temp_prot)               
+            # else:
+            #     reordered_prot = temp_prot.reorder(map12)
+            #     # reordered_prot.coords = target.coord
+            #     if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {map12=}")
+            #     cs = get_charge(reference.charge_state.uncorr_total_charge, reordered_prot)
         
         elif mode == 2:
-            print(f"{temp_prot.labels=} {len(temp_prot.labels)=} {len(temp_prot.coords)=} {len(temp_prot.block)=} {temp_prot.added_atoms=}")
+            print(f"SET_CHARGE_STATE:{temp_prot.labels=} {len(temp_prot.labels)=} {len(temp_prot.coords)=} {len(temp_prot.block)=} {temp_prot.added_atoms=}")
             # For "unit" cell
             ref_data = reference.get_parent_indices("reference")
             target_data = target.get_parent_indices("reference")
@@ -245,14 +186,14 @@ def set_charge_state(reference, target, mode, debug: int=0):
             
             reordered_prot = temp_prot.reorder(sorted_indices)
             # reordered_prot.coords = target.coord
-            if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {sorted_indices=}")
+            if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {sorted_indices=}")
             cs = get_charge(reference.charge_state.uncorr_total_charge , reordered_prot)
 
     target.charge_state = cs
     if final_charge != cs.corr_total_charge:
-        print(f"WARNING: {target.formula=} {final_charge=} {cs.corr_total_charge=} final_charge != cs.corr_total_charge")
+        print(f"SET_CHARGE_STATE: WARNING!!! {target.formula=} {final_charge=} {cs.corr_total_charge=} final_charge != cs.corr_total_charge")
     target.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
-    print(f"{target.formula=} {target.totcharge=} {target.smiles=}")
+    print(f"SET_CHARGE_STATE:{target.formula=} {target.totcharge=} {target.smiles=}")
 
 ######################################################
 def get_charge(charge: int, prot: object, allow: bool=True, debug: int=0): 
@@ -305,3 +246,139 @@ def prepare_mol (mol):
         tmp_atcharge[parent_index] = met.charge  
         
     mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge, smiles=tmp_smiles)
+
+######################################################
+def create_bonds_specie (specie, debug: int=0):
+    from cell2mol.classes import bond
+    if debug >= 1: print(f"CREATE_bonds_specie: {specie.formula=}, {specie.subtype=} {specie.smiles=}")
+    n_atoms = specie.natoms # e.g. 9 
+    n_atoms_rdkit = specie.rdkit_obj.GetNumAtoms() # e.g.10 
+    if debug >= 1: print(f"CREATE_bonds_specie: {specie.formula=}, {specie.subtype=}")
+
+    if n_atoms == n_atoms_rdkit:
+        if debug >= 2: print(f"\tNumber of atoms in {specie.subtype} object and RDKit object are equal: {n_atoms} {n_atoms_rdkit}")
+        for idx, rdkit_atom in enumerate(specie.rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8
+            if debug >= 2: print(f"\t{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
+            if len(rdkit_atom.GetBonds()) == 0:
+                if debug >= 1: print(f"\tNO BONDS CREATED for {specie.atoms[idx].label} due to no bonds in {specie.subtype} RDKit object")
+            else:
+                for b in rdkit_atom.GetBonds():
+                    bond_startatom = b.GetBeginAtomIdx()
+                    bond_endatom   = b.GetEndAtomIdx()
+                    bond_order     = b.GetBondTypeAsDouble()
+                    if specie.atoms[bond_endatom].label != specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
+                        if debug >= 1: print(f"\tError with Bond EndAtom", specie.atoms[bond_endatom].label, specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
+                    else:
+                        if bond_endatom == idx:
+                            start = bond_endatom
+                            end   = bond_startatom
+                        elif bond_startatom == idx:
+                            start = bond_startatom
+                            end   = bond_endatom      
+
+                        # create new bond object
+                        if debug >=2: print(f"\tBOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
+                        new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
+                        specie.atoms[idx].add_bond(new_bond)
+                
+                if hasattr(specie.atoms[idx], "bonds"):
+                    if debug >=1 : 
+                        print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
+                else:
+                    if debug >=1: print(f"\tNO BONDS for {specie.atoms[idx].label} with {specie.subtype} RDKit object index {idx}. Please check the RDKit object.")
+                    return False # return False if no bonds are created
+    else:
+        if debug >= 1: print(f"\tNumber of atoms in {specie.subtype} object and RDKit object are different: {n_atoms} {n_atoms_rdkit}")
+        if debug >= 2: print(f"\t{[(i, atom.label) for i, atom in enumerate(specie.atoms)]}")
+        if debug >= 2: print(f"\t{[(i, atom.GetSymbol()) for i, atom in enumerate(specie.rdkit_obj.GetAtoms())]}")       
+        non_bonded_atoms = list(range(0, n_atoms_rdkit))[n_atoms:]
+        if debug >= 2: print(f"\tNON_BONDED_ATOMS", non_bonded_atoms)
+
+        for idx, rdkit_atom in enumerate(specie.rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+            if debug >= 2: print(f"\t{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
+            if len(rdkit_atom.GetBonds()) == 0:
+                if debug >= 1: print(f"\tNO BONDS CREATED for {rdkit_atom.GetSymbol()} due to no bonds in {specie.subtype} RDKit object")
+            else:
+                for b in rdkit_atom.GetBonds():
+                    bond_startatom = b.GetBeginAtomIdx()
+                    bond_endatom   = b.GetEndAtomIdx()
+                    bond_order     = b.GetBondTypeAsDouble()
+  
+                    if bond_startatom in non_bonded_atoms or bond_endatom in non_bonded_atoms:
+                        if debug >= 2: print(f"\tNO BOND CREATED {bond_startatom=} or {bond_endatom=} is not in the specie.atoms. It belongs to {non_bonded_atoms=}.")
+                    else :
+                        if bond_endatom == idx:
+                            start = bond_endatom
+                            end   = bond_startatom
+                        elif bond_startatom == idx:
+                            start = bond_startatom
+                            end   = bond_endatom   
+
+                        # create new bond object
+                        if debug >=2: print(f"\tBOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
+                        new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
+                        specie.atoms[idx].add_bond(new_bond)
+                
+                if idx not in non_bonded_atoms:
+                    if hasattr(specie.atoms[idx], "bonds"):
+                        if debug >=2: 
+                            print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
+                    else:
+                        if debug >=1: print(f"\tNO BONDS for {specie.atoms[idx].label} with {specie.subtype} RDKit object index {idx}. Please check the RDKit object.")
+                        return False # return False if no bonds are created
+                else :
+                    if debug >=1: print(f"\tNO BONDS for {rdkit_atom.GetSymbol()} with {specie.subtype} RDKit object index {idx} because it is an added atom")
+
+    return True                    
+######################################################
+def create_metal_ligand_bonds (mol, debug: int=0):
+    # Third Part. Adds Metal-Ligand Bonds, with a zero order:
+    from cell2mol.classes import bond
+    if mol.iscomplex:
+        for lig in mol.ligands:
+            for at in lig.atoms:
+                count = 0
+                for met in mol.metals: 
+                    isconnected = at.check_connectivity(met, debug=debug)
+                    if isconnected:
+                        index_1 = at.get_parent_index("molecule")
+                        index_2 = met.get_parent_index("molecule")
+                        if index_1 < index_2 : 
+                            bond_startatom = at
+                            bond_endatom   = met
+                        else:
+                            bond_startatom = met
+                            bond_endatom   = at
+                        newbond = bond(bond_startatom, bond_endatom, 0)
+                        at.add_bond(newbond)
+                        met.add_bond(newbond)
+                        count += 1 
+                if count != at.mconnec: 
+                    if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for atom: \n{at}\n of ligand: \n{lig}\n")
+                    if debug >= 1: print(f"CELL.CREATE_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
+
+######################################################
+def create_metal_metal_bonds (mol, debug: int=0):
+    from cell2mol.classes import bond
+    # Adds Metal-Metal Bonds, with a zero order:
+    if mol.iscomplex:
+        if len(mol.metals) > 1 :
+            if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
+            if debug >= 2: print(f"CELL.CREATE_BONDS: Metals: {mol.metals}")
+            for idx, met1 in enumerate(mol.metals):
+                for jdx, met2 in enumerate(mol.metals):
+                    if idx <= jdx: continue
+                    isconnected = met1.check_connectivity(met2, debug=debug)
+                    if isconnected:
+                        index_1 = met1.get_parent_index("molecule")
+                        index_2 = met2.get_parent_index("molecule")
+                        if index_1 < index_2 : 
+                            bond_startatom = met1
+                            bond_endatom   = met2
+                        else:
+                            bond_startatom = met2
+                            bond_endatom   = met1
+                        newbond = bond(bond_startatom, bond_endatom, 0)
+                        met1.add_bond(newbond) 
+                        met2.add_bond(newbond) 
+######################################################
