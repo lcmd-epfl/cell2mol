@@ -588,23 +588,23 @@ class ligand(specie):
         connected_idx     = self.connected_idx
         if debug > 0: print(f"\nLIGAND.SPLIT_LIGAND: splitting {self.formula} into groups")
         if debug >= 2:
-            print(f"LIGAND.SPLIT_LIGAND: {self.indices=}") 
-            print(f"LIGAND.SPLIT_LIGAND: {connected_idx=}")
+            print(f"\tLIGAND.SPLIT_LIGAND: {self.indices=}") 
+            print(f"\tLIGAND.SPLIT_LIGAND: {connected_idx=}")
         conn_labels     = extract_from_list(connected_idx, self.labels, dimension=1)
         conn_coord      = extract_from_list(connected_idx, self.coord, dimension=1)
         conn_frac_coord = extract_from_list(connected_idx, self.frac_coord, dimension=1)
         conn_radii      = extract_from_list(connected_idx, self.radii, dimension=1)
         conn_atoms      = extract_from_list(connected_idx, self.atoms, dimension=1)
-        if debug >= 2: print(f"LIGAND.SPLIT_LIGAND: {conn_labels=}")
+        if debug >= 2: print(f"\tLIGAND.SPLIT_LIGAND: {conn_labels=}")
 
         if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=self.cov_factor, debug=debug)
         else:                          blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, debug=debug)      
-        if debug >= 2: print(f"LIGAND.SPLIT_LIGAND: {blocklist=}")
+        if debug >= 2: print(f"\tLIGAND.SPLIT_LIGAND: {blocklist=}")
         ## Arranges Groups 
         for b in blocklist:
-            if debug >= 2 : print(f"LIGAND.SPLIT_LIGAND: block={b}")
+            if debug >= 2 : print(f"\tLIGAND.SPLIT_LIGAND: block={b}")
             gr_indices = extract_from_list(b, connected_idx, dimension=1, debug=debug)
-            if debug > 1: print(f"LIGAND.SPLIT_LIGAND: {gr_indices=}")
+            if debug > 1: print(f"\tLIGAND.SPLIT_LIGAND: {gr_indices=}")
             gr_labels       = extract_from_list(b, conn_labels, dimension=1, debug=debug)
             gr_coord        = extract_from_list(b, conn_coord, dimension=1)
             gr_frac_coord   = extract_from_list(b, conn_frac_coord, dimension=1)
@@ -626,16 +626,16 @@ class ligand(specie):
             newgroup.get_hapticity(debug=debug)
             newgroup, conn_idx = newgroup.check_coordination(debug=debug)
             if len(conn_idx) == len(newgroup.atoms):
-                if debug > 1 : print(f"LIGAND.SPLIT_LIGAND: new group is found")
+                if debug > 1 : print(f"\tLIGAND.SPLIT_LIGAND: new group is found")
                 newgroup.get_denticity(debug=debug)
                 # Top-down hierarchy
                 self.groups.append(newgroup)
             else:
-                if debug > 1 : print(f"enterting SPLIT_GROUP for the GROUP {newgroup.formula} with {conn_idx=}")
+                if debug > 1 : print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.formula} with {conn_idx=}")
                 splitted_groups = split_group(newgroup, conn_idx, debug=debug)
                 for g in splitted_groups:
                     self.groups.append(g)
-        if debug > 0 : print(f"LIGAND.SPLIT_LIGAND: found groups {[ group.formula for group in self.groups]}")
+        if debug > 0 : print(f"\tLIGAND.SPLIT_LIGAND: found groups {[ group.formula for group in self.groups]}")
         if debug > 2 : print(f"{self.groups}")
         return self.groups
 

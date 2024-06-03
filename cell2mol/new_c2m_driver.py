@@ -9,6 +9,7 @@ from cell2mol.new_c2m_module import cell2mol
 from cell2mol.other import handle_error
 from cell2mol.cell_operations import frac2cart_fromparam
 from cell2mol.new_charge_assignment import assign_charge_state_for_unique_species, balance_charge
+from cell2mol.new_cell_reconstruction import determine_wrap_keywords_pbc
 
 if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     
@@ -39,19 +40,18 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     if os.path.exists(input_path):    
         ## If the input is a .cif file, then it is converted to a .info file using cif_2_info from cif2cell
         if extension == ".cif":
-            pass
-            # try:
-            #     errorpath    = os.path.join(current_dir, "cif2cell.err")
-            #     infopath     = os.path.join(current_dir, "{}.info".format(name))
-            #     # if error exist : sys.exit(1)
-            #     # Create .info file 
-            #     cif_2_info(input_path, infopath, errorpath)
-            #     # Checks errors in cif_2_info
-            #     with open(errorpath, 'r') as err:
-            #         for line in err.readlines():
-            #             if "Error" in line: sys.exit(1)
-            # except:
-            #     pass
+            try:
+                errorpath    = os.path.join(current_dir, "cif2cell.err")
+                infopath     = os.path.join(current_dir, "{}.info".format(name))
+                # if error exist : sys.exit(1)
+                # Create .info file 
+                cif_2_info(input_path, infopath, errorpath)
+                # Checks errors in cif_2_info
+                with open(errorpath, 'r') as err:
+                    for line in err.readlines():
+                        if "Error" in line: sys.exit(1)
+            except:
+                pass
         ## If the input is an .info file, then is used directly
         elif extension == ".info": infopath = input_path
         else:                      sys.exit(1)
@@ -73,15 +73,13 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
 
     # Read cif file
     atoms = read(input_path)
-    cell_labels = atoms.get_chemical_symbols()
     
     wrap_keywords = {
         'pbc': True,                  # Periodic boundary conditions
         'center': (0.5, 0.5, 0.5),    # Center the positions in the unit cell
-        # 'pretty_translation': True,   # Use pretty translation (minimizing jumps in the trajectory)
-        # 'eps': 1e-5                   # Epsilon for numerical precision
         }
-
+    
+    cell_labels = atoms.get_chemical_symbols()
     cell_pos = atoms.get_positions(wrap=True, **wrap_keywords)
     cell_fracs = atoms.get_scaled_positions()
     cell_vector = atoms.cell.array
@@ -112,8 +110,8 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
             # Get unique species for the reference cell
             refcell.get_unique_species(debug=debug) # Get unique_species, unique_indices, and species_list
             if debug >= 1:
-                print(f"refcell.unique_species {[specie.formula for specie in refcell.unique_species]} {refcell.unique_indices=}\n")
-                print(f"refcell.species_list {[specie.formula for specie in refcell.species_list]}")
+                print(f"refcell.unique_species {[specie.formula for specie in refcell.unique_species]} {refcell.unique_indices=}")
+                print(f"refcell.species_list {[specie.formula for specie in refcell.species_list]}\n")
             # Get possible charge states for the unique species in the reference cell
             refcell.get_selected_cs(debug=debug)
             refcell.assess_errors(mode="unique_species")
@@ -128,7 +126,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
         reconstruction = True
         charge_assignment = False
         spin_assignment = False
-
+        
         # Define new cell object for the unit cell
         newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
         newcell.get_subtype("unit_cell")
