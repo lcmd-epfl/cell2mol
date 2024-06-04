@@ -1530,15 +1530,15 @@ class cell(object):
             tmp = specie.get_possible_cs(debug=debug)
             if tmp is None: 
                 self.selected_cs.append(None)
-            if specie.subtype != "metal":
+            elif specie.subtype != "metal":
                 self.selected_cs.append(list([cs.corr_total_charge for cs in specie.possible_cs]))
             else :
                 self.selected_cs.append(specie.possible_cs)
         
         if None in self.selected_cs:
-            self.error_empty_poscharges = True
+            self.error_get_poscharges = True
         else :
-            self.error_empty_poscharges = False
+            self.error_get_poscharges = False
 
     #######################################################
     def assign_charges (self, debug: int=0):
@@ -1719,13 +1719,13 @@ class cell(object):
         for idx, spec in enumerate(self.unique_species):
             tmp = spec.get_possible_cs(debug=debug)
             if tmp is None: 
-                self.error_empty_poscharges = True
+                self.error_get_poscharges = True
                 return # Stopping. Empty list of possible charges received. 
-            if spec.subtype != "metal":
+            elif spec.subtype != "metal":
                 selected_cs.append(list([cs.corr_total_charge for cs in spec.possible_cs]))
             else :
                 selected_cs.append(spec.possible_cs)   
-        self.error_empty_poscharges = False
+        self.error_get_poscharges = False
 
         # Finds the charge_state that satisfies that the crystal must be neutral
         final_charge_distribution = balance_charge(self.unique_indices, self.unique_species, debug=debug)
@@ -1860,13 +1860,13 @@ class cell(object):
             if self.has_isolated_H:             case = 1
             elif self.has_missing_H:            case = 2
             else :                              case = 0
-        elif mode == "unique_species":
+        elif mode == "possible_charges":
             print("-------------------------------")
-            print("Errors in unique species")
+            print("Errors in possible charges")
             print("-------------------------------")
             if self.has_isolated_H:             case = 1
             elif self.has_missing_H:            case = 2
-            elif self.error_empty_poscharges:   case = 5
+            elif self.error_get_poscharges:     case = 5
             else :                              case = 0
         elif mode == "reconstruction":
             print("-------------------------------")
@@ -1885,7 +1885,7 @@ class cell(object):
             elif self.has_missing_H:            case = 2
             elif self.error_get_fragments:      case = 3
             elif self.error_reconstruction:     case = 4
-            elif self.error_empty_poscharges :  case = 5
+            elif self.error_get_poscharges :    case = 5
             elif self.error_multiple_distrib :  case = 6
             elif self.error_empty_distrib :     case = 7
             elif self.error_create_bonds :      case = 8
@@ -1901,7 +1901,7 @@ class cell(object):
         #     # elif self.error_get_fragments:      case = 3
         #     # elif self.error_reconstruction:     case = 4
         #     # Assign Charges
-        #     # elif self.error_empty_poscharges :  case = 5
+        #     # elif self.error_get_poscharges :  case = 5
         #     # elif self.error_multiple_distrib :  case = 6
         #     # elif self.error_empty_distrib :     case = 7
         #     # elif self.error_prepare_mols :      case = 8 

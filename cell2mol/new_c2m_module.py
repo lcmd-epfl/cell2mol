@@ -49,9 +49,9 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
         if not newcell.error_reconstruction:
 
             if None in refcell.selected_cs :
-                newcell.error_empty_poscharges = True
+                newcell.error_get_poscharges = True
             else:
-                newcell.error_empty_poscharges = False
+                newcell.error_get_poscharges = False
                 print_possible_and_selected_cs(newcell, refcell, debug=debug)
 
                 # Find charge distribution for the unit cell                
@@ -63,7 +63,7 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
                 # Assign charge for the unit cell and check charge neutrality
                 newcell.assign_charges(debug=debug)
 
-            if   newcell.error_empty_poscharges :   return newcell
+            if   newcell.error_get_poscharges :   return newcell
             elif newcell.error_multiple_distrib :   return newcell
             elif newcell.error_empty_distrib :      return newcell
             else :
@@ -85,7 +85,7 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
             print("              Spin Assignment            ")
             print("#########################################")  
         tini = time.time()
-        if not newcell.error_empty_poscharges and not newcell.error_multiple_distrib and not newcell.error_empty_distrib:
+        if not newcell.error_get_poscharges and not newcell.error_multiple_distrib and not newcell.error_empty_distrib:
             newcell.assign_spin(debug=debug)
             tend = time.time()
             if debug >= 1: print(f"\nTotal execution time for Spin Assignment: {tend - tini:.2f} seconds")

@@ -93,7 +93,7 @@ def handle_error(case: int):
     if case == 2: print("We detected that H atoms are likely missing. This will cause errors in the charge prediction, so STOPPING pre-emptively.") 
     if case == 3: print("We failed to get fragments. STOPPING pre-emptively.")
     if case == 4: print("After reconstruction of the unit cell, we still detected some fragments. STOPPING pre-emptively.") 
-    if case == 5: print("Empty list of possible charges received for molecule or ligand")
+    if case == 5: print("Error in list of possible charges received for molecule or ligand")
     if case == 6: print("More than one valid possible charge distribution found")
     if case == 7: print("No valid possible charge distribution found")
     # if case == 8: print("Error while preparing molecules")

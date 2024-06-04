@@ -485,6 +485,8 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
     # make a list of valences, e.g. for CO: [[4],[2,1]]
     valences_list_of_lists = []
     AC_valence = list(AC.sum(axis=1))
+    print(f"{AC_valence=}")
+    wrong = 0
 
     for i, (atomicNum, valence) in enumerate(zip(atoms, AC_valence)):
         # valence can't be smaller than number of neighbours
@@ -502,12 +504,20 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
             possible_valence.append(valence)
         # if atomicNum == 15:
         #    print("Possible valences for:", atomicNum,"are",possible_valence, valence)
-        if not possible_valence:
-            pass
-            # print('Valence of atom',i,'is',valence,'which bigger than allowed max',max(atomic_valence[atomicNum]),'. Stopping')
+        if len(possible_valence) == 0:
+            print('WARNING!! Valence of atom', elemdatabase.elementsym[atomicNum], i,\
+                  'is',valence,'which bigger than allowed max',max(atomic_valence[atomicNum]),'. Stopping')
+            possible_valence.append(valence)
+            wrong += 1
             # sys.exit()
         valences_list_of_lists.append(possible_valence)
-
+    print(f"{wrong=}")
+    if wrong > 0:
+        # print(f"AC2BO: {wrong=}")
+        return None, atomic_valence_electrons
+    
+    print(f"\tAC2BO: {valences_list_of_lists=}")
+    
     # convert [[4],[2,1]] to [[4,2],[4,1]]
     valences_list = []
     for i in itertools.product(*valences_list_of_lists):
@@ -519,12 +529,15 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
     best_BO = AC.copy()
     # print("Final valences list:", list(valences_list), len(list(valences_list)))
     BO_is_OK_list = []
+    # print(f"AC2BO: {valences_list=}")
     for valences in valences_list:
 
-        # print("Sending", valences, AC_valence, "to get_UA")
+        #print(f"\tSending", valences, AC_valence, "to get_UA")
         UA, DU_from_AC = get_UA(valences, AC_valence)
 
         check_len = len(UA) == 0
+        #print (f"\tAC2BO: check_len", check_len)
+        #print(f"\tUA", UA)
         if check_len:
             check_bo = BO_is_OK(
                 AC,
@@ -540,6 +553,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
             check_bo = None
 
         if check_len and check_bo:
+            print(f"\tAC2BO: return AC", check_len, check_bo)
             return AC, atomic_valence_electrons
 
         UA_pairs_list = get_UA_pairs(UA, AC, use_graph=use_graph)
@@ -566,25 +580,29 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
                 allow_charged_fragments=allow_charged_fragments,
             )
 
-            # if status:
-            #     return BO, atomic_valence_electrons
-            # elif (
-            #     BO.sum() >= best_BO.sum()
-            #     and valences_not_too_large(BO, valences)
-            #     and charge_OK
-            # ):
-            #     best_BO = BO.copy()
-            # if status:
-            #     return BO, atomic_valence_electrons
             if status:
-                if (
-                    BO.sum() >= best_BO.sum()
-                    and valences_not_too_large(BO, valences)
-                    and charge_OK
-                    ):
-                    best_BO = BO.copy()
-                    print("AC2BO: best bo", best_BO)
+                print(f"\tAC2BO: status", status)
+                return BO, atomic_valence_electrons
+            elif (
+                BO.sum() >= best_BO.sum()
+                and valences_not_too_large(BO, valences)
+                and charge_OK
+            ):
+                # print(f"\tAC2BO: status", status, "BO.sum()", BO.sum(), "best_BO.sum()", best_BO.sum())
+                best_BO = BO.copy()
+            # if status:
+            #     return BO, atomic_valence_electrons
+            # if status:
+            #     if (
+            #         BO.sum() >= best_BO.sum()
+            #         and valences_not_too_large(BO, valences)
+            #         and charge_OK
+            #         ):
+            #         best_BO = BO.copy()
+            #         print("AC2BO: best bo", best_BO)
         # print("best bo", best_BO)
+    print(f"\tAC2BO: return best bo")
+    #print("AC2BO: return best bo", best_BO)
     return best_BO, atomic_valence_electrons
 
 
@@ -599,7 +617,9 @@ def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True)
         allow_charged_fragments=allow_charged_fragments,
         use_graph=use_graph,
     )
-
+    if BO is None:
+        return [], None
+    
     # add BO connectivity and charge info to mol object
     mol = BO2mol(
         mol,
@@ -859,14 +879,10 @@ def xyz2mol(
         use_graph=use_graph,
     )
 
-    # Check for stereocenters and chiral centers
-    
-    if embed_chiral:
-        is_okay = []
-        for new_mol in new_mols:
-            is_okay.append(chiral_stereo_check(new_mol))
-        return new_mols, all(is_okay)
-    
+    # Check for stereocenters and chiral centers -> Move to get_charge function
+    # if embed_chiral:
+    #     chiral_stereo_check(new_mol))
+
     if exportBO:
         return new_mols, BO
     else:

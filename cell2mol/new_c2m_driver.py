@@ -91,9 +91,10 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     ### PREPARES THE REFERENCE CELL OBJECT ###
     ##########################################
     cov_factor = 1.3
-
+    # cov_factor -= 0.1
     print(f"{cov_factor=}")
     metal_factor = 1.0
+    
     # Get reference molecules
     # labels, pos, ref_labels, ref_fracs, cellvec, cell_param = readinfo(infopath)
     # labels, pos, and cellvec will not be used
@@ -112,8 +113,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
             # Increase covalent factor for H atoms
             cov_factor += 0.05
             refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=cov_factor, debug=debug)
-        if debug >= 1:
-            print(f"Covalent factor increases: {cov_factor=}")
+        if debug >= 1: print(f"Covalent factor increases: {cov_factor=}")
         refcell.check_missing_H(debug=debug)
     refcell.assess_errors(mode="hydrogens")
     refcell.save(ref_cell_fname)
@@ -126,23 +126,36 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
             print(f"refcell.species_list {[specie.formula for specie in refcell.species_list]}\n")
         # Get possible charge states for the unique species in the reference cell
         refcell.get_selected_cs(debug=debug)
-        refcell.assess_errors(mode="unique_species")
+        refcell.assess_errors(mode="possible_charges")
 
+        if refcell.error_get_poscharges:
+            if debug >= 1: print(f"{refcell.selected_cs=}")
+            while refcell.error_get_poscharges and cov_factor > 1.15:
+                # Decrease covalent factor for H atoms
+                cov_factor -= 0.05
+                refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=cov_factor, debug=debug)
+                refcell.check_missing_H(debug=debug)
+                if not refcell.has_isolated_H:
+                    refcell.get_unique_species(debug=debug)
+                    refcell.get_selected_cs(debug=debug)
+
+            if debug >= 1: print(f"Covalent factor decreases: {cov_factor=}")
+        refcell.assess_errors(mode="possible_charges")
     # Save reference cell object
     refcell.save(ref_cell_fname)
 
     ##########################################
+    # Define new cell object for the unit cell
+    newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
+    newcell.get_subtype("unit_cell")
+    
     if refcell.error_case != 0:
-        sys.exit(1)
+        pass
     else:
         reconstruction = True
         charge_assignment = False
         spin_assignment = False
-        
-        # Define new cell object for the unit cell
-        newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
-        newcell.get_subtype("unit_cell")
-        
+    
         # Get reference molecules
         newcell.get_reference_molecules(refcell.labels, refcell.frac_coord, cov_factor=cov_factor, debug=-1)
         if not newcell.has_isolated_H:  
@@ -188,10 +201,10 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     print("*** Reference molecules ***")
     print(refcell)
     print_output(refcell.refmoleclist)
-    
+
+    print("***Unit cell molecules ***")
+    print(newcell)
     if hasattr(newcell, "moleclist"):
-        print("***Unit cell molecules ***")
-        print(newcell)
         print_output(newcell.moleclist)
 
     surmmary.close()
