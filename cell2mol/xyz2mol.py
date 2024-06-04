@@ -6,7 +6,7 @@
 
 import copy
 import itertools
-
+import rdkit
 from rdkit.Chem import rdmolops
 from rdkit.Chem import rdchem
 
@@ -518,7 +518,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
 
     best_BO = AC.copy()
     # print("Final valences list:", list(valences_list), len(list(valences_list)))
-
+    BO_is_OK_list = []
     for valences in valences_list:
 
         # print("Sending", valences, AC_valence, "to get_UA")
@@ -566,15 +566,24 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
                 allow_charged_fragments=allow_charged_fragments,
             )
 
+            # if status:
+            #     return BO, atomic_valence_electrons
+            # elif (
+            #     BO.sum() >= best_BO.sum()
+            #     and valences_not_too_large(BO, valences)
+            #     and charge_OK
+            # ):
+            #     best_BO = BO.copy()
+            # if status:
+            #     return BO, atomic_valence_electrons
             if status:
-                return BO, atomic_valence_electrons
-            elif (
-                BO.sum() >= best_BO.sum()
-                and valences_not_too_large(BO, valences)
-                and charge_OK
-            ):
-                best_BO = BO.copy()
-
+                if (
+                    BO.sum() >= best_BO.sum()
+                    and valences_not_too_large(BO, valences)
+                    and charge_OK
+                    ):
+                    best_BO = BO.copy()
+                    print("AC2BO: best bo", best_BO)
         # print("best bo", best_BO)
     return best_BO, atomic_valence_electrons
 
@@ -791,12 +800,17 @@ def chiral_stereo_check(mol):
         mol - rdkit molecule, with embeded conformer
 
     """
-    Chem.SanitizeMol(mol)
-    Chem.DetectBondStereochemistry(mol, -1)
-    Chem.AssignStereochemistry(mol, flagPossibleStereoCenters=True, force=True)
-    Chem.AssignAtomChiralTagsFromStructure(mol, -1)
-
-    return
+    try:
+        Chem.SanitizeMol(mol)
+        Chem.DetectBondStereochemistry(mol, -1)
+        Chem.AssignStereochemistry(mol, flagPossibleStereoCenters=True, force=True)
+        Chem.AssignAtomChiralTagsFromStructure(mol, -1)
+        return True
+    
+    except rdkit.Chem.rdchem.AtomValenceException as e:
+        print(f"Failed to process molecule: {e}")
+        return False
+    
 
 
 def xyz2mol(
@@ -846,10 +860,13 @@ def xyz2mol(
     )
 
     # Check for stereocenters and chiral centers
+    
     if embed_chiral:
+        is_okay = []
         for new_mol in new_mols:
-            chiral_stereo_check(new_mol)
-
+            is_okay.append(chiral_stereo_check(new_mol))
+        return new_mols, all(is_okay)
+    
     if exportBO:
         return new_mols, BO
     else:

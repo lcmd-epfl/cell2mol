@@ -8,7 +8,7 @@ import itertools
 import sys
 from cell2mol.hungarian import reorder
 from cell2mol.xyz2mol import xyz2mol
-
+from cell2mol.new_charge_assignment import get_charge
 elemdatabase = ElementData()
 
 #############################
@@ -370,13 +370,15 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                     if a.connec == 1:
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
-                    elif a.connec > 1:
+                    elif a.connec == 2:
                         needs_nonlocal = True
                         non_local_groups += 1
                         if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")                        
                         # block[idx] = 1
                         # elemlist[idx] = "H"
                         # addedlist[idx] = 1
+                    else:
+                        block[idx] = 1
                 # Hydrides
                 elif a.label == "H":
                     if a.connec == 0:
@@ -584,45 +586,45 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     return protonation_states 
 
 #######################################################
-def get_charge(ich: int, prot: object, allow: bool=True, debug: int=0): 
-    ## Generates the connectivity of a molecule given a desired charge (ich).
-    # The molecule is described by a protonation states that has labels, and the atomic cartesian coordinates "coords"
-    # The adjacency matrix is also provided in the protonation state(adjmat)
-    #:return charge_state which is an object with the necessary information for other functions to handle the result
+# def get_charge(ich: int, prot: object, allow: bool=True, debug: int=0): 
+#     ## Generates the connectivity of a molecule given a desired charge (ich).
+#     # The molecule is described by a protonation states that has labels, and the atomic cartesian coordinates "coords"
+#     # The adjacency matrix is also provided in the protonation state(adjmat)
+#     #:return charge_state which is an object with the necessary information for other functions to handle the result
 
-    natoms = prot.natoms
-    atnums = prot.atnums
+#     natoms = prot.natoms
+#     atnums = prot.atnums
 
-    ##########################
-    # xyz2mol is called here #
-    ##########################
-    # use_graph is called for a faster generation
-    # allow_charged_fragments is necessary for non-neutral molecules
-    # embed_chiral shouldn't ideally be necessary, but it runs a sanity check that improves the proposed connectivity
-    # use_huckel false means that the xyz2mol adjacency will be generated based on atom distances and vdw radii.
-    # instead of use_huckel, we provide the adjacency matrix 
+#     ##########################
+#     # xyz2mol is called here #
+#     ##########################
+#     # use_graph is called for a faster generation
+#     # allow_charged_fragments is necessary for non-neutral molecules
+#     # embed_chiral shouldn't ideally be necessary, but it runs a sanity check that improves the proposed connectivity
+#     # use_huckel false means that the xyz2mol adjacency will be generated based on atom distances and vdw radii.
+#     # instead of use_huckel, we provide the adjacency matrix 
 
-    mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=ich, use_graph=True,allow_charged_fragments=allow,embed_chiral=True,use_huckel=False)
-    if len(mols) > 1: print("WARNING: More than 1 mol received from xyz2mol for initcharge:", ich)
+#     mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=ich, use_graph=True,allow_charged_fragments=allow,embed_chiral=True,use_huckel=False)
+#     if len(mols) > 1: print("WARNING: More than 1 mol received from xyz2mol for initcharge:", ich)
 
-    # Smiles are generated with rdkit
-    smiles = Chem.MolToSmiles(mols[0])
-    if debug >= 2: print(f"GET_CHARGE. {smiles=}")
-    # Gets the resulting charges
-    atom_charge = []
-    total_charge = 0
-    for i in range(natoms):
-        a = mols[0].GetAtomWithIdx(i)  # Returns a particular Atom
-        atom_charge.append(a.GetFormalCharge())
-        total_charge += a.GetFormalCharge()
+#     # Smiles are generated with rdkit
+#     smiles = Chem.MolToSmiles(mols[0])
+#     if debug >= 2: print(f"GET_CHARGE. {smiles=}")
+#     # Gets the resulting charges
+#     atom_charge = []
+#     total_charge = 0
+#     for i in range(natoms):
+#         a = mols[0].GetAtomWithIdx(i)  # Returns a particular Atom
+#         atom_charge.append(a.GetFormalCharge())
+#         total_charge += a.GetFormalCharge()
 
-    # Connectivity is checked
-    iscorrect = check_rdkit_obj_connectivity(mols[0], prot.natoms, ich, debug=debug)
+#     # Connectivity is checked
+#     iscorrect = check_rdkit_obj_connectivity(mols[0], prot.natoms, ich, debug=debug)
 
-    # Charge_state is initiated
-    ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, ich, allow, prot)
+#     # Charge_state is initiated
+#     ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, ich, allow, prot)
 
-    return ch_state
+#     return ch_state
 
 #######################################################
 def check_rdkit_obj_connectivity(mol: object, natoms: int, ich: int, debug: int=0): 

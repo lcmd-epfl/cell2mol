@@ -196,7 +196,7 @@ def set_charge_state(reference, target, mode, debug: int=0):
     print(f"SET_CHARGE_STATE:{target.formula=} {target.totcharge=} {target.smiles=}")
 
 ######################################################
-def get_charge(charge: int, prot: object, allow: bool=True, debug: int=0): 
+def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=True, debug: int=0): 
     ## Generates the connectivity of a molecule given a desired charge (charge).
     # The molecule is described by a protonation states that has labels, and the atomic cartesian coordinates "coords"
     # The adjacency matrix is also provided in the protonation state(adjmat)
@@ -285,8 +285,12 @@ def create_bonds_specie (specie, debug: int=0):
                     if debug >=1 : 
                         print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
                 else:
-                    if debug >=1: print(f"\tNO BONDS for {specie.atoms[idx].label} with {specie.subtype} RDKit object index {idx}. Please check the RDKit object.")
-                    return False # return False if no bonds are created
+                    if specie.natoms == 1:
+                        if debug >=1: print(f"\tNO BONDS CREATED for {specie.atoms[idx].label} because it is the only atom in {specie.subtype} object")
+                        pass
+                    else:
+                        if debug >=1: print(f"\tNO BONDS for {specie.atoms[idx].label} with {specie.subtype} RDKit object index {idx}. Please check the RDKit object.")
+                        return False # return False if no bonds are created
     else:
         if debug >= 1: print(f"\tNumber of atoms in {specie.subtype} object and RDKit object are different: {n_atoms} {n_atoms_rdkit}")
         if debug >= 2: print(f"\t{[(i, atom.label) for i, atom in enumerate(specie.atoms)]}")
@@ -324,8 +328,12 @@ def create_bonds_specie (specie, debug: int=0):
                         if debug >=2: 
                             print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
                     else:
-                        if debug >=1: print(f"\tNO BONDS for {specie.atoms[idx].label} with {specie.subtype} RDKit object index {idx}. Please check the RDKit object.")
-                        return False # return False if no bonds are created
+                        if specie.natoms == 1:
+                            if debug >=1: print(f"\tNO BONDS CREATED for {specie.atoms[idx].label} because it is the only atom in {specie.subtype} object")
+                            pass
+                        else:
+                            if debug >=1: print(f"\tNO BONDS for {specie.atoms[idx].label} with {specie.subtype} RDKit object index {idx}. Please check the RDKit object.")
+                            return False # return False if no bonds are created
                 else :
                     if debug >=1: print(f"\tNO BONDS for {rdkit_atom.GetSymbol()} with {specie.subtype} RDKit object index {idx} because it is an added atom")
 

@@ -41,7 +41,7 @@ def find_row_indices(source, target):
     # Iterate over each row in the source array with enumeration to track the index
     for index, row in enumerate(source):
         # Check if any row in the target array matches the current row
-        if any(np.allclose(row, target_row, atol=1e-6, rtol=1e-4) for target_row in target):
+        if any(np.allclose(row, target_row, atol=1e-4, rtol=1e-2) for target_row in target):
             found_indices.append(index)
             found_rows.append(row)
         else :
@@ -58,7 +58,7 @@ def find_row_index_from_matrix (matrix, query_row):
     
     # Check each row for equality with the query_row
     for index, row in enumerate(matrix):
-        if np.allclose(row, query_row, atol=1e-6, rtol=1e-4):
+        if np.allclose(row, query_row, atol=1e-4, rtol=1e-2):
             return index
     return -1
 
@@ -367,9 +367,9 @@ def get_updated_indices(sp_idx, new, cell_labels, cell_pos, cell_fracs, debug: i
 
     for jdx, (n_l, n_p, n_f) in enumerate(zip(new_labels, new_pos, new_fracs)):
         for kdx, (l, p, f) in enumerate(zip(cell_labels, cell_pos, cell_fracs)):
-            if n_l == l and np.allclose(n_p, p, atol=1e-5, rtol=1e-3):
-                if np.allclose(np.remainder(n_f, 1), np.remainder(f, 1), atol=1e-5, rtol=1e-3):
-                    if debug > 2: 
+            if n_l == l and np.allclose(n_p, p, atol=1e-4, rtol=1e-2):
+                if np.allclose(np.remainder(n_f, 1), np.remainder(f, 1), atol=1e-4, rtol=1e-2):
+                    if debug >= 2: 
                         print(f"symmtry operation {sp_idx}:", f"atom of new (index: {jdx})", n_l, n_p, n_f, \
                             f"is the same as the atom of the unit cell (index: {kdx})", l, p, f)
                 indices_lists.append((jdx, kdx))
