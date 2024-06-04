@@ -1,9 +1,6 @@
 import numpy as np
-from cell2mol.hungarian import reorder
 import copy
-from cell2mol.xyz2mol import xyz2mol
-from cell2mol.charge_assignment import check_rdkit_obj_connectivity, arrange_data_for_reorder, charge_state, protonation
-from rdkit import Chem
+from cell2mol.charge_assignment import protonation, get_charge
 import itertools
 
 #######################################################
@@ -194,41 +191,6 @@ def set_charge_state(reference, target, mode, debug: int=0):
         print(f"SET_CHARGE_STATE: WARNING!!! {target.formula=} {final_charge=} {cs.corr_total_charge=} final_charge != cs.corr_total_charge")
     target.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
     print(f"SET_CHARGE_STATE:{target.formula=} {target.totcharge=} {target.smiles=}")
-
-######################################################
-def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=True, debug: int=0): 
-    ## Generates the connectivity of a molecule given a desired charge (charge).
-    # The molecule is described by a protonation states that has labels, and the atomic cartesian coordinates "coords"
-    # The adjacency matrix is also provided in the protonation state(adjmat)
-    #:return charge_state which is an object with the necessary information for other functions to handle the result
-
-    natoms = prot.natoms
-    atnums = prot.atnums
-
-    # prot.coords and prot.cov_factor will not be used
-    mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow)
-    print(f"GET_CHARGE.{len(mols)=} received from xyz2mol with charge {charge}")
-    
-    if len(mols) > 1: print("WARNING: More than 1 mol received from xyz2mol for initcharge:", charge)
-
-    # Smiles are generated with rdkit
-    smiles = Chem.MolToSmiles(mols[0])
-    if debug >= 2: print(f"GET_CHARGE. {smiles=}")
-    # Gets the resulting charges
-    atom_charge = []
-    total_charge = 0
-    for i in range(natoms):
-        a = mols[0].GetAtomWithIdx(i)  # Returns a particular Atom
-        atom_charge.append(a.GetFormalCharge())
-        total_charge += a.GetFormalCharge()
-
-    # Connectivity is checked
-    iscorrect = check_rdkit_obj_connectivity(mols[0], prot.natoms, charge, debug=debug)
-
-    # Charge_state is initiated
-    ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, charge, allow, prot)
-
-    return ch_state
     
 ######################################################
 def prepare_mol (mol):

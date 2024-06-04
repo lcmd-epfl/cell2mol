@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import os
 import numpy as np  
 from cell2mol.elementdata import ElementData
 from cell2mol.connectivity import *
@@ -7,8 +7,7 @@ from collections import defaultdict
 import itertools
 import sys
 from cell2mol.hungarian import reorder
-from cell2mol.xyz2mol import xyz2mol
-from cell2mol.new_charge_assignment import get_charge
+from cell2mol.xyz2mol import xyz2mol, chiral_stereo_check
 elemdatabase = ElementData()
 
 #############################
@@ -34,18 +33,22 @@ def get_possible_charge_state(spec: object, debug: int=0):
     if not hasattr(spec,"protonation_states"): spec.get_protonation_states(debug=debug)
     if spec.protonation_states is None:                                             return None
     if spec.subtype == "group" or (spec.subtype == 'molecule' and spec.iscomplex):  return None
-
+    
+    charge_states = []
     ### Evaluates possible charges for each protonation state ###
     for prot in spec.protonation_states:
-        charge_states = []
-        target_charges = get_list_of_charges_to_try(prot)
-        if debug >= 2: print(f"    POSCHARGE will try charges {target_charges}") 
+        # charge_states = []
+        final_charges = get_list_of_charges_to_try(prot)
+        if debug >= 2: print(f"    POSCHARGE will try charges {final_charges}") 
 
-        for ich in target_charges:
+        for ich in final_charges:
             ch_state = get_charge(ich, prot)    ## Protonation is passed to the ch_state object (ch_state.protonation)
             charge_states.append(ch_state)
-            if debug >= 2: print(f"    POSCHARGE: charge {ich} with smiles {ch_state.smiles}")
-
+            if ch_state is not None:
+                if debug >= 2: print(f"    POSCHARGE: charge {ich} with smiles {ch_state.smiles}")
+            else :
+                if debug >= 2: print(f"    POSCHARGE: charge {ich} failed {ch_state}")
+    if debug >= 2: print(f"POSCHARGE: {len(charge_states)=}")
     ### After collecting charge states, then best ones are selected 
     if spec.subtype == "ligand":
         if spec.is_nitrosyl:
@@ -76,6 +79,10 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
     uncorr_abs_atcharge = []
     uncorr_zwitt = []
     coincide = []
+    charge_states =[ch for ch in charge_states if ch is not None]
+
+    if len(charge_states) == 0: return []
+
     for chs in charge_states:
         uncorr_total.append(chs.uncorr_total_charge)
         uncorr_abs_total.append(chs.uncorr_abstotal)
@@ -539,7 +546,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
             added_atoms = local_added_atoms
             non_local_added_atoms = 0
 
-            os = np.sum(com)
+            o_s = np.sum(com)
             toallocate = int(0)
             for jdx, a in enumerate(ligand.atoms):
                 if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
@@ -571,11 +578,11 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                     toallocate += 1
 
             smi = " "
-            new_prot = protonation(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, os, typ="Non-local", parent=specie)
+            new_prot = protonation(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, o_s, typ="Non-local", parent=specie)
             count+=1
-            if new_prot.status == 1 and new_prot.added_atoms == os+local_added_atoms:
+            if new_prot.status == 1 and new_prot.added_atoms == o_s + local_added_atoms:
                 print(f"{new_prot.added_atoms=}")
-                print(f"{os=}")
+                print(f"{o_s=}")
                 print(f"{local_added_atoms=}")
                 print(f"{elemlist=}")
                 protonation_states.append(new_prot)
@@ -585,47 +592,61 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     if debug >= 2: print(f"        GET_PROTONATION_STATES:{protonation_states=}")            
     return protonation_states 
 
-#######################################################
-# def get_charge(ich: int, prot: object, allow: bool=True, debug: int=0): 
-#     ## Generates the connectivity of a molecule given a desired charge (ich).
-#     # The molecule is described by a protonation states that has labels, and the atomic cartesian coordinates "coords"
-#     # The adjacency matrix is also provided in the protonation state(adjmat)
-#     #:return charge_state which is an object with the necessary information for other functions to handle the result
+######################################################
+def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=True, debug: int=0): 
+    ## Generates the connectivity of a molecule given a desired charge (charge).
+    # The molecule is described by a protonation states that has labels, and the atomic cartesian coordinates "coords"
+    # The adjacency matrix is also provided in the protonation state(adjmat)
+    #:return charge_state which is an object with the necessary information for other functions to handle the result
 
-#     natoms = prot.natoms
-#     atnums = prot.atnums
+    natoms = prot.natoms
+    atnums = prot.atnums
+    print(f"\nGET_CHARGE. Starting get_charge with charge {charge} and {prot.formula} ({prot.added_atoms=}")
+    # prot.coords and prot.cov_factor will not be used
+    mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow)
+    print(f"\tGET_CHARGE.{len(mols)=} received from xyz2mol with charge {charge}")
+    
+    if len(mols) > 1: 
+        if debug >=1 : print(f"\tGET_CHARGE. WARNING: More than 1 mol received from xyz2mol for initcharge: {charge}")
+    elif len(mols) == 0:
+        if debug >=1 : print(f"\tGET_CHARGE. WARNING: No mol received from xyz2mol for initcharge: {charge}")
+        return None
+    else :
+        pass
 
-#     ##########################
-#     # xyz2mol is called here #
-#     ##########################
-#     # use_graph is called for a faster generation
-#     # allow_charged_fragments is necessary for non-neutral molecules
-#     # embed_chiral shouldn't ideally be necessary, but it runs a sanity check that improves the proposed connectivity
-#     # use_huckel false means that the xyz2mol adjacency will be generated based on atom distances and vdw radii.
-#     # instead of use_huckel, we provide the adjacency matrix 
+    if embed_chiral:
+        is_okay = []
+        for mol in mols:
+            is_okay.append(chiral_stereo_check(mol))
+        if debug >=2 : print(f"GET_CHARGE.{is_okay=}")
+        if all(is_okay):
+            pass
+        else:
+            if debug >=2 : print(f"GET_CHARGE. Some mols have wrong chirality")
+            for mol in mols:
+                for i in range(natoms):
+                    a = mol.GetAtomWithIdx(i)
+                    if debug >=2 : print(f"GET_CHARGE. {i} {a.GetSymbol()=}, {a.GetFormalCharge()=}, {a.GetImplicitValence()=}, {a.GetExplicitValence()=} {a.GetTotalValence()=}")
+            return None
+    
+    # Smiles are generated with rdkit
+    smiles = Chem.MolToSmiles(mols[0])
+    if debug >= 2: print(f"GET_CHARGE. {smiles=}")
+    # Gets the resulting charges
+    atom_charge = []
+    total_charge = 0
+    for i in range(natoms):
+        a = mols[0].GetAtomWithIdx(i)  # Returns a particular Atom
+        atom_charge.append(a.GetFormalCharge())
+        total_charge += a.GetFormalCharge()
 
-#     mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=ich, use_graph=True,allow_charged_fragments=allow,embed_chiral=True,use_huckel=False)
-#     if len(mols) > 1: print("WARNING: More than 1 mol received from xyz2mol for initcharge:", ich)
+    # Connectivity is checked
+    iscorrect = check_rdkit_obj_connectivity(mols[0], prot.natoms, charge, debug=debug)
 
-#     # Smiles are generated with rdkit
-#     smiles = Chem.MolToSmiles(mols[0])
-#     if debug >= 2: print(f"GET_CHARGE. {smiles=}")
-#     # Gets the resulting charges
-#     atom_charge = []
-#     total_charge = 0
-#     for i in range(natoms):
-#         a = mols[0].GetAtomWithIdx(i)  # Returns a particular Atom
-#         atom_charge.append(a.GetFormalCharge())
-#         total_charge += a.GetFormalCharge()
+    # Charge_state is initiated
+    ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, charge, allow, prot)
 
-#     # Connectivity is checked
-#     iscorrect = check_rdkit_obj_connectivity(mols[0], prot.natoms, ich, debug=debug)
-
-#     # Charge_state is initiated
-#     ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, ich, allow, prot)
-
-#     return ch_state
-
+    return ch_state
 #######################################################
 def check_rdkit_obj_connectivity(mol: object, natoms: int, ich: int, debug: int=0): 
     # Here, the atom charge is retrieved, and the connectivity of each atom goes through 3 checks.
@@ -905,12 +926,12 @@ def prepare_unresolved(unique_indices: list, unique_species: list, distributions
     return list_molecules, list_indices, list_options
 
 #######################################################    
-def set_target_charge (specie, unique_indices, unique_species, final_charge_distribution, debug):
+def set_final_charge (specie, unique_indices, unique_species, final_charge_distribution, debug):
         
     spec = unique_species[specie.unique_index]
     indices = [index for index, value in enumerate(unique_indices) if value == specie.unique_index]
-    target_charge = [final_charge_distribution[i] for i in indices][0] 
-    if debug > 1: print("SET_TARGET_CHARGE:", spec, indices, target_charge)
+    final_charge = [final_charge_distribution[i] for i in indices][0] 
+    if debug > 1: print("SET_FINAL_CHARGE:", spec, indices, final_charge)
     
     if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
         formula = specie.formula
@@ -920,48 +941,48 @@ def set_target_charge (specie, unique_indices, unique_species, final_charge_dist
         formula = specie.label
         charge_list = spec.possible_cs
     
-    if target_charge in charge_list:           
-        if debug > 1: print(f"SET_TARGET_CHARGE: Target charge {target_charge} of {formula} exists in {charge_list}." )
+    if final_charge in charge_list:           
+        if debug > 1: print(f"SET_FINAL_CHARGE: Target charge {final_charge} of {formula} exists in {charge_list}." )
     else:
-        if debug >= 1: print(f"SET_TARGET_CHARGE: ERROR!! Target charge {target_charge} of {formula} does not exist in {charge_list}." )
+        if debug >= 1: print(f"SET_FINAL_CHARGE: ERROR!! Target charge {final_charge} of {formula} does not exist in {charge_list}." )
         return None
         
     if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
-        if debug > 1: print("SET_TARGET_CHARGE:", specie.formula)
+        if debug > 1: print("SET_FINAL_CHARGE:", specie.formula)
         specie.get_protonation_states(debug=debug)
         specie.get_possible_cs(debug=debug)
         formula = specie.formula
         charge_list = [cs.corr_total_charge for cs in specie.possible_cs]        
         
-        if target_charge in charge_list:
-            if debug > 1: print(f"SET_TARGET_CHARGE: Target charge {target_charge} of {formula} exists in {charge_list}.")
-            idx = charge_list.index(target_charge)
+        if final_charge in charge_list:
+            if debug > 1: print(f"SET_FINAL_CHARGE: Target charge {final_charge} of {formula} exists in {charge_list}.")
+            idx = charge_list.index(final_charge)
             cs = specie.possible_cs[idx]
             specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
         else:
-            if debug >= 1: print(f"SET_TARGET_CHARGE: ERROR!! Target charge {target_charge} of {formula} does not exist in {charge_list}." )
+            if debug >= 1: print(f"SET_FINAL_CHARGE: ERROR!! Target charge {final_charge} of {formula} does not exist in {charge_list}." )
             return None
                     
     elif specie.subtype == "metal":
-        if debug > 1: print("SET_TARGET_CHARGE:", specie.label)
+        if debug > 1: print("SET_FINAL_CHARGE:", specie.label)
         specie.get_possible_cs(debug=debug)
         formula = specie.label
         charge_list = spec.possible_cs        
 
-        if target_charge in charge_list:
-            if debug > 1: print(f"SET_TARGET_CHARGE: Target charge {target_charge} of {formula} exists in {charge_list}." )
-            idx = charge_list.index(target_charge)
+        if final_charge in charge_list:
+            if debug > 1: print(f"SET_FINAL_CHARGE: Target charge {final_charge} of {formula} exists in {charge_list}." )
+            idx = charge_list.index(final_charge)
             cs = specie.possible_cs[idx]
             specie.set_charge(cs)         
         else:
-            if debug >= 1: print(f"SET_TARGET_CHARGE: ERROR!! Target charge {target_charge} of {formula} does not exist in {charge_list}." )
+            if debug >= 1: print(f"SET_FINAL_CHARGE: ERROR!! Target charge {final_charge} of {formula} does not exist in {charge_list}." )
             return None  
 #######################################################
 def prepare_mols (moleclist: list, unique_indices: list, unique_species: list, final_charge_distribution: list, debug: int=0):
     count = 0 
     for mol in moleclist:
         if mol.iscomplex == False:
-            set_target_charge(mol, unique_indices, unique_species, final_charge_distribution, debug)
+            set_final_charge(mol, unique_indices, unique_species, final_charge_distribution, debug)
             count += 1
         
         elif mol.iscomplex:
@@ -969,7 +990,7 @@ def prepare_mols (moleclist: list, unique_indices: list, unique_species: list, f
             tmp_smiles = []
             
             for lig in mol.ligands:            
-                set_target_charge(lig, unique_indices, unique_species, final_charge_distribution, debug)
+                set_final_charge(lig, unique_indices, unique_species, final_charge_distribution, debug)
                 count += 1
                  
                 tmp_smiles.append(lig.smiles)
@@ -978,7 +999,7 @@ def prepare_mols (moleclist: list, unique_indices: list, unique_species: list, f
                     tmp_atcharge[a] = lig.atomic_charges[kdx]
                     
             for met in mol.metals:        
-                set_target_charge(met, unique_indices, unique_species, final_charge_distribution, debug)
+                set_final_charge(met, unique_indices, unique_species, final_charge_distribution, debug)
                 count += 1
                 parent_index = met.get_parent_index("molecule")
                 tmp_atcharge[parent_index] = met.charge     
@@ -1162,14 +1183,14 @@ def reorder_protonation (prot, map, debug: int=0):
 
     reordered_protonation = protonation(reordered_labels, reordered_coords, prot.cov_factor, prot.added_atoms,
                                         reordered_addedlist, reordered_block, reordered_metal_electrons, reordered_elemlist, 
-                                        tmpsmiles=prot.tmpsmiles, os=prot.os, typ="Reordered", parent=prot.parent)
+                                        tmpsmiles=prot.tmpsmiles, o_s=prot.o_s, typ="Reordered", parent=prot.parent)
     print("CREATED REORDERED PROTONATION", reordered_protonation)
 
     return reordered_protonation
 
 #######################################################
 class protonation(object):
-    def __init__(self, labels, coord, cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, tmpsmiles=" ", os=int(0), typ="Local", parent: object=None):
+    def __init__(self, labels, coord, cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, tmpsmiles=" ", o_s=int(0), typ="Local", parent: object=None):
         self.labels                     = labels
         self.coords                     = coord
         self.natoms                     = len(labels)
@@ -1181,7 +1202,7 @@ class protonation(object):
         self.elemlist                   = elemlist
         self.typ                        = typ
         self.cov_factor                 = cov_factor
-        self.os                         = os
+        self.o_s                         = o_s
         self.tmpsmiles                  = tmpsmiles
         self.atnums                     = [elemdatabase.elementnr[l] for l in labels]  # from xyz2mol
         self.parent                     = parent
