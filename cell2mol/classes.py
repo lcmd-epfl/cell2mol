@@ -1524,7 +1524,7 @@ class cell(object):
     #######################################################
     def get_selected_cs(self, debug: int=0):
         if not hasattr(self, "unique_species"): self.get_unique_species(debug=debug)  
-        
+
         self.selected_cs = []
         for specie in self.unique_species:
             tmp = specie.get_possible_cs(debug=debug)
