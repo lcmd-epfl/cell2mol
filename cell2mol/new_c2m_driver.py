@@ -91,6 +91,8 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     ### PREPARES THE REFERENCE CELL OBJECT ###
     ##########################################
     cov_factor = 1.3
+
+    print(f"{cov_factor=}")
     metal_factor = 1.0
     # Get reference molecules
     # labels, pos, ref_labels, ref_fracs, cellvec, cell_param = readinfo(infopath)
@@ -101,7 +103,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     # Create reference cell object
     refcell = cell(name, ref_labels, ref_pos, ref_fracs, cell_vector, cell_param)
     refcell.get_subtype("reference")
-    refcell.get_reference_molecules(ref_labels, ref_fracs, debug=debug)
+    refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=cov_factor, debug=debug)
 
     if not refcell.has_isolated_H:  
         refcell.check_missing_H(debug=debug)                                     
@@ -114,7 +116,8 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
             print(f"Covalent factor increases: {cov_factor=}")
         refcell.check_missing_H(debug=debug)
     refcell.assess_errors(mode="hydrogens")
-
+    refcell.save(ref_cell_fname)
+    
     if refcell.error_case == 0:
         # Get unique species for the reference cell
         refcell.get_unique_species(debug=debug) # Get unique_species, unique_indices, and species_list

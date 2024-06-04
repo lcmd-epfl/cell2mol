@@ -206,7 +206,7 @@ def get_radii(labels: list) -> np.ndarray:
     for l in labels:
         if l[-1].isdigit(): label = l[:-1]
         else: label = l
-
+        # radii.append(elemdatabase.CovalentRadius3[label])
         if elemdatabase.elementgroup[label] == 1 and label != "H":
             radii.append(elemdatabase.CovalentRadius2[label])
         else:
