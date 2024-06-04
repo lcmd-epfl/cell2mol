@@ -9,7 +9,7 @@ from cell2mol.new_c2m_module import cell2mol
 from cell2mol.other import handle_error
 from cell2mol.cell_operations import frac2cart_fromparam
 from cell2mol.new_charge_assignment import assign_charge_state_for_unique_species, balance_charge
-from cell2mol.new_cell_reconstruction import determine_wrap_keywords_pbc
+from cell2mol.new_cell_reconstruction import determine_wrap_keywords_pbc, modify_cov_factor_due_to_H, modify_cov_factor_due_to_possible_charges
 
 if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     
@@ -106,40 +106,17 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     refcell.get_subtype("reference")
     refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=cov_factor, debug=debug)
 
-    if not refcell.has_isolated_H:  
-        refcell.check_missing_H(debug=debug)                                     
-    else:
-        while refcell.has_isolated_H :
-            # Increase covalent factor for H atoms
-            cov_factor += 0.05
-            refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=cov_factor, debug=debug)
-        if debug >= 1: print(f"Covalent factor increases: {cov_factor=}")
-        refcell.check_missing_H(debug=debug)
-    refcell.assess_errors(mode="hydrogens")
+    refcell = modify_cov_factor_due_to_H(refcell, debug=debug)
     refcell.save(ref_cell_fname)
     
     if refcell.error_case == 0:
-        # Get unique species for the reference cell
-        refcell.get_unique_species(debug=debug) # Get unique_species, unique_indices, and species_list
+        refcell.get_unique_species(debug=debug) # Get unique_species, unique_indices, and species_list of the reference cell
         if debug >= 1:
             print(f"refcell.unique_species {[specie.formula for specie in refcell.unique_species]} {refcell.unique_indices=}")
             print(f"refcell.species_list {[specie.formula for specie in refcell.species_list]}\n")
-        # Get possible charge states for the unique species in the reference cell
-        refcell.get_selected_cs(debug=debug)
-        refcell.assess_errors(mode="possible_charges")
-
-        if refcell.error_get_poscharges:
-            if debug >= 1: print(f"{refcell.selected_cs=}")
-            while refcell.error_get_poscharges and cov_factor > 1.15:
-                # Decrease covalent factor for H atoms
-                cov_factor -= 0.05
-                refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=cov_factor, debug=debug)
-                refcell.check_missing_H(debug=debug)
-                if not refcell.has_isolated_H:
-                    refcell.get_unique_species(debug=debug)
-                    refcell.get_selected_cs(debug=debug)
-
-            if debug >= 1: print(f"Covalent factor decreases: {cov_factor=}")
+        
+        refcell = modify_cov_factor_due_to_possible_charges(refcell, debug=debug)
+        refcell.get_selected_cs(debug=debug) # for the last time for unique species
         refcell.assess_errors(mode="possible_charges")
     # Save reference cell object
     refcell.save(ref_cell_fname)
@@ -155,7 +132,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
         reconstruction = True
         charge_assignment = False
         spin_assignment = False
-    
+        cov_factor = refcell.refmoleclist[0].cov_factor
         # Get reference molecules
         newcell.get_reference_molecules(refcell.labels, refcell.frac_coord, cov_factor=cov_factor, debug=-1)
         if not newcell.has_isolated_H:  

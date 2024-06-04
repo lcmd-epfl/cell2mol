@@ -10,6 +10,54 @@ from itertools import combinations
 # import pickle
 
 ######################################################
+def modify_cov_factor_due_to_H (refcell, debug: int=0):
+    cov_factor = refcell.refmoleclist[0].cov_factor
+    if not refcell.has_isolated_H:  
+        refcell.check_missing_H(debug=debug)                                     
+    else:
+        if debug >= 1: print(f"Initial covalent factor: {cov_factor=} before increasing")
+        while refcell.has_isolated_H :
+            # Increase covalent factor for H atoms
+            cov_factor += 0.05
+            refcell.get_reference_molecules(refcell.labels, refcell.frac_coord, cov_factor=cov_factor, debug=0)
+        if debug >= 1: print(f"Covalent factor increases: {cov_factor=}")
+        refcell.check_missing_H(debug=debug)
+    refcell.assess_errors(mode="hydrogens")
+    return refcell
+
+######################################################
+def modify_cov_factor_due_to_possible_charges (refcell, debug: int=0):
+
+    cov_factor = refcell.refmoleclist[0].cov_factor
+    print(f"Initial ovalent factor: {cov_factor=}")
+    
+    temp_selection = []
+    while (len(temp_selection) != len(refcell.species_list) or (refcell.has_isolated_H or refcell.has_missing_H) ) and (cov_factor > 1.15):
+        for specie in refcell.species_list:
+            tmp = specie.get_possible_cs(debug=debug)
+            if tmp is None:
+                cov_factor -= 0.05
+                refcell.get_reference_molecules(refcell.labels, refcell.frac_coord, cov_factor=cov_factor, debug=0)
+                if not refcell.has_isolated_H : refcell.check_missing_H(debug=debug)
+                if not refcell.has_missing_H :  refcell.get_unique_species(debug=debug)
+                temp_selection = []
+                break
+            elif specie.subtype != "metal":
+                temp_selection.append(list([cs.corr_total_charge for cs in specie.possible_cs]))
+            else :
+                temp_selection.append(specie.possible_cs)    
+
+    if debug >= 1: print(f"Covalent factor decreases: {cov_factor=}")
+    refcell.assess_errors(mode="hydrogens")
+    if refcell.error_case == 0:
+        if debug >= 1: print(f"OK with decreasing cov_factor {cov_factor=}")
+        return refcell
+    else:
+        if debug >= 1: print(f"Error with decreasing cov_factor {cov_factor=}")
+        refcell = modify_cov_factor_due_to_H(refcell, debug=debug)
+        return refcell
+
+######################################################
 def apply_symmetry_operations_reference (refcell, cell_vector, sym_ops, normalize: bool=True, pbc: bool=True):
     
     new_structures = []

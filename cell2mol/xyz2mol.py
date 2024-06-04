@@ -485,7 +485,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
     # make a list of valences, e.g. for CO: [[4],[2,1]]
     valences_list_of_lists = []
     AC_valence = list(AC.sum(axis=1))
-    print(f"{AC_valence=}")
+    #print(f"{AC_valence=}")
     wrong = 0
 
     for i, (atomicNum, valence) in enumerate(zip(atoms, AC_valence)):
@@ -511,12 +511,12 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
             wrong += 1
             # sys.exit()
         valences_list_of_lists.append(possible_valence)
-    print(f"{wrong=}")
+    #print(f"{wrong=}")
     if wrong > 0:
         # print(f"AC2BO: {wrong=}")
         return None, atomic_valence_electrons
     
-    print(f"\tAC2BO: {valences_list_of_lists=}")
+    #print(f"\tAC2BO: {valences_list_of_lists=}")
     
     # convert [[4],[2,1]] to [[4,2],[4,1]]
     valences_list = []
@@ -553,7 +553,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
             check_bo = None
 
         if check_len and check_bo:
-            print(f"\tAC2BO: return AC", check_len, check_bo)
+            #print(f"\tAC2BO: return AC", check_len, check_bo)
             return AC, atomic_valence_electrons
 
         UA_pairs_list = get_UA_pairs(UA, AC, use_graph=use_graph)
@@ -581,7 +581,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
             )
 
             if status:
-                print(f"\tAC2BO: status", status)
+                #print(f"\tAC2BO: status", status)
                 return BO, atomic_valence_electrons
             elif (
                 BO.sum() >= best_BO.sum()
@@ -601,7 +601,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
             #         best_BO = BO.copy()
             #         print("AC2BO: best bo", best_BO)
         # print("best bo", best_BO)
-    print(f"\tAC2BO: return best bo")
+    #print(f"\tAC2BO: return best bo")
     #print("AC2BO: return best bo", best_BO)
     return best_BO, atomic_valence_electrons
 

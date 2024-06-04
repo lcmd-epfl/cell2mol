@@ -33,7 +33,7 @@ def get_possible_charge_state(spec: object, debug: int=0):
     if not hasattr(spec,"protonation_states"): spec.get_protonation_states(debug=debug)
     if spec.protonation_states is None:                                             return None
     if spec.subtype == "group" or (spec.subtype == 'molecule' and spec.iscomplex):  return None
-    
+    print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) {spec.cov_factor=}")
     charge_states = []
     ### Evaluates possible charges for each protonation state ###
     for prot in spec.protonation_states:
@@ -392,7 +392,9 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         elemlist[idx] = "Cl"
                         addedlist[idx] = 1
                     else:
-                        block[idx] = 1
+                        # block[idx] = 1
+                        elemlist[idx] = "Cl"
+                        addedlist[idx] = 1
                 # Nitrogen
                 elif a.label == "N":
                     # Nitrosyl
@@ -601,15 +603,15 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
 
     natoms = prot.natoms
     atnums = prot.atnums
-    print(f"\nGET_CHARGE. Starting get_charge with charge {charge} and {prot.formula} ({prot.added_atoms=}")
+    print(f"\nGET_CHARGE. Starting get_charge with charge {charge} and {prot.formula} {prot.added_atoms=}")
     # prot.coords and prot.cov_factor will not be used
     mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow)
-    print(f"\tGET_CHARGE.{len(mols)=} received from xyz2mol with charge {charge}")
+    print(f"GET_CHARGE.{len(mols)=} received from xyz2mol with charge {charge}")
     
     if len(mols) > 1: 
-        if debug >=1 : print(f"\tGET_CHARGE. WARNING: More than 1 mol received from xyz2mol for initcharge: {charge}")
+        if debug >=1 : print(f"GET_CHARGE. WARNING: More than 1 mol received from xyz2mol for initcharge: {charge}")
     elif len(mols) == 0:
-        if debug >=1 : print(f"\tGET_CHARGE. WARNING: No mol received from xyz2mol for initcharge: {charge}")
+        if debug >=1 : print(f"GET_CHARGE. WARNING: No mol received from xyz2mol for initcharge: {charge}")
         return None
     else :
         pass
@@ -626,7 +628,9 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
             for mol in mols:
                 for i in range(natoms):
                     a = mol.GetAtomWithIdx(i)
-                    if debug >=2 : print(f"GET_CHARGE. {i} {a.GetSymbol()=}, {a.GetFormalCharge()=}, {a.GetImplicitValence()=}, {a.GetExplicitValence()=} {a.GetTotalValence()=}")
+                    if a.GetExplicitValence() != a.GetTotalValence():
+                        if debug >=2 : print(f"GET_CHARGE. {i} {a.GetSymbol()=}, {a.GetFormalCharge()=}, \
+                                             {a.GetImplicitValence()=}, {a.GetExplicitValence()=} {a.GetTotalValence()=}")
             return None
     
     # Smiles are generated with rdkit
