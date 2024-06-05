@@ -1,6 +1,6 @@
 import numpy as np
 import copy
-from cell2mol.charge_assignment import protonation, get_charge
+from cell2mol.charge_assignment import protonation, get_charge, get_charge_manual
 import itertools
 
 #######################################################
@@ -101,34 +101,6 @@ def print_possible_and_selected_cs (newcell, refcell, debug: int=0):
             if idx != specie.unique_index:
                 print(f"WARNING: {specie.formula=} {specie.unique_index=} {idx=} from newcell unique indices")
 
-######################################################
-def set_charge_state_simple (reference, target, debug: int=0):
-
-    final_charge = reference.totcharge
-    print("SET_CHARGE_STATE:", reference.charge_state)
-
-    if target.subtype == "molecule" and target.iscomplex == False:
-        if debug >=1 : print(f"({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie")
-        empty_list = [int(0)]*len(target.labels)
-        empty_prot = protonation(target.labels, target.coord, target.cov_factor, 
-                                int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=target)
-        cs = get_charge(final_charge, empty_prot)
-    
-    elif target.subtype == "ligand":
-        if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Ligand")
-        target.get_protonation_states(debug=debug)
-        prot = target.protonation_states[0]
-        cs = get_charge(reference.charge_state.uncorr_total_charge, prot)
-
-        if len(target.protonation_states) != 1 :
-            if debug >=1 : print("WARNING:", target.protonation_states)
-
-    target.charge_state = cs
-    if final_charge != cs.corr_total_charge:
-        print(f"WARNING: {target.formula=} {final_charge=} {cs.corr_total_charge=} final_charge != cs.corr_total_charge")
-
-    target.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
-    print(f"SET_CHARGE_STATE. {target.formula=} {target.totcharge=} {target.smiles=}")
 
 ######################################################
 def set_charge_state(reference, target, mode, debug: int=0):
@@ -136,44 +108,31 @@ def set_charge_state(reference, target, mode, debug: int=0):
     final_charge = reference.totcharge
     print("SET_CHARGE_STATE:", reference.charge_state)
 
-    if target.subtype == "molecule" and target.iscomplex == False:
-        if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie")
-        empty_list = [int(0)]*len(target.labels)
-        empty_prot = protonation(target.labels, target.coord, target.cov_factor, 
-                                int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=target)
-        cs = get_charge(final_charge, empty_prot)
-    
-    elif target.subtype == "ligand":
-        if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Ligand")
-        prot = reference.charge_state.protonation
-        temp_prot = copy.deepcopy(prot)
-        temp_prot.parent = target
-        
-        if mode == 1:
-            # For "reference" cell
-            target.get_protonation_states(debug=debug)
+    if mode == 1 : # For "reference" cell. Their possible charge states are already calculated
+        if target.formula in ["O4-Cl", "N3", "I3"]:
+            cs = get_charge_manual(target, debug=debug)
+        else :
             target.get_possible_cs(debug=debug)
             charge_list = [cs.corr_total_charge for cs in target.possible_cs]
             idx = charge_list.index(final_charge)
             cs = target.possible_cs[idx]
-            # if len(target.protonation_states) != 1 :
-            #     if debug >=1 : print(f"WARNING: {target.protonation_states=}")
-            
-            # ref_data, target_data = arrange_data_for_reorder(reference, target)
-            # if debug >=2 : print(ref_data, target_data)
-            # dummy1, dummy2, map12 = reorder(ref_data, target_data, reference.coord, target.coord)
-        
-            # if np.array_equal(map12, np.arange(len(target_data))):
-            #     if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} No need to reorder")
-            #     # temp_prot.coords = target.coord
-            #     cs = get_charge(reference.charge_state.uncorr_total_charge, temp_prot)               
-            # else:
-            #     reordered_prot = temp_prot.reorder(map12)
-            #     # reordered_prot.coords = target.coord
-            #     if debug >=1 : print(f"({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {map12=}")
-            #     cs = get_charge(reference.charge_state.uncorr_total_charge, reordered_prot)
-        
-        elif mode == 2:
+
+    elif mode == 2 : # For "unit" cell. Their charge state are not calculated
+        if target.formula in ["O4-Cl", "N3", "I3"]:
+            cs = get_charge_manual(target, debug=debug)
+        elif (target.subtype == "molecule" and target.iscomplex == False) :
+            if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie")
+            empty_list = [int(0)]*len(target.labels)
+            empty_prot = protonation(target.labels, target.coord, target.cov_factor, 
+                                    int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=target)
+            cs = get_charge(final_charge, empty_prot)
+
+        elif target.subtype == "ligand":
+            if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Ligand")
+            prot = reference.charge_state.protonation
+            temp_prot = copy.deepcopy(prot)
+            temp_prot.parent = target
+
             print(f"SET_CHARGE_STATE:{temp_prot.labels=} {len(temp_prot.labels)=} {len(temp_prot.coords)=} {len(temp_prot.block)=} {temp_prot.added_atoms=}")
             # For "unit" cell
             ref_data = reference.get_parent_indices("reference")
