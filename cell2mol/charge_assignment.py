@@ -401,7 +401,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                     elif a.connec == 1:
                         elemlist[idx] = "Cl"
                         addedlist[idx] = 1
-                    else:
+                    elif a.connec > 1:
                         block[idx] = 1
                 # Nitrogen
                 elif a.label == "N":
