@@ -314,8 +314,11 @@ def getconec(labels: list, pos: list, factor: float, radii="default") -> Tuple[i
     # Sometimes argument radii np.ndarry, or list
     with warnings.catch_warnings():
         warnings.simplefilter(action="ignore", category=FutureWarning)
-        if radii == "default":
-            radii = getradii(labels)
+        if isinstance(radii, np.ndarray):
+            pass
+        else :
+            if radii == "default":
+                radii = getradii(labels)
 
     for i in range(0, natoms - 1):
         for j in range(i, natoms):
