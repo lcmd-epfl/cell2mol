@@ -62,6 +62,10 @@ def get_atomic_valences(k):
         return [6, 5, 3]  # [5,4,3]
     if k in [16, 34]:  # S, Se
         return [6, 3, 2, 1]  # [6,4,2]
+    if k in [17]:  # Cl
+        return [1, 7]
+    if k in [53]:  # I
+        return [1, 2]
     if block == "s" and period == 1:
         av = 2 - ave
     elif block == "s" and period != 1:

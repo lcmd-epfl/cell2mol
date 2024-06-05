@@ -417,7 +417,7 @@ def get_updated_indices(sp_idx, new, cell_labels, cell_pos, cell_fracs, debug: i
         for kdx, (l, p, f) in enumerate(zip(cell_labels, cell_pos, cell_fracs)):
             if n_l == l and np.allclose(n_p, p, atol=1e-4, rtol=1e-2):
                 if np.allclose(np.remainder(n_f, 1), np.remainder(f, 1), atol=1e-4, rtol=1e-2):
-                    if debug >= 2: 
+                    if debug > 2: 
                         print(f"symmtry operation {sp_idx}:", f"atom of new (index: {jdx})", n_l, n_p, n_f, \
                             f"is the same as the atom of the unit cell (index: {kdx})", l, p, f)
                 indices_lists.append((jdx, kdx))

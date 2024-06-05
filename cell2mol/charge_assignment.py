@@ -31,10 +31,17 @@ rdBase.DisableLog("rdApp.*")
 #######################################################
 def get_possible_charge_state(spec: object, debug: int=0): 
     if not hasattr(spec,"protonation_states"): spec.get_protonation_states(debug=debug)
-    if spec.protonation_states is None:                                             return None
-    if spec.subtype == "group" or (spec.subtype == 'molecule' and spec.iscomplex):  return None
+    if spec.protonation_states is None: 
+        return None 
+    if spec.formula in ["O4-Cl", "N3", "I3"]:
+        ch_state = get_charge_manual(spec, debug=debug)
+        possible_cs = [ch_state]
+        return possible_cs
+    
+    if spec.subtype == "group" or (spec.subtype == 'molecule' and spec.iscomplex):  
+        return None
     print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) {spec.cov_factor=}")
-    charge_states = []
+    charge_states = []  
     ### Evaluates possible charges for each protonation state ###
     for prot in spec.protonation_states:
         # charge_states = []
@@ -178,8 +185,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     ##############################
     if   specie.type != "specie":                                   return None
     if   specie.subtype == "group":                                 return None
-    elif specie.subtype == "molecule" and specie.iscomplex == True: return None
-    elif specie.subtype == "molecule" and specie.iscomplex == False: 
+    elif specie.subtype == "molecule" and specie.iscomplex == True: return None     
+    elif (specie.subtype == "molecule" and specie.iscomplex == False) or specie.formula in ["O4-Cl", "N3", "I3"]: 
         if debug >= 2: print(f"\nPOSCHARGE: doing empty PROTONATION for this specie {specie.formula} ({specie.subtype})")
         #empty_list = list([np.zeros((len(specie.labels)))])
         empty_list = []
@@ -391,10 +398,11 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                     if a.connec == 0:
                         elemlist[idx] = "Cl"
                         addedlist[idx] = 1
-                    else:
-                        # block[idx] = 1
+                    elif a.connec == 1:
                         elemlist[idx] = "Cl"
                         addedlist[idx] = 1
+                    else:
+                        block[idx] = 1
                 # Nitrogen
                 elif a.label == "N":
                     # Nitrosyl
@@ -593,6 +601,70 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 if debug >= 2:  print(f"        GET_PROTONATION_STATES: Protonation DISCARDED. Steric Clashes found when adding atoms. status={new_prot.status}")
     if debug >= 2: print(f"        GET_PROTONATION_STATES:{protonation_states=}")            
     return protonation_states 
+#######################################################
+def move_to_front(lst, index):
+    element = lst.pop(index)  # Remove the element from its current position
+    lst.insert(0, element)    # Insert the element at the beginning
+    return lst
+#######################################################
+def move_element(lst, old_index, new_index):
+    element = lst.pop(old_index)  # Remove the element from its current position
+    lst.insert(new_index, element)  # Insert the element at the new position
+    return lst
+#######################################################
+def get_charge_manual(spec, debug: int=0):
+
+    if spec.formula == "O4-Cl":
+        smiles = "[O-]Cl(=O)(=O)=O"
+        charge = -1
+        order = [0, 1, 2, 3, 4] # Cl index is 1
+        for idx, a in enumerate(spec.atoms):
+            if a.label == "Cl":
+                new_order = move_element(order, 1, idx)
+        if debug >= 2: print(f" O4-Cl: {new_order=}")
+    elif spec.formula == "N3":
+        smiles = "[N-]=[N+]=[N-]"
+        charge = -1
+        order = [0, 1, 2]
+        for idx, a in enumerate(spec.atoms):
+            list_of_adj_atoms = []
+            for adj in a.adjacency:
+                if debug >= 2: print(f" N3: {adj=}", spec.get_parent("molecule").labels[adj])
+                list_of_adj_atoms.append(spec.get_parent("molecule").labels[adj])
+            numN = list_of_adj_atoms.count("N")
+            if numN == 2: 
+                new_order = move_element(order, 1, idx)
+        if debug >= 2: print(f" N3: {new_order=}")    
+        
+    elif spec.formula == "I3":
+        smiles = "I[I-]I"
+        charge = -1
+        order = [0, 1, 2]
+        for idx, a in enumerate(spec.atoms):
+            list_of_adj_atoms = []
+            for adj in a.adjacency:
+                if debug >= 2: print(f" I3: {adj=}", spec.get_parent("molecule").labels[adj])
+                list_of_adj_atoms.append(spec.get_parent("molecule").labels[adj])
+            numI = list_of_adj_atoms.count("I")
+            if numI == 2: 
+                new_order = move_element(order, 1, idx)
+        if debug >= 2: print(f" I3: {new_order=}") 
+
+    temp_mol = Chem.MolFromSmiles(smiles, sanitize=False)
+    mol = Chem.RenumberAtoms(temp_mol, new_order)
+    atom_charge = []
+    total_charge = 0
+    for i in range(spec.natoms):
+        a = mol.GetAtomWithIdx(i)  # Returns a particular Atom
+        atom_charge.append(a.GetFormalCharge())
+        total_charge += a.GetFormalCharge()
+
+    # iscorrect = check_rdkit_obj_connectivity(mol, spec.natoms, charge, debug=debug)
+    iscorrect = True
+    allow = True
+    prot = spec.get_protonation_states()[0]
+    ch_state = charge_state(iscorrect, total_charge, atom_charge, mol, smiles, charge, allow, prot)
+    return ch_state
 
 ######################################################
 def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=True, debug: int=0): 
@@ -628,9 +700,9 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
             for mol in mols:
                 for i in range(natoms):
                     a = mol.GetAtomWithIdx(i)
-                    if a.GetExplicitValence() != a.GetTotalValence():
-                        if debug >=2 : print(f"GET_CHARGE. {i} {a.GetSymbol()=}, {a.GetFormalCharge()=}, \
-                                             {a.GetImplicitValence()=}, {a.GetExplicitValence()=} {a.GetTotalValence()=}")
+                    # if a.GetExplicitValence() != a.GetTotalValence():
+                    if debug >=2 : print(f"GET_CHARGE. {i} {a.GetSymbol()=}, {a.GetFormalCharge()=}, \
+                                         {a.GetImplicitValence()=}, {a.GetExplicitValence()=} {a.GetTotalValence()=}")
             return None
     
     # Smiles are generated with rdkit
