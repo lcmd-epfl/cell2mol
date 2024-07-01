@@ -15,16 +15,29 @@ import numpy as np
 from sys import argv
 from cell2mol.spin import make_geom_list
 
+"""
+if metal == "total", all metals are considered in the TM-GSspin dataset
+else only the specified metal e.g. "Cr", "Mn", "Fe", "Co", or "Ni"
 
-dataframe=argv[1]
-metal = argv[2]
-prop = argv[3]
-mode = argv[4]
+different modes basend on the feature set
+F_TM: ["elem_nr", "m_ox", "d_elec"]
+F_CE: ["CN", "geom_nr", "rel_m"]
+F_TM+CE: ["elem_nr", "m_ox", "d_elec", "CN", "geom_nr", "rel_m"]
 
+read dataframe from property_2063.txt
+
+predict spin_multiplicity 
+"""
+
+metal = argv[1] 
+mode = argv[2]
+
+dataframe="property_2063.txt"
+prop = "spin_multiplicity"
 
 print("Sklearn version:", sklearn.__version__)
 
-df = pd.read_csv(dataframe, delimiter=",")
+df = pd.read_csv(dataframe, delimiter="\t")
 print("the length of dataframe", len(df))
 print(df.columns)
 
@@ -43,10 +56,16 @@ else :
 
 print("the length of", metal,  len(df))
 
-if prop == "spin_multiplicity" or prop == "spin" or prop == "s" :
-    # extract = ["elem_nr", "m_ox", "d_elec"] # F_TM 
-    # extract = ["CN", "geom_nr", "rel_m"] # F_CE
-    extract = ["elem_nr", "m_ox", "d_elec", "CN", "geom_nr", "rel_m"] # F_TM+CE
+if prop == "spin_multiplicity":
+    if mode == "F_TM":
+        extract = ["elem_nr", "m_ox", "d_elec"] 
+    elif mode == "F_CE":
+        extract = ["CN", "geom_nr", "rel_m"] 
+    elif mode == "F_TM+CE":
+        extract = ["elem_nr", "m_ox", "d_elec", "CN", "geom_nr", "rel_m"]
+    else:
+        print("No such mode in the database")
+        exit()
 elif prop == "m_ox":
     extract = ["elem_nr", "CN", "geom_nr", "rel_m"] 
 else :
@@ -176,4 +195,3 @@ filename = "{}_{}_{}.pkl".format(metal, prop, len(df))
 learner = learner = rf_random.best_estimator_.fit(X, Y)
 pickle.dump(learner, open(filename, "wb"))
 print("feature importance", learner.feature_importances_)
-

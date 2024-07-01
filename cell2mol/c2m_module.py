@@ -15,7 +15,7 @@ from cell2mol.missingH import check_missingH
 from cell2mol.tmcharge_common import cell
 from cell2mol.cellconversions import frac2cart_fromparam
 from cell2mol.readwrite import readinfo
-from cell2mol.spin import count_N, count_d_elec, assign_ground_state_spin_empirical, generate_feature_vector
+from cell2mol.spin import count_N, count_d_elec, assign_ground_state_spin_empirical, generate_feature_vector, calcualte_relative_metal_radius
 from typing import Tuple
 from cell2mol import __file__
 from cell2mol.elementdata import ElementData
@@ -255,11 +255,11 @@ def assign_spin (cell: object, debug: int=0) -> object:
                 met = mol.metalist[0]
                 period = elemdatabase.elementperiod[met.label]
                 d_elec = count_d_elec (met.label, met.totcharge)
-
+                rel = calcualte_relative_metal_radius(met)
                 if period == 4:               
                     if met.hapticity == False: # 3d transition metal coordination complexes      
                         if debug >= 1: print("3d transition metal coordination complexes")
-                        if debug >= 1: print(f"{mol.type=} {mol.formula=} {met.label=} OS={met.totcharge} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=}")
+                        if debug >= 1: print(f"{mol.type=} {mol.formula=} {met.label=} OS={met.totcharge} {met.geometry=} {met.coordination_number=} {met.coordinating_atoms=} rel_m={rel} d_elec={d_elec}")
                         # i) Assign spin multiplicity based on empirical rules
                         spin, rule, threshold  = assign_ground_state_spin_empirical(met, N)
                         if debug >= 1: print(f"By empirical model {spin=}")
