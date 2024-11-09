@@ -24,11 +24,13 @@ import pickle
 ####  CLASSES FOR CELL2MOL 2  ####
 ##################################
 class specie(object):
-    def __init__(self, labels: list, coord: list, frac_coord: list, radii: list=None) -> None:
+    def __init__(self, labels: list, coord: list, frac_coord: list=None, radii: list=None) -> None:
 
        # Sanity Checks
         assert len(labels) == len(coord)
-        assert len(coord) == len(frac_coord)
+        if frac_coord is not None:        
+            self.frac_coord = frac_coord
+            assert len(coord) == len(frac_coord)
 
         # Optional Information
         if radii   is not None: self.radii   = radii
@@ -195,8 +197,12 @@ class specie(object):
                 ## For each l in labels, create an atom class object.
                 ismetal = elemdatabase.elementblock[l] == "d" or elemdatabase.elementblock[l] == "f"
                 if debug > 0: print(f"SPECIE.SET_ATOMS: {ismetal=}")
-                if ismetal: newatom = metal(l, self.coord[idx], self.frac_coord[idx], radii=self.radii[idx])
-                else:       newatom = atom(l, self.coord[idx], self.frac_coord[idx],radii=self.radii[idx])
+                if self.frac_coord is not None: 
+                    if ismetal: newatom = metal(l, self.coord[idx], self.frac_coord[idx], radii=self.radii[idx])
+                    else:       newatom = atom(l, self.coord[idx], self.frac_coord[idx],radii=self.radii[idx])
+                else :
+                    if ismetal: newatom = metal(l, self.coord[idx], radii=self.radii[idx])
+                    else:       newatom = atom(l, self.coord[idx], radii=self.radii[idx])
                 if debug > 0: print(f"SPECIE.SET_ATOMS: added atom to specie: {self.formula}")
                 newatom.add_parent(self, index=idx)
                 self.atoms.append(newatom)
@@ -344,8 +350,9 @@ class specie(object):
 ### MOLECULE ##
 ###############
 class molecule(specie):
-    def __init__(self, labels: list, coord: list, frac_coord: list, radii: list=None) -> None:
+    def __init__(self, labels: list, coord: list, frac_coord: list=None, radii: list=None) -> None:
         self.subtype = "molecule"
+        if frac_coord is not None:        self.frac_coord = frac_coord
         specie.__init__(self, labels, coord, frac_coord, radii)
 
     def __repr__(self):
@@ -393,7 +400,8 @@ class molecule(specie):
             # Split the "rest" to obtain the ligands
             rest_labels  = extract_from_list(rest_idx, self.labels, dimension=1)
             rest_coord   = extract_from_list(rest_idx, self.coord, dimension=1)
-            rest_frac    = extract_from_list(rest_idx, self.frac_coord, dimension=1)
+            if self.frac_coord is not None:        
+                rest_frac    = extract_from_list(rest_idx, self.frac_coord, dimension=1)
             rest_indices = extract_from_list(rest_idx, self.indices, dimension=1)
             rest_radii   = extract_from_list(rest_idx, self.radii, dimension=1)
             rest_atoms   = extract_from_list(rest_idx, self.atoms, dimension=1)
@@ -413,21 +421,25 @@ class molecule(specie):
                 lig_indices = extract_from_list(b, rest_indices, dimension=1)
                 lig_labels  = extract_from_list(b, rest_labels, dimension=1) 
                 lig_coord   = extract_from_list(b, rest_coord, dimension=1) 
-                lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
+                if self.frac_coord is not None:  
+                    lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
                 lig_radii   = extract_from_list(b, rest_radii, dimension=1) 
                 lig_atoms   = extract_from_list(b, rest_atoms, dimension=1) 
                 
                 if debug > 0: print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
                 # Create Ligand Object
-                newligand   = ligand(lig_labels, lig_coord, lig_frac_coord, radii=lig_radii)
+                if self.frac_coord is not None:  
+                    newligand   = ligand(lig_labels, lig_coord, lig_frac_coord, radii=lig_radii)
+                else :
+                    newligand   = ligand(lig_labels, lig_coord, radii=lig_radii)
                 # For debugging
                 newligand.origin = "split_complex"
                 # Define the molecule as parent of the ligand. Bottom-Up hierarchy
                 newligand.add_parent(self, indices=lig_indices)
 
-                if self.check_parent("unit_cell"):
-                    cell_indices = [a.get_parent_index("unit_cell") for a in lig_atoms]
-                    newligand.add_parent(self.get_parent("unit_cell"), indices=cell_indices)
+                if self.check_parent("unitcell"):
+                    cell_indices = [a.get_parent_index("unitcell") for a in lig_atoms]
+                    newligand.add_parent(self.get_parent("unitcell"), indices=cell_indices)
 
                 if self.check_parent("reference"):
                     ref_indices = [a.get_parent_index("reference") for a in lig_atoms]
@@ -463,13 +475,18 @@ class molecule(specie):
                 for entry in lig.haptic_type:
                     if entry not in self.haptic_type: self.haptic_type.append(entry)
         return self.haptic_type
-
+   
+    def save(self, path):
+        print(f"SAVING cell2mol CELL object to {path}")
+        with open(path, "wb") as fil:
+            pickle.dump(self,fil)
 ###############
 ### LIGAND ####
 ###############
 class ligand(specie):
-    def __init__(self, labels: list, coord: list, frac_coord: list, radii: list=None) -> None:
+    def __init__(self, labels: list, coord: list, frac_coord: list=None, radii: list=None) -> None:
         self.subtype  = "ligand"
+        if frac_coord is not None:        self.frac_coord = frac_coord
         specie.__init__(self, labels, coord, frac_coord, radii)
         self.evaluate_as_nitrosyl()
         
@@ -592,7 +609,8 @@ class ligand(specie):
             print(f"\tLIGAND.SPLIT_LIGAND: {connected_idx=}")
         conn_labels     = extract_from_list(connected_idx, self.labels, dimension=1)
         conn_coord      = extract_from_list(connected_idx, self.coord, dimension=1)
-        conn_frac_coord = extract_from_list(connected_idx, self.frac_coord, dimension=1)
+        if self.frac_coord is not None:
+            conn_frac_coord = extract_from_list(connected_idx, self.frac_coord, dimension=1)
         conn_radii      = extract_from_list(connected_idx, self.radii, dimension=1)
         conn_atoms      = extract_from_list(connected_idx, self.atoms, dimension=1)
         if debug >= 2: print(f"\tLIGAND.SPLIT_LIGAND: {conn_labels=}")
@@ -607,11 +625,15 @@ class ligand(specie):
             if debug > 1: print(f"\tLIGAND.SPLIT_LIGAND: {gr_indices=}")
             gr_labels       = extract_from_list(b, conn_labels, dimension=1, debug=debug)
             gr_coord        = extract_from_list(b, conn_coord, dimension=1)
-            gr_frac_coord   = extract_from_list(b, conn_frac_coord, dimension=1)
+            if self.frac_coord is not None:
+                gr_frac_coord   = extract_from_list(b, conn_frac_coord, dimension=1)
             gr_radii        = extract_from_list(b, conn_radii, dimension=1)
             gr_atoms        = extract_from_list(b, conn_atoms, dimension=1)
             # Create Group Object
-            newgroup = group(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
+            if self.frac_coord is not None:
+                newgroup = group(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
+            else:
+                newgroup = group(gr_labels, gr_coord, radii=gr_radii)
             # For debugging
             newgroup.origin = "split_ligand"
             # Define the ligand as parent of the group. Bottom-Up hierarchy
@@ -655,8 +677,9 @@ class ligand(specie):
 #### GROUP ####
 ###############
 class group(specie):
-    def __init__(self, labels: list, coord: list, frac_coord: list, radii: list=None) -> None:
+    def __init__(self, labels: list, coord: list, frac_coord: list=None, radii: list=None) -> None:
         self.subtype = "group"
+        if frac_coord is not None:        self.frac_coord = frac_coord
         specie.__init__(self, labels, coord, frac_coord, radii)
 
     #######################################################

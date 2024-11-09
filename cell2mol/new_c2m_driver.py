@@ -124,7 +124,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     ##########################################
     # Define new cell object for the unit cell
     newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
-    newcell.get_subtype("unit_cell")
+    newcell.get_subtype("unitcell")
     
     if refcell.error_case != 0:
         pass

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
-
+import numpy as np
 
 def parsing_arguments():
     """Parses the arguments of the command line.
@@ -22,13 +22,30 @@ def parsing_arguments():
         dest="filename",
         type=str,
         required=True,
-        help="Filename of Input (.info or .cif file)",
+        help="Filename of Input (.info, .xyz, or .cif file)",
+    )
+
+    parser.add_argument(
+        "-t",
+        "--type",
+        dest="system_type",
+        type=str,
+        choices=["reference", "unitcell", "molecule"],
+        required=True,
+        help="Type of information in the input file ('reference', 'unitcell' or 'molecule')",
+    )
+
+    parser.add_argument(
+        "--cell-para",
+        dest="cell_para",
+        type=float,
+        nargs=6,
+        help="Cell parameters (a, b, c, alpha, beta, gamma) for .xyz file",
     )
 
     parser.add_argument(
         "-v",
         "--verbose",
-        #dest="verbose",
         help="Extended output for debugging.",
         action="store_true",
     )
@@ -36,14 +53,30 @@ def parsing_arguments():
     parser.add_argument(
         "-q",
         "--quiet",
-        #dest="quiet",
         help="Suppress all screen output. Overrides --verbose flag.",
         action="store_true",
     )
 
     args = parser.parse_args()
 
-    return args.filename, args.verbose, args.quiet
+    cell_para = None
+    if args.filename.endswith(".xyz") and args.system_type == "unitcell":
+        if args.cell_para is None:
+            parser.error("Cell parameters must be provided for .xyz file of an unit cell")
+        cell_para = np.array(args.cell_para)
+
+    debug_mode = determine_debug_level(args.verbose, args.quiet)
+    return args.filename, args.system_type, cell_para, debug_mode
+
+def determine_debug_level(isverbose, isquiet):
+    if isverbose and not isquiet:
+        return 2
+    elif isverbose and isquiet:
+        return 0
+    elif not isverbose and isquiet:
+        return 0
+    elif not isverbose and not isquiet:
+        return 1
 
 
 if __name__ == "__main__":
