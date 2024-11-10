@@ -73,7 +73,7 @@ def assign_charge_state_for_unique_species(unique_species, final_charges_tuple, 
             specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
         elif specie.subtype == "metal" :
             charge_list = specie.possible_cs   
-            # idx = charge_list.index(final_charge)
+            idx = charge_list.index(final_charge)
             cs = specie.possible_cs[idx]
             specie.set_charge(cs) 
     for specie in unique_species:
@@ -112,8 +112,10 @@ def set_charge_state(reference, target, mode, debug: int=0):
         if target.formula in ["O4-Cl", "N3", "I3"]:
             cs = get_charge_manual(target, debug=debug)
         else :
+            #if not hasattr(target, "possible_cs"): target.get_possible_cs(debug=debug)
             target.get_possible_cs(debug=debug)
             charge_list = [cs.corr_total_charge for cs in target.possible_cs]
+            print(charge_list, final_charge, target.possible_cs)
             idx = charge_list.index(final_charge)
             cs = target.possible_cs[idx]
 
@@ -148,12 +150,13 @@ def set_charge_state(reference, target, mode, debug: int=0):
     target.charge_state = cs
     if final_charge != cs.corr_total_charge:
         print(f"SET_CHARGE_STATE: WARNING!!! {target.formula=} {final_charge=} {cs.corr_total_charge=} final_charge != cs.corr_total_charge")
+    print("SET_CHARGE_STATE!!!!", f"{mode=}", cs, cs.smiles)
     target.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
     print(f"SET_CHARGE_STATE:{target.formula=} {target.totcharge=} {target.smiles=}")
     
 ######################################################
 def prepare_mol (mol):
-    tmp_atcharge = np.zeros((mol.natoms))
+    tmp_atcharge = np.zeros((mol.natoms), dtype=int)
     tmp_smiles = []
     
     for lig in mol.ligands: 
@@ -164,7 +167,7 @@ def prepare_mol (mol):
     
     for met in mol.metals:  
         parent_index = met.get_parent_index("molecule")
-        tmp_atcharge[parent_index] = met.charge  
+        tmp_atcharge[parent_index] = met.charge
         
     mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge, smiles=tmp_smiles)
 

@@ -298,6 +298,7 @@ class specie(object):
             # if not hasattr(self,"groups"): self.split_ligand()
             if not hasattr(self, "is_haptic"): self.get_hapticity()
             if not hasattr(self, "denticity"): self.get_denticity()
+            if not hasattr(self, "is_nitrosyl"): self.evaluate_as_nitrosyl()
             self.protonation_states = get_protonation_states_specie(self, debug=debug)
         else:
             if not hasattr(self,"is_haptic"): self.get_hapticity()
@@ -436,7 +437,7 @@ class molecule(specie):
                 newligand.origin = "split_complex"
                 # Define the molecule as parent of the ligand. Bottom-Up hierarchy
                 newligand.add_parent(self, indices=lig_indices)
-
+                
                 if self.check_parent("unitcell"):
                     cell_indices = [a.get_parent_index("unitcell") for a in lig_atoms]
                     newligand.add_parent(self.get_parent("unitcell"), indices=cell_indices)
@@ -452,6 +453,7 @@ class molecule(specie):
                 # Inherit the adjacencies from molecule
                 newligand.inherit_adjmatrix("molecule")
                 # Add ligand to the list. Top-Down hierarchy
+                # newligand.evaluate_as_nitrosyl()
                 self.ligands.append(newligand)
 
             ## Arranges Metals
@@ -488,7 +490,7 @@ class ligand(specie):
         self.subtype  = "ligand"
         if frac_coord is not None:        self.frac_coord = frac_coord
         specie.__init__(self, labels, coord, frac_coord, radii)
-        self.evaluate_as_nitrosyl()
+        #self.evaluate_as_nitrosyl() ### move to the split_complexes function 
         
     #######################################################
     def __repr__(self):
@@ -1332,13 +1334,14 @@ class cell(object):
         refcell.get_subtype("reference")
         # Get reference molecules
         blocklist = split_species(ref_labels, ref_pos, cov_factor=cov_factor)
-
+        print(blocklist)
         self.refmoleclist = []
         for b in blocklist:
             mol_labels       = extract_from_list(b, ref_labels, dimension=1)
             mol_coord        = extract_from_list(b, ref_pos, dimension=1)
             mol_frac_coord   = extract_from_list(b, ref_fracs, dimension=1)
             newmolec         = molecule(mol_labels, mol_coord, mol_frac_coord)
+            print(newmolec)
             newmolec.add_parent(self, indices=b)
             newmolec.add_parent(refcell, indices=b)
             newmolec.set_adjacency_parameters(cov_factor, metal_factor)
@@ -1550,6 +1553,7 @@ class cell(object):
 
         self.selected_cs = []
         for specie in self.unique_species:
+            print("Get possible charge states for unique specie", specie.formula)
             tmp = specie.get_possible_cs(debug=debug)
             if tmp is None: 
                 self.selected_cs.append(None)
@@ -1614,26 +1618,33 @@ class cell(object):
                     cs = specie.possible_cs[idx]
                     specie.set_charge(cs) 
             for specie in self.unique_species:
+                print("Unique Species final charges")
                 if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
-                    print(specie.formula, specie.charge_state, specie.totcharge, specie.smiles)
+                    print(specie.formula, specie.totcharge)
+                elif specie.subtype == "metal" :
+                    print(specie.formula, specie.charge)
 
             for idx, ref in enumerate(self.refmoleclist):
                 print(f"Refenrence Molecule {idx}: {ref.formula}")
                 if ref.iscomplex:
                     for jdx, lig in enumerate(ref.ligands):
-                        for specie in self.unique_species:
+                        for kdx, specie in enumerate(self.unique_species):
                             if specie.subtype == "ligand":
                                 issame = compare_species(lig, specie)
                                 if issame:
                                     set_charge_state (specie, lig, mode=1, debug=debug)
-                                    print(lig.formula, specie.formula, issame)    
+                                    print(lig.formula, specie.formula, lig.totcharge, specie.totcharge, issame)   
+                                print("Check Error", f"{idx=}, {jdx=}, {kdx=}", lig.formula, specie.formula, issame)
+                                # print(f"{lig.smiles=}")
+                                # print(f"{specie.smiles=}")
+                                    
                     for met in ref.metals:
                         for specie in self.unique_species:
                             if specie.subtype == "metal":
                                 issame = compare_metals(met, specie)
                                 if issame:
                                     met.set_charge(specie.charge)
-                                    print(met.formula, specie.formula, issame) 
+                                    print(met.formula, specie.formula, met.charge, specie.charge, issame) 
                     prepare_mol(ref)
                 else:
                     for specie in self.unique_species:  
@@ -1641,7 +1652,7 @@ class cell(object):
                             issame = compare_species(ref, specie)
                             if issame:
                                 set_charge_state (specie, ref, mode=1, debug=debug)
-                                print(ref.formula, specie.formula, issame)
+                                print(ref.formula, specie.formula, ref.totcharge, specie.totcharge, issame)
 
             for idx, mol in enumerate(self.moleclist):
                 print(f"Unit cell Molecule {idx}: {mol.formula}")
@@ -1651,20 +1662,30 @@ class cell(object):
                             issame = compare_reference_indices(ref, mol, debug=debug)
                             if issame:
                                 set_charge_state (ref, mol, mode=2, debug=debug)
-                                print(mol.formula, ref.formula, issame) 
+                                print(mol.formula, ref.formula, mol.totcharge, ref.totcharge, issame) 
                 else:
                     for ref in self.refmoleclist:
                         if ref.iscomplex:
-                            for lig in mol.ligands:
-                                for ref_lig in ref.ligands:
+                            for jdx, lig in enumerate(mol.ligands):
+                                for kdx, ref_lig in enumerate(ref.ligands):
                                     issame = compare_reference_indices(ref_lig, lig, debug=debug)
                                     if issame:
                                         set_charge_state (ref_lig, lig, mode=2, debug=debug)
-                                        print(lig.formula, ref_lig.formula, issame)                                     
+                                        print(lig.formula, ref_lig.formula, lig.totcharge, ref_lig.totcharge, lig.smiles, ref_lig.smiles, issame) 
+                                    else :
+                                        issame_2 = compare_species(lig, ref_lig)
+                                        if issame_2:
+                                            set_charge_state (ref_lig, lig, mode=1, debug=debug)
+                                            print("Check Error", f"{idx=} {jdx=} {kdx}", lig.formula, ref_lig.formula, issame)                                    
                             for met in mol.metals:
                                 for ref_met in ref.metals:
                                     if ref_met.get_parent_index("reference") == met.get_parent_index("reference"):
                                         met.set_charge(ref_met.charge)
+                                        print(met.formula, ref_met.formula, met.charge, ref_met.charge, issame)
+                                    else :
+                                        issame_2 = compare_metals(met, ref_met)
+                                        if issame_2:
+                                            met.set_charge(ref_met.charge) 
                             prepare_mol(mol)
 
     #######################################################
@@ -1770,11 +1791,7 @@ class cell(object):
         else: # Only one possible charge distribution -> getcharge for the repeated species
             self.error_multiple_distrib = False
             self.error_empty_distrib    = False
-            if debug >= 1:
-                print(f"\nFINAL Charge Distribution: {final_charge_distribution}\n")
-                print("#########################################")
-                print("Assigning Charges and Preparing Molecules")
-                print("#########################################")
+
             self.moleclist, self.error_prepare_mols =  prepare_mols (self.moleclist, self.unique_indices, self.unique_species, final_charge_distribution[0], debug=debug)
             
             if self.error_prepare_mols: 

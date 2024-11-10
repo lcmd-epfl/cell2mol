@@ -59,8 +59,8 @@ def get_possible_charge_state(spec: object, debug: int=0):
     ### After collecting charge states, then best ones are selected 
     if spec.subtype == "ligand":
         if spec.is_nitrosyl:
-            if   spec.NO_type == "Linear": possible_cs = charge_states[2]      ## When Nitrosyl, we sistematically get the correct charge_distribution in [2] (charge = 1)and [0] (charge = 0)for Linear and Bent respectively
-            elif spec.NO_type == "Bent":   possible_cs = charge_states[0]       
+            if   spec.NO_type == "Linear": possible_cs = [charge_states[2]]      ## When Nitrosyl, we sistematically get the correct charge_distribution in [2] (charge = 1)and [0] (charge = 0)for Linear and Bent respectively
+            elif spec.NO_type == "Bent":   possible_cs = [charge_states[0]]       
         else: 
             # spec.get_connected_atoms()
             # if [a.label for a in spec.connected_atoms] == ['S', 'S'] :
@@ -68,7 +68,7 @@ def get_possible_charge_state(spec: object, debug: int=0):
             # else :
             possible_cs = select_charge_distr(charge_states, debug=debug)   ## For ligands other than nitrosyl
     else:     possible_cs = select_charge_distr(charge_states, debug=debug)     ## For organic molecules
-
+    print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) {spec.cov_factor=} {possible_cs=}")
     ### Return possible charge states
     if len(possible_cs) == 0:    return None
     else:                        return possible_cs
