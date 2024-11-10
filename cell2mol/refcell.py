@@ -69,7 +69,7 @@ def get_unique_species_in_reference (refcell, debug):
     if debug >= 1:
         print(f"Unique species: {[specie.formula for specie in refcell.unique_species]}")
         print(f"Species list: {[specie.formula for specie in refcell.species_list]}\n")
-
+        
     refcell = modify_cov_factor_due_to_possible_charges(refcell, debug=debug)
     refcell.get_selected_cs(debug=debug)
     refcell.assess_errors(mode="possible_charges")

@@ -50,10 +50,13 @@ def assign_spin_complexes (mol:object, debug: int=0) -> None:
     """
     for metal in mol.metals:
         if not hasattr(metal,"spin"): metal.get_spin(debug=debug)
+    for ligand in mol.ligands:
+        if not hasattr(ligand, "is_nitrosyl"): ligand.evaluate_as_nitrosyl()
+    
     metals_spin = [metal.spin for metal in mol.metals]
     if debug >=2: print(f"ASSIGN_SPIN_COMPLEXES: {metals_spin=}")
 
-    if any(ligand.is_nitrosyl for ligand in mol.ligands):       return None
+    if any([ligand.is_nitrosyl for ligand in mol.ligands]):       return None
     else :
         if None in metals_spin :                        return None
         elif len(metals_spin) == 1:                     return metals_spin[0]       # Mononuclear complex

@@ -106,7 +106,7 @@ def check_missingH(refmoleclist: list, debug: int=0):
     Warning = False
 
     # List of Metal Atoms for which O atoms might appear connected directly.
-    Exceptions_for_CoordWater = ["Re", "V", "Mo", "W"]
+    Exceptions_for_CoordWater = ["Re", "V", "Mo", "W", "Fe"]
 
     if debug >= 2: print("")
     if debug >= 2: print("##################")
@@ -141,7 +141,7 @@ def check_missingH(refmoleclist: list, debug: int=0):
         else:
             for jdx, lig in enumerate(ref.ligands):
                 if lig.natoms == 1 and "O" in lig.labels and lig.denticity <= 1:
-                    if any(m.label in Exceptions_for_CoordWater for m in lig.metalatoms): pass
+                    if any(m.label in Exceptions_for_CoordWater for m in lig.metals): pass
                     else:
                         Missing_H_in_CoordWater = True
                         if debug >= 2: print("")

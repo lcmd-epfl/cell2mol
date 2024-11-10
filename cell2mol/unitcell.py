@@ -8,7 +8,7 @@ from cell2mol.classes import cell
 from cell2mol.new_c2m_module import cell2mol
 from cell2mol.new_charge_assignment import assign_charge_state_for_unique_species, balance_charge
 from cell2mol.other import handle_error
-
+import copy
 # Constants
 VERSION = "2.0"
 COV_FACTOR = 1.3
@@ -23,26 +23,27 @@ def process_unitcell(input_path, name, current_dir, debug=0):
     ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
     output_fname = os.path.join(current_dir, "cell2mol.out")
     
-    # Redirect stdout to file for logging
-    with open(output_fname, "w") as output, redirect_stdout(output):
-        logging.info(f"cell2mol version {VERSION}")
-        logging.info(f"Initializing cell object from input path: {input_path}")
-        logging.info(f"Debug level: {debug}")
-
-        # Read CIF file and initialize unit cell parameters
-        structure = read(input_path)
-        cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
-        
-        # Create and process unit cell
-        newcell = create_unitcell_object(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, "unitcell")
-        
-        # Process reference cell and update new cell with molecules and properties
-        refcell = process_refcell(input_path, name, current_dir, debug=debug)
-        if refcell.error_case == 0:
-            perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debug)
-        else:
-            logging.error("Error encountered while processing the reference cell")
+    # Process reference cell and update new cell with molecules and properties
+    refcell = process_refcell(input_path, name, current_dir, debug=debug)
     
+    if refcell.error_case == 0:
+        # Redirect stdout to file for logging
+        with open(output_fname, "a") as output, redirect_stdout(output):
+            logging.info(f"cell2mol version {VERSION}")
+            logging.info(f"Initializing cell object from input path: {input_path}")
+            logging.info(f"Debug level: {debug}")
+            # Read CIF file and initialize unit cell parameters
+            structure = read(input_path)
+            cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops = get_cell_parameters(structure) 
+
+            # Create and process unit cell
+            newcell = create_unitcell_object(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, "unitcell")
+
+            perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debug)
+    else:
+        logging.error("Error encountered while processing the reference cell")
+
+    # Handle error cases for the unit cell
     if hasattr(newcell, 'error_case'):
         error_fname = os.path.join(current_dir, f"unitcell_error_{newcell.error_case}.out")
         with open(error_fname, "w") as error_output:
@@ -76,10 +77,14 @@ def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debu
     cov_factor = refcell.refmoleclist[0].cov_factor if refcell.refmoleclist else COV_FACTOR
 
     # Get reference molecules for the new cell
-    newcell.get_reference_molecules(refcell.labels, refcell.frac_coord, cov_factor=cov_factor, debug=-1)
-    if not newcell.has_isolated_H:
-        newcell.check_missing_H(debug=-1)
+    # newcell.get_reference_molecules(refcell.labels, refcell.frac_coord, cov_factor=cov_factor, debug=-1)
+    # if not newcell.has_isolated_H:
+    #     newcell.check_missing_H(debug=-1)
+    newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
 
+    newcell.has_isolated_H = refcell.has_isolated_H
+    newcell.has_missing_H = refcell.has_missing_H
+    newcell.error_get_poscharges = refcell.error_get_poscharges
     logging.info("Starting molecule reconstruction with cell2mol")
     
     # Step-by-step molecule reconstruction and error assessment
@@ -98,8 +103,13 @@ def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debu
 
             # Assign and balance charges
             final_charge_distribution, final_charges = balance_charge(newcell.unique_indices, refcell.unique_species, debug=debug)
-            refcell.unique_species = assign_charge_state_for_unique_species(refcell.unique_species, final_charges[0], debug=debug)
-            
+            print(f"{final_charges=}")
+            refcell.unique_species = assign_charge_state_for_unique_species(newcell.unique_species, final_charges[0], debug=2)
+            for specie in refcell.unique_species:
+                if specie.subtype == "metal":
+                    print("refcell.unique_species", specie.formula, specie.charge)
+                else:
+                    print("refcell.unique_species", specie.formula, specie.totcharge)
             # Finalize refcell properties and save both cell objects
             refcell.assign_charges_for_refcell(debug=debug)
             refcell.assign_spin(debug=debug)

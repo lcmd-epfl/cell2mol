@@ -509,10 +509,14 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
         # if atomicNum == 15:
         #    print("Possible valences for:", atomicNum,"are",possible_valence, valence)
         if len(possible_valence) == 0:
-            print('WARNING!! Valence of atom', elemdatabase.elementsym[atomicNum], i,\
-                  'is',valence,'which bigger than allowed max',max(atomic_valence[atomicNum]),'. Stopping')
-            possible_valence.append(valence)
-            wrong += 1
+            element = elemdatabase.elementsym[atomicNum]
+            if elemdatabase.elementperiod[element] < 3 :
+                print('WARNING!! Valence of atom', element, i,\
+                    'is',valence,'which bigger than allowed max',max(atomic_valence[atomicNum]),'. Stopping')
+                possible_valence.append(valence)
+                wrong += 1
+            else:
+                possible_valence.append(valence)
             # sys.exit()
         valences_list_of_lists.append(possible_valence)
     #print(f"{wrong=}")

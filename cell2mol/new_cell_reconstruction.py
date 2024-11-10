@@ -47,7 +47,7 @@ def modify_cov_factor_due_to_possible_charges (refcell, debug: int=0):
             else :
                 temp_selection.append(specie.possible_cs)    
 
-    if debug >= 1: print(f"Covalent factor decreases: {cov_factor=}")
+    if debug >= 1: print(f"Covalent factor : {cov_factor=}")
     refcell.assess_errors(mode="hydrogens")
     if refcell.error_case == 0:
         if debug >= 1: print(f"OK with decreasing cov_factor {cov_factor=}")
