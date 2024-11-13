@@ -141,7 +141,7 @@ def set_charge_state(reference, target, mode, debug: int=0):
             target_data = target.get_parent_indices("reference")
             index_map = {value: index for index, value in enumerate(target_data)}
             sorted_indices = sorted(range(len(ref_data)), key=lambda i: index_map[ref_data[i]])            
-            
+            print(f"SET_CHARGE_STATE:{sorted_indices=}")
             reordered_prot = temp_prot.reorder(sorted_indices)
             # reordered_prot.coords = target.coord
             if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {sorted_indices=}")

@@ -410,7 +410,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         if ligand.NO_type == "Linear":
                             if debug >= 2: print("        GET_PROTONATION_STATES: Found Linear Nitrosyl")
                             elemlist[idx] = "O"
-                            addedlist[idx] = 2
+                            addedlist[idx] = 1
                             metal_electrons[idx] = 1
                         elif ligand.NO_type == "Bent":
                             if debug >= 2: print("        GET_PROTONATION_STATES: Found Bent Nitrosyl")

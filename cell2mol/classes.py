@@ -1334,14 +1334,12 @@ class cell(object):
         refcell.get_subtype("reference")
         # Get reference molecules
         blocklist = split_species(ref_labels, ref_pos, cov_factor=cov_factor)
-        print(blocklist)
         self.refmoleclist = []
         for b in blocklist:
             mol_labels       = extract_from_list(b, ref_labels, dimension=1)
             mol_coord        = extract_from_list(b, ref_pos, dimension=1)
             mol_frac_coord   = extract_from_list(b, ref_fracs, dimension=1)
             newmolec         = molecule(mol_labels, mol_coord, mol_frac_coord)
-            print(newmolec)
             newmolec.add_parent(self, indices=b)
             newmolec.add_parent(refcell, indices=b)
             newmolec.set_adjacency_parameters(cov_factor, metal_factor)
@@ -1354,20 +1352,20 @@ class cell(object):
         
         if debug >= 0: print(f"GETREFS: found {len(self.refmoleclist)} reference molecules")
         if debug >= 0: print(f"GETREFS:", [ref.formula for ref in self.refmoleclist])
-        if debug >= 0: print(f"GETREFS: {self.refmoleclist}")
         # Checks for isolated atoms, and retrieves warning if there is any. Except if it is H, halogen (group 17) or alkalyne (group 2)
         isgood = True 
         for ref in self.refmoleclist:
             if ref.natoms == 1:
                 label = ref.atoms[0].label
                 group = elemdatabase.elementgroup[label]
-                if (group == 1 or group == 2 or group == 17) and label != "H": pass 
-                else:
+                if label == "H" or label == "D": 
                     isgood = False
+                else: #(group == 1 or group == 2 or group == 17)
                     if debug >= 0: print(f"GETREFS: found ref molecule with only one atom {ref.labels}")
 
         # If all good, then works with the reference molecules
         if isgood:
+            self.has_isolated_H = False
             for ref in self.refmoleclist:
                 if debug >= 0: print(f"GETREFS: working with {ref.formula}")
                 if ref.iscomplex: 
@@ -1377,8 +1375,9 @@ class cell(object):
                     for met in ref.metals:                         
                         met.get_coordination_geometry(debug=debug)
                         met.get_coord_sphere_formula()
-        if isgood: self.has_isolated_H = False
-        else:      self.has_isolated_H = True
+        else:      
+            self.has_isolated_H = True
+            
         return self.refmoleclist
 
     #######################################################
