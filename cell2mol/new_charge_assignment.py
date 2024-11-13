@@ -181,6 +181,7 @@ def create_bonds_specie (specie, debug: int=0):
 
     if n_atoms == n_atoms_rdkit:
         if debug >= 2: print(f"\tNumber of atoms in {specie.subtype} object and RDKit object are equal: {n_atoms} {n_atoms_rdkit}")
+
         for idx, rdkit_atom in enumerate(specie.rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8
             if debug >= 2: print(f"\t{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
             if len(rdkit_atom.GetBonds()) == 0:
@@ -190,7 +191,19 @@ def create_bonds_specie (specie, debug: int=0):
                     bond_startatom = b.GetBeginAtomIdx()
                     bond_endatom   = b.GetEndAtomIdx()
                     bond_order     = b.GetBondTypeAsDouble()
-                    if specie.atoms[bond_endatom].label != specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
+                    if specie.atoms[bond_endatom].label == "D" and specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol() == "H":
+                        if bond_endatom == idx:
+                            start = bond_endatom
+                            end   = bond_startatom
+                        elif bond_startatom == idx:
+                            start = bond_startatom
+                            end   = bond_endatom         
+                        # create new bond object
+                        if debug >=2: print(f"\tBOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
+                        new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
+                        specie.atoms[idx].add_bond(new_bond)
+
+                    elif specie.atoms[bond_endatom].label != specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
                         if debug >= 1: print(f"\tError with Bond EndAtom", specie.atoms[bond_endatom].label, specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
                     else:
                         if bond_endatom == idx:
