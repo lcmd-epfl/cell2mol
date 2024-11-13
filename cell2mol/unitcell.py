@@ -40,22 +40,28 @@ def process_unitcell(input_path, name, current_dir, debug=0):
             newcell = create_unitcell_object(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, "unitcell")
 
             perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debug)
+
+            # Handle error cases for the unit cell
+            if hasattr(newcell, 'error_case'):
+                error_fname = os.path.join(current_dir, f"unitcell_error_{newcell.error_case}.out")
+                with open(error_fname, "w") as error_output:
+                    with redirect_stdout(error_output):
+                        handle_error(newcell.error_case)
     else:
         logging.error("Error encountered while processing the reference cell")
-
-    # Handle error cases for the unit cell
-    if hasattr(newcell, 'error_case'):
-        error_fname = os.path.join(current_dir, f"unitcell_error_{newcell.error_case}.out")
-        with open(error_fname, "w") as error_output:
-            with redirect_stdout(error_output):
-                handle_error(newcell.error_case)
 
     return newcell
 
 def get_cell_parameters(structure):
     """Extracts cell parameters and symmetry operations from structure."""
     wrap_keywords = {'pbc': True, 'center': (0.5, 0.5, 0.5)}
-    cell_labels = structure.get_chemical_symbols()
+    cell_labels = []
+    for l, n, m in zip(structure.get_chemical_symbols(), structure.get_atomic_numbers(), structure.get_masses()):
+        if n == 1 and (m > 2 or  m== 2.01355) : # Deuterium
+            cell_labels.append("D")
+        else:
+            cell_labels.append(l)
+
     cell_pos = structure.get_positions(wrap=True, **wrap_keywords)
     cell_fracs = structure.get_scaled_positions()
     cell_vector = structure.cell.array

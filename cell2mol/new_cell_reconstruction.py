@@ -6,8 +6,9 @@ from cell2mol.other import get_dist, extract_from_list
 from cell2mol.connectivity import split_species, count_species, compare_reference_indices
 from cell2mol.cell_operations import translate
 from itertools import combinations
-# from cell2mol.read_write import writexyz
-# import pickle
+from cell2mol.elementdata import ElementData
+elemdatabase = ElementData()
+
 
 ######################################################
 def modify_cov_factor_due_to_H (refcell, debug: int=0):
@@ -16,11 +17,11 @@ def modify_cov_factor_due_to_H (refcell, debug: int=0):
         refcell.check_missing_H(debug=debug)                                     
     else:
         if debug >= 1: print(f"Initial covalent factor: {cov_factor=} before increasing")
-        while refcell.has_isolated_H :
+        while refcell.has_isolated_H and cov_factor < 1.5:
             # Increase covalent factor for H atoms
             cov_factor += 0.05
             refcell.get_reference_molecules(refcell.labels, refcell.frac_coord, cov_factor=cov_factor, debug=0)
-        if debug >= 1: print(f"Covalent factor increases: {cov_factor=}")
+            if debug >= 1: print(f"Covalent factor increases: {cov_factor=}")
         refcell.check_missing_H(debug=debug)
     refcell.assess_errors(mode="hydrogens")
     return refcell
@@ -63,16 +64,20 @@ def apply_symmetry_operations_reference (refcell, cell_vector, sym_ops, normaliz
     new_structures = []
     ref_labels = refcell.labels
     fractional_coords = np.array(refcell.frac_coord)
-    
-    # reference : ase atoms object
-    reference = Atoms(symbols=ref_labels, scaled_positions=fractional_coords, cell=cell_vector, pbc=pbc)
+
+    if "D" in ref_labels:
+        numbers = [elemdatabase.elementnr[elem] for elem in ref_labels] # Atoms object cannot handle Deuterium in the symbols
 
     for rot, trans in zip(sym_ops[0], sym_ops[1]):
         transformed_positions = np.dot(fractional_coords, rot.T)
         transformed_positions += np.array(trans)       
         if normalize:
             transformed_positions = np.remainder(transformed_positions, 1)
-        new = Atoms(symbols=ref_labels, scaled_positions=transformed_positions, cell=cell_vector)    
+        if "D" in ref_labels:
+            new = Atoms(scaled_positions=transformed_positions, numbers=numbers, cell=cell_vector)
+        else:
+            new = Atoms(symbols=ref_labels, scaled_positions=transformed_positions, cell=cell_vector)
+
         new_structures.append(new)
     
     return new_structures
@@ -400,7 +405,7 @@ def fragments_reconstruct (subset_remaining_fragments, target_ref, cell_vector, 
     return list_of_found_molecules, list_of_bigger_fragments
 
 ######################################################
-def get_updated_indices(sp_idx, new, cell_labels, cell_pos, cell_fracs, debug: int=0):
+def get_updated_indices(sp_idx, ref_labels, new, cell_labels, cell_pos, cell_fracs, debug: int=0):
     """
     sp_idx : index of the symmetry operation
     new : ase atoms object by applying symmetry operations to the reference structure
@@ -409,11 +414,11 @@ def get_updated_indices(sp_idx, new, cell_labels, cell_pos, cell_fracs, debug: i
     cell_fracs : list of fractional coordinates of the atoms in the unit cell
     """
     indices_lists = []
-    new_labels =  new.get_chemical_symbols()
+    # new_labels =  new.get_chemical_symbols()
     new_pos = new.get_positions()    
     new_fracs = new.get_scaled_positions()
 
-    for jdx, (n_l, n_p, n_f) in enumerate(zip(new_labels, new_pos, new_fracs)):
+    for jdx, (n_l, n_p, n_f) in enumerate(zip(ref_labels, new_pos, new_fracs)):
         for kdx, (l, p, f) in enumerate(zip(cell_labels, cell_pos, cell_fracs)):
             if n_l == l and np.allclose(n_p, p, atol=1e-4, rtol=1e-2):
                 if np.allclose(np.remainder(n_f, 1), np.remainder(f, 1), atol=1e-4, rtol=1e-2):
@@ -423,7 +428,7 @@ def get_updated_indices(sp_idx, new, cell_labels, cell_pos, cell_fracs, debug: i
     return indices_lists
 
 ######################################################
-def get_updated_indices_old (new, cell_labels, cell_pos, cell_fracs, all_found, debug: int=0):
+def get_updated_indices_old (ref_labels, new, cell_labels, cell_pos, cell_fracs, all_found, debug: int=0):
 
     # new structure : ase atoms object by applying symmetry operations to the reference structure
     # Find the indices of the atoms in the unit cell that have the same cartisian coordinates as the atoms in the new structure
@@ -435,8 +440,9 @@ def get_updated_indices_old (new, cell_labels, cell_pos, cell_fracs, all_found, 
     updated = [i for i in found_indices if i not in all_found]
 
     new_fracs = new.get_scaled_positions()
-    new_labels =  new.get_chemical_symbols()
-    
+    # new_labels =  new.get_chemical_symbols()
+    new_labels = ref_labels
+
     indices_in_ref = [ find_row_index_from_matrix(new_fracs, cell_fracs[u]) for u in updated ]
     if debug >= 2:
         print("Get indices in reference")
@@ -538,10 +544,17 @@ def determine_wrap_keywords_pbc (atoms,refcell, wrap_keywords, debug: int=0):
 def reconstuct (refcell, newcell, sym_ops, debug: int=0):
     
     cell_labels = newcell.labels
+    print(f"{cell_labels=}")
+    if "D" in cell_labels:
+        print("Deuterium is in the cell")
     cell_pos = newcell.coord
     cell_fracs = newcell.frac_coord
     cell_vector = newcell.cell_vector
-
+    
+    ref_labels = refcell.labels
+    print(f"{ref_labels=}")
+    if "D" in ref_labels:
+        print("Deuterium is in the reference")
     cov_factor = refcell.refmoleclist[0].cov_factor
     metal_factor = refcell.refmoleclist[0].metal_factor
 
@@ -555,7 +568,7 @@ def reconstuct (refcell, newcell, sym_ops, debug: int=0):
 
     for idx, new in enumerate(new_structures):
         print(f"\nApplying symmetry operations to reference {idx}")
-        indices_lists = get_updated_indices(idx, new, cell_labels, cell_pos, cell_fracs, debug=debug)
+        indices_lists = get_updated_indices(idx, ref_labels, new, cell_labels, cell_pos, cell_fracs, debug=debug)
         print(f"{len(indices_lists)=}")
 
         updated_lists = [i for i in indices_lists if i[1] not in all_found]   
