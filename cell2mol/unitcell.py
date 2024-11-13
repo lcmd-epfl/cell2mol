@@ -26,7 +26,10 @@ def process_unitcell(input_path, name, current_dir, debug=0):
     # Process reference cell and update new cell with molecules and properties
     refcell = process_refcell(input_path, name, current_dir, debug=debug)
     
-    if refcell.error_case == 0:
+    if refcell.error_case != 0:
+        logging.error("Error encountered while processing the reference cell")
+        return refcell
+    else:
         # Redirect stdout to file for logging
         with open(output_fname, "a") as output, redirect_stdout(output):
             logging.info(f"cell2mol version {VERSION}")
@@ -47,10 +50,8 @@ def process_unitcell(input_path, name, current_dir, debug=0):
                 with open(error_fname, "w") as error_output:
                     with redirect_stdout(error_output):
                         handle_error(newcell.error_case)
-    else:
-        logging.error("Error encountered while processing the reference cell")
 
-    return newcell
+            return newcell
 
 def get_cell_parameters(structure):
     """Extracts cell parameters and symmetry operations from structure."""
