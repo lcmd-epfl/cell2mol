@@ -623,37 +623,55 @@ def get_charge_manual(spec, debug: int=0):
         smiles = "[O-]Cl(=O)(=O)=O"
         charge = -1
         order = [0, 1, 2, 3, 4] # Cl index is 1
-        for idx, a in enumerate(spec.atoms):
-            if a.label == "Cl":
+        new_order = order  # Default to initial order in case no move is needed
+
+        # Find the index of the "Cl" atom and update `new_order`
+        for idx, atom in enumerate(spec.atoms):
+            if atom.label == "Cl":
                 new_order = move_element(order, 1, idx)
-        if debug >= 2: print(f" O4-Cl: {new_order=}")
+                break  # Stop once we find and move Cl
+
+        # Debug output if needed
+        if debug >= 2:
+            print(f"O4-Cl: {new_order=}")
+
     elif spec.formula == "N3":
-        smiles = "[N-]=[N+]=[N-]"
+        smiles = "[N-]=[N+]=[N-]" 
         charge = -1
         order = [0, 1, 2]
-        for idx, a in enumerate(spec.atoms):
-            list_of_adj_atoms = []
-            for adj in a.adjacency:
-                if debug >= 2: print(f" N3: {adj=}", spec.get_parent("molecule").labels[adj])
-                list_of_adj_atoms.append(spec.get_parent("molecule").labels[adj])
-            numN = list_of_adj_atoms.count("N")
-            if numN == 2: 
+        new_order = order  # Default to initial order if no modification is needed
+
+        # Iterate over each atom to check adjacency
+        for idx, atom in enumerate(spec.atoms):
+            # Find adjacent atoms and check if there are exactly two "N" atoms
+            adjacent_labels = [spec.get_parent("molecule").labels[adj] for adj in atom.adjacency]
+            if debug >= 2: print(f"N3: atom index {idx}, adjacent_labels={adjacent_labels}")
+
+            # Check if the atom has exactly 2 nitrogen neighbors
+            if adjacent_labels.count("N") == 2:
                 new_order = move_element(order, 1, idx)
-        if debug >= 2: print(f" N3: {new_order=}")    
+                break  # Found the target atom, no need to check further
+
+        if debug >= 2: print(f"N3: new_order={new_order}")
         
     elif spec.formula == "I3":
         smiles = "I[I-]I"
         charge = -1
         order = [0, 1, 2]
-        for idx, a in enumerate(spec.atoms):
-            list_of_adj_atoms = []
-            for adj in a.adjacency:
-                if debug >= 2: print(f" I3: {adj=}", spec.get_parent("molecule").labels[adj])
-                list_of_adj_atoms.append(spec.get_parent("molecule").labels[adj])
-            numI = list_of_adj_atoms.count("I")
-            if numI == 2: 
+        new_order = order  # Default to initial order if no modification is needed
+
+        # Iterate over each atom to check adjacency
+        for idx, atom in enumerate(spec.atoms):
+            # Find adjacent atoms and check if there are exactly two "N" atoms
+            adjacent_labels = [spec.get_parent("molecule").labels[adj] for adj in atom.adjacency]
+            if debug >= 2: print(f"I3: atom index {idx}, adjacent_labels={adjacent_labels}")
+
+            # Check if the atom has exactly 2 nitrogen neighbors
+            if adjacent_labels.count("I") == 2:
                 new_order = move_element(order, 1, idx)
-        if debug >= 2: print(f" I3: {new_order=}") 
+                break  # Found the target atom, no need to check further
+
+        if debug >= 2: print(f"I3: new_order={new_order}")
 
     temp_mol = Chem.MolFromSmiles(smiles, sanitize=False)
     mol = Chem.RenumberAtoms(temp_mol, new_order)

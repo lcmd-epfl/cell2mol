@@ -21,11 +21,14 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
             # Cell Reconstruction
             all_molecules, reconstructed_molecules = reconstuct(refcell, newcell, sym_ops, debug=debug)    
             all_molecules.extend(reconstructed_molecules)                                       
-
-            if newcell.error_get_fragments:     return newcell
-            elif newcell.error_reconstruction:  return newcell
+            tend = time.time()
+            if newcell.error_get_fragments:     
+                if debug >= 1: print(f"\nCell Reconstruction Failed. Total execution time: {tend - tini:.2f} seconds")
+                return newcell
+            elif newcell.error_reconstruction:  
+                if debug >= 1: print(f"\nCell Reconstruction Failed. Total execution time: {tend - tini:.2f} seconds")
+                return newcell
             else:
-                tend = time.time()
                 if debug >= 1: print(f"\nCell Reconstruction Finished Normally. Total execution time: {tend - tini:.2f} seconds")
                 
                 # Get moleclist for the unit cell
@@ -62,18 +65,26 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
 
                 # Assign charge for the unit cell and check charge neutrality
                 newcell.assign_charges(debug=debug)
-
-            if   newcell.error_get_poscharges :   return newcell
-            elif newcell.error_multiple_distrib :   return newcell
-            elif newcell.error_empty_distrib :      return newcell
+            tend = time.time()
+            if   newcell.error_get_poscharges :   
+                if debug >= 1: print(f"Charge Assignment Failed. Total execution time: {tend - tini:.2f} seconds")
+                return newcell
+            elif newcell.error_multiple_distrib :   
+                if debug >= 1: print(f"Charge Assignment Failed. Total execution time: {tend - tini:.2f} seconds")
+                return newcell
+            elif newcell.error_empty_distrib :      
+                if debug >= 1: print(f"Charge Assignment Failed. Total execution time: {tend - tini:.2f} seconds")
+                return newcell
             else :
-                tend = time.time()
+                
                 if debug >= 1: print(f"Charge Assignment Finished Normally. Total execution time: {tend - tini:.2f} seconds")
 
                 newcell.check_charge_neutrality(debug=debug)
                 newcell.create_bonds(debug=debug)
 
-                if newcell.error_create_bonds:      return newcell
+                if newcell.error_create_bonds:      
+                    if debug >= 1: print(f"Creating bonds Failed")
+                    return newcell
                 else:
                     if debug >= 1: print("Creating bonds Finished Normally")
         else:

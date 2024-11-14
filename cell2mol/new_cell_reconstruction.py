@@ -697,7 +697,10 @@ def get_moleclist (newcell, refcell, all_molecules, debug: int=0):
             atom.add_parent(newcell, index=idx)  
         for atom, idx in zip(newmolec.atoms, mol.ref_indices):
             atom.add_parent(refcell, index=idx)  
-        if newmolec.iscomplex: newmolec.split_complex()
+        if newmolec.iscomplex: 
+            newmolec.split_complex()
+        else:
+            newmolec.add_parent(newmolec, indices=[*range(0,newmolec.natoms,1)])
         newcell.moleclist.append(newmolec)  
 
     for mol in newcell.moleclist:
