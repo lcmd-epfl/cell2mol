@@ -330,3 +330,73 @@ def create_metal_metal_bonds (mol, debug: int=0):
                         met1.add_bond(newbond) 
                         met2.add_bond(newbond) 
 ######################################################
+
+def assign_charge_to_specie(specie, final_charge, debug: int=0):    
+    """Assign the charge to a specific species based on its type."""
+    if debug >= 1: print(f"ASSIGN_CHARGE_TO_SPECIE: Unique Species final charges {specie.formula=} {final_charge=}")
+    if (specie.subtype == "molecule" and not specie.iscomplex) or (specie.subtype == "ligand"):
+        idx = [cs.corr_total_charge for cs in specie.possible_cs].index(final_charge)
+        cs = specie.possible_cs[idx]
+        specie.charge_state = cs
+        specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
+        if debug >= 1: print(specie.unique_index, specie.formula, specie.totcharge, specie.smiles)
+    
+    elif specie.subtype == "metal":
+        idx = specie.possible_cs.index(final_charge)
+        specie.set_charge(specie.possible_cs[idx])  
+        if debug >= 1: print(specie.unique_index, specie.formula, specie.charge)
+
+######################################################
+
+def validate_reference_molecules(self, debug):
+    """Validate reference molecules by checking ligand and metal charges."""
+    for idx, ref in enumerate(self.refmoleclist):
+        if ref.iscomplex:
+            self.validate_complex_ligands(ref, idx, debug)
+            self.validate_complex_metals(ref, debug)
+            prepare_mol(ref)
+        else:
+            self.validate_non_complex_molecule(ref, debug)
+
+
+
+def validate_complex_ligands(unique_species, ref, idx, debug):
+    """Validate ligands within complex reference molecules."""
+    for jdx, lig in enumerate(ref.ligands):
+        for kdx, specie in enumerate(unique_species):
+            if specie.subtype == "ligand" and lig.formula == specie.formula:
+                issame = self.compare_and_set_charge(lig, specie, debug)
+                if not issame:
+                    print("Check Error", f"{idx=}, {jdx=}, {kdx=}", lig.formula, specie.formula, issame)
+
+
+
+def compare_and_set_charge(self, lig, specie, debug):
+    """Compare ligands and species, setting charge if they match."""
+    issame = self.compare_species_or_nitrosyl(lig, specie)
+    if issame:
+        set_charge_state(specie, lig, mode=1, debug=debug)
+    return issame
+def compare_species_or_nitrosyl(self, lig, specie):
+    """Compare if two entities are the same, considering nitrosyl properties."""
+    if not hasattr(lig, "is_nitrosyl"):
+        lig.evaluate_as_nitrosyl()
+    if not hasattr(specie, "is_nitrosyl"):
+        specie.evaluate_as_nitrosyl()
+    if lig.is_nitrosyl and specie.is_nitrosyl:
+        return lig.NO_type == specie.NO_type
+    return compare_species(lig, specie)
+
+def validate_complex_metals(self, ref, debug):
+    """Validate metals within complex reference molecules."""
+    for met in ref.metals:
+        for specie in self.unique_species:
+            if specie.subtype == "metal" and compare_metals(met, specie):
+                met.set_charge(specie.charge)
+
+def validate_non_complex_molecule(self, ref, debug):
+    """Validate non-complex reference molecules."""
+    for specie in self.unique_species:
+        if specie.subtype == "molecule" and ref.formula == specie.formula:
+            if compare_species(ref, specie):
+                set_charge_state(specie, ref, mode=1, debug=debug)

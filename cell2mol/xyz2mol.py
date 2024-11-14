@@ -539,15 +539,17 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
     best_BO = AC.copy()
     BO_is_OK_list = []
     print(f"AC2BO: {formula=} {len(valences_list)=}")
+    max_count = 1000
+
     count = 0
     for valences in valences_list:
 
-        print(f"\tSending", valences, AC_valence, "to get_UA")
+        #print(f"\tSending", valences, AC_valence, "to get_UA")
         UA, DU_from_AC = get_UA(valences, AC_valence)
 
         check_len = len(UA) == 0
-        print (f"\tAC2BO: check_len", check_len)
-        print(f"\tUA", UA)
+        #print (f"\tAC2BO: check_len", check_len)
+        #print(f"\tUA", UA)
         if check_len:
             check_bo = BO_is_OK(
                 AC,
@@ -602,7 +604,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
                 best_BO = BO.copy()
             
             count += 1
-            if count > 1000:
+            if count > max_count :
                 print(f"Failing AC2BO: {formula=} {charge=} {count=}")
                 return best_BO, atomic_valence_electrons
 
