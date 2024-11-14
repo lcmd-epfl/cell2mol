@@ -20,7 +20,7 @@ def main():
         if prefiter_cif(input_path):
             handle_cif_file(input_path, system_type, name, current_dir, debug_mode)
         else:
-            exit_with_error("g")
+            exit_with_error("CIF file is not suitable for processing")
     elif extension == ".xyz":
         handle_xyz_file(input_path, system_type, name, cell_para, current_dir, debug_mode)
     else:
