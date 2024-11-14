@@ -1120,7 +1120,7 @@ class metal(atom):
         return self.coord_sphere_formula 
 
     #######################################################
-    def get_connected_groups(self, debug: int=0):
+    def get_connected_groups(self, debug: int=2):
         from cell2mol.connectivity import split_group
         # metal.groups will be used for the calculation of the relative metal radius 
         # and define the coordination geometry of the metal /hapicitiy/ hapttype    
@@ -1130,6 +1130,7 @@ class metal(atom):
         for lig in mol.ligands:
             for group in lig.groups:
                 if debug > 1: print(group.formula)
+                ligand_indices = [ a.get_parent_index("ligand") for a in group.atoms ]
                 tmplabels = []
                 tmpcoord  = []
                 tmplabels.append(self.label)
@@ -1144,9 +1145,12 @@ class metal(atom):
                     if all(tmpadjnum[1:]): 
                         self.groups.append(group)
                     elif any(tmpadjnum[1:]): 
+                        
                         if debug > 1: print(f"Metal {self.label} is connected to {group.formula} but not all atoms are connected")
                         conn_idx = [ idx for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
-                        splitted_groups = split_group(group, conn_idx, debug=debug)
+                        conn_ligand_indices = [ ligand_indices[idx] for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
+                        print(f"get_connected_groups {tmpadjnum[1:]=} {conn_idx=} {conn_ligand_indices=} {ligand_indices=}")
+                        splitted_groups = split_group(group, conn_idx, conn_ligand_indices, debug=debug)
                         for g in splitted_groups:
                             self.groups.append(g)
                             if debug > 1: print(f"Metal {self.label} is connected to {g.formula}")
@@ -1358,7 +1362,10 @@ class cell(object):
             for atom, idx in zip(newmolec.atoms, b):
                 atom.add_parent(refcell, index=idx)
             # This must be below the frac_coord, so they are carried on to the ligands
-            if newmolec.iscomplex: newmolec.split_complex()
+            if newmolec.iscomplex: 
+                newmolec.split_complex()
+            else:
+                newmolec.add_parent(newmolec, indices=[*range(0,newmolec.natoms,1)])
             self.refmoleclist.append(newmolec)
         
         if debug >= 0: print(f"GETREFS: found {len(self.refmoleclist)} reference molecules")
@@ -1731,28 +1738,6 @@ class cell(object):
                             prepare_mol(mol)
 
     #######################################################
-    def assign_final_charge_to_unique_species(self, final_charges, debug: int=0):
-        for specie, final_charge in zip(self.unique_species, final_charges):
-            print(specie.unique_index, specie.formula)
-            if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
-                charge_list = [cs.corr_total_charge for cs in specie.possible_cs]
-                idx = charge_list.index(final_charge)
-                cs = specie.possible_cs[idx]
-                specie.charge_state = cs
-                # print(specie.charge_state.protonation)
-                specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
-            elif specie.subtype == "metal" :
-                charge_list = specie.possible_cs   
-                idx = charge_list.index(final_charge)
-                cs = specie.possible_cs[idx]
-                specie.set_charge(cs) 
-        for specie in self.unique_species:
-            print("Unique Species final charges")
-            if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
-                print(specie.formula, specie.totcharge)
-            elif specie.subtype == "metal" :
-                print(specie.formula, specie.charge)
-    #######################################################
     def assign_charges_for_refcell(self, debug: int=0):
         for idx, ref in enumerate(self.refmoleclist):
             print(f"Refenrence Molecule {idx}: {ref.formula}")
@@ -1812,7 +1797,7 @@ class cell(object):
     # The whole process is done by 4 functions, which are run at the specie class level:
     # 1) spec.get_protonation_states(), which determines which atoms of the specie must have added elements (see above) to have a meaningful Lewis structure
     # 2) spec.get_possible_cs(), which retrieves the possible charge states associated with the specie
-    # 3) spec.get_charge(), which generates one connectivity for a set of charges
+    # 3) spec.get_possible_charge_state(), which generates one connectivity for a set of charges
     # 4) cell.select_charge_distr() chooses the best connectivity among the generated ones.
 
     # Basically, this function connects these other three functions,

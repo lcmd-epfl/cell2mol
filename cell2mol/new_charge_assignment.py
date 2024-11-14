@@ -112,8 +112,11 @@ def set_charge_state(reference, target, mode, debug: int=0):
         if target.formula in ["O4-Cl", "N3", "I3"]:
             cs = get_charge_manual(target, debug=debug)
         else :
-            #if not hasattr(target, "possible_cs"): target.get_possible_cs(debug=debug)
-            target.get_possible_cs(debug=debug)
+            if not hasattr(target, "possible_cs"): 
+                target.get_possible_cs(debug=debug)
+            else:
+                if debug >= 1: print("SET_CHARGE_STATE: possible_cs of reference already exists")
+            print(f"{target.formula=} {target.possible_cs=}")
             charge_list = [cs.corr_total_charge for cs in target.possible_cs]
             print(charge_list, final_charge, target.possible_cs)
             idx = charge_list.index(final_charge)
