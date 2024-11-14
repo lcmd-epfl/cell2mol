@@ -648,7 +648,7 @@ class ligand(specie):
             newgroup.get_connected_metals(debug=debug)
             newgroup.get_closest_metal(debug=debug)
             newgroup.get_hapticity(debug=debug)
-            newgroup, conn_idx = newgroup.check_coordination(debug=debug)
+            newgroup, conn_idx, final_ligand_indices = newgroup.check_coordination(debug=debug)
             if len(conn_idx) == len(newgroup.atoms):
                 if debug > 1 : print(f"\tLIGAND.SPLIT_LIGAND: new group is found")
                 newgroup.get_denticity(debug=debug)
@@ -656,7 +656,7 @@ class ligand(specie):
                 self.groups.append(newgroup)
             else:
                 if debug > 1 : print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.formula} with {conn_idx=}")
-                splitted_groups = split_group(newgroup, conn_idx, debug=debug)
+                splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices, debug=debug)
                 for g in splitted_groups:
                     self.groups.append(g)
         if debug > 0 : print(f"\tLIGAND.SPLIT_LIGAND: found groups {[ group.formula for group in self.groups]}")
@@ -775,10 +775,10 @@ class group(specie):
     def check_coordination(self, debug: int=0):
         if not hasattr(self,"is_haptic"): self.get_hapticity()
         if not hasattr(self,"atoms"):     self.set_atoms()
-        if self.is_haptic:                self, conn_idx = coordination_correction_for_haptic(self, debug=debug)
-        if self.is_haptic == False:       self, conn_idx = coordination_correction_for_nonhaptic(self, debug=debug)
+        if self.is_haptic:                self, conn_idx, final_ligand_indices = coordination_correction_for_haptic(self, debug=debug)
+        if self.is_haptic == False:       self, conn_idx, final_ligand_indices = coordination_correction_for_nonhaptic(self, debug=debug)
         self.checked_coordination = True
-        return self, conn_idx
+        return self, conn_idx, final_ligand_indices
     
     #######################################################
     def get_denticity(self, debug: int=0):
@@ -1012,6 +1012,9 @@ class atom(object):
             #lig.madjmat[lig_idx,met_idx] += diff            # Corrects data in metal_adjacency matrix
             #lig.madjmat[met_idx,lig_idx] += diff            # Corrects data in metal_adjacency matrix
             lig.adjnum[lig_idx]  += diff                    # Corrects data in adjacency number of the ligand class
+
+            lig.atoms[lig_idx].set_adjacencies(lig.adjmat[lig_idx], lig.madjmat[lig_idx], lig.adjnum[lig_idx], lig.madjnum[lig_idx])
+
             # lig.adjmat[lig_idx,met_idx]  += diff            # Corrects data in adjacency matrix
             # lig.adjmat[met_idx,lig_idx]  += diff            # Corrects data in adjacency matrix
             # we should delete the adjacencies, but not a priority 
@@ -1277,7 +1280,15 @@ class cell(object):
                 for jdx, lig in enumerate(mol.ligands):     # ligands
                     found = False
                     for ldx, typ in enumerate(typelist_ligs):
-                        issame = compare_species(lig, typ[0], debug=0)
+                        if not hasattr(lig, "is_nitrosyl"): lig.evaluate_as_nitrosyl()
+                        if not hasattr(typ[0], "is_nitrosyl"): typ[0].evaluate_as_nitrosyl()
+                        if lig.is_nitrosyl and typ[0].is_nitrosyl: 
+                            if lig.NO_type == typ[0].NO_type: 
+                                issame = True
+                            else:
+                                issame = False
+                        else:                            
+                            issame = compare_species(lig, typ[0], debug=0)
                         if issame :
                             found = True ; kdx = typ[1]
                             if debug >= 2: print(f"ligand {jdx} is the same with {ldx} in typelist")
@@ -1622,20 +1633,27 @@ class cell(object):
                     print(specie.formula, specie.totcharge)
                 elif specie.subtype == "metal" :
                     print(specie.formula, specie.charge)
-
+            #######################
             for idx, ref in enumerate(self.refmoleclist):
                 print(f"Refenrence Molecule {idx}: {ref.formula}")
                 if ref.iscomplex:
                     for jdx, lig in enumerate(ref.ligands):
                         for kdx, specie in enumerate(self.unique_species):
-                            if specie.subtype == "ligand":
-                                issame = compare_species(lig, specie)
+                            if specie.subtype == "ligand" and lig.formula == specie.formula:
+                                if not hasattr(lig, "is_nitrosyl"): lig.evaluate_as_nitrosyl()
+                                if not hasattr(specie, "is_nitrosyl"): specie.evaluate_as_nitrosyl()
+                                if lig.is_nitrosyl and specie.is_nitrosyl: 
+                                    if lig.NO_type == specie.NO_type: 
+                                        issame = True
+                                    else:
+                                        issame = False
+                                else:
+                                    issame = compare_species(lig, specie)
                                 if issame:
                                     set_charge_state (specie, lig, mode=1, debug=debug)
-                                    print(lig.formula, specie.formula, lig.totcharge, specie.totcharge, issame)   
-                                print("Check Error", f"{idx=}, {jdx=}, {kdx=}", lig.formula, specie.formula, issame)
-                                # print(f"{lig.smiles=}")
-                                # print(f"{specie.smiles=}")
+                                    print(lig.formula, specie.formula, lig.totcharge, specie.totcharge, issame)
+                                else :
+                                    print("Check Error", f"{idx=}, {jdx=}, {kdx=}", lig.formula, specie.formula, issame)   
                                     
                     for met in ref.metals:
                         for specie in self.unique_species:
@@ -1647,24 +1665,38 @@ class cell(object):
                     prepare_mol(ref)
                 else:
                     for specie in self.unique_species:  
-                        if specie.subtype == "molecule":
+                        if specie.subtype == "molecule" and ref.formula == specie.formula:
                             issame = compare_species(ref, specie)
                             if issame:
                                 set_charge_state (specie, ref, mode=1, debug=debug)
                                 print(ref.formula, specie.formula, ref.totcharge, specie.totcharge, issame)
 
+
+            for idx, ref in enumerate(self.refmoleclist):
+                print("Validation")
+                print(f"Refenrence Molecule {idx}: {ref.formula}")
+                if ref.iscomplex:
+                    print(idx, ref.formula, ref.totcharge)
+                    for jdx, lig in enumerate(ref.ligands):
+                        print(idx, jdx, lig.formula, lig.totcharge, lig.smiles)
+                    for met in ref.metals:
+                        print(met.formula, met.charge)
+                else:
+                    print(idx, ref.formula, ref.totcharge, ref.smiles)
+            #######################
+
             for idx, mol in enumerate(self.moleclist):
                 print(f"Unit cell Molecule {idx}: {mol.formula}")
                 if not mol.iscomplex:
                     for ref in self.refmoleclist:
-                        if not ref.iscomplex :
+                        if not ref.iscomplex and (mol.formula == ref.formula) :
                             issame = compare_reference_indices(ref, mol, debug=debug)
                             if issame:
                                 set_charge_state (ref, mol, mode=2, debug=debug)
                                 print(mol.formula, ref.formula, mol.totcharge, ref.totcharge, issame) 
                 else:
                     for ref in self.refmoleclist:
-                        if ref.iscomplex:
+                        if ref.iscomplex and (mol.formula == ref.formula) :
                             for jdx, lig in enumerate(mol.ligands):
                                 for kdx, ref_lig in enumerate(ref.ligands):
                                     issame = compare_reference_indices(ref_lig, lig, debug=debug)
@@ -1672,9 +1704,18 @@ class cell(object):
                                         set_charge_state (ref_lig, lig, mode=2, debug=debug)
                                         print(lig.formula, ref_lig.formula, lig.totcharge, ref_lig.totcharge, lig.smiles, ref_lig.smiles, issame) 
                                     else :
-                                        issame_2 = compare_species(lig, ref_lig)
+                                        if not hasattr(lig, "is_nitrosyl"): lig.evaluate_as_nitrosyl()
+                                        if not hasattr(ref_lig, "is_nitrosyl"): ref_lig.evaluate_as_nitrosyl()
+                                        if lig.is_nitrosyl and ref_lig.is_nitrosyl: 
+                                            if lig.NO_type == ref_lig.NO_type: 
+                                                issame_2 = True
+                                            else:
+                                                issame_2 = False
+                                        else:
+                                            issame_2 = compare_species(lig, ref_lig)
                                         if issame_2:
                                             set_charge_state (ref_lig, lig, mode=1, debug=debug)
+                                        else:
                                             print("Check Error", f"{idx=} {jdx=} {kdx}", lig.formula, ref_lig.formula, issame)                                    
                             for met in mol.metals:
                                 for ref_met in ref.metals:
@@ -1685,8 +1726,32 @@ class cell(object):
                                         issame_2 = compare_metals(met, ref_met)
                                         if issame_2:
                                             met.set_charge(ref_met.charge) 
+                                            print(met.formula, ref_met.formula, met.charge, ref_met.charge, issame_2)    
+                                
                             prepare_mol(mol)
 
+    #######################################################
+    def assign_final_charge_to_unique_species(self, final_charges, debug: int=0):
+        for specie, final_charge in zip(self.unique_species, final_charges):
+            print(specie.unique_index, specie.formula)
+            if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+                charge_list = [cs.corr_total_charge for cs in specie.possible_cs]
+                idx = charge_list.index(final_charge)
+                cs = specie.possible_cs[idx]
+                specie.charge_state = cs
+                # print(specie.charge_state.protonation)
+                specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
+            elif specie.subtype == "metal" :
+                charge_list = specie.possible_cs   
+                idx = charge_list.index(final_charge)
+                cs = specie.possible_cs[idx]
+                specie.set_charge(cs) 
+        for specie in self.unique_species:
+            print("Unique Species final charges")
+            if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+                print(specie.formula, specie.totcharge)
+            elif specie.subtype == "metal" :
+                print(specie.formula, specie.charge)
     #######################################################
     def assign_charges_for_refcell(self, debug: int=0):
         for idx, ref in enumerate(self.refmoleclist):
@@ -1695,7 +1760,13 @@ class cell(object):
                 for jdx, lig in enumerate(ref.ligands):
                     for specie in self.unique_species:
                         if specie.subtype == "ligand":
-                            issame = compare_species(lig, specie)
+                            if lig.is_nitrosyl and specie.is_nitrosyl: 
+                                if lig.NO_type == specie.NO_type: 
+                                    issame = True
+                                else:
+                                    issmae = False
+                            else:
+                                issame = compare_species(lig, specie)
                             if issame:
                                 set_charge_state (specie, lig, mode=1, debug=debug)
                                 print(lig.formula, specie.formula, issame)    
