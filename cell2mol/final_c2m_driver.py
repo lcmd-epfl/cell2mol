@@ -4,6 +4,7 @@ from cell2mol.helper import parsing_arguments
 from cell2mol.refcell import process_refcell
 from cell2mol.unitcell import process_unitcell
 from cell2mol.xyz_molecule import get_molecule
+from cell2mol.read_write import prefiter_cif
 
 def main():
     input, system_type, cell_para, debug_mode = parsing_arguments()
@@ -17,7 +18,10 @@ def main():
         raise FileNotFoundError(f"Input file not found: {input_path}")
 
     if extension == ".cif":
-        handle_cif_file(input_path, system_type, name, current_dir, debug_mode)
+        if prefiter_cif(input_path):
+            handle_cif_file(input_path, system_type, name, current_dir, debug_mode)
+        else:
+            sys.exit("CIF file is not suitable for processing")
     elif extension == ".xyz":
         handle_xyz_file(input_path, system_type, name, cell_para, current_dir, debug_mode)
     else:

@@ -386,6 +386,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
     ## First Correction (former verify_connectivity)
     conn_idx = []
+    final_ligand_indices = []
     good_atoms = []
     removed_idx = []
     for idx, atom in zip(original_indices, sorted_atoms):
@@ -404,6 +405,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
             if isadded:
                 if debug > 0: print(f"\tConnectivity verified for atom {atom.label} with ligand index {ligand_idx}")
                 conn_idx.append(idx)
+                final_ligand_indices.append(atom.get_parent_index("ligand"))
                 good_atoms.append(atom)
             else:
                 if debug > 0: print(f"\tCORRECT mconnec of atom {atom.label} with ligand index {ligand_idx}")
@@ -417,12 +419,13 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
                 # group.remove_atom(idx, debug=debug)
 
     conn_idx = sorted(list(set(conn_idx)))
-    return group, conn_idx
+    return group, conn_idx, final_ligand_indices
 
 
 #######################################################    
 def coordination_correction_for_haptic (group: object, debug: int=0):
-
+    thres_std = 0.05
+    thres_ratio = 0.95
     if debug > 0: print("Entering COORD_CORR_HAPTIC:")
     ratio_list = []
     for idx, atom in enumerate(group.atoms):
@@ -437,17 +440,19 @@ def coordination_correction_for_haptic (group: object, debug: int=0):
     if debug >= 2 : print(f"\t{ratio_list=} {std_dev=}")
 
     conn_idx = []
+    final_ligand_indices = []
     for idx, (atom, ratio) in enumerate(zip(group.atoms, ratio_list)) :
         if atom.label == "H" : 
             if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
             if debug >=1 : print(atom.label)
             atom.reset_mconnec(metal, debug=debug)  
-        elif std_dev > 0.05 and ratio > 0.9 :
+        elif std_dev > thres_std and ratio > thres_ratio :
             if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to the long distance")
             if debug >=1 : print(atom.label)
             atom.reset_mconnec(metal, debug=debug) 
         else :
             conn_idx.append(idx)
+            final_ligand_indices.append(atom.get_parent_index("ligand"))
     conn_idx = sorted(list(set(conn_idx)))
-    return group, conn_idx
+    return group, conn_idx, final_ligand_indices
 #######################################################

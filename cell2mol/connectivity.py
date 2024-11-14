@@ -221,6 +221,7 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
     adjmat = np.zeros((natoms, natoms))
     adjnum = np.zeros((natoms))
 
+    add_factor = 0.3
     # Sometimes argument radii np.ndarry, or list
     with warnings.catch_warnings():
         warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -242,6 +243,9 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
                 # else :
                 #     cov_factor = 1.3
                 thres = (radii[i] + radii[j]) * cov_factor
+                if thres - (radii[i] + radii[j]) > 0.8:
+                    thres = (radii[i] + radii[j]) + add_factor
+
                 if dist <= clash_threshold:
                     isgood = False # invalid molecule
                     print("Adjacency Matrix: Distance", round(dist, 3), "smaller than clash for atoms", i, j, labels[i], labels[j], a, b, cov_factor)
@@ -539,7 +543,7 @@ def mol_with_atom_index(mol):
     return mol
 
 #################################
-def split_group(original_group, conn_idx, debug: int=0):
+def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
     from cell2mol.classes import group
     # Split the "group" to obtain the groups connected to a specific metal
     splitted_groups = []
@@ -560,6 +564,7 @@ def split_group(original_group, conn_idx, debug: int=0):
     for b in blocklist:
         if debug > 1: print(f"GROUP.SPLIT_GROUP: block={b}")
         gr_indices      = extract_from_list(b, conn_idx, dimension=1)
+        ligand_idx      = extract_from_list(b, final_ligand_indices, dimension=1)
         gr_labels       = extract_from_list(b, conn_labels, dimension=1)
         gr_coord        = extract_from_list(b, conn_coord, dimension=1)
         gr_frac_coord   = extract_from_list(b, conn_frac_coord, dimension=1)
@@ -570,7 +575,7 @@ def split_group(original_group, conn_idx, debug: int=0):
         # For debugging
         newgroup.origin = "split_group"
         # Define the GROUP as parent of the group. Bottom-Up hierarchy
-        newgroup.add_parent(original_group.get_parent("ligand"), indices=gr_indices)
+        newgroup.add_parent(original_group.get_parent("ligand"), indices=ligand_idx)
         # Pass the GROUP atoms to the groud
         newgroup.set_atoms(atomlist=gr_atoms)
         # Inherit the adjacencies from molecule

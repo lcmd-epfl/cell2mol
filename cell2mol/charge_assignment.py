@@ -220,6 +220,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
     if debug >= 2: print(f"\nPOSCHARGE: doing PROTONATION for this specie {specie.formula} ({specie.subtype})")
     # Program runs sequentially for each group of the ligand
+    print(f"{ligand.groups=}")
+
     for g in ligand.groups:
         parent_indices = g.get_parent_indices("ligand")
         if debug >= 2: print(f"    GET_PROTONATION_STATES: Evaluating group {g.formula} with parent_indices {parent_indices}")
@@ -527,10 +529,11 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
         if debug >= 2: print(" ")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: Enters non-local with:")
+        if debug >= 2: print(f"        GET_PROTONATION_STATES: local_labels: {local_labels}")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: block: {block}")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: addedlist: {addedlist}")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: {non_local_groups} non_local_groups groups found") 
-
+        if debug >= 2: print(f"        GET_PROTONATION_STATES: {non_local_groups=}")
         # CREATES ALL COMBINATIONS OF PROTONATION STATES# 
         # Creates [0,1] tuples for each non_local protonation site
         tmp = []
@@ -560,7 +563,9 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
             toallocate = int(0)
             for jdx, a in enumerate(ligand.atoms):
                 if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
+                    print(a.label)
                     if non_local_groups > 1:
+                        print(f"{com=} {toallocate=}")
                         if com[toallocate] == 1:
                             elemlist[jdx] = "H"
                             addedlist[jdx] = 1
@@ -613,7 +618,7 @@ def move_element(lst, old_index, new_index):
     return lst
 #######################################################
 def get_charge_manual(spec, debug: int=0):
-
+    print(spec.parents)
     if spec.formula == "O4-Cl":
         smiles = "[O-]Cl(=O)(=O)=O"
         charge = -1
