@@ -1149,7 +1149,7 @@ class metal(atom):
                         if debug > 1: print(f"Metal {self.label} is connected to {group.formula} but not all atoms are connected")
                         conn_idx = [ idx for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
                         conn_ligand_indices = [ ligand_indices[idx] for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
-                        print(f"get_connected_groups {tmpadjnum[1:]=} {conn_idx=} {conn_ligand_indices=} {ligand_indices=}")
+                        if debug > 1: print(f"get_connected_groups {tmpadjnum[1:]=} {conn_idx=} {conn_ligand_indices=} {ligand_indices=}")
                         splitted_groups = split_group(group, conn_idx, conn_ligand_indices, debug=debug)
                         for g in splitted_groups:
                             self.groups.append(g)
@@ -1659,6 +1659,7 @@ class cell(object):
                     print("ASSIGN_CHARGES: Non-Complex", idx, ref.formula, ref.totcharge, ref.smiles)
             
             for idx, mol in enumerate(self.moleclist):
+                print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")
                 if not mol.iscomplex:
                     for ref in self.refmoleclist:
                         if not ref.iscomplex and (mol.unique_index == ref.unique_index) :
@@ -1669,11 +1670,13 @@ class cell(object):
                     for ref in self.refmoleclist:
                         if ref.iscomplex and (mol.formula == ref.formula):
                             for jdx, lig in enumerate(mol.ligands):
-                                for ref_lig in ref.ligands:
+                                for rdx, ref_lig in enumerate(ref.ligands):
                                     if lig.formula == ref_lig.formula:
                                         issame = compare_reference_indices(ref_lig, lig, debug=debug)
                                         if issame:
                                             set_charge_state (ref_lig, lig, mode=2, debug=debug)
+                                        else:
+                                            print("ERROR: ASSIGN_CHARGES: Ligand", idx, jdx, rdx, lig.formula, ref_lig.totcharge, ref_lig.smiles)
                             for kdx, met in enumerate(mol.metals):
                                 for ref_met in ref.metals:
                                     if (met.formula == ref_met.formula):

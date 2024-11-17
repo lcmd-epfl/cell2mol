@@ -498,8 +498,12 @@ def compare_reference_indices (ref, mol, debug: int=0):
                 print("Matched", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
             issame = True
         else:
+            if debug >= 2:
+                print("Different indices", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
             issame = False
     else : 
+        if debug >= 2:
+            print("Different numbers", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
         issame = False
     return issame
 #################################

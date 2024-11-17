@@ -82,7 +82,7 @@ def generate_feature_vector (metal: object, target_prop: str, debug: int = 0) ->
     valence_elec = metal.get_valence_elec(metal.charge)
     if debug > 1: print(f"GENERATE_feature_vector: {elem_nr=} {m_ox=} {valence_elec=}")
     
-    coord_group = metal.get_connected_groups()
+    coord_group = metal.get_connected_groups(debug=debug)
     coord_nr = metal.coord_nr
     geom_nr = make_geom_list()[metal.coord_geometry]
     if debug > 1: print(f"GENERATE_feature_vector: {metal.coord_nr=} {metal.coord_geometry=} {geom_nr=}")

@@ -13,7 +13,9 @@ def parsing_arguments():
         quiet (bool): quiet flag
     """
     parser = argparse.ArgumentParser(
-        prog="cell2mol", description="Interprets the crystallography file (.cif) of a molecular crystal, and stores the information in a python cell object"
+        prog="cell2mol", 
+        description="Interprets the crystallography file (.cif) of a molecular crystal, and stores the information in a python cell object",
+        add_help=True
     )
 
     parser.add_argument(
@@ -22,7 +24,7 @@ def parsing_arguments():
         dest="filename",
         type=str,
         required=True,
-        help="Filename of Input (.info, .xyz, or .cif file)",
+        help="Filename of Input (.cif or .xyz file)",
     )
 
     parser.add_argument(
