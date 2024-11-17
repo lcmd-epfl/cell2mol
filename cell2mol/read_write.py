@@ -5,6 +5,7 @@ import pickle
 import sys
 import re
 from collections import defaultdict
+import os
 
 #######################
 def get_wyckoff_positions(file_path):
@@ -53,25 +54,35 @@ def get_wyckoff_positions(file_path):
     return ref_labels, ref_fracs
 
 #######################
-def prefiter_cif(input_path):
+def exit_with_error(message):
+    """Logs the error message to a file and exits the program."""
+    error_log_path = os.path.join(os.getcwd(), "error_input.out")
+    with open(error_log_path, "w") as error_log:
+        error_log.write(f"Error: {message}\n")
+    sys.exit(message)
+
+#######################
+def prefilter_cif(input_path):
 
     with open(input_path, 'r') as ciffile:
         file_content = ciffile.read()
         if 'radical' in file_content:
-            print("Radical found in cif file. STOPPING")                   
+            exit_with_error("Radical found in cif file. STOPPING")                   
             return False
         elif '_atom_site_fract_x' not in file_content:
-            print("No fractional coordinates found in cif file. STOPPING")  
+            exit_with_error("No fractional coordinates found in cif file. STOPPING")  
             return False
         elif '?' in file_content:
             if "_diffrn_ambient_temperature ?" not in file_content and "_chemical_melting_point ?" not in file_content:
-                print("Disorder found in cif file. STOPPING")
+                exit_with_error("Disorder found in cif file. STOPPING")
                 return False
             else:
                 num_greps = file_content.count('?')
                 if num_greps > 1:
-                    print("Disorder found in cif file. STOPPING")                      
+                    exit_with_error("Disorder found in cif file. STOPPING")                      
                     return False
+                else:
+                    return True
         else:
             print("Cif file is ready for processing")
             return True
