@@ -1608,22 +1608,42 @@ class cell(object):
         print("final_charges", final_charges)
         if len(final_charge_distribution) > 1:
             if debug >= 1: print("More than one Possible Distribution Found:", final_charge_distribution)
-            self.error_multiple_distrib = True
-            self.error_empty_distrib    = False
-            pp_mols, pp_idx, pp_opt = prepare_unresolved(self.unique_indices, self.unique_species, final_charge_distribution, debug=debug)
-            self.data_for_postproc(pp_mols, pp_idx, pp_opt)
-            return # Stopping.
+            second_final_charge_distribution, second_final_charges = balance_charge(self.unique_indices, self.unique_species, predict=True, debug=debug)
+            print("second_final_charge_distribution", second_final_charge_distribution)
+            print("second_final_charges", second_final_charges)
+            
+            if len(second_final_charge_distribution) == 1:
+                self.error_multiple_distrib = False
+                self.error_empty_distrib    = False
+                final_charge_distribution = second_final_charge_distribution
+                final_charges = second_final_charges
+            else:
+                self.error_multiple_distrib = True
+                self.error_empty_distrib    = False
+                return # Stopping.
         
         elif len(final_charge_distribution) == 0: # 
             if debug >= 1: print("No valid Distribution Found", final_charge_distribution)
-            self.error_multiple_distrib = False
-            self.error_empty_distrib    = True
-            return # Stopping.
+            second_final_charge_distribution, second_final_charges = balance_charge(self.unique_indices, self.unique_species, rare=True, debug=debug)
+            print("second_final_charge_distribution", second_final_charge_distribution)
+            print("second_final_charges", second_final_charges)
+            
+            if len(second_final_charge_distribution) == 1:
+                self.error_multiple_distrib = False
+                self.error_empty_distrib    = False
+                final_charge_distribution = second_final_charge_distribution
+                final_charges = second_final_charges
+
+            else:
+                self.error_multiple_distrib = False
+                self.error_empty_distrib    = True
+                return # Stopping.
         
         else: # Only one possible charge distribution -> getcharge for the repeated species
             self.error_multiple_distrib = False
             self.error_empty_distrib    = False
-            
+
+        if self.error_multiple_distrib == False and self.error_empty_distrib == False:
             if debug >= 1:
                 print(f"\nFINAL Charge Distribution: {final_charge_distribution}\n")
                 print("#########################################")
@@ -1700,37 +1720,36 @@ class cell(object):
                     print("ASSIGN_CHARGES: Non-Complex", idx, mol.formula, mol.totcharge, mol.smiles)
     #######################################################
     def assign_charges_for_refcell(self, debug: int=0):
+    
+        for specie in self.unique_species:
+            for idx, ref in enumerate(self.refmoleclist):
+                if ref.iscomplex:
+                    for jdx, lig in enumerate(ref.ligands):
+                        print(lig.unique_index)
+                        print(specie.unique_index)
+                        if lig.unique_index == specie.unique_index:
+                            set_charge_state (specie, lig, mode=1, debug=debug)
+                    for kdx, met in enumerate(ref.metals):
+                        if met.unique_index == specie.unique_index:
+                            met.set_charge(specie.charge)
+                else:
+                    if ref.unique_index == specie.unique_index:
+                        set_charge_state (specie, ref, mode=1, debug=debug)
+
         for idx, ref in enumerate(self.refmoleclist):
-            print(f"Refenrence Molecule {idx}: {ref.formula}")
+            if ref.iscomplex: prepare_mol(ref)
+        
+        for idx, ref in enumerate(self.refmoleclist):
+            print(f"ASSIGN_CHARGES: Refenrence Molecule {idx}: {ref.formula}")
             if ref.iscomplex:
+                print("ASSIGN_CHARGES: Complex", idx, ref.formula, ref.totcharge)
                 for jdx, lig in enumerate(ref.ligands):
-                    for specie in self.unique_species:
-                        if specie.subtype == "ligand":
-                            if lig.is_nitrosyl and specie.is_nitrosyl: 
-                                if lig.NO_type == specie.NO_type: 
-                                    issame = True
-                                else:
-                                    issmae = False
-                            else:
-                                issame = compare_species(lig, specie)
-                            if issame:
-                                set_charge_state (specie, lig, mode=1, debug=debug)
-                                print(lig.formula, specie.formula, issame)    
-                for met in ref.metals:
-                    for specie in self.unique_species:
-                        if specie.subtype == "metal":
-                            issame = compare_metals(met, specie)
-                            if issame:
-                                met.set_charge(specie.charge)
-                                print(met.formula, specie.formula, issame) 
-                prepare_mol(ref)
+                    print("ASSIGN_CHARGES: Ligand", idx, jdx, lig.formula, lig.totcharge, lig.smiles)
+                for kdx, met in enumerate(ref.metals):
+                    print("ASSIGN_CHARGES: Metal", idx, kdx, met.formula, met.charge)
             else:
-                for specie in self.unique_species:  
-                    if specie.subtype == "molecule":
-                        issame = compare_species(ref, specie)
-                        if issame:
-                            set_charge_state (specie, ref, mode=1, debug=debug)
-                            print(ref.formula, specie.formula, issame)
+                print("ASSIGN_CHARGES: Non-Complex", idx, ref.formula, ref.totcharge, ref.smiles)
+
 
     #######################################################
     def check_charge_neutrality(self, debug: int=0):

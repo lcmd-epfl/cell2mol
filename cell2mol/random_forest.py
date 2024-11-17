@@ -20,8 +20,8 @@ from cell2mol.spin import make_geom_list
 
 dataframe=argv[1]
 metal = argv[2]
-#mode = argv[3]
 prop = argv[3]
+mode = argv[4]
 
 
 print("Sklearn version:", sklearn.__version__)
