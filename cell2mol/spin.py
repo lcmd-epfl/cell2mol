@@ -75,32 +75,27 @@ def generate_feature_vector (metal: object, target_prop: str, debug: int = 0) ->
     Returns:
         feature (np.ndarray): feature vector
     """
-    if debug > 1: print(f"GENERATE_feature_vector: {metal.label}")
+    if debug >= 1: print(f"GENERATE_feature_vector: {metal.label}")
 
     elem_nr = elemdatabase.elementnr[metal.label]
-    m_ox = metal.charge
-    valence_elec = metal.get_valence_elec(metal.charge)
-    if debug > 1: print(f"GENERATE_feature_vector: {elem_nr=} {m_ox=} {valence_elec=}")
     
     coord_group = metal.get_connected_groups(debug=debug)
     coord_nr = metal.coord_nr
     geom_nr = make_geom_list()[metal.coord_geometry]
-    if debug > 1: print(f"GENERATE_feature_vector: {metal.coord_nr=} {metal.coord_geometry=} {geom_nr=}")
-
     rel_metal_radius = metal.rel_metal_radius
-    if debug > 1: print(f"GENERATE_feature_vector: {metal.rel_metal_radius=}")
 
     coord_hapticty = [ group.is_haptic for group in coord_group ]
     if any(coord_hapticty) :    hapticity = 1
     else :                      hapticity = 0
-    if debug > 1: print(f"GENERATE_feature_vector: {hapticity=}")
     
     if target_prop == "m_ox":
         feature = np.array([[elem_nr, coord_nr, geom_nr, rel_metal_radius, hapticity]])
-        if debug > 1: print(f"GENERATE_feature_vector: {feature=}")
+        if debug >= 1: print(f"GENERATE_feature_vector: {feature=}")
     elif target_prop == "spin":
+        m_ox = metal.charge
+        valence_elec = metal.get_valence_elec(metal.charge)
         feature = np.array([[elem_nr, m_ox, valence_elec, coord_nr, geom_nr, rel_metal_radius, hapticity]])
-        if debug > 1: print(f"GENERATE_feature_vector: {feature=}")
+        if debug >= 1: print(f"GENERATE_feature_vector: {feature=}")
     
     return feature
 
