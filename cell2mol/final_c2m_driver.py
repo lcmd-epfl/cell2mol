@@ -4,7 +4,7 @@ from cell2mol.helper import parsing_arguments
 from cell2mol.refcell import process_refcell
 from cell2mol.unitcell import process_unitcell
 from cell2mol.xyz_molecule import get_molecule
-from cell2mol.read_write import prefiter_cif
+from cell2mol.read_write import prefilter_cif, exit_with_error
 
 def main():
     input, system_type, cell_para, debug_mode = parsing_arguments()
@@ -17,7 +17,7 @@ def main():
     if not os.path.exists(input_path):
         exit_with_error(f"Input file not found: {input_path}")
     if extension == ".cif":
-        if prefiter_cif(input_path):
+        if prefilter_cif(input_path):
             handle_cif_file(input_path, system_type, name, current_dir, debug_mode)
         else:
             exit_with_error("CIF file is not suitable for processing")
@@ -51,12 +51,6 @@ def handle_xyz_file(input_path, system_type, name, cell_para, current_dir, debug
     else:
         exit_with_error("Invalid system type for .xyz file", {"system_type": system_type})
 
-def exit_with_error(message):
-    """Logs the error message to a file and exits the program."""
-    error_log_path = os.path.join(os.getcwd(), "error_input.out")
-    with open(error_log_path, "w") as error_log:
-        error_log.write(f"Error: {message}\n")
-    sys.exit(message)
 
 if __name__ == "__main__" or __name__ == "cell2mol.final_c2m_driver":
     main()
