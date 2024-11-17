@@ -605,7 +605,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
             
             count += 1
             if count > max_count :
-                print(f"Failing AC2BO: {formula=} {charge=} {count=}")
+                print(f"\tOver maximum counts AC2BO: {formula=} {charge=} {count=}")
                 return best_BO, atomic_valence_electrons
 
             # if status:

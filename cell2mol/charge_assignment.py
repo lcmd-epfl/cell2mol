@@ -744,7 +744,7 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
 
     # Charge_state is initiated
     ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, charge, allow, prot)
-
+    
     return ch_state
 #######################################################
 def check_rdkit_obj_connectivity(mol: object, natoms: int, ich: int, debug: int=0): 
