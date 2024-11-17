@@ -6,7 +6,7 @@ from contextlib import redirect_stdout
 from ase.io import read
 from cell2mol.classes import cell
 from cell2mol.new_c2m_module import cell2mol
-from cell2mol.new_charge_assignment import assign_charge_state_for_unique_species, balance_charge
+from cell2mol.new_charge_assignment import assign_charge_to_specie
 from cell2mol.other import handle_error
 import copy
 # Constants
@@ -109,14 +109,19 @@ def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debu
             cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
 
             # Assign and balance charges
-            final_charge_distribution, final_charges = balance_charge(newcell.unique_indices, refcell.unique_species, debug=debug)
-            print(f"{final_charges=}")
-            refcell.unique_species = assign_charge_state_for_unique_species(newcell.unique_species, final_charges[0], debug=2)
+            for specie in newcell.unique_species:
+                for refspecie in refcell.unique_species:
+                    if specie.unique_index == refspecie.unique_index:
+                        if specie.subtype == "metal":
+                            assign_charge_to_specie(refspecie, specie.charge, debug=debug)
+                        else:
+                            assign_charge_to_specie(refspecie, specie.totcharge, debug=debug)
+
             for specie in refcell.unique_species:
                 if specie.subtype == "metal":
-                    print("refcell.unique_species", specie.formula, specie.charge)
+                    print("refcell.unique_species", specie.formula, specie.charge, specie.unique_index)
                 else:
-                    print("refcell.unique_species", specie.formula, specie.totcharge)
+                    print("refcell.unique_species", specie.formula, specie.totcharge, specie.unique_index)
             # Finalize refcell properties and save both cell objects
             refcell.assign_charges_for_refcell(debug=debug)
             refcell.assign_spin(debug=debug)

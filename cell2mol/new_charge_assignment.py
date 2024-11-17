@@ -2,22 +2,35 @@ import numpy as np
 import copy
 from cell2mol.charge_assignment import protonation, get_charge, get_charge_manual
 import itertools
+import os
+from cell2mol import __file__
+from cell2mol.spin import generate_feature_vector
+import pickle
 
 #######################################################
-def balance_charge(unique_indices: list, unique_species: list, debug: int=0) -> list:
+def balance_charge(unique_indices: list, unique_species: list, rare: bool="False", predict: bool="False", debug: int=0) -> list:
 
     # Function to Select the Best Charge Distribution for the unique species.
     # It accepts multiple charge options for each molecule/ligand/metal (poscharge, etc...).
     # NO: It should select the best one depending on whether the final metal charge makes sense or not.
     # In some cases, can accept metal oxidation state = 0, if no other makes sense
-
+    all_possible_m_ox = [0, 1, 2, 3, 4, 5, 6, 7]
     iserror = False
     iterlist = []
     for idx, spec in enumerate(unique_species):
         toadd = []
         if spec.subtype == "metal":
-            for tch in spec.possible_cs:
+            if rare == True:
+                rare_m_ox = [x for x in all_possible_m_ox if x not in spec.possible_cs]
+                print(f"RARE METAL OXIDATION STATES: {spec.formula} {rare_m_ox}")
+                for tch in rare_m_ox:
+                    toadd.append(tch)
+            elif predict == True :
+                tch = predict_metal_ox(spec, debug=debug)
                 toadd.append(tch)
+            else:
+                for tch in spec.possible_cs:
+                    toadd.append(tch)                
         else :   
             if len(spec.possible_cs) == 1:
                 toadd.append(spec.possible_cs[0].corr_total_charge)
@@ -60,9 +73,9 @@ def balance_charge(unique_indices: list, unique_species: list, debug: int=0) -> 
     return final_charge_distribution, final_charges
 ######################################################
 
-def assign_charge_state_for_unique_species(unique_species, final_charges_tuple, debug: int=0):
-    
-    for specie, final_charge in zip(unique_species, final_charges_tuple):
+def assign_charge_state_for_unique_species(unique_species, final_charge_tuple, debug: int=0):
+
+    for specie, final_charge in zip(unique_species, final_charge_tuple):
         print(specie.unique_index, specie.formula)
         if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
             charge_list = [cs.corr_total_charge for cs in specie.possible_cs]
@@ -72,10 +85,10 @@ def assign_charge_state_for_unique_species(unique_species, final_charges_tuple, 
             # print(specie.charge_state.protonation)
             specie.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
         elif specie.subtype == "metal" :
-            charge_list = specie.possible_cs   
-            idx = charge_list.index(final_charge)
-            cs = specie.possible_cs[idx]
-            specie.set_charge(cs) 
+            # charge_list = specie.possible_cs   
+            # idx = charge_list.index(final_charge)
+            # cs = specie.possible_cs[idx]
+            specie.set_charge(final_charge) 
     for specie in unique_species:
         if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
             print(specie.formula, specie.charge_state, specie.totcharge, specie.smiles)
@@ -342,8 +355,7 @@ def assign_charge_to_specie(specie, final_charge, debug: int=0):
         if debug >= 1: print(specie.unique_index, specie.formula, specie.totcharge, specie.smiles)
     
     elif specie.subtype == "metal":
-        idx = specie.possible_cs.index(final_charge)
-        specie.set_charge(specie.possible_cs[idx])  
+        specie.set_charge(final_charge)  
         if debug >= 1: print(specie.unique_index, specie.formula, specie.charge)
 
 ######################################################
@@ -358,45 +370,15 @@ def validate_reference_molecules(self, debug):
         else:
             self.validate_non_complex_molecule(ref, debug)
 
+######################################################
+def predict_metal_ox (metal:object, debug: int=0) -> None:
+    model = "Fe_mono_m_ox_5486.pkl"
+    feature = generate_feature_vector (metal, target_prop = "m_ox", debug=debug)
+    path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), model)
+    ramdom_forest = pickle.load(open(path_rf, 'rb'))
+    predictions = ramdom_forest.predict(feature)
+    m_ox_rf = predictions[0]
+    print(f"PREDICT_METAL_OS: metal OS of the metal {metal.label} is predicted as {m_ox_rf} using Random Forest model")
 
-
-def validate_complex_ligands(unique_species, ref, idx, debug):
-    """Validate ligands within complex reference molecules."""
-    for jdx, lig in enumerate(ref.ligands):
-        for kdx, specie in enumerate(unique_species):
-            if specie.subtype == "ligand" and lig.formula == specie.formula:
-                issame = self.compare_and_set_charge(lig, specie, debug)
-                if not issame:
-                    print("Check Error", f"{idx=}, {jdx=}, {kdx=}", lig.formula, specie.formula, issame)
-
-
-
-def compare_and_set_charge(self, lig, specie, debug):
-    """Compare ligands and species, setting charge if they match."""
-    issame = self.compare_species_or_nitrosyl(lig, specie)
-    if issame:
-        set_charge_state(specie, lig, mode=1, debug=debug)
-    return issame
-def compare_species_or_nitrosyl(self, lig, specie):
-    """Compare if two entities are the same, considering nitrosyl properties."""
-    if not hasattr(lig, "is_nitrosyl"):
-        lig.evaluate_as_nitrosyl()
-    if not hasattr(specie, "is_nitrosyl"):
-        specie.evaluate_as_nitrosyl()
-    if lig.is_nitrosyl and specie.is_nitrosyl:
-        return lig.NO_type == specie.NO_type
-    return compare_species(lig, specie)
-
-def validate_complex_metals(self, ref, debug):
-    """Validate metals within complex reference molecules."""
-    for met in ref.metals:
-        for specie in self.unique_species:
-            if specie.subtype == "metal" and compare_metals(met, specie):
-                met.set_charge(specie.charge)
-
-def validate_non_complex_molecule(self, ref, debug):
-    """Validate non-complex reference molecules."""
-    for specie in self.unique_species:
-        if specie.subtype == "molecule" and ref.formula == specie.formula:
-            if compare_species(ref, specie):
-                set_charge_state(specie, ref, mode=1, debug=debug)
+    return m_ox_rf
+######################################################

@@ -11,7 +11,7 @@ VERSION = "2.0"
 COV_FACTOR = 1.3
 METAL_FACTOR = 1.0
 
-def get_molecule (input_path, name, current_dir, debug=0):
+def get_molecule (input_path, name, current_dir, debug=2):
 
     molec_fname = os.path.join(current_dir, f"Molecule_{name}.mol")
     output_fname = os.path.join(current_dir, "cell2mol.out")
