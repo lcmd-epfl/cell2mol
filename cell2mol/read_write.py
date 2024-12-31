@@ -6,6 +6,7 @@ import sys
 import re
 from collections import defaultdict
 import os
+import traceback
 
 #######################
 def get_wyckoff_positions(file_path):
@@ -54,32 +55,48 @@ def get_wyckoff_positions(file_path):
     return ref_labels, ref_fracs
 
 #######################
-def exit_with_error(message):
+def exit_with_error_input(message):
     """Logs the error message to a file and exits the program."""
     error_log_path = os.path.join(os.getcwd(), "error_input.out")
     with open(error_log_path, "w") as error_log:
         error_log.write(f"Error: {message}\n")
     sys.exit(message)
 
+#######################    
+def exit_with_error_exception(e):
+    """Logs the error details to a file and exits the program."""
+    error_details = traceback.format_exc()
+    error_log_path = os.path.join(os.getcwd(), f"error_{type(e).__name__}.out")
+    
+    # Write the full error details to the log file
+    with open(error_log_path, "w") as error_log:
+        error_log.write(f"Error message: {type(e).__name__} - {str(e)}\n")
+        error_log.write(f"Error details:\n{error_details}")
+    
+    # Print the error details to the console
+    print(f"An error occurred. Details have been logged to {error_log_path}")
+    print(f"Error details:\n{error_details}")
+    
+    sys.exit(e)
 #######################
 def prefilter_cif(input_path):
 
     with open(input_path, 'r') as ciffile:
         file_content = ciffile.read()
         if 'radical' in file_content:
-            exit_with_error("Radical found in cif file. STOPPING")                   
+            exit_with_error_input("Radical found in cif file. STOPPING")                   
             return False
         elif '_atom_site_fract_x' not in file_content:
-            exit_with_error("No fractional coordinates found in cif file. STOPPING")  
+            exit_with_error_input("No fractional coordinates found in cif file. STOPPING")  
             return False
         elif '?' in file_content:
             if "_diffrn_ambient_temperature ?" not in file_content and "_chemical_melting_point ?" not in file_content:
-                exit_with_error("Disorder found in cif file. STOPPING")
+                exit_with_error_input("Disorder found in cif file. STOPPING")
                 return False
             else:
                 num_greps = file_content.count('?')
                 if num_greps > 1:
-                    exit_with_error("Disorder found in cif file. STOPPING")                      
+                    exit_with_error_input("Disorder found in cif file. STOPPING")                      
                     return False
                 else:
                     return True
