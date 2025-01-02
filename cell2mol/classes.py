@@ -654,6 +654,9 @@ class ligand(specie):
                 newgroup.get_denticity(debug=debug)
                 # Top-down hierarchy
                 self.groups.append(newgroup)
+            elif len(conn_idx) == 0:
+                if debug > 1 : print(f"\tLIGAND.SPLIT_LIGAND: no group is found")
+                continue
             else:
                 if debug > 1 : print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.formula} with {conn_idx=}")
                 splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices, debug=debug)
@@ -1117,6 +1120,7 @@ class metal(atom):
     def get_coord_sphere_formula(self):
         if not hasattr(self,"coord_sphere"): self.get_coord_sphere()
         self.coord_sphere_formula = labels2formula(list([at.label for at in self.coord_sphere])) 
+        print(f"METAL.Get_coord_sphere_formula: {self.get_parent_index('molecule')} {self.label} {self.coord_sphere_formula}")
         return self.coord_sphere_formula 
 
     #######################################################
@@ -1161,7 +1165,6 @@ class metal(atom):
     #######################################################
     def get_relative_metal_radius(self, debug: int=0):
         if not hasattr(self,"groups"): self.get_connected_groups(debug=debug)
-        
         diff_list = []
         for group in self.groups:
             if group.is_haptic == False :
@@ -1182,14 +1185,39 @@ class metal(atom):
         self.rel_metal_radius = round(average/elemdatabase.CovalentRadius3[self.label], 3)
 
         return self.rel_metal_radius
+    #######################################################
+    def get_connected_metals(self, debug: int=2):
+        self.metals = []
+        mol = self.get_parent("molecule")
+        for met in mol.metals:
+            if met == self : continue
+            tmplabels = []
+            tmpcoord  = []
+            tmplabels.append(self.label)
+            tmpcoord.append(self.coord)
+            tmplabels.append(met.label)
+            tmpcoord.append(met.coord)
+
+            if debug > 1: print(tmplabels, tmpcoord)
+
+            isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+            if isgood:
+                if debug > 1: print(met.label, tmpadjmat, tmpadjnum)
+                if all(tmpadjnum[1:]): 
+                    self.metals.append(met)
+                else:
+                    if debug > 1: print(f"Metal {self.label} is not connected to {met.label}")
+        if debug >= 2 : print(f"METAL.Get_connected_metals: {self.label} connected to {len(self.metals)} metals {[m.label for m in self.metals]}")
+        return self.metals
     
     #######################################################
     def get_coordination_geometry(self: object, debug: int = 0):
         coord_group = self.get_connected_groups()
         self.coord_nr = len(coord_group)
+
         if debug >= 1: print(f"\nMETAL.Get_coord_geometry: {self.label}")
-        if debug > 2 : print(f"METAL.Get_coord_geometry:\n{coord_group=}")
-        if debug >= 1: print(f"METAL.Get_coord_geometry: coord_nr={self.coord_nr}")
+        if debug >= 2 : print(f"METAL.Get_coord_geometry:\n{coord_group=}")
+        if debug >= 1: print(f"METAL.Get_ccoord_geometry: coord_nr={self.coord_nr}")
         
         self.coord_geometry, self.geom_deviation = define_coordination_geometry(self, coord_group, debug = debug)
         if debug >= 2: print(f"METAL.Get_coord_geometry: {self.coord_geometry=} {self.geom_deviation=}")
@@ -1390,7 +1418,8 @@ class cell(object):
                     ref.get_hapticity(debug=debug)
                     for lig in ref.ligands:
                         lig.get_denticity(debug=debug)
-                    for met in ref.metals:                         
+                    for met in ref.metals:
+                        met.get_connected_metals(debug=debug)                         
                         met.get_coordination_geometry(debug=debug)
                         met.get_coord_sphere_formula()
         else:      
