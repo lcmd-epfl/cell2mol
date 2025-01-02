@@ -61,6 +61,7 @@ def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:
     if debug >= 2:print(f"SHAPE_MEASURE: {positions=}")
 
     cn = len(symbols)-1 # coordination number of metal center
+
     connectivity= [[1, i] for i in range(2, cn+2)]
     if debug >= 2: print(f"SHAPE_MEASURE: coordination number of metal center {cn}")
     if debug >= 2: print(f"SHAPE_MEASURE: connectivity of metal center(1) {connectivity}")
@@ -68,15 +69,17 @@ def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:
                         symbols=symbols, 
                         connectivity=connectivity)            
     
-    # ref_geom = np.array(shape_structure_references['{} Vertices'.format(cn)])
-    ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)])
-    
-    posgeom_dev={}
-    
-    for idx, rg in enumerate(ref_geom[:,0]):
-        shp_measure = geometry.get_shape_measure(rg, central_atom=1)
-        geom = ref_geom[:,3][idx]
-        posgeom_dev[geom]=round(shp_measure, 3)      
+    if cn == 0 : 
+        posgeom_dev = {}
+    elif cn == 1 :
+        posgeom_dev = {'Linear' : 0.0}
+    else :
+        posgeom_dev={}
+        ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)])
+        for idx, rg in enumerate(ref_geom[:,0]):
+            shp_measure = geometry.get_shape_measure(rg, central_atom=1)
+            geom = ref_geom[:,3][idx]
+            posgeom_dev[geom]=round(shp_measure, 3)      
     
     return posgeom_dev
 
