@@ -546,6 +546,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         else:
             combinations = [0,1]
         count = 0   
+        print(f"{combinations=}")
         for com in combinations:
             newlab = local_labels.copy()
             newcoord = local_coords.copy()
@@ -561,6 +562,11 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
             o_s = np.sum(com)
             toallocate = int(0)
+            print(f"{non_local_groups=}")
+            for jdx, a in enumerate(ligand.atoms):
+                if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
+                    print(jdx, a.label, a.mconnec)
+            print("====")
             for jdx, a in enumerate(ligand.atoms):
                 if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
                     print(a.label)
