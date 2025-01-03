@@ -16,13 +16,17 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
 
     symbols.append(metal.label)
     positions.append(metal.coord)
-    
+    if debug >= 2 : print(f"DEFINE_coordination_geometry: {metal.label} {metal.coord}")
+    print(f"DEFINE_coordination_geometry: {[group.formula for group in coord_group]}")
+    print(f"DEFINE_coordination_geometry: {[group.is_haptic for group in coord_group]}")
+    print(f"DEFINE_coordination_geometry: {[[a.label for a in group.atoms] for group in coord_group]}")
+
     for group in coord_group:
         if group.is_haptic == False:
             for atom in group.atoms:
                 symbols.append(atom.label)
                 positions.append(atom.coord)
-                #if debug >= 2 : print("DEFINE_coordination_geometry:", atom.label, atom.coord)
+                if debug >= 2 : print("DEFINE_coordination_geometry:", atom.label, atom.coord)
         else :
             if debug >= 2 : print(f"DEFINE_coordination_geometry: {group.haptic_type=}")
             #if debug >= 2 : print(f"DEFINE_coordination_geometry: {[atom.coord for atom in group.atoms]}")
@@ -372,8 +376,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
     if debug > 0: print("Entering COORD_CORR_NONHAPTIC:")
     if not hasattr(group,"metals"): group.get_connected_metals()
-
-
+    print(f"group: {[atom.label for atom in group.atoms]}")
     # Pair each atom with its index in the original list
     indexed_atoms = list(enumerate(group.atoms))
 
@@ -383,9 +386,6 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
     # Extract the sorted atoms and their original indices into separate lists
     sorted_atoms = [atom[1] for atom in sorted_indexed_atoms]
     original_indices = [atom[0] for atom in sorted_indexed_atoms]
-
-    # Update the group's atoms list to the sorted atoms
-    group.atoms = sorted_atoms
 
     ## First Correction (former verify_connectivity)
     conn_idx = []
@@ -422,6 +422,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
                 # group.remove_atom(idx, debug=debug)
 
     conn_idx = sorted(list(set(conn_idx)))
+
     return group, conn_idx, final_ligand_indices
 
 
@@ -456,6 +457,8 @@ def coordination_correction_for_haptic (group: object, debug: int=0):
         else :
             conn_idx.append(idx)
             final_ligand_indices.append(atom.get_parent_index("ligand"))
+
     conn_idx = sorted(list(set(conn_idx)))
+
     return group, conn_idx, final_ligand_indices
 #######################################################
