@@ -28,11 +28,13 @@ if "ipykernel" in sys.modules:
 # print("RDKIT Version:", rdBase.rdkitVersion)
 rdBase.DisableLog("rdApp.*")
 
+fullerene = ["C60", "C72", "C80"]
 #######################################################
 def get_possible_charge_state(spec: object, debug: int=0): 
     if not hasattr(spec,"protonation_states"): spec.get_protonation_states(debug=debug)
     if spec.protonation_states is None: 
-        return None 
+        return None
+     
     if spec.formula in ["O4-Cl", "N3", "I3"]:
         ch_state = get_charge_manual(spec, debug=debug)
         possible_cs = [ch_state]
@@ -186,7 +188,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     if   specie.type != "specie":                                   return None
     if   specie.subtype == "group":                                 return None
     elif specie.subtype == "molecule" and specie.iscomplex == True: return None     
-    elif (specie.subtype == "molecule" and specie.iscomplex == False) or specie.formula in ["O4-Cl", "N3", "I3"]: 
+    elif (specie.subtype == "molecule" and specie.iscomplex == False) or specie.formula in ["O4-Cl", "N3", "I3"] or specie.formula in fullerene: 
         if debug >= 2: print(f"\nPOSCHARGE: doing empty PROTONATION for this specie {specie.formula} ({specie.subtype})")
         #empty_list = list([np.zeros((len(specie.labels)))])
         empty_list = []
@@ -678,6 +680,7 @@ def get_charge_manual(spec, debug: int=0):
                 break  # Found the target atom, no need to check further
 
         if debug >= 2: print(f"I3: new_order={new_order}")
+
 
     temp_mol = Chem.MolFromSmiles(smiles, sanitize=False)
     mol = Chem.RenumberAtoms(temp_mol, new_order)
