@@ -39,7 +39,8 @@ def process_refcell(input_path, name, current_dir, debug=0):
 
             # Finalize and save the reference cell object if no errors
             if refcell.error_case == 0:
-                get_unique_species_in_reference(refcell, debug)
+                pass
+                # get_unique_species_in_reference(refcell, debug)
             else:
                 print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
             refcell.save(ref_cell_fname)

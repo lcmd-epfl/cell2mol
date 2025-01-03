@@ -553,6 +553,9 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
     splitted_groups = []
     
     if debug > 1: print(f"GROUP.SPLIT_GROUP: {conn_idx=}")
+    if debug > 1: print(f"GROUP.SPLIT_GROUP: {original_group.labels=}")
+    if debug > 1: print(f"GROUP.SPLIT_GROUP: {original_group.coord=}")
+    if debug > 1: print(f"GROUP.SPLIT_GROUP: {original_group.atoms=}")
     conn_labels  = extract_from_list(conn_idx, original_group.labels, dimension=1)
     conn_coord   = extract_from_list(conn_idx, original_group.coord, dimension=1)
     conn_frac_coord   = extract_from_list(conn_idx, original_group.frac_coord, dimension=1)
@@ -576,6 +579,7 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
         gr_atoms        = extract_from_list(b, conn_atoms, dimension=1)
         # Create Group Object
         newgroup = group(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
+        if debug > 1: print(f"GROUP.SPLIT_GROUP: {newgroup.labels=}")
         # For debugging
         newgroup.origin = "split_group"
         # Define the GROUP as parent of the group. Bottom-Up hierarchy
