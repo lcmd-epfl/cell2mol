@@ -6,7 +6,7 @@ from cell2mol.connectivity import compare_atoms, compare_species, compare_metals
 from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
 
-from cell2mol.charge_assignment import get_protonation_states_specie, get_possible_charge_state, get_metal_poscharges
+from cell2mol.charge_assignment import get_protonation_states_specie, get_possible_charge_state, get_metal_poscharges, get_empty_protonation_state
 from cell2mol.charge_assignment import prepare_unresolved, prepare_mols, correct_smiles_ligand
 
 from cell2mol.new_charge_assignment import set_charge_state, prepare_mol, balance_charge, assign_charge_to_specie
@@ -1357,9 +1357,12 @@ class cell(object):
     #######################################################
     def check_missing_H(self, debug: int=0):
         from cell2mol.missingH import check_missingH
-        Warning, ismissingH, Missing_H_in_C, Missing_H_in_CoordWater = check_missingH(self.refmoleclist, debug=debug)
-        if ismissingH or Missing_H_in_C or Missing_H_in_CoordWater: self.has_missing_H = True
-        else:                                                       self.has_missing_H = False
+        Warning, ismissingH, Missing_H_in_C, Missing_H_in_CoordWater, Missing_H_in_Water = check_missingH(self.refmoleclist, debug=debug)
+        print(f"CELL.Check_missing_H: {Missing_H_in_C=} {Missing_H_in_CoordWater=} {Missing_H_in_Water=}")
+        if ismissingH or Missing_H_in_C or Missing_H_in_CoordWater or Missing_H_in_Water : 
+            self.has_missing_H = True
+        else:                                                       
+            self.has_missing_H = False
         return self.has_missing_H 
 
     #######################################################
@@ -1617,6 +1620,43 @@ class cell(object):
                 self.selected_cs.append(list([cs.corr_total_charge for cs in specie.possible_cs]))
             else :
                 self.selected_cs.append(specie.possible_cs)
+        
+        #     if unique_specie.subtype == "metal":
+        #         self.selected_cs.append(unique_specie.possible_cs)
+        #     else:
+        #         if tmp is not None:
+        #             self.selected_cs.append(list([cs.corr_total_charge for cs in unique_specie.possible_cs]))
+        #         else:
+        #             if unique_specie.subtype == "ligand" :
+        #                 unique_specie.protonation_states = get_empty_protonation_state(unique_specie)
+        #                 tmp_2 = unique_specie.get_possible_cs(debug=debug)
+        #                 if tmp_2 is None:
+        #                     self.selected_cs.append(None)
+        #                 else:
+        #                     self.selected_cs.append(list([cs.corr_total_charge for cs in unique_specie.possible_cs]))
+        #             else:
+        #                 self.selected_cs.append(None)
+
+        
+        # for specie in self.species_list:
+        #     print("Get possible charge states for species list", specie.formula)
+        #     tmp = specie.get_possible_cs(debug=debug)
+        #     if specie.subtype == "metal":
+        #         self.selected_cs.append(specie.possible_cs)
+        #     else:
+        #         if tmp is not None:
+        #             self.selected_cs.append(list([cs.corr_total_charge for cs in specie.possible_cs]))
+        #         else:
+        #             if specie.subtype == "ligand" :
+        #                 specie.protonation_states = get_empty_protonation_state(specie)
+        #                 tmp_2 = specie.get_possible_cs(debug=debug)
+        #                 if tmp_2 is None:
+        #                     self.selected_cs.append(None)
+        #                 else:
+        #                     self.selected_cs.append(list([cs.corr_total_charge for cs in specie.possible_cs]))
+        #             else:
+        #                 self.selected_cs.append(None)            
+
 
         if None in self.selected_cs:
             self.error_get_poscharges = True

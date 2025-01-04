@@ -60,7 +60,9 @@ def get_missingH_from_adjacency(Z, center, points, bonded_atom_labels):
             missingH = True
     elif val_e == shapeval :  
         missingH = False
-    else :
+    elif val_e > shapeval:  # carbon has more than 4 bonds       
+        missingH = False
+    else : # val_e < shapeval
         missingH = True
 
     # Saves report
@@ -108,12 +110,13 @@ def find_shape(vecs):
 def check_missingH(refmoleclist: list, debug: int=0):
 
     Missing_H_in_C = False
+    Missing_H_in_Water = False
     Missing_H_in_CoordWater = False
     ismissingH = False
     Warning = False
 
     # List of Metal Atoms for which O atoms might appear connected directly.
-    Exceptions_for_CoordWater = ["Re", "V", "Mo", "W", "Fe"]
+    Exceptions_for_CoordWater = ["Re", "V", "Mo", "W", "Fe", "Tc"]
 
     if debug >= 1: print("")
     if debug >= 1: print("##################")
@@ -122,7 +125,8 @@ def check_missingH(refmoleclist: list, debug: int=0):
     for idx, ref in enumerate(refmoleclist):
         if not ref.iscomplex:
             if ref.natoms == 1 and "O" in ref.labels: 
-                Missing_H_in_CoordWater = True
+                Missing_H_in_Water = True
+                # Missing_H_in_CoordWater = True
                 if debug >= 1: print(f"WARNING found isolated O atom in the cell. This tends to be a water with missing H, so stopping")
             elif ref.formula == "CO" or ref.formula == "CN":
                 pass
@@ -154,7 +158,7 @@ def check_missingH(refmoleclist: list, debug: int=0):
                     else:
                         Missing_H_in_CoordWater = True
                         if debug >= 1: print("")
-                        if debug >= 1: print("WARNING in Missing H function for ligand",lig.natoms,lig.labels)
+                        if debug >= 1: print("WARNING in Missing H function for ligand", lig.natoms, lig.labels)
                 elif lig.formula == "CO" or lig.formula == "CN":
                     pass
                 else:
@@ -169,14 +173,15 @@ def check_missingH(refmoleclist: list, debug: int=0):
                             if debug >= 2: print("Adjacency", a.adjacency, bonded_atom_labels)
                             ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord, bonded_atom_labels)
                             if ismissingH:
+                                print(a.label, a.mconnec, a.coord)
                                 if debug >= 1: print("")
                                 if debug >= 1: print(f"WARNING in Missing H function for: {ref.type}, molecule index {idx}, ligand index {jdx}, {lig.formula}")
                                 if debug >= 1: print(f"C Atom {kdx} {a.get_parent_index('molecule')} has missing H atoms")
                                 if debug >= 1: print(report)
                                 Missing_H_in_C = True
 
-    if Missing_H_in_C or Missing_H_in_CoordWater:  Warning = True
+    if Missing_H_in_C or Missing_H_in_CoordWater or Missing_H_in_Water :  Warning = True
     if not Warning:
         if debug >= 1: print("Not a Single Molecule has Missing H atoms (apparently)")
 
-    return Warning, ismissingH, Missing_H_in_C, Missing_H_in_CoordWater
+    return Warning, ismissingH, Missing_H_in_C, Missing_H_in_CoordWater, Missing_H_in_Water
