@@ -272,12 +272,16 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
         for j in range(i, natoms):
             if i != j:
                 if (elemdatabase.elementgroup[labels[i]] == 2 or elemdatabase.elementgroup[labels[j]] == 2) :  
-                    adjmat[i, j] = 0
-                    adjmat[j, i] = 0   
-                elif (labels[i] != "H" and labels[j] != "H") and (labels[i] != "D" and labels[j] != "D"): 
-                    if (elemdatabase.elementgroup[labels[i]] == 1 or elemdatabase.elementgroup[labels[j]] == 1 ):     
+                    if adjmat[i, j] == 1 or adjmat[j, i] == 1:
+                        print("Adjacency Matrix: Alkali or Alkaline Earth Metal", labels[i], labels[j], f"{i=}", f"{j=}", f"{adjmat[i, j]=}")
                         adjmat[i, j] = 0
-                        adjmat[j, i] = 0  
+                        adjmat[j, i] = 0   
+                elif (labels[i] != "H" and labels[j] != "H") and (labels[i] != "D" and labels[j] != "D"): 
+                    if (elemdatabase.elementgroup[labels[i]] == 1 or elemdatabase.elementgroup[labels[j]] == 1 ):  
+                        if adjmat[i, j] == 1 or adjmat[j, i] == 1:
+                            print("Adjacency Matrix: Alkali or Alkaline Earth Metal", labels[i], labels[j], f"{i=}", f"{j=}", f"{adjmat[i, j]=}")
+                            adjmat[i, j] = 0
+                            adjmat[j, i] = 0  
 
     # Sums the adjacencies of each atom to obtain "adjnum" 
     for i in range(0, natoms):
