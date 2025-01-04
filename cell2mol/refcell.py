@@ -21,41 +21,60 @@ def process_refcell(input_path, name, current_dir, debug=0):
     ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
     output_fname = os.path.join(current_dir, "cell2mol.out")
     summary_fname = os.path.join(current_dir, "summary.out")
-    
-    if os.path.exists(ref_cell_fname):
-        with open(output_fname, "a") as output:
-            with redirect_stdout(output):
-                print("=====================================================")
-                print(f"cell2mol version {VERSION}")
-                print(f"Reference cell file {ref_cell_fname} already exists. Skipping reference cell generation.")
-                print(f"Debug level: {debug}")
-                refcell = np.load(ref_cell_fname, allow_pickle=True)
-                if refcell.error_case == 0:
-                    get_unique_species_in_reference(refcell, debug) 
-                else:
-                    print(f"Error occurred in processing reference cell: error case {refcell.error_case}")   
-                refcell.save(ref_cell_fname)
-    else:
-        with open(output_fname, "w") as output:
-            with redirect_stdout(output):
-                print(f"cell2mol version {VERSION}")
-                print(f"INITIATING cell object from input path: {input_path}")
-                print(f"Debug level: {debug}")
+    with open(output_fname, "w") as output:
+        with redirect_stdout(output):
+            print(f"cell2mol version {VERSION}")
+            print(f"INITIATING cell object from input path: {input_path}")
+            print(f"Debug level: {debug}")
 
-                # # Read .cif file
-                structure = read(input_path)
-                cell_vector = structure.cell.array
-                cell_param = structure.cell.cellpar()      
+            # # Read .cif file
+            structure = read(input_path)
+            cell_vector = structure.cell.array
+            cell_param = structure.cell.cellpar()      
 
-                # Create the reference cell
-                refcell = create_reference(input_path, name, cell_vector, cell_param, debug)
+            # Create the reference cell
+            refcell = create_reference(input_path, name, cell_vector, cell_param, debug)
 
-                # Finalize and save the reference cell object if no errors
-                if refcell.error_case == 0:
-                    pass
-                else:
-                    print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
-                refcell.save(ref_cell_fname)
+            # Finalize and save the reference cell object if no errors
+            if refcell.error_case == 0:
+                get_unique_species_in_reference(refcell, debug) 
+            else:
+                print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
+            refcell.save(ref_cell_fname)   
+    # if os.path.exists(ref_cell_fname):
+    #     with open(output_fname, "a") as output:
+    #         with redirect_stdout(output):
+    #             print("=====================================================")
+    #             print(f"cell2mol version {VERSION}")
+    #             print(f"Reference cell file {ref_cell_fname} already exists. Skipping reference cell generation.")
+    #             print(f"Debug level: {debug}")
+    #             refcell = np.load(ref_cell_fname, allow_pickle=True)
+    #             if refcell.error_case == 0:
+    #                 get_unique_species_in_reference(refcell, debug) 
+    #             else:
+    #                 print(f"Error occurred in processing reference cell: error case {refcell.error_case}")   
+    #             refcell.save(ref_cell_fname)
+    # else:
+    #     with open(output_fname, "w") as output:
+    #         with redirect_stdout(output):
+    #             print(f"cell2mol version {VERSION}")
+    #             print(f"INITIATING cell object from input path: {input_path}")
+    #             print(f"Debug level: {debug}")
+
+    #             # # Read .cif file
+    #             structure = read(input_path)
+    #             cell_vector = structure.cell.array
+    #             cell_param = structure.cell.cellpar()      
+
+    #             # Create the reference cell
+    #             refcell = create_reference(input_path, name, cell_vector, cell_param, debug)
+
+    #             # Finalize and save the reference cell object if no errors
+    #             if refcell.error_case == 0:
+    #                 pass
+    #             else:
+    #                 print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
+    #             refcell.save(ref_cell_fname)
     
     error_fname = os.path.join(current_dir, f"reference_error_{refcell.error_case}.out")
     with open(error_fname, "w") as error_output:
