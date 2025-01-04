@@ -179,7 +179,17 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Case 2, more than one entry for {tgt_charge} in tmplist. Taking first")
 
     return good_states
-
+#######################################################
+def get_empty_protonation_state (specie: object, debug: int=2) -> list:
+    if debug >= 2: print(f"\nPOSCHARGE: doing empty PROTONATION for this specie {specie.formula} ({specie.subtype})")
+    #empty_list = list([np.zeros((len(specie.labels)))])
+    empty_list = []
+    for i in range(len(specie.labels)):
+        empty_list.append(int(0))
+    empty_protonation = protonation(specie.labels, specie.coord, specie.cov_factor, int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=specie)
+    if debug >= 2: print("    CREATED EMPTY PROTONATION", empty_protonation)
+    
+    return list([empty_protonation])
 #######################################################
 def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     ##############################

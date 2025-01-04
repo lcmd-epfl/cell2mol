@@ -155,6 +155,17 @@ def get_metal_idxs(labels: list, debug: int=0):
     return metal_indices
 
 ################################
+def get_alkali_alkaline_earth_metal_idxs(labels: list, debug: int=0):
+    """ alkali metals (Group 1) and alkaline earth metals (Group 2)  """
+    alkali_alkaline_earth_metal_indices = []
+    for idx, l in enumerate(labels):
+        if elemdatabase.elementgroup[l]==1 and l != "H" and l != "D":
+            alkali_alkaline_earth_metal_indices.append(idx)
+        elif elemdatabase.elementgroup[l]==2 :
+            alkali_alkaline_earth_metal_indices.append(idx)
+    return alkali_alkaline_earth_metal_indices
+
+################################
 def get_metal_species(labels: list):
     from cell2mol.elementdata import ElementData
     elemdatabase = ElementData()
@@ -232,16 +243,11 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
     # Creates Adjacency Matrix
     for i in range(0, natoms - 1):
         for j in range(i, natoms):
-            if i != j:
+            if i != j:                
                 a = np.array(pos[i])
                 b = np.array(pos[j])
                 dist = np.linalg.norm(a - b)
-                # if (elemdatabase.elementgroup[labels[i]] == 1 or elemdatabase.elementgroup[labels[j]] == 1 ) and (labels[i] != "H" and labels[j] != "H"):
-                #     cov_factor = 1.05
-                # elif (elemdatabase.elementgroup[labels[i]] == 1 and elemdatabase.elementgroup[labels[j]] == 1 ) and (labels[i] == "H" or labels[j] == "H"):
-                #     cov_factor = 1.05
-                # else :
-                #     cov_factor = 1.3
+
                 thres = (radii[i] + radii[j]) * cov_factor
                 if thres - (radii[i] + radii[j]) > 0.8:
                     thres = (radii[i] + radii[j]) + add_factor
@@ -260,6 +266,18 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
                         or elemdatabase.elementblock[labels[j]] == "f"):
                             adjmat[i, j] = 1
                             adjmat[j, i] = 1
+                            
+    # Set Adjacency Matrix as zeros for alkali and alkaline earth metals
+    for i in range(0, natoms - 1):
+        for j in range(i, natoms):
+            if i != j:
+                if (elemdatabase.elementgroup[labels[i]] == 2 or elemdatabase.elementgroup[labels[j]] == 2) :  
+                    adjmat[i, j] = 0
+                    adjmat[j, i] = 0   
+                elif (labels[i] != "H" and labels[j] != "H") and (labels[i] != "D" and labels[j] != "D"): 
+                    if (elemdatabase.elementgroup[labels[i]] == 1 or elemdatabase.elementgroup[labels[j]] == 1 ):     
+                        adjmat[i, j] = 0
+                        adjmat[j, i] = 0  
 
     # Sums the adjacencies of each atom to obtain "adjnum" 
     for i in range(0, natoms):
