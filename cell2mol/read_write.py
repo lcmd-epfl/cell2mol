@@ -495,3 +495,75 @@ def print_output(moleclist):
                 print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula}") #{mol.totcharge=} {mol.spin=}\n  {mol.smiles}")
         print("")
 
+######################################################
+def print_refmoleclist (cell):
+    for i, ref in enumerate(cell.refmoleclist):
+        if hasattr(ref, "totcharge"):
+            if ref.iscomplex:
+                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (Complex)\n{ref}")
+            else:
+                print(f"Reference Molecule {i} : {ref.formula} {ref.smiles=} {ref.totcharge=} (Non-complex)")
+        else:
+            if ref.iscomplex:
+                print(f"Reference Molecule {i}: {ref.formula} (Complex)")
+            else:
+                print(f"Reference Molecule {i} : {ref.formula} (Non-complex)")
+
+        if ref.iscomplex:
+            for met in ref.metals:
+                if hasattr(met, "charge"):
+                    print(f"\t{met.formula} {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=} {met.charge=}")
+                else:
+                    print(f"\t{met.formula} {met.coord_sphere_formula=}{met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=}")
+            for lig in ref.ligands:
+                if hasattr(lig, "totcharge"):
+                    print(f"\t{lig.formula} {lig.smiles=} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} {lig.totcharge=}")
+                else:
+                    print(f"\t{lig.formula} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=}")
+                for group in lig.groups:
+                    print(f"\t|--(group){group.labels} {group.is_haptic=} {group.haptic_type=} {group.denticity=} {group.closest_metal.label=}")
+                    # for met in group.metals:
+                    #     print(f"\t|--(group.metals){met.label} {met.mconnec=}")
+######################################################
+def print_unique_species (cell):
+    print(f"Unique Species in {cell.subtype}:")
+    for specie in cell.unique_species:
+        if specie.subtype == "metal":
+            if hasattr(specie, "charge"):
+                print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.charge=}")
+            else:
+                print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=}")
+        else:
+            if hasattr(specie, "totcharge"):
+                print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.smiles=} {specie.totcharge=}")
+            else:
+                 print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})")
+######################################################
+def print_moleclist (cell):                 
+    for i, mol in enumerate(cell.moleclist):
+        if hasattr(mol, "totcharge"):
+            if mol.iscomplex:
+                print(f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex)\n{mol}")
+            else:
+                print(f"Unitcell Molecule {i} : {mol.formula} {mol.smiles=} {mol.totcharge=} (Non-complex)")
+        else:
+            if mol.iscomplex:
+                print(f"Unitcell Molecule {i}: {mol.formula} (Complex)")
+            else:
+                print(f"Unitcell Molecule {i} : {mol.formula} (Non-complex)")
+
+        if mol.iscomplex:
+            for met in mol.metals:
+                if hasattr(met, "charge"):
+                    print(f"\t{met.formula} {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=} {met.charge=}")
+                else:
+                    print(f"\t{met.formula} {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=}")
+            for lig in mol.ligands:
+                if hasattr(lig, "totcharge"):
+                    print(f"\t{lig.formula} {lig.smiles=} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} {lig.totcharge=}")
+                else:
+                    print(f"\t{lig.formula} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=}")
+                for group in lig.groups:
+                    print(f"\t|--(group){group.labels} {group.is_haptic=} {group.haptic_type=} {group.denticity=} {group.closest_metal.label=}")
+                    # for met in group.metals:
+                    #     print(f"\t|--(group.metals){met.label} {met.mconnec=}")

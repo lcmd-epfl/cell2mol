@@ -1,7 +1,7 @@
 import numpy as np
 from cosymlib import Geometry
 from cell2mol.other import *
-from cell2mol.connectivity import add_atom
+from cell2mol.connectivity import add_atom, get_adjmatrix
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
@@ -397,29 +397,36 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
         isremoved = False
         ## Now there is an extra loop for each metal of the group. For bridging ligands
 
-        for met in group.metals:
+        for jdx, met in enumerate(group.metals):
             if isremoved: continue
             lig     = group.get_parent("ligand")
             ligand_idx = atom.get_parent_index("ligand")
             if debug > 0: print(f"\tevaluating coordination with metal {met.label}")
             if debug > 2: print(f"\n{met}")
-            isadded, newlab, newcoord = add_atom(lig.labels, lig.coord, ligand_idx, lig, list([met]), "H", removed_idx, debug=debug)
-            if debug >= 2:print(f"{removed_idx=}")
-            if isadded:
-                if debug > 0: print(f"\tConnectivity verified for atom {atom.label} with ligand index {ligand_idx}")
-                conn_idx.append(idx)
-                final_ligand_indices.append(atom.get_parent_index("ligand"))
-                good_atoms.append(atom)
+            tmplabels = [atom.label, met.label]
+            tmpcoord = [atom.coord, met.coord]
+            isconnected, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+            if isconnected and any(tmpadjnum) > 0: 
+                if debug > 0 : print(f"\tAtom {atom.label} is connected to metal {met.label} (atom {ligand_idx=}) (metal group.metals index {jdx=})")
+                isadded, newlab, newcoord = add_atom(lig.labels, lig.coord, ligand_idx, lig, list([met]), "H", removed_idx, debug=debug)
+                if debug >= 2:print(f"{removed_idx=}")
+                if isadded:
+                    if debug > 0: print(f"\tConnectivity verified for atom {atom.label} with ligand index {ligand_idx}")
+                    conn_idx.append(idx)
+                    final_ligand_indices.append(atom.get_parent_index("ligand"))
+                    good_atoms.append(atom)
+                else:
+                    if debug > 0: print(f"\tCORRECT mconnec of atom {atom.label} with ligand index {ligand_idx}")
+                    isremoved = True
+                    removed_idx.append(ligand_idx)
+                    ### Reset Connectivity of the atom and the parents
+                    atom.reset_mconnec(met, debug=debug)
+                    met.get_coord_sphere()
+                    met.get_coord_sphere_formula()
+                    # Group will be redifined using split_group, so we don't need to remove the atom from group 
+                    # group.remove_atom(idx, debug=debug)
             else:
-                if debug > 0: print(f"\tCORRECT mconnec of atom {atom.label} with ligand index {ligand_idx}")
-                isremoved = True
-                removed_idx.append(ligand_idx)
-                ### Reset Connectivity of the atom and the parents
-                atom.reset_mconnec(met, debug=debug)
-                met.get_coord_sphere()
-                met.get_coord_sphere_formula()
-                # Group will be redifined using split_group, so we don't need to remove the atom from group 
-                # group.remove_atom(idx, debug=debug)
+                if debug > 0 : print(f"\tAtom {atom.label} is not connected to metal {met.label} (atom {ligand_idx=}) (metal group.metals index {jdx=})")
 
     conn_idx = sorted(list(set(conn_idx)))
 
@@ -450,10 +457,10 @@ def coordination_correction_for_haptic (group: object, debug: int=0):
             if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
             if debug >=1 : print(atom.label)
             atom.reset_mconnec(metal, debug=debug)  
-        elif std_dev > thres_std and ratio > thres_ratio :
-            if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to the long distance")
-            if debug >=1 : print(atom.label)
-            atom.reset_mconnec(metal, debug=debug) 
+        # elif std_dev > thres_std and ratio > thres_ratio :
+        #     if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to the long distance")
+        #     if debug >=1 : print(atom.label)
+        #     atom.reset_mconnec(metal, debug=debug) 
         else :
             conn_idx.append(idx)
             final_ligand_indices.append(atom.get_parent_index("ligand"))
