@@ -3,7 +3,7 @@ import sys
 from ase.io import read
 from contextlib import redirect_stdout
 from cell2mol.classes import cell
-from cell2mol.read_write import get_wyckoff_positions
+from cell2mol.read_write import get_wyckoff_positions, print_refmoleclist, print_unique_species
 from cell2mol.cell_operations import frac2cart_fromparam
 from cell2mol.new_cell_reconstruction import modify_cov_factor_due_to_H, modify_cov_factor_due_to_possible_charges
 from cell2mol.other import handle_error
@@ -40,6 +40,9 @@ def process_refcell(input_path, name, current_dir, debug=0):
                 get_unique_species_in_reference(refcell, debug) 
             else:
                 print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
+            print_refmoleclist(refcell)
+            if hasattr(refcell, "unique_species"):
+                print_unique_species(refcell)
             refcell.save(ref_cell_fname)   
     # if os.path.exists(ref_cell_fname):
     #     with open(output_fname, "a") as output:
@@ -79,7 +82,16 @@ def process_refcell(input_path, name, current_dir, debug=0):
     error_fname = os.path.join(current_dir, f"reference_error_{refcell.error_case}.out")
     with open(error_fname, "w") as error_output:
         with redirect_stdout(error_output):
-            handle_error(refcell.error_case)
+            if refcell.error_case == 2 or refcell.error_case == 3 or refcell.error_case == 4 :
+                handle_error(2)
+                if refcell.error_case == 2:
+                    print("    - Missing Hydrogens in Water Molecules")
+                elif refcell.error_case == 3:
+                    print("    - Missing Hydrogens in Coordinated Water Molecules")
+                elif refcell.error_case == 4:
+                    print("    - Missing Hydrogens in Carbon Atoms")
+            else :
+                handle_error(refcell.error_case)
     return refcell
 
 def create_reference (input_path, name, cell_vector, cell_param, debug):
@@ -109,6 +121,20 @@ def get_unique_species_in_reference (refcell, debug):
     #refcell = modify_cov_factor_due_to_possible_charges(refcell, debug=debug)
     refcell.get_selected_cs(debug=debug)
     refcell.assess_errors(mode="possible_charges")
+    
+    print("Results of possible charges")
+    for specie in refcell.species_list:
+        # for specie in refcell.unique_species:
+        if hasattr(specie, "possible_cs"):
+            if specie.subtype == "metal":
+                print(f"{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula} {specie.possible_cs=}") 
+            else:
+                print(f"{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.possible_cs=}")
+        else:
+            if specie.subtype == "metal":
+                print(f"{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula} No possible cs")
+            else:
+                print(f"{specie.unique_index=} {specie.formula}, {specie.subtype}  No possible cs") #[p.subtype for p in specie.parents])    
     tend = time.time()    
     if debug >= 1: print(f"\nAssign possible charges of Reference molecules. Total execution time: {tend - tini:.2f} seconds")
 

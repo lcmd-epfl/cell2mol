@@ -8,6 +8,7 @@ from cell2mol.classes import cell
 from cell2mol.new_c2m_module import cell2mol
 from cell2mol.new_charge_assignment import assign_charge_to_specie
 from cell2mol.other import handle_error
+from cell2mol.read_write import print_refmoleclist, print_unique_species, print_moleclist
 import copy
 # Constants
 VERSION = "2.0"
@@ -127,6 +128,9 @@ def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debu
             refcell.assign_spin(debug=debug)
             refcell.create_bonds(debug=debug)
             refcell.save(ref_cell_fname)
+    print_refmoleclist(newcell)
+    print_unique_species(newcell)
+    print_moleclist(newcell)
     newcell.save(cell_fname)
 
 

@@ -1,7 +1,7 @@
 import numpy as np
 import os
-from cell2mol.connectivity import get_adjacency_types, get_element_count, labels2electrons, labels2formula, get_adjmatrix
-from cell2mol.connectivity import get_metal_idxs, split_species, get_radii, split_group
+from cell2mol.connectivity import get_adjacency_types, get_element_count, labels2electrons, labels2formula, get_adjmatrix, is_haptic_ring
+from cell2mol.connectivity import get_metal_idxs, get_non_transition_metal_idxs, split_species, get_radii, split_group
 from cell2mol.connectivity import compare_atoms, compare_species, compare_metals, compare_reference_indices
 from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
@@ -196,6 +196,9 @@ class specie(object):
                 if debug > 0: print(f"SPECIE.SET_ATOMS: creating atom for label {l}")
                 ## For each l in labels, create an atom class object.
                 ismetal = elemdatabase.elementblock[l] == "d" or elemdatabase.elementblock[l] == "f"
+                # non transition metals
+                if len(get_non_transition_metal_idxs([l])) > 0: ismetal = True
+                if ismetal : print(f"SPECIE.SET_ATOMS: {l}")
                 if debug > 0: print(f"SPECIE.SET_ATOMS: {ismetal=}")
                 if self.frac_coord is not None: 
                     if ismetal: newatom = metal(l, self.coord[idx], self.frac_coord[idx], radii=self.radii[idx])
@@ -393,6 +396,12 @@ class molecule(specie):
             self.metals  = []
             # Identify Metals and the rest
             metal_idx = list([self.indices[idx] for idx in get_metal_idxs(self.labels, debug=debug)])
+            non_transition_metals_idx = list([self.indices[idx] for idx in get_non_transition_metal_idxs(self.labels, debug=debug)])
+            if len(non_transition_metals_idx) > 0:
+                print(f"MOLECULE.SPLIT COMPLEX: Found non-transition metals in the molecule {self.formula}")
+                print(f"MOLECULE.SPLIT COMPLEX: Non-transition metals found: {[self.labels[idx] for idx in non_transition_metals_idx]}")
+                metal_idx.extend(non_transition_metals_idx)
+
             rest_idx  = list(idx for idx in self.indices if idx not in metal_idx) 
             if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: labels={self.labels}")
             if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: metal_idx={metal_idx}")
@@ -759,6 +768,7 @@ class group(specie):
         numO  = self.labels.count("O")  # For h4-Enone
         numN  = self.labels.count("N")
     
+
         ## Carbon-based Haptic Ligands
         if   numC == 2:                   self.haptic_type = ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]; self.is_haptic = True
         elif numC == 3 and numO == 0:     self.haptic_type = ["h3-Allyl", "h3-Cp"];                         self.is_haptic = True
@@ -771,7 +781,11 @@ class group(specie):
         # Other less common types of haptic ligands
         elif numC == 0 and numAs == 5:    self.haptic_type = ["h5-AsCp"];                                   self.is_haptic = True
         elif numC == 0 and numP == 5:     self.haptic_type = ["h5-Pentaphosphole"];                         self.is_haptic = True
-        elif numC == 1 and numP == 1:     self.haptic_type = ["h2-P=C"];                                    self.is_haptic = True
+        elif numC == 1 and numP == 1:     self.haptic_type = ["h2-P=C"]; 
+        elif is_haptic_ring(self.labels, self.coord): 
+            self.haptic_type = [f"{len(self.labels)}-ring {self.formula}"]
+            self.is_haptic = True
+
         return self.haptic_type 
 
     #######################################################
@@ -1359,6 +1373,9 @@ class cell(object):
         from cell2mol.missingH import check_missingH
         Warning, ismissingH, Missing_H_in_C, Missing_H_in_CoordWater, Missing_H_in_Water = check_missingH(self.refmoleclist, debug=debug)
         print(f"CELL.Check_missing_H: {Missing_H_in_C=} {Missing_H_in_CoordWater=} {Missing_H_in_Water=}")
+        self.missing_H_in_Carbon = Missing_H_in_C
+        self.missing_H_in_CoordWater = Missing_H_in_CoordWater
+        self.missing_H_in_Water = Missing_H_in_Water
         if ismissingH or Missing_H_in_C or Missing_H_in_CoordWater or Missing_H_in_Water : 
             self.has_missing_H = True
         else:                                                       
@@ -1675,38 +1692,49 @@ class cell(object):
         final_charge_distribution, final_charges = balance_charge(self.unique_indices, self.unique_species, debug=debug)
         print("final_charge_distribution", final_charge_distribution)
         print("final_charges", final_charges)
+        # if len(final_charge_distribution) > 1:
+        #     if debug >= 1: print("More than one Possible Distribution Found:", final_charge_distribution)
+        #     second_final_charge_distribution, second_final_charges = balance_charge(self.unique_indices, self.unique_species, predict=True, debug=debug)
+        #     print("second_final_charge_distribution", second_final_charge_distribution)
+        #     print("second_final_charges", second_final_charges)
+            
+        #     if len(second_final_charge_distribution) == 1:
+        #         self.error_multiple_distrib = False
+        #         self.error_empty_distrib    = False
+        #         final_charge_distribution = second_final_charge_distribution
+        #         final_charges = second_final_charges
+        #     else:
+        #         self.error_multiple_distrib = True
+        #         self.error_empty_distrib    = False
+        #         return # Stopping.
+        
+        # elif len(final_charge_distribution) == 0: # 
+        #     if debug >= 1: print("No valid Distribution Found", final_charge_distribution)
+        #     second_final_charge_distribution, second_final_charges = balance_charge(self.unique_indices, self.unique_species, rare=True, debug=debug)
+        #     print("second_final_charge_distribution", second_final_charge_distribution)
+        #     print("second_final_charges", second_final_charges)
+            
+        #     if len(second_final_charge_distribution) == 1:
+        #         self.error_multiple_distrib = False
+        #         self.error_empty_distrib    = False
+        #         final_charge_distribution = second_final_charge_distribution
+        #         final_charges = second_final_charges
+
+        #     else:
+        #         self.error_multiple_distrib = False
+        #         self.error_empty_distrib    = True
+        #         return # Stopping.
         if len(final_charge_distribution) > 1:
             if debug >= 1: print("More than one Possible Distribution Found:", final_charge_distribution)
-            second_final_charge_distribution, second_final_charges = balance_charge(self.unique_indices, self.unique_species, predict=True, debug=debug)
-            print("second_final_charge_distribution", second_final_charge_distribution)
-            print("second_final_charges", second_final_charges)
-            
-            if len(second_final_charge_distribution) == 1:
-                self.error_multiple_distrib = False
-                self.error_empty_distrib    = False
-                final_charge_distribution = second_final_charge_distribution
-                final_charges = second_final_charges
-            else:
-                self.error_multiple_distrib = True
-                self.error_empty_distrib    = False
-                return # Stopping.
+            self.error_multiple_distrib = True
+            self.error_empty_distrib    = False
+            return # Stopping.            
         
-        elif len(final_charge_distribution) == 0: # 
+        elif len(final_charge_distribution) == 0:
             if debug >= 1: print("No valid Distribution Found", final_charge_distribution)
-            second_final_charge_distribution, second_final_charges = balance_charge(self.unique_indices, self.unique_species, rare=True, debug=debug)
-            print("second_final_charge_distribution", second_final_charge_distribution)
-            print("second_final_charges", second_final_charges)
-            
-            if len(second_final_charge_distribution) == 1:
-                self.error_multiple_distrib = False
-                self.error_empty_distrib    = False
-                final_charge_distribution = second_final_charge_distribution
-                final_charges = second_final_charges
-
-            else:
-                self.error_multiple_distrib = False
-                self.error_empty_distrib    = True
-                return # Stopping.
+            self.error_multiple_distrib = False
+            self.error_empty_distrib    = True            
+            return # Stopping.            
         
         else: # Only one possible charge distribution -> getcharge for the repeated species
             self.error_multiple_distrib = False
@@ -2002,14 +2030,20 @@ class cell(object):
             print("Errors in hydrogens")
             print("-------------------------------")
             if self.has_isolated_H:             case = 1
-            elif self.has_missing_H:            case = 2
+            # elif self.has_missing_H:            case = 2
+            elif self.missing_H_in_Water:       case = 2
+            elif self.missing_H_in_CoordWater:  case = 3
+            elif self.missing_H_in_Carbon:      case = 4
             else :                              case = 0
         elif mode == "possible_charges":
             print("-------------------------------")
             print("Errors in possible charges")
             print("-------------------------------")
             if self.has_isolated_H:             case = 1
-            elif self.has_missing_H:            case = 2
+            # elif self.has_missing_H:            case = 2
+            elif self.missing_H_in_Water:       case = 2
+            elif self.missing_H_in_CoordWater:  case = 3
+            elif self.missing_H_in_Carbon:      case = 4
             elif self.error_get_poscharges:     case = 5
             else :                              case = 0
         elif mode == "reconstruction":
@@ -2034,6 +2068,8 @@ class cell(object):
             elif self.error_empty_distrib :     case = 7
             elif self.error_create_bonds :      case = 8
             else :                              case = 0
+            # handle_error(case)
+            # print("")
         # elif mode == "neutrality":
         #     print("-------------------------------")
         #     print("Errors in Unit Cell")
@@ -2052,9 +2088,20 @@ class cell(object):
         #     if not self.is_neutral:             case = 9  
         #     # No errors
         #     else :                              case = 0
-        
-        handle_error(case)
-        print("")
+        if mode == "hydrogens" or mode == "possible_charges":
+            if case == 2 or case == 3 or case == 4 :
+                handle_error(2)
+                if case == 2:
+                    print("    - Missing Hydrogens in Water Molecules")
+                elif case == 3:
+                    print("    - Missing Hydrogens in Coordinated Water Molecules")
+                elif case == 4:
+                    print("    - Missing Hydrogens in Carbon Atoms")
+            else :
+                handle_error(case)
+        else:
+            handle_error(case)
+        print("")    
         self.error_case = case
 
     #######################################################
