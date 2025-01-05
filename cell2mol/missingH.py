@@ -56,7 +56,7 @@ def get_missingH_from_adjacency(Z, center, points, bonded_atom_labels):
         if bonded_atom_labels[0] == "O" or bonded_atom_labels[0] == "N": # CO or CN
             missingH = False
         else:
-            shapeval = "more than 1 (possibly 3 in missing H in methyl)"
+            shapeval = "more than 1 (possibly missing H in methyl)"
             missingH = True
     elif val_e == shapeval :  
         missingH = False

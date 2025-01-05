@@ -542,8 +542,8 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
 
     best_BO = AC.copy()
     BO_is_OK_list = []
-    print(f"AC2BO: {formula=} {len(valences_list)=}")
-    max_count = 1000
+    max_count = max(1000, int(len(valences_list)*0.3))
+    print(f"AC2BO: {formula=} {len(valences_list)=} {max_count=}")
 
     count = 0
     for valences in valences_list:

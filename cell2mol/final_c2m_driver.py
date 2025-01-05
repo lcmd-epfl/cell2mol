@@ -35,7 +35,10 @@ def handle_cif_file(input_path, system_type, name, current_dir, debug_mode):
             exit_with_error_exception(e)
     elif system_type == "unitcell":
         print("Processing unit cell from .cif file")
-        process_unitcell(input_path, name, current_dir, debug_mode)
+        try:
+            process_unitcell(input_path, name, current_dir, debug_mode)
+        except Exception as e:
+            exit_with_error_exception(e)
     else:
         exit_with_error_input("Invalid system type for .cif file", {"system_type": system_type})
 
