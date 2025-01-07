@@ -960,7 +960,6 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     at_charge[47] = [1]  # Ag
     at_charge[48] = [2]  # Cd
     # 3rd-row transition metals.
-    at_charge[57] = []  # La
     at_charge[72] = [4]  # Hf
     at_charge[73] = [2, 3, 4, 5]  # Ta
     at_charge[74] = [0, 2, 4, 5, 6]  # W
@@ -980,6 +979,41 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     at_charge[81] = [0, 1, 3]  # Tl
     at_charge[82] = [0, 2, 4]  # Pb
     at_charge[83] = [0, 3]  # Bi
+
+    # Lanthanides (atomic numbers 57 to 71)
+    at_charge[57] = [3]  # La
+    at_charge[58] = [3, 4]  # Ce
+    at_charge[59] = [3]  # Pr
+    at_charge[60] = [2, 3]  # Nd
+    at_charge[61] = [3]  # Pm
+    at_charge[62] = [2, 3]  # Sm
+    at_charge[63] = [3]  # Eu (some +2)
+    at_charge[64] = [3]  # Gd
+    at_charge[65] = [3]  # Tb (rare +4 in complexes)
+    at_charge[66] = [3]  # Dy
+    at_charge[67] = [3]  # Ho
+    at_charge[68] = [3]  # Er
+    at_charge[69] = [3]  # Tm
+    at_charge[70] = [2, 3]  # Yb
+    at_charge[71] = [3]  # Lu
+
+    # Actinides (atomic numbers 89 to 103)
+    at_charge[89] = [3]  # Ac
+    at_charge[90] = [3, 4]  # Th
+    at_charge[91] = [3, 4, 5]  # Pa
+    at_charge[92] = [3, 4, 5, 6]  # U
+    at_charge[93] = [3, 4, 5, 6]  # Np
+    at_charge[94] = [3, 4, 5, 6]  # Pu
+    at_charge[95] = [3, 4, 5, 6]  # Am
+    at_charge[96] = [3, 4]  # Cm
+    at_charge[97] = [3]  # Bk
+    at_charge[98] = [3]  # Cf
+    at_charge[99] = [3]  # Es
+    at_charge[100] = [2, 3]  # Fm
+    at_charge[101] = [2, 3]  # Md
+    at_charge[102] = [2, 3]  # No
+    at_charge[103] = [3]  # Lr
+
 
     poscharges = at_charge[atnum]
 
