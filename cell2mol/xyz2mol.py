@@ -604,7 +604,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
                 and valences_not_too_large(BO, valences)
                 and charge_OK
             ):
-                print(f"\tAC2BO: status", status, "BO.sum()", BO.sum(), "best_BO.sum()", best_BO.sum())
+                #print(f"\tAC2BO: status", status, "BO.sum()", BO.sum(), "best_BO.sum()", best_BO.sum())
                 best_BO = BO.copy()
             
             count += 1

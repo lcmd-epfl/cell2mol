@@ -35,7 +35,7 @@ def get_possible_charge_state(spec: object, debug: int=0):
     if spec.protonation_states is None: 
         return None
      
-    if spec.formula in ["O4-Cl", "N3", "I3"]:
+    if spec.formula in ["O4-Cl", "N3", "I3", "N2"]:
         ch_state = get_charge_manual(spec, debug=debug)
         possible_cs = [ch_state]
         return possible_cs
@@ -437,7 +437,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             addedlist[idx] = 1
                     else:
                         # nitrogen with at least 3 adjacencies doesnt need H
-                        if a.connec >= 3:
+                        # if a.connec >= 3:
+                        if (a.connec - a.mconnec) >= 3 :
                             block[idx] = 1
                             # needs_nonlocal = True
                             # non_local_groups += 1
@@ -700,7 +701,11 @@ def get_charge_manual(spec, debug: int=0):
                 break  # Found the target atom, no need to check further
 
         if debug >= 2: print(f"I3: new_order={new_order}")
-
+    elif spec.formula == "N2":
+        smiles = "N#N"
+        charge = 0
+        order = [0, 1]
+        new_order = order
 
     temp_mol = Chem.MolFromSmiles(smiles, sanitize=False)
     mol = Chem.RenumberAtoms(temp_mol, new_order)
@@ -943,9 +948,9 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     at_charge[23] = [1, 2, 3, 4, 5]  # V
     at_charge[24] = [0, 2, 3] # Cr ; including 5 leads to worse results
     at_charge[25] = [1, 2, 3]  # Mn
-    at_charge[26] = [2, 3]  # Fe
+    at_charge[26] = [0, 2, 3]  # Fe
     at_charge[27] = [1, 2, 3]  # Co
-    at_charge[28] = [2, 3]  # Ni
+    at_charge[28] = [0, 2, 3]  # Ni
     at_charge[29] = [1, 2]  # Cu
     at_charge[30] = [2]  # Zn
     # 2nd-row transition metals.
@@ -954,7 +959,7 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     at_charge[41] = [1, 3, 4, 5]  # Nb
     at_charge[42] = [0, 2, 4, 5, 6]  # Mo
     at_charge[43] = [1, 2, 3, 4, 5]  # Tc
-    at_charge[44] = [2, 3, 4]  # Ru
+    at_charge[44] = [0, 2, 3, 4]  # Ru
     at_charge[45] = [1, 2, 3]  # Rh
     at_charge[46] = [0, 2]  # Pd
     at_charge[47] = [1]  # Ag
@@ -971,14 +976,14 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     at_charge[80] = [2]  # Hg
 
     # post-transition metals
-    at_charge[13] = [0, 3]  # Al
-    at_charge[31] = [0, 3]  # Ga
-    at_charge[32] = [0, 2, 4]  # Ge
-    at_charge[49] = [0, 3]  # In
-    at_charge[50] = [0, 2, 4]  # Sn
-    at_charge[81] = [0, 1, 3]  # Tl
-    at_charge[82] = [0, 2, 4]  # Pb
-    at_charge[83] = [0, 3]  # Bi
+    at_charge[13] = [3]  # Al
+    at_charge[31] = [3]  # Ga
+    at_charge[32] = [2, 4]  # Ge
+    at_charge[49] = [3]  # In
+    at_charge[50] = [2, 4]  # Sn
+    at_charge[81] = [1, 3]  # Tl
+    at_charge[82] = [2, 4]  # Pb
+    at_charge[83] = [3]  # Bi
 
     # Lanthanides (atomic numbers 57 to 71)
     at_charge[57] = [3]  # La
@@ -1226,6 +1231,8 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
             ismetal_1 = elemdatabase.elementblock[b.atom1.label] == "d" or elemdatabase.elementblock[b.atom1.label] == "f"
             ismetal_2 = elemdatabase.elementblock[b.atom2.label] == "d" or elemdatabase.elementblock[b.atom2.label] == "f"
             if ismetal_1 or ismetal_2:
+                pass
+            elif len(get_non_transition_metal_idxs([b.atom1.label, b.atom2.label])) > 0:
                 pass
             else:
                 begin_idx = b.atom1.get_parent_index("ligand")
