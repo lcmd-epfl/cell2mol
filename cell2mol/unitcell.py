@@ -128,9 +128,12 @@ def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debu
             refcell.assign_spin(debug=debug)
             refcell.create_bonds(debug=debug)
             refcell.save(ref_cell_fname)
+    
     print_refmoleclist(newcell)
-    print_unique_species(newcell)
-    print_moleclist(newcell)
+    if hasattr(newcell, "unique_species"):
+        print_unique_species(newcell)
+    if hasattr(newcell, "moleclist"):
+        print_moleclist(newcell)
     newcell.save(cell_fname)
 
 
