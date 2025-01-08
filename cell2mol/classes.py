@@ -1972,6 +1972,7 @@ class cell(object):
                 mol.smiles_with_H = [lig.smiles for lig in mol.ligands]
                 mol.smiles = []
                 for lig in mol.ligands:
+                    print(f"CELL.CREATE_BONDS: Correcting Smiles for ligand {lig.formula}")
                     result = correct_smiles_ligand(lig, debug=debug)
                     if result == False:
                         if debug >= 1: print(f"CELL.CREATE_BONDS: error correcting smiles for ligand {lig.formula}")

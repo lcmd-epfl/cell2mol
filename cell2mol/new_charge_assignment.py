@@ -176,6 +176,10 @@ def prepare_mol (mol):
     tmp_smiles = []
     
     for lig in mol.ligands: 
+        if hasattr(lig, "smiles"):
+            print(f"prepare_mol: {lig.formula=} {lig.smiles=}")
+        else:
+            print(f"prepare_mol: {lig.formula=}")
         tmp_smiles.append(lig.smiles)
         parent_indices = lig.get_parent_indices("molecule")
         for kdx, a in enumerate(parent_indices):
