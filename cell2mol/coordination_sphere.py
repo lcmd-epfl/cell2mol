@@ -16,20 +16,20 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
 
     symbols.append(metal.label)
     positions.append(metal.coord)
-    if debug >= 2 : print(f"DEFINE_coordination_geometry: {metal.label} {metal.coord}")
-    print(f"DEFINE_coordination_geometry: {[group.formula for group in coord_group]}")
-    print(f"DEFINE_coordination_geometry: {[group.is_haptic for group in coord_group]}")
-    print(f"DEFINE_coordination_geometry: {[[a.label for a in group.atoms] for group in coord_group]}")
+    if debug >= 2 : print(f"METAL.DEFINE_coordination_geometry: {metal.label} {metal.coord}")
+    if debug >= 1 :print(f"METAL.DEFINE_coordination_geometry: coord_group formula {[group.formula for group in coord_group]}")
+    if debug >= 1 :print(f"METAL.DEFINE_coordination_geometry: coord_group hapticity {[group.is_haptic for group in coord_group]}")
+    if debug >= 1 :print(f"METAL.DEFINE_coordination_geometry: coord_group atoms{[[a.label for a in group.atoms] for group in coord_group]}")
 
     for group in coord_group:
         if group.is_haptic == False:
             for atom in group.atoms:
                 symbols.append(atom.label)
                 positions.append(atom.coord)
-                if debug >= 2 : print("DEFINE_coordination_geometry:", atom.label, atom.coord)
+                if debug >= 2 : print("METAL.DEFINE_coordination_geometry:", atom.label, atom.coord)
         else :
-            if debug >= 2 : print(f"DEFINE_coordination_geometry: {group.haptic_type=}")
-            #if debug >= 2 : print(f"DEFINE_coordination_geometry: {[atom.coord for atom in group.atoms]}")
+            if debug >= 2 : print(f"METAL.DEFINE_coordination_geometry: {group.haptic_type=}")
+            #if debug >= 2 : print(f"METAL.DEFINE_coordination_geometry: {[atom.coord for atom in group.atoms]}")
             haptic_center_coord = compute_centroid(np.array([atom.coord for atom in group.atoms]))
             symbols.append(str(group.haptic_type))
             positions.append(list(haptic_center_coord))      
@@ -47,12 +47,12 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
 
     if debug >= 2 :
         # for haptic ligands, it's the mid point of haptic ligands
-        print(f"DEFINE_coordination_geometry: The number of coordinating points: {len(coord_group)}")
-        print(f"DEFINE_coordination_geometry: {posgeom_dev}")
-        print(f"DEFINE_coordination_geometry: The type of hapticity : {coord_haptic_type}")
+        print(f"METAL.DEFINE_coordination_geometry: The number of coordinating points: {len(coord_group)}")
+        print(f"METAL.DEFINE_coordination_geometry: {posgeom_dev}")
+        print(f"METAL.DEFINE_coordination_geometry: The type of hapticity : {coord_haptic_type}")
     
     if debug >= 1 : 
-        print(f"DEFINE_coordination_geometry: The most likely geometry is '{coordination_geometry}' with deviation value {geom_deviation}")
+        print(f"METAL.DEFINE_coordination_geometry: The most likely geometry is '{coordination_geometry}' with deviation value {geom_deviation}")
 
     # return coordination_geometry
     return coordination_geometry, geom_deviation
@@ -376,7 +376,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
     if debug > 0: print("Entering COORD_CORR_NONHAPTIC:")
     if not hasattr(group,"metals"): group.get_connected_metals()
-    print(f"group: {[atom.label for atom in group.atoms]}")
+    if debug > 1: print(f"group: {[atom.label for atom in group.atoms]}")
     # Pair each atom with its index in the original list
     indexed_atoms = list(enumerate(group.atoms))
 

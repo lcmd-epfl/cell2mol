@@ -3,12 +3,61 @@ import sys
 from ase.io import read
 from contextlib import redirect_stdout
 from cell2mol.classes import cell
-from cell2mol.read_write import get_wyckoff_positions, print_refmoleclist, print_unique_species
+from cell2mol.read_write import get_wyckoff_positions, print_refmoleclist, print_unique_species, extract_chemical_name, extract_metal_oxidation_state, extract_moiety, cifformula_to_list
 from cell2mol.cell_operations import frac2cart_fromparam
 from cell2mol.new_cell_reconstruction import modify_cov_factor_due_to_H, modify_cov_factor_due_to_possible_charges
 from cell2mol.other import handle_error
+from cell2mol.connectivity import labels2formula
 import time
 import numpy as np
+from collections import Counter
+import re
+
+# Helper to convert string like "H13-C5-N2" to Counter {'H':13, 'C':5, 'N':2}
+def parse_formula_string(formula_str):
+    tokens = re.findall(r'([A-Z][a-z]*)(\d*)', formula_str)
+    return Counter({el: int(cnt) if cnt else 1 for el, cnt in tokens})
+
+# Function to compute atom-wise difference between two formula strings
+# def formula_diff(f1, f2):
+#     c1 = parse_formula_string(f1)
+#     c2 = parse_formula_string(f2)
+#     all_elements = set(c1) | set(c2)
+#     diff = sum(abs(c1[el] - c2[el]) for el in all_elements)
+#     return diff
+
+def formula_diff_dict(f1, f2):
+    c1 = parse_formula_string(f1)
+    c2 = parse_formula_string(f2)
+    all_elements = set(c1) | set(c2)
+    diff = {el: abs(c1[el] - c2[el]) for el in all_elements if c1[el] != c2[el]}
+    return diff
+
+# Main comparison logic
+# def find_closest_matches(reference, target):
+#     matches = {}
+#     for ref in reference:
+#         if ref in target:
+#             matches[ref] = {'match': ref, 'diff': 0}
+#         else:
+#             # Find the closest match in target
+#             diffs = [(tgt, formula_diff(ref, tgt)) for tgt in target]
+#             best_match, min_diff = min(diffs, key=lambda x: x[1])
+#             matches[ref] = {'match': best_match, 'diff': min_diff}
+#     return matches
+
+
+def find_closest_matches(reference, target):
+    matches = {}
+    for i, ref in enumerate(reference):
+        if ref in target:
+            matches[i] = {'ref': ref, 'match': ref, 'diff_dict': {}}
+        else:
+            diffs = [(tgt, formula_diff_dict(ref, tgt)) for tgt in target]
+            # Select the one with the smallest total difference
+            best_match, best_diff = min(diffs, key=lambda x: sum(x[1].values()))
+            matches[i] = {'ref': ref, 'match': best_match, 'diff_dict': best_diff}
+    return matches
 
 # Constants
 VERSION = "2.0"
@@ -91,6 +140,9 @@ def process_refcell(input_path, name, current_dir, debug=0):
                     print("    - Missing Hydrogens in Coordinated Water Molecules")
                 elif refcell.error_case == 4:
                     print("    - Missing Hydrogens in Carbon Atoms")
+            elif refcell.error_case == 9:
+                handle_error(9) 
+                print("    - Missing elements in Reference Molecules compared to CIF")
             else :
                 handle_error(refcell.error_case)
     return refcell
@@ -105,12 +157,55 @@ def create_reference (input_path, name, cell_vector, cell_param, debug):
     refcell.get_subtype("reference")
     refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=COV_FACTOR, debug=debug)
     #refcell = modify_cov_factor_due_to_H(refcell, debug=debug)
-    if not refcell.has_isolated_H:  
+    
+    if not refcell.has_isolated_H:
+        compare_with_CIF(input_path, refcell)
+    refcell.assess_errors(mode="cif_formula") 
+
+    if not refcell.disagree_with_cif_formula:  
         refcell.check_missing_H(debug=debug)  
-    refcell.assess_errors(mode="hydrogens")    
+        refcell.assess_errors(mode="hydrogens") 
+       
     tend = time.time()    
     if debug >= 1: print(f"\nReference molecules are generated. Total execution time: {tend - tini:.2f} seconds")
     return refcell
+
+def compare_with_CIF (input_path, refcell):
+    """Extract chemical name, oxidation state, and moiety information from the CIF file."""
+
+    chemical_name = extract_chemical_name(input_path)
+    refcell.chemical_name = chemical_name
+    reported_metal_os = extract_metal_oxidation_state(chemical_name)
+    print(f"_chemical_name_systematic in CIF: {refcell.chemical_name}")
+    refcell.reported_metal_os = reported_metal_os
+    print(f"Reported oxidation states: {refcell.reported_metal_os}")
+    moiety_dicts = extract_moiety(input_path)
+    refcell.moiety_dicts = moiety_dicts
+    print(f"Moiety dictionaries: {refcell.moiety_dicts}")
+    
+    formulas_from_cif = [labels2formula(cifformula_to_list(moiety['formula'])) for moiety in moiety_dicts]
+    ratios_from_cif = [moiety['ratio'] for moiety in moiety_dicts]
+    print(f"Formulas from CIF: {formulas_from_cif}")
+    print(f"Ratios from CIF: {ratios_from_cif}")
+    formulas_from_refcell = [ref.formula for ref in refcell.refmoleclist]
+    print(f"Formulas from refcell: {formulas_from_refcell}")
+    matches = find_closest_matches(formulas_from_refcell, formulas_from_cif)
+
+    disagree_with_cif = []
+    for ref_idx, info in matches.items():
+        if len(info['diff_dict']) == 0:
+            print(f"{ref_idx=} {info['ref']}: Exact match found. {info['match']}")
+        else:
+            print(f"{ref_idx=} {info['ref']}: Closest match found. {info['match']} with difference of {info['diff_dict']}")
+            disagree_with_cif.append(ref_idx)
+    
+    if len(disagree_with_cif) > 0:
+        print("Discrepancies found between refcell and CIF") #: {disagree_with_cif}")
+        refcell.disagree_with_cif_formula = True
+    else:
+        print("No discrepancies found between formulas from refcell and CIF.")
+        refcell.disagree_with_cif_formula = False
+
 
 def get_unique_species_in_reference (refcell, debug):
     """Processes the reference cell to obtain unique species and handle any errors."""
@@ -122,20 +217,20 @@ def get_unique_species_in_reference (refcell, debug):
     #refcell = modify_cov_factor_due_to_possible_charges(refcell, debug=debug)
     refcell.get_selected_cs(debug=debug)
     refcell.assess_errors(mode="possible_charges")
-    
-    print("Results of possible charges")
-    for specie in refcell.species_list:
-        # for specie in refcell.unique_species:
-        if hasattr(specie, "possible_cs"):
-            if specie.subtype == "metal":
-                print(f"{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula} {specie.possible_cs=}") 
+    if debug >= 2:
+        print("Results of possible charges")
+        for specie in refcell.species_list:
+            # for specie in refcell.unique_species:
+            if hasattr(specie, "possible_cs"):
+                if specie.subtype == "metal":
+                    print(f"{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.possible_cs=}") 
+                else:
+                    print(f"{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.possible_cs=}")
             else:
-                print(f"{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.possible_cs=}")
-        else:
-            if specie.subtype == "metal":
-                print(f"{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula} No possible cs")
-            else:
-                print(f"{specie.unique_index=} {specie.formula}, {specie.subtype}  No possible cs") #[p.subtype for p in specie.parents])    
+                if specie.subtype == "metal":
+                    print(f"{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} No possible cs")
+                else:
+                    print(f"{specie.unique_index=} {specie.formula}, {specie.subtype}  No possible cs") #[p.subtype for p in specie.parents])    
     tend = time.time()    
     if debug >= 1: print(f"\nAssign possible charges of Reference molecules. Total execution time: {tend - tini:.2f} seconds")
 

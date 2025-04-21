@@ -184,7 +184,7 @@ class specie(object):
         debug = 0
         ## If the atom objects already exist, and you want to set them in self from a different specie
         if atomlist is not None: 
-            if debug > 0: print(f"SPECIE.SET_ATOMS: received {atomlist=}")
+            if debug >= 2: print(f"SPECIE.SET_ATOMS: received {atomlist=}")
             self.atoms = atomlist.copy()
             for idx, at in enumerate(self.atoms):
                 at.add_parent(self, index=idx)
@@ -193,20 +193,21 @@ class specie(object):
         else: 
             self.atoms = []
             for idx, l in enumerate(self.labels):
-                if debug > 0: print(f"SPECIE.SET_ATOMS: creating atom for label {l}")
+                if debug >= 2: print(f"SPECIE.SET_ATOMS: creating atom for label {l}")
                 ## For each l in labels, create an atom class object.
                 ismetal = elemdatabase.elementblock[l] == "d" or elemdatabase.elementblock[l] == "f"
                 # non transition metals
                 if len(get_non_transition_metal_idxs([l])) > 0: ismetal = True
-                if ismetal : print(f"SPECIE.SET_ATOMS: {l}")
-                if debug > 0: print(f"SPECIE.SET_ATOMS: {ismetal=}")
+                if ismetal : 
+                    if debug >= 2: print(f"SPECIE.SET_ATOMS: {l}")
+                if debug >= 2: print(f"SPECIE.SET_ATOMS: {ismetal=}")
                 if self.frac_coord is not None: 
                     if ismetal: newatom = metal(l, self.coord[idx], self.frac_coord[idx], radii=self.radii[idx])
                     else:       newatom = atom(l, self.coord[idx], self.frac_coord[idx],radii=self.radii[idx])
                 else :
                     if ismetal: newatom = metal(l, self.coord[idx], radii=self.radii[idx])
                     else:       newatom = atom(l, self.coord[idx], radii=self.radii[idx])
-                if debug > 0: print(f"SPECIE.SET_ATOMS: added atom to specie: {self.formula}")
+                if debug >= 2: print(f"SPECIE.SET_ATOMS: added atom to specie: {self.formula}")
                 newatom.add_parent(self, index=idx)
                 self.atoms.append(newatom)
         
@@ -672,7 +673,7 @@ class ligand(specie):
                 for g in splitted_groups:
                     self.groups.append(g)
         if debug > 0 : print(f"\tLIGAND.SPLIT_LIGAND: found groups {[ group.formula for group in self.groups]}")
-        if debug > 2 : print(f"{self.groups}")
+        if debug > 3 : print(f"{self.groups}")
         return self.groups
 
     #######################################################
@@ -1131,14 +1132,14 @@ class metal(atom):
         return self.coord_sphere
 
     #######################################################
-    def get_coord_sphere_formula(self):
+    def get_coord_sphere_formula(self, debug: int=1):
         if not hasattr(self,"coord_sphere"): self.get_coord_sphere()
         self.coord_sphere_formula = labels2formula(list([at.label for at in self.coord_sphere])) 
-        print(f"METAL.Get_coord_sphere_formula: {self.get_parent_index('molecule')} {self.label} {self.coord_sphere_formula}")
+        if debug >= 2 : print(f"METAL.Get_coord_sphere_formula: molecule parent_index={self.get_parent_index('molecule')} metal={self.label} coord_sphere_formula={self.coord_sphere_formula}")
         return self.coord_sphere_formula 
 
     #######################################################
-    def get_connected_groups(self, debug: int=2):
+    def get_connected_groups(self, debug: int=0):
         from cell2mol.connectivity import split_group
         # metal.groups will be used for the calculation of the relative metal radius 
         # and define the coordination geometry of the metal /hapicitiy/ hapttype    
@@ -1147,7 +1148,7 @@ class metal(atom):
         self.groups = []
         for lig in mol.ligands:
             for group in lig.groups:
-                if debug > 1: print(group.formula)
+                if debug > 2: print(group.formula)
                 ligand_indices = [ a.get_parent_index("ligand") for a in group.atoms ]
                 tmplabels = []
                 tmpcoord  = []
@@ -1155,15 +1156,14 @@ class metal(atom):
                 tmpcoord.append(self.coord)
                 tmplabels.extend(group.labels)
                 tmpcoord.extend(group.coord)
-                if debug > 1: print(tmplabels, tmpcoord)
+                if debug > 2: print(tmplabels, tmpcoord)
                 isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
                 # if isgood and any(tmpadjnum) > 0: self.groups.append(group)
                 if isgood:
-                    if debug > 1: print(group.formula, tmpadjmat, tmpadjnum)
+                    if debug > 2: print(group.formula, tmpadjmat, tmpadjnum)
                     if all(tmpadjnum[1:]): 
                         self.groups.append(group)
                     elif any(tmpadjnum[1:]): 
-                        
                         if debug > 1: print(f"Metal {self.label} is connected to {group.formula} but not all atoms are connected")
                         conn_idx = [ idx for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
                         conn_ligand_indices = [ ligand_indices[idx] for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
@@ -1200,7 +1200,7 @@ class metal(atom):
 
         return self.rel_metal_radius
     #######################################################
-    def get_connected_metals(self, debug: int=2):
+    def get_connected_metals(self, debug: int=1):
         self.metals = []
         mol = self.get_parent("molecule")
         for met in mol.metals:
@@ -1226,11 +1226,11 @@ class metal(atom):
     
     #######################################################
     def get_coordination_geometry(self: object, debug: int = 0):
-        coord_group = self.get_connected_groups()
+        coord_group = self.get_connected_groups(debug=debug)
         self.coord_nr = len(coord_group)
 
         if debug >= 1: print(f"\nMETAL.Get_coord_geometry: {self.label}")
-        if debug >= 2 : print(f"METAL.Get_coord_geometry:\n{coord_group=}")
+        if debug >= 3 : print(f"METAL.Get_coord_geometry:\n{coord_group=}")
         if debug >= 1: print(f"METAL.Get_ccoord_geometry: coord_nr={self.coord_nr}")
         
         self.coord_geometry, self.geom_deviation = define_coordination_geometry(self, coord_group, debug = debug)
@@ -1372,7 +1372,7 @@ class cell(object):
     def check_missing_H(self, debug: int=0):
         from cell2mol.missingH import check_missingH
         Warning, ismissingH, Missing_H_in_C, Missing_H_in_CoordWater, Missing_H_in_Water = check_missingH(self.refmoleclist, debug=debug)
-        print(f"CELL.Check_missing_H: {Missing_H_in_C=} {Missing_H_in_CoordWater=} {Missing_H_in_Water=}")
+        if debug >=2 : print(f"CELL.Check_missing_H: {Missing_H_in_C=} {Missing_H_in_CoordWater=} {Missing_H_in_Water=}")
         self.missing_H_in_Carbon = Missing_H_in_C
         self.missing_H_in_CoordWater = Missing_H_in_CoordWater
         self.missing_H_in_Water = Missing_H_in_Water
@@ -1441,7 +1441,7 @@ class cell(object):
                     for met in ref.metals:
                         met.get_connected_metals(debug=debug)                         
                         met.get_coordination_geometry(debug=debug)
-                        met.get_coord_sphere_formula()
+                        met.get_coord_sphere_formula(debug=debug)
         else:      
             self.has_isolated_H = True
             
@@ -1449,33 +1449,33 @@ class cell(object):
 
     #######################################################
     def get_moleclist(self, cov_factor: float=1.3, metal_factor: float=1.0, debug: int=0):
-        if debug > 0: print(f"Entered CELL.MOLECLIST with debug={debug}")
+        if debug > 3: print(f"Entered CELL.MOLECLIST with debug={debug}")
         if not hasattr(self,"labels") or not hasattr(self,"coord"): 
-            if debug > 0: print(f"CELL.MOLECLIST. Labels or coordinates not found. Returning None")
+            if debug > 3: print(f"CELL.MOLECLIST. Labels or coordinates not found. Returning None")
             return None
         if len(self.labels) == 0 or len(self.coord) == 0:           
-            if debug > 0: print(f"CELL.MOLECLIST. Empty labels or coordinates. Returning None")
+            if debug > 3: print(f"CELL.MOLECLIST. Empty labels or coordinates. Returning None")
             return None
-        if debug > 0: print(f"CELL.MOLECLIST passed initial checks")
+        if debug > 3: print(f"CELL.MOLECLIST passed initial checks")
         
         ions_idx = []
         for ref in self.refmoleclist:
             if ref.natoms == 1:
                 label = ref.atoms[0].label
                 ions_idx.extend([idx for idx, l in enumerate(self.labels) if l == label])
-                if debug > 0: print(f"CELL.MOLECLIST: {ions_idx=} with {label=}")        
+                if debug > 3: print(f"CELL.MOLECLIST: {ions_idx=} with {label=}")        
         
         if len(ions_idx) > 0: 
             cell_indices = [*range(0,len(self.labels),1)]
-            if debug > 0: print(f"CELL.MOLECLIST: found {len(ions_idx)} ions")
+            if debug > 3: print(f"CELL.MOLECLIST: found {len(ions_idx)} ions")
             rest_idx  = list(idx for idx in cell_indices if idx not in ions_idx)
-            if debug > 0: print(f"CELL.MOLECLIST: {rest_idx=}")
+            if debug > 3: print(f"CELL.MOLECLIST: {rest_idx=}")
             rest_labels  = extract_from_list(rest_idx, self.labels, dimension=1)
             rest_coord   = extract_from_list(rest_idx, self.coord, dimension=1)
             rest_indices = extract_from_list(rest_idx, cell_indices, dimension=1)
-            if debug > 0: print(f"CELL.MOLECLIST: {rest_labels=}")
-            if debug > 0: print(f"CELL.MOLECLIST: {rest_coord=}")
-            if debug > 0: print(f"CELL.MOLECLIST: {rest_indices=}")
+            if debug > 3: print(f"CELL.MOLECLIST: {rest_labels=}")
+            if debug > 3: print(f"CELL.MOLECLIST: {rest_coord=}")
+            if debug > 3: print(f"CELL.MOLECLIST: {rest_indices=}")
             blocklist = split_species(rest_labels, rest_coord, indices=rest_indices, cov_factor=cov_factor, debug=debug)
             for idx in ions_idx: blocklist.append([idx])    
         else :
@@ -1484,12 +1484,12 @@ class cell(object):
         if blocklist is None: 
             return None
         else :
-            if debug > 0: print(f"CELL.MOLECLIST: found {len(blocklist)} blocks")
-            if debug > 0: print(f"CELL.MOLECLIST: {blocklist=}")
+            if debug > 3: print(f"CELL.MOLECLIST: found {len(blocklist)} blocks")
+            if debug > 3: print(f"CELL.MOLECLIST: {blocklist=}")
         
         self.moleclist = []
         for b in blocklist:
-            if debug > 0: print(f"CELL.MOLECLIST: doing block={b}")
+            if debug > 3: print(f"CELL.MOLECLIST: doing block={b}")
             mol_labels  = extract_from_list(b, self.labels, dimension=1)
             mol_coord   = extract_from_list(b, self.coord, dimension=1)
             mol_frac_coord  = extract_from_list(b, self.frac_coord, dimension=1)
@@ -1619,7 +1619,7 @@ class cell(object):
 
         self.selected_cs = []
         for unique_specie in self.unique_species:
-            print("Get possible charge states for unique specie", unique_specie.formula)
+            if debug >= 0 : print("Get possible charge states for unique specie", unique_specie.formula)
             tmp = unique_specie.get_possible_cs(debug=debug)
             if tmp is None: 
                 self.selected_cs.append(None)
@@ -2026,6 +2026,13 @@ class cell(object):
     def assess_errors(self, mode):
         ### This function might be called to print the possible errors found in the unit cell, during reconstruction, and charge/spin assignment
 
+        if mode == "cif_formula":
+            print("-------------------------------")
+            print("Errors in disagreement with CIF")
+            print("-------------------------------")
+            if self.has_isolated_H:             case = 1
+            elif self.disagree_with_cif_formula:case = 9
+            else :                              case = 0
         if mode == "hydrogens":
             print("-------------------------------")
             print("Errors in hydrogens")
@@ -2035,6 +2042,7 @@ class cell(object):
             elif self.missing_H_in_Water:       case = 2
             elif self.missing_H_in_CoordWater:  case = 3
             elif self.missing_H_in_Carbon:      case = 4
+            elif self.disagree_with_cif_formula:case = 9
             else :                              case = 0
         elif mode == "possible_charges":
             print("-------------------------------")
