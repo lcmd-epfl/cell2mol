@@ -9,6 +9,7 @@ from cell2mol.elementdata import ElementData
 from cell2mol.read_write import writexyz
 import os
 import networkx as nx
+import re
 
 elemdatabase = ElementData()
 
@@ -66,7 +67,7 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
                 set2 = set(removed_idx)
                 if debug >= 1: print(f"ADD_ATOM: {element} is connected with ligand atoms with indices {set1}. previously removed indices {set2}")
                 result = list(set1 - set2)
-                print(f"ADD_ATOM: {element} is connected with ligand atoms with indices {result=}. ")
+                if debug >= 2: print(f"ADD_ATOM: {element} is connected with ligand atoms with indices {result=}. ")
                 if len(result) <= 1:
                     isadded = True
                     if debug >= 2: print(f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} is added at site {site} after previously removing atom {removed_idx}")
@@ -398,8 +399,8 @@ def split_species(labels: list, pos: list, radii: list=None, indices: list=None,
 
     # creates block matrix
     graph = csr_matrix(lap)
-    if debug >=2: print(f"SPILT_SPECIES: Laplacian {lap=}")
-    if debug >=2: print(f"SPILT_SPECIES: {graph=}")
+    # if debug >=3: print(f"SPILT_SPECIES: Laplacian {lap=}")
+    # if debug >=3: print(f"SPILT_SPECIES: {graph=}")
     perm = reverse_cuthill_mckee(graph)
     gp1 = graph[perm, :]
     gp2 = gp1[:, perm]

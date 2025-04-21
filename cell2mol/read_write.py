@@ -7,7 +7,71 @@ import re
 from collections import defaultdict
 import os
 import traceback
+from typing import Tuple
+from collections import Counter
+from ase.io import read
+from pathlib import Path
+from typing import Dict
+import pandas as pd
 
+transition_metals = {
+    'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+    'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
+    'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg'
+}
+
+#######################
+def screening_cif(cif_file_path):
+    
+    radical = False
+    disorder = False
+    notfound_atom = False
+
+    with open(cif_file_path, 'r') as ciffile:
+        file_content = ciffile.read()
+        if 'radical' in file_content:
+            radical = True
+        elif '_atom_site_fract_x' not in file_content:
+            notfound_atom = True
+        elif '?' in file_content:
+            if "_diffrn_ambient_temperature ?" not in file_content and "_chemical_melting_point ?" not in file_content:
+                disorder = True
+            else:
+                num_greps = file_content.count('?')
+                if num_greps > 1:
+                    disorder = True
+    
+    moiety_dicts = extract_moiety(cif_file_path)
+    polymeric = any("n(" in moiety['formula'] for moiety in moiety_dicts)
+
+    return radical, disorder, notfound_atom, polymeric
+
+#################
+def prefilter_cif(input_path):
+    """
+    Pre-filters a CIF file to check for certain conditions.
+    Returns True if the file is ready for processing, otherwise returns False.
+    """
+    # Check for radical, disorder, 3D fractional coordinates, and polymeric structure
+    radical, disorder, notfound_atom, polymeric = screening_cif(input_path)
+    
+    message = ""
+
+    if any([radical, disorder, notfound_atom, polymeric]):
+        #print(f"{radical=}, {disorder=}, {notfound_atom=}, {polymeric=}")    
+        if radical:
+            message += "\nRadical found in .cif file."        
+        if disorder:
+            message += "\nDisorder found in .cif file."
+        if notfound_atom:
+            message += "\nNo fractional coordinates found in .cif file."
+        if polymeric:
+            message += "\nPolymeric structure found in .cif file."
+        return False, message
+    else :
+        print("Cif file is ready for processing")
+        return True, message
+        
 #######################
 def get_wyckoff_positions(file_path):
     # Open and read the CIF file
@@ -41,11 +105,6 @@ def get_wyckoff_positions(file_path):
                     # Append label, type, and cleaned fractional coordinates
                     data.append((parts[0], parts[1], float(x), float(y), float(z)))
 
-    # Now 'data' is a list of tuples, each containing:
-    # (Label, Element, Fractional_x, Fractional_y, Fractional_z)    
-    # for entry in data:
-    #     print(f"{entry[0]} {entry[1]} {entry[2]} {entry[3]} {entry[4]}")
-
     ref_labels = [entry[1] for entry in data]
     ref_fracs = [[entry[2], entry[3], entry[4]] for entry in data]
 
@@ -77,32 +136,253 @@ def exit_with_error_exception(e):
     print(f"An error occurred. Details have been logged to {error_log_path}")
     print(f"Error details:\n{error_details}")
     
-    sys.exit(e)
-#######################
-def prefilter_cif(input_path):
+    sys.exit(e)      
 
-    with open(input_path, 'r') as ciffile:
-        file_content = ciffile.read()
-        if 'radical' in file_content:
-            exit_with_error_input("Radical found in cif file. STOPPING")                   
-            return False
-        elif '_atom_site_fract_x' not in file_content:
-            exit_with_error_input("No fractional coordinates found in cif file. STOPPING")  
-            return False
-        elif '?' in file_content:
-            if "_diffrn_ambient_temperature ?" not in file_content and "_chemical_melting_point ?" not in file_content:
-                exit_with_error_input("Disorder found in cif file. STOPPING")
-                return False
-            else:
-                num_greps = file_content.count('?')
-                if num_greps > 1:
-                    exit_with_error_input("Disorder found in cif file. STOPPING")                      
-                    return False
-                else:
-                    return True
-        else:
-            print("Cif file is ready for processing")
-            return True
+#######################
+def extract_chemical_name(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            start_reading = False
+            chemical_name = ""
+
+            for line in file:
+                # Check for line starting with '_chemical_name_systematic'
+                if line.startswith('_chemical_name_systematic'):
+                    start_reading = True
+                    continue  
+
+                if start_reading:
+                    chemical_name += line.strip()
+
+                    if chemical_name.count(';') >= 2:
+                        # Extract content between the first and second ';'
+                        # Reformat without extra line breaks or extra spaces
+                        chemical_name = ' '.join(chemical_name.split(';')[1].strip().split())
+                        break
+
+            return chemical_name
+
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return None
+
+#######################
+def extract_metal_oxidation_state(chemical_name):
+
+    oxidation_states = []
+
+    # Regex pattern to capture any format like "iron(iii)"
+    pattern = r'(\b[a-zA-Z-]+\b)\((iii|ii|iv|v|vi|vii|i|0|o)\)'
+
+    matches = re.findall(pattern, chemical_name, re.IGNORECASE)
+    for metal, ox_state in matches:
+        ox_state_map = {'0': 0, 'o': 0, 'i': 1, 'ii': 2, 'iii': 3, 'iv': 4, 'v': 5, 'vi': 6, 'vii': 7}
+        oxidation_state = ox_state_map.get(ox_state.lower(), ox_state)  # Retain text if needed
+        oxidation_states.append((metal, oxidation_state))
+
+    return oxidation_states
+
+#######################
+def parse_moiety(moiety: str) -> Tuple[str, float, int, str]:
+    """ Parse a moiety string and return its formula, ratio (float), charge, and type """
+    # Default values
+    ratio = 1.0
+    formula_with_charge = moiety.strip()
+
+    # Handle 'x(' 
+    x_match = re.match(r"^[^\d\W]\w*\((.*?)\)$", moiety)                     
+    if x_match:
+        formula_with_charge = x_match.group(1)
+        ratio = ""
+
+    # Check for ratio in the unit cell with parentheses, e.g., 0.5(...) or 2(...)
+    match = re.match(r"([0-9\.]+)\((.*?)\)", moiety)
+    if match:
+        ratio = float(match.group(1))
+        formula_with_charge = match.group(2)
+        
+    # Extract charge at the end, e.g., "1+", "2-"
+    charge_match = re.search(r'(\d+[+-])$', formula_with_charge)
+    if charge_match:
+        charge_str = charge_match.group(1)
+        charge = int(charge_str[:-1]) * (1 if charge_str[-1] == '+' else -1)
+        formula = formula_with_charge.replace(charge_str, '').strip()
+    else:
+        charge = 0
+        formula = formula_with_charge.strip()
+
+    # Check if it contains any transition metal
+    is_complex = any(re.search(rf'{metal}\d*', formula) for metal in transition_metals)
+    compound_type = "complex" if is_complex else "molecule"
+
+    return (formula, ratio, charge, compound_type)
+
+################################
+def cifformula_to_list(formula: str) -> list:
+    # Match element symbols with optional numbers (e.g., 'C4', 'H2', 'N1')
+    tokens = re.findall(r'([A-Z][a-z]*)(\d*)', formula)
+    result = []
+    for element, count in tokens:
+        n = int(count) if count else 1
+        result.extend([element] * n)
+    return result
+
+#########################
+def extract_moiety(file_path: str) -> list:
+    """ Extracts the moiety information from a CIF file """
+    uploaded_file_path = Path(file_path)
+    with uploaded_file_path.open("r", encoding="utf-8") as file:
+        cif_data_uploaded = file.read()
+
+    # Extract the moiety block
+    moiety_match_uploaded = re.search(r"_chemical_formula_moiety\s*;\s*(.*?)\s*;", cif_data_uploaded, re.DOTALL)
+    moiety_string_uploaded = moiety_match_uploaded.group(1) if moiety_match_uploaded else ""
+
+    # # Split and parse moieties
+    moieties_uploaded = moiety_string_uploaded.split(',')
+    moieties_uploaded = [moiety.replace('\n', '') for moiety in moieties_uploaded]
+
+    moiety_tuples = [parse_moiety(m.strip()) for m in moieties_uploaded]
+    moiety_dicts = [ {'formula': f, 'ratio': s, 'charge': c, 'type': t} for f, s, c, t in moiety_tuples ]
+
+    # print("moiety_dicts=",moiety_dicts)
+    return moiety_dicts
+
+##########################
+def classify_metals(formula: str) -> Dict[str, Dict[str, int]]:
+    # Define categories
+    transition_metals = {
+        'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+        'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
+        'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg'
+    }
+
+    alkali_metals = {'Li', 'Na', 'K', 'Rb', 'Cs', 'Fr'}
+    alkaline_earth_metals = {'Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra'}
+
+    post_transition_metals = {
+        'Al', 'Ga', 'Ge', 'In', 'Sn', 'Tl', 'Pb', 'Bi'
+    }
+
+    lanthanides = {
+        'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy',
+        'Ho', 'Er', 'Tm', 'Yb', 'Lu'
+    }
+
+    actinides = {
+        'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf',
+        'Es', 'Fm', 'Md', 'No', 'Lr'
+    }
+
+    # Initialize category results
+    result = {
+        'transition_metals': {},
+        'alkali_metals': {},
+        'alkaline_earth_metals': {},
+        'post_transition_metals': {},
+        'lanthanides': {},
+        'actinides': {}
+    }
+
+    # Split and parse
+    parts = formula.strip().split()
+    for part in parts:
+        match = re.match(r"([A-Z][a-z]*)(\d*)", part)
+        if match:
+            element = match.group(1)
+            count = int(match.group(2)) if match.group(2) else 1
+
+            if element in transition_metals:
+                result['transition_metals'][element] = result['transition_metals'].get(element, 0) + count
+            elif element in alkali_metals:
+                result['alkali_metals'][element] = result['alkali_metals'].get(element, 0) + count
+            elif element in alkaline_earth_metals:
+                result['alkaline_earth_metals'][element] = result['alkaline_earth_metals'].get(element, 0) + count
+            elif element in post_transition_metals:
+                result['post_transition_metals'][element] = result['post_transition_metals'].get(element, 0) + count
+            elif element in lanthanides:
+                result['lanthanides'][element] = result['lanthanides'].get(element, 0) + count
+            elif element in actinides:
+                result['actinides'][element] = result['actinides'].get(element, 0) + count
+
+    return result
+
+##########################
+def metal_info (moiety_dicts: list) -> dict:
+    """
+    Extracts metal information from moiety dictionaries.
+    """
+    metal_data = {}
+    for moiety in moiety_dicts:
+        formula = moiety['formula']
+        ratio = moiety['ratio']
+        charge = moiety['charge']
+        compound_type = moiety['type']
+
+        # Classify metals
+        classified_metals = classify_metals(formula)
+        metal_data[formula] = {
+            'ratio': ratio,
+            'charge': charge,
+            'type': compound_type,
+            'classified_metals': classified_metals
+        }
+    return metal_data
+
+##########################
+def flatten_metal_info(metal_info_dict, refcode):
+    flat_list = []
+
+    for i, (formula, info) in enumerate(metal_info_dict.items()):
+        base = {
+            'refcode': refcode,  # Placeholder for refcode
+            'index': i,
+            'formula': formula,
+            'ratio': info['ratio'],
+            'charge': info['charge'],
+            'type': info['type']
+        }
+
+        found = False
+        classified = info['classified_metals']
+        for category, elements in classified.items():
+            for element, count in elements.items():
+                row = base.copy()
+                row['metal_category'] = category
+                row['metal'] = element
+                row['count'] = count
+                flat_list.append(row)
+                found = True
+
+        if not found:
+            row = base.copy()
+            row['metal_category'] = None
+            row['metal'] = None
+            row['count'] = 0
+            flat_list.append(row)
+
+    return flat_list
+
+##########################
+def compare_formula_xyz_vs_cif(xyzfile: str, formula_str_from_cif: str) -> dict:
+    """
+    Compare the elements from CIF with the elements in the XYZ file.
+    """
+    element_pattern = r'([A-Z][a-z]*)(\d*)'
+    parsed_formula_cif = dict()
+    for (element, count) in re.findall(element_pattern, formula_str_from_cif):
+        parsed_formula_cif[element] = int(count) if count else 1
+    mol = read(xyzfile)
+    element_list = mol.get_chemical_symbols()
+    element_list_count = dict(Counter(element_list))
+    comparison_result = {
+        'in_formula_cif': parsed_formula_cif,
+        'in_list_xyz': element_list_count,
+        'missing_in_xyz': {k: v-element_list_count.get(k, 0) for k, v in parsed_formula_cif.items() if element_list_count.get(k, 0) < v},
+        'extra_in_xyz': {k: v-parsed_formula_cif.get(k, 0) for k, v in element_list_count.items() if parsed_formula_cif.get(k, 0) < v}
+    }
+    return comparison_result
+
 #######################
 def save_binary(variable, pathfile, backup: bool=False):
     try:
@@ -514,7 +794,7 @@ def print_refmoleclist (cell):
                 if hasattr(met, "charge"):
                     print(f"\t{met.formula} {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=} {met.charge=}")
                 else:
-                    print(f"\t{met.formula} {met.coord_sphere_formula=}{met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=}")
+                    print(f"\t{met.formula} {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=}")
             for lig in ref.ligands:
                 if hasattr(lig, "totcharge"):
                     print(f"\t{lig.formula} {lig.smiles=} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} {lig.totcharge=}")

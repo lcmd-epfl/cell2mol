@@ -98,6 +98,8 @@ def handle_error(case: int):
     if case == 7: print("No valid possible charge distribution found")
     # if case == 8: print("Error while preparing molecules")
     if case == 8: print("Error while creating bonds for molecule or ligand")
-    if case == 9: print("The charge neutralization failed.")
+    # if case == 9: print("The charge neutralization failed.")
+    if case == 9: print("Discrepancies found between refcell and CIF. This will cause errors in the charge prediction, so STOPPING pre-emptively.")
+
     if case == 0: print("No errors Found")
     #sys.exit(1)
