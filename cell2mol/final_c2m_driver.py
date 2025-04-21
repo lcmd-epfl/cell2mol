@@ -14,17 +14,19 @@ def main():
     name, extension = os.path.splitext(file)
 
     print(input, input_path, system_type, cell_para, debug_mode, name, extension)
+    
     if not os.path.exists(input_path):
         exit_with_error_input(f"Input file not found: {input_path}")
     if extension == ".cif":
-        if prefilter_cif(input_path):
+        cif_okay, error_message = prefilter_cif(input_path)
+        if cif_okay:
             handle_cif_file(input_path, system_type, name, current_dir, debug_mode)
         else:
-            exit_with_error_input("CIF file is not suitable for processing")
+            exit_with_error_input(f"CIF file is not suitable for processing {error_message}")
     elif extension == ".xyz":
         handle_xyz_file(input_path, system_type, name, cell_para, current_dir, debug_mode)
     else:
-        exit_with_error_input("Invalid file extension")
+        exit_with_error_input(f"Invalid file extension: {input_path}")
 
 def handle_cif_file(input_path, system_type, name, current_dir, debug_mode):
     if system_type == "reference":

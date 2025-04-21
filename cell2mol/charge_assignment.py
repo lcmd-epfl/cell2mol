@@ -42,10 +42,9 @@ def get_possible_charge_state(spec: object, debug: int=0):
     
     if spec.subtype == "group" or (spec.subtype == 'molecule' and spec.iscomplex):  
         return None
-    print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) {spec.cov_factor=}")
     charge_states = []  
     ### Evaluates possible charges for each protonation state ###
-    print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) ({len(spec.protonation_states)}) {spec.protonation_states=}")
+    print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) ({len(spec.protonation_states)=})\n{spec.protonation_states=}")
     for prot in spec.protonation_states:
         charge_states_for_one_prot = []
         final_charges = get_list_of_charges_to_try(prot)
@@ -72,7 +71,7 @@ def get_possible_charge_state(spec: object, debug: int=0):
             # else :
             possible_cs = select_charge_distr(charge_states, debug=debug)   ## For ligands other than nitrosyl
     else:     possible_cs = select_charge_distr(charge_states, debug=debug)     ## For organic molecules
-    print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) {spec.cov_factor=} {possible_cs=}")
+    if debug >= 1: print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) {possible_cs=}")
     ### Return possible charge states
     if len(possible_cs) == 0:    return None
     else:                        return possible_cs
@@ -235,7 +234,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
     if debug >= 2: print(f"\nPOSCHARGE: doing PROTONATION for this specie {specie.formula} ({specie.subtype})")
     # Program runs sequentially for each group of the ligand
-    print(f"{ligand.groups=}")
+    if debug >= 2: print(f"{ligand.groups=}")
 
     for g in ligand.groups:
         parent_indices = g.get_parent_indices("ligand")
@@ -732,10 +731,10 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
 
     natoms = prot.natoms
     atnums = prot.atnums
-    print(f"\nGET_CHARGE. Starting get_charge with charge {charge} and {prot.formula} {prot.added_atoms=}")
+    if debug >= 2: print(f"\nGET_CHARGE. Starting get_charge with charge {charge} and {prot.formula} {prot.added_atoms=}")
     # prot.coords and prot.cov_factor will not be used
     mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow)
-    print(f"GET_CHARGE.{len(mols)=} received from xyz2mol with charge {charge}")
+    if debug >= 2: print(f"GET_CHARGE.{len(mols)=} received from xyz2mol with charge {charge}")
     
     if len(mols) > 1: 
         if debug >=1 : print(f"GET_CHARGE. WARNING: More than 1 mol received from xyz2mol for initcharge: {charge}")

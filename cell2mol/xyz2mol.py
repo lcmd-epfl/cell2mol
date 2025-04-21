@@ -489,7 +489,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
     # make a list of valences, e.g. for CO: [[4],[2,1]]
     valences_list_of_lists = []
     AC_valence = list(AC.sum(axis=1))
-    print(f"{AC_valence=}")
+    #print(f"{AC_valence=}")
     formula = labels2formula([elemdatabase.elementsym[atom] for atom in atoms])    
     wrong = 0
 
@@ -530,7 +530,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
         # print(f"AC2BO: {wrong=}")
         return None, atomic_valence_electrons
     
-    print(f"\tAC2BO: {valences_list_of_lists=}")
+    #print(f"\tAC2BO: {valences_list_of_lists=}")
     
     # convert [[4],[2,1]] to [[4,2],[4,1]]
     valences_list = []
@@ -543,7 +543,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
     best_BO = AC.copy()
     BO_is_OK_list = []
     max_count = max(1000, int(len(valences_list)*0.3))
-    print(f"AC2BO: {formula=} {len(valences_list)=} {max_count=}")
+    #print(f"AC2BO: {formula=} {len(valences_list)=} {max_count=}")
 
     count = 0
     for valences in valences_list:
@@ -569,7 +569,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
             check_bo = None
 
         if check_len and check_bo:
-            print(f"\tAC2BO: {formula=} return AC", check_len, check_bo, f"{charge=} {count=}")
+            #print(f"\tAC2BO: {formula=} return AC", check_len, check_bo, f"{charge=} {count=}")
             return AC, atomic_valence_electrons
         
         UA_pairs_list = get_UA_pairs(UA, AC, use_graph=use_graph)
@@ -625,7 +625,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
         # print("best bo", best_BO)
     #print(f"\tAC2BO: return best bo")
     #print("AC2BO: return best bo", best_BO)
-    print(f"Failing AC2BO: {formula=} {charge=} {count=}")
+    #print(f"Failing AC2BO: {formula=} {charge=} {count=}")
     return best_BO, atomic_valence_electrons
 
 

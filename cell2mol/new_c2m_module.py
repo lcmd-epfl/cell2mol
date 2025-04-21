@@ -38,8 +38,9 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
                 newcell.unique_species = copy.deepcopy(refcell.unique_species)
                 newcell = get_unique_indices(newcell, refcell.species_list, debug=debug) 
                 if debug >= 1: 
-                    print(f"newcell.unique_species {[specie.formula for specie in newcell.unique_species]} {newcell.unique_indices=}\n")
-                    print(f"newcell.species_list {[specie.formula for specie in newcell.species_list]}")
+                    print(f"newcell.unique_species formula={[specie.formula for specie in newcell.unique_species]}")
+                    print(f"newcell.species_list formula={[specie.formula for specie in newcell.species_list]}")
+                    print(f"{newcell.unique_indices=}")
         else:
             return newcell
 
