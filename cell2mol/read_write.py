@@ -13,6 +13,7 @@ from ase.io import read
 from pathlib import Path
 from typing import Dict
 import pandas as pd
+import networkx as nx
 
 transition_metals = {
     'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
@@ -73,7 +74,7 @@ def prefilter_cif(input_path):
         return True, message
         
 #######################
-def get_wyckoff_positions(file_path):
+def get_wyckoff_positions_old (file_path):
     # Open and read the CIF file
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -112,6 +113,140 @@ def get_wyckoff_positions(file_path):
     # print(f"{len(ref_fracs)=} {ref_fracs}=")
 
     return ref_labels, ref_fracs
+#######################
+def get_geom_bond (file_path):
+    full_text = Path(file_path).read_text()
+    loop_sections = re.split(r'\nloop_\n', full_text)
+
+    geom_bond_data = []
+
+    for section in loop_sections:
+        lines = section.strip().splitlines()
+        if not lines:
+            continue
+        # === _geom_bond block ===
+        if lines[0].startswith('_geom_bond'):
+            headers = []
+            start_idx = -1
+
+            for i, line in enumerate(lines):
+                if line.strip().startswith('_geom_bond'):
+                    headers.append(line.strip())
+                else:
+                    start_idx = i
+                    break
+
+            required = {'_geom_bond_atom_site_label_1',
+                        '_geom_bond_atom_site_label_2',
+                        '_geom_bond_distance'}
+            if not required.issubset(headers):
+                continue
+
+            header_map = {h: idx for idx, h in enumerate(headers)}
+            print("Bond header map:", header_map)
+
+            for line in lines[start_idx:]:
+                if line.strip().startswith('_') or line.strip() == 'loop_':
+                    break
+                parts = line.split()
+                if len(parts) >= len(headers):
+                    try:
+                        atom_1 = parts[header_map['_geom_bond_atom_site_label_1']]
+                        atom_2 = parts[header_map['_geom_bond_atom_site_label_2']]
+                        dist = float(parts[header_map['_geom_bond_distance']])
+                        geom_bond_data.append((atom_1, atom_2, dist))
+                    except (KeyError, ValueError, IndexError):
+                        continue
+
+    # --- Build connectivity graph and extract moieties ---
+    G = nx.Graph()
+    for atom1, atom2, _ in geom_bond_data:
+        G.add_edge(atom1, atom2)
+
+    moieties = list(nx.connected_components(G))
+    moiety_list = [sorted(list(group)) for group in moieties]
+
+    print("Bond data (first 5):", geom_bond_data[:5])
+    print("Moieties:", moiety_list)
+
+    return geom_bond_data, moiety_list    
+
+######################
+def get_wyckoff_positions (file_path):
+
+    full_text = Path(file_path).read_text()
+    loop_sections = re.split(r'\nloop_\n', full_text)
+
+    atom_site_data = []
+
+    for section in loop_sections:
+        lines = section.strip().splitlines()
+        if not lines:
+            continue
+
+        # === _atom_site block ===
+        if lines[0].startswith('_atom_site'):
+            headers = []
+            start_idx = -1
+
+            for i, line in enumerate(lines):
+                if line.strip().startswith('_atom_site'):
+                    headers.append(line.strip())
+                else:
+                    start_idx = i
+                    break
+
+            required = {'_atom_site_label', '_atom_site_type_symbol',
+                        '_atom_site_fract_x', '_atom_site_fract_y', '_atom_site_fract_z'}
+            if not required.issubset(headers):
+                continue
+
+            header_map = {h: idx for idx, h in enumerate(headers)}
+            print("Atom site header map:", header_map)
+
+            for line in lines[start_idx:]:
+                if line.strip().startswith('_') or line.strip() == 'loop_':
+                    break
+                parts = line.split()
+                if len(parts) >= len(headers):
+                    try:
+                        label = parts[header_map['_atom_site_label']]
+                        symbol = parts[header_map['_atom_site_type_symbol']]
+                        x = float(parts[header_map['_atom_site_fract_x']].split('(')[0])
+                        y = float(parts[header_map['_atom_site_fract_y']].split('(')[0])
+                        z = float(parts[header_map['_atom_site_fract_z']].split('(')[0])
+                        atom_site_data.append((label, symbol, x, y, z))
+                    except (KeyError, ValueError, IndexError):
+                        continue
+
+    # --- Separate parsed data ---
+    atom_site_labels = [entry[0] for entry in atom_site_data]
+    ref_labels = [entry[1] for entry in atom_site_data]
+    ref_fracs = [[entry[2], entry[3], entry[4]] for entry in atom_site_data]
+
+    # --- Preview output ---
+    print("Atom site data (first 5):", atom_site_data[:5])
+    print("Atom labels:", atom_site_labels[:5])
+    print("Element types:", ref_labels[:5])
+    print("Fractional coords:", ref_fracs[:5])
+
+    return atom_site_labels, ref_labels, ref_fracs
+
+##################
+def get_moiety_indices_from_labels(atom_site_labels, moiety_list):
+    
+    flat_list = [atom for moiety in moiety_list for atom in moiety]
+
+    atom_site_labels = np.array(atom_site_labels)  # ensure it's a numpy array
+    moiety_indices = [
+        np.where(np.isin(atom_site_labels, moiety))[0].tolist()
+        for moiety in moiety_list
+    ]
+    for i, atom in enumerate(atom_site_labels):
+        if atom not in flat_list:
+            moiety_indices.append([i])
+    
+    return moiety_indices
 
 #######################
 def exit_with_error_input(message):
@@ -137,7 +272,30 @@ def exit_with_error_exception(e):
     print(f"Error details:\n{error_details}")
     
     sys.exit(e)      
+#######################
+# Helper to convert string like "H13-C5-N2" to Counter {'H':13, 'C':5, 'N':2}
+def parse_formula_string(formula_str):
+    tokens = re.findall(r'([A-Z][a-z]*)(\d*)', formula_str)
+    return Counter({el: int(cnt) if cnt else 1 for el, cnt in tokens})
 
+def formula_diff_dict(f1, f2):
+    c1 = parse_formula_string(f1)
+    c2 = parse_formula_string(f2)
+    all_elements = set(c1) | set(c2)
+    diff = {el: abs(c1[el] - c2[el]) for el in all_elements if c1[el] != c2[el]}
+    return diff
+
+def find_closest_matches(reference, target):
+    matches = {}
+    for i, ref in enumerate(reference):
+        if ref in target:
+            matches[i] = {'ref': ref, 'match': ref, 'diff_dict': {}}
+        else:
+            diffs = [(tgt, formula_diff_dict(ref, tgt)) for tgt in target]
+            # Select the one with the smallest total difference
+            best_match, best_diff = min(diffs, key=lambda x: sum(x[1].values()))
+            matches[i] = {'ref': ref, 'match': best_match, 'diff_dict': best_diff}
+    return matches
 #######################
 def extract_chemical_name(file_path):
     try:
@@ -434,8 +592,9 @@ def writexyz(fdir, fname, labels, pos, charge: int=0, spin: int=1):
     with open(fullname, "w") as fil:
         print(natoms, file=fil)
         print(charge, spin, file=fil)
-        for idx, l in enumerate(labels):
-            print("%s  %.6f  %.6f  %.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]),file=fil)
+        for label, (x, y, z) in zip(labels, pos):
+            print(f"{label:<2}\t{x: .6f}\t{y: .6f}\t{z: .6f}", file=fil)
+            # print("%s\t%.6f\t%.6f\t%.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]),file=fil)
 
 ##############
 def search_string_in_file(file_name, string_to_search):
@@ -777,11 +936,12 @@ def print_output(moleclist):
 
 ######################################################
 def print_refmoleclist (cell):
+    
     for i, ref in enumerate(cell.refmoleclist):
         if hasattr(ref, "totcharge"):
             if ref.iscomplex:
                 print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (Complex)\n{ref}")
-            else:
+            elif hasattr(ref, "smiles"):
                 print(f"Reference Molecule {i} : {ref.formula} {ref.smiles=} {ref.totcharge=} (Non-complex)")
         else:
             if ref.iscomplex:
@@ -792,58 +952,92 @@ def print_refmoleclist (cell):
         if ref.iscomplex:
             for met in ref.metals:
                 if hasattr(met, "charge"):
-                    print(f"\t{met.formula} {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=} {met.charge=}")
+                    print(f"\t{met.formula} ({met.subtype}) {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=} {met.charge=}")
                 else:
-                    print(f"\t{met.formula} {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=}")
+                    print(f"\t{met.formula} ({met.subtype}) {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=}")
             for lig in ref.ligands:
                 if hasattr(lig, "totcharge"):
-                    print(f"\t{lig.formula} {lig.smiles=} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} {lig.totcharge=}")
+                    print(f"\t{lig.formula} ({lig.subtype}) {lig.smiles=} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} {lig.totcharge=}")
                 else:
-                    print(f"\t{lig.formula} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=}")
+                    print(f"\t{lig.formula} ({lig.subtype}) {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=}")
                 for group in lig.groups:
-                    print(f"\t|--(group){group.labels} {group.is_haptic=} {group.haptic_type=} {group.denticity=} {group.closest_metal.label=}")
+                    print(f"\t|--(group) {group.labels} {group.is_haptic=} {group.haptic_type=} {group.denticity=} {group.closest_metal.label=}")
                     # for met in group.metals:
                     #     print(f"\t|--(group.metals){met.label} {met.mconnec=}")
+
 ######################################################
 def print_unique_species (cell):
-    print(f"Unique Species in {cell.subtype}:")
-    for specie in cell.unique_species:
-        if specie.subtype == "metal":
-            if hasattr(specie, "charge"):
-                print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.charge=}")
+    if hasattr(cell, "unique_species"):
+        print(f"\nUnique Species in {cell.subtype}:")
+        for specie in cell.unique_species:
+            if specie.subtype == "metal":
+                if hasattr(specie, "charge"):
+                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.charge=}")
+                else:
+                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=}")
             else:
-                print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=}")
-        else:
-            if hasattr(specie, "totcharge"):
-                print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.smiles=} {specie.totcharge=}")
-            else:
-                 print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})")
-######################################################
-def print_moleclist (cell):                 
-    for i, mol in enumerate(cell.moleclist):
-        if hasattr(mol, "totcharge"):
-            if mol.iscomplex:
-                print(f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex)\n{mol}")
-            else:
-                print(f"Unitcell Molecule {i} : {mol.formula} {mol.smiles=} {mol.totcharge=} (Non-complex)")
-        else:
-            if mol.iscomplex:
-                print(f"Unitcell Molecule {i}: {mol.formula} (Complex)")
-            else:
-                print(f"Unitcell Molecule {i} : {mol.formula} (Non-complex)")
+                if hasattr(specie, "totcharge") and hasattr(specie, "smiles"):
+                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.smiles=} {specie.totcharge=}")
+                elif hasattr(specie, "totcharge"):
+                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.totcharge=}")
+                else:
+                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})")
+    else:
+        print("\nNo unique species found in the cell object.")
 
-        if mol.iscomplex:
-            for met in mol.metals:
-                if hasattr(met, "charge"):
-                    print(f"\t{met.formula} {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=} {met.charge=}")
+######################################################
+def print_possible_charges (cell, debug=0):
+    """
+    Print the possible charges for each species in the cell object.
+    """
+    if hasattr(cell, "species_list"):
+        print(f"\nPossible charges of species in {cell.subtype}:")
+        for specie in cell.species_list:
+            if hasattr(specie, "possible_cs"):
+                if specie.subtype == "metal":
+                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.possible_cs=}") 
                 else:
-                    print(f"\t{met.formula} {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=}")
-            for lig in mol.ligands:
-                if hasattr(lig, "totcharge"):
-                    print(f"\t{lig.formula} {lig.smiles=} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} {lig.totcharge=}")
+                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})\n\t{specie.possible_cs=}")
+                    if debug > 0 : print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})\n\t{specie.possible_cs=}")
+            else:
+                if specie.subtype == "metal":
+                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} No possible cs")
                 else:
-                    print(f"\t{lig.formula} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=}")
-                for group in lig.groups:
-                    print(f"\t|--(group){group.labels} {group.is_haptic=} {group.haptic_type=} {group.denticity=} {group.closest_metal.label=}")
-                    # for met in group.metals:
-                    #     print(f"\t|--(group.metals){met.label} {met.mconnec=}")
+                    print(f"\t{specie.unique_index=} {specie.formula}, {specie.subtype}  No possible cs") #[p.subtype for p in specie.parents])    
+    else:
+        print("\nNo species list found in the cell object.")
+
+######################################################
+def print_moleclist (cell):
+    if hasattr(cell, "moleclist"):
+        print(f"\nMolecules in {cell.subtype}:")                 
+        for i, mol in enumerate(cell.moleclist):
+            if hasattr(mol, "totcharge"):
+                if mol.iscomplex:
+                    print(f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex)\n{mol}")
+                elif hasattr(mol, "smiles"):
+                    print(f"Unitcell Molecule {i} : {mol.formula} {mol.smiles=} {mol.totcharge=} (Non-complex)")
+            else:
+                if mol.iscomplex:
+                    print(f"Unitcell Molecule {i}: {mol.formula} (Complex)")
+                else:
+                    print(f"Unitcell Molecule {i} : {mol.formula} (Non-complex)")
+
+            if mol.iscomplex:
+                for met in mol.metals:
+                    if hasattr(met, "charge"):
+                        print(f"\t{met.formula} ({met.subtype}) {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=} {met.charge=}")
+                    else:
+                        print(f"\t{met.formula} ({met.subtype}) {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=}")
+                for lig in mol.ligands:
+                    if hasattr(lig, "totcharge"):
+                        print(f"\t{lig.formula} ({lig.subtype}) {lig.smiles=} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} {lig.totcharge=}")
+                    else:
+                        print(f"\t{lig.formula} ({lig.subtype}) {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=}")
+                    for group in lig.groups:
+                        print(f"\t|--(group){group.labels} {group.is_haptic=} {group.haptic_type=} {group.denticity=} {group.closest_metal.label=}")
+                        # for met in group.metals:
+                        #     print(f"\t|--(group.metals){met.label} {met.mconnec=}")
+    else:
+        print("\nNo molecules found in the cell object.")
+######################################################

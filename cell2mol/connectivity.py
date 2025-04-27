@@ -324,6 +324,41 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
     return isgood, adjmat, adjnum
 
 ####################################
+def get_adjmatrix_from_cif_bonds (labels: list, mol_atom_site_labels: list, bond_data: list, metal_only: bool = False) -> Tuple[int, list, list]:
+    isgood = True
+    indices = {atom: idx for idx, atom in enumerate(mol_atom_site_labels)}
+
+    natoms = len(labels)
+    adjmat = np.zeros((natoms, natoms))
+    adjnum = np.zeros((natoms))
+
+    for atom1, atom2, _ in bond_data:
+        if atom1 in mol_atom_site_labels and atom2 in mol_atom_site_labels:
+            i = indices[atom1]
+            j = indices[atom2]
+            if not metal_only: 
+                adjmat[i, j] = 1
+                adjmat[j, i] = 1
+            if metal_only: 
+                if (elemdatabase.elementblock[labels[i]] == "d"
+                or elemdatabase.elementblock[labels[i]] == "f"
+                or elemdatabase.elementblock[labels[j]] == "d"
+                or elemdatabase.elementblock[labels[j]] == "f"):
+                    adjmat[i, j] = 1
+                    adjmat[j, i] = 1
+                elif len(get_non_transition_metal_idxs([labels[i], labels[j]])) > 0:
+                    adjmat[i, j] = 1
+                    adjmat[j, i] = 1    
+
+    for i in range(0, natoms):
+        adjnum[i] = np.sum(adjmat[i, :])
+
+    adjmat = adjmat.astype(int)
+    adjnum = adjnum.astype(int)
+    
+    return isgood, adjmat, adjnum
+
+####################################
 def get_blocks(matrix: np.ndarray) -> Tuple[list, list]:
     # retrieves the blocks from a diagonal block matrix
     startlist = []  # List including the starting atom for all blocks
@@ -378,7 +413,28 @@ def count_species(labels: list, pos: list, radii: list=None, indices: list=None,
     return nblocks
 
 ####################################
-def split_species(labels: list, pos: list, radii: list=None, indices: list=None, cov_factor: float=1.3, debug: int=0) -> Tuple[bool, list]:
+def count_species_from_moiety(labels: list, atom_site_labels: list, geom_bond_cif: list, debug: int=0) -> Tuple[bool, list]:
+
+    isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds (labels, atom_site_labels, geom_bond_cif)
+    if not isgood: return int(0)
+
+    degree = np.diag(adjnum)  # creates a matrix with adjnum as diagonal values. Needed for the laplacian
+    lap = adjmat - degree     # computes laplacian
+
+    # creates block matrix
+    graph = csr_matrix(lap)
+    perm = reverse_cuthill_mckee(graph)
+    gp1 = graph[perm, :]
+    gp2 = gp1[:, perm]
+    dense = gp2.toarray()
+
+    # detects blocks in the block diagonal matrix called "dense"
+    startlist, endlist = get_blocks(dense)
+
+    nblocks = len(startlist)
+    return nblocks
+####################################
+def split_species(labels: list, pos: list, radii: list=None, indices: list=None, atom_site_labels : list=None, geom_bond_cif: list=None, cov_factor: float=1.3, debug: int=0) -> Tuple[bool, list]:
     ## Function that identifies connected groups of atoms from their atomic coordinates and labels.
     
     # if debug >= 2:
@@ -391,7 +447,10 @@ def split_species(labels: list, pos: list, radii: list=None, indices: list=None,
 
     # Computes the adjacency matrix of what is received
     # isgood indicates whether the adjacency matrix could be built normally, or errors were detected. Typically, those errors are steric clashes
-    isgood, adjmat, adjnum = get_adjmatrix(labels, pos, cov_factor, radii)
+    if atom_site_labels is not None and geom_bond_cif is not None:
+        isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds (labels, atom_site_labels, geom_bond_cif)
+    else:
+        isgood, adjmat, adjnum = get_adjmatrix(labels, pos, cov_factor, radii)
     if not isgood: return None
 
     degree = np.diag(adjnum)  # creates a matrix with adjnum as diagonal values. Needed for the laplacian
@@ -399,8 +458,8 @@ def split_species(labels: list, pos: list, radii: list=None, indices: list=None,
 
     # creates block matrix
     graph = csr_matrix(lap)
-    # if debug >=3: print(f"SPILT_SPECIES: Laplacian {lap=}")
-    # if debug >=3: print(f"SPILT_SPECIES: {graph=}")
+    # print(f"SPILT_SPECIES: Laplacian {lap=}")
+    # print(f"SPILT_SPECIES: {graph=}")
     perm = reverse_cuthill_mckee(graph)
     gp1 = graph[perm, :]
     gp2 = gp1[:, perm]

@@ -10,7 +10,7 @@ from cell2mol.new_charge_assignment import assign_charge_to_specie
 from cell2mol.other import handle_error
 from cell2mol.read_write import print_refmoleclist, print_unique_species, print_moleclist
 import copy
-# Constants
+
 VERSION = "2.0"
 COV_FACTOR = 1.3
 METAL_FACTOR = 1.0
@@ -24,7 +24,8 @@ def process_unitcell(input_path, name, current_dir, debug=0):
     ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
     output_fname = os.path.join(current_dir, "cell2mol.out")
     
-    # Process reference cell and update new cell with molecules and properties
+    # Process reference cell 
+    logging.info("Starting the cell2mol process for the reference cell")
     refcell = process_refcell(input_path, name, current_dir, debug=debug)
     
     if refcell.error_case != 0:
@@ -36,14 +37,25 @@ def process_unitcell(input_path, name, current_dir, debug=0):
             logging.info(f"cell2mol version {VERSION}")
             logging.info(f"Initializing cell object from input path: {input_path}")
             logging.info(f"Debug level: {debug}")
+
             # Read CIF file and initialize unit cell parameters
             structure = read(input_path)
             cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops = get_cell_parameters(structure) 
 
             # Create and process unit cell
-            newcell = create_unitcell_object(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, "unitcell")
-
+            newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
+            newcell.get_subtype("unitcell")
             perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debug)
+            refcell.save(ref_cell_fname)
+            newcell.save(cell_fname)
+
+            # Print summary information for the unit cell
+            summary_fname = os.path.join(current_dir, "unitcell_summary.out")
+            with open(summary_fname, "w") as summary:
+                with redirect_stdout(summary):
+                    print_refmoleclist(newcell)
+                    print_unique_species(newcell)
+                    print_moleclist(newcell)
 
             # Handle error cases for the unit cell
             if hasattr(newcell, 'error_case'):
@@ -70,31 +82,22 @@ def get_cell_parameters(structure):
     cell_param = structure.cell.cellpar()
     space_group = structure.info.get('spacegroup')
     sym_ops = space_group.get_op() if space_group else None
+    
     return cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops
-
-
-def create_unitcell_object(name, labels, pos, fracs, vector, param, subtype):
-    """Creates a cell object and sets its subtype."""
-    newcell = cell(name, labels, pos, fracs, vector, param)
-    newcell.get_subtype(subtype)
-    return newcell
 
 
 def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debug):
     """Handles the reconstruction, charge assignment, and spin assignment for molecules."""
     cov_factor = refcell.refmoleclist[0].cov_factor if refcell.refmoleclist else COV_FACTOR
 
-    # Get reference molecules for the new cell
-    # newcell.get_reference_molecules(refcell.labels, refcell.frac_coord, cov_factor=cov_factor, debug=-1)
-    # if not newcell.has_isolated_H:
-    #     newcell.check_missing_H(debug=-1)
+    # Copy reference molecules from refcell
     newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
 
     newcell.has_isolated_H = refcell.has_isolated_H
     newcell.has_missing_H = refcell.has_missing_H
     newcell.error_get_poscharges = refcell.error_get_poscharges
-    logging.info("Starting molecule reconstruction with cell2mol")
-    
+    logging.info("Starting the cell2mol process for the unit cell")
+
     # Step-by-step molecule reconstruction and error assessment
     mode = "reconstruction"
     cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
@@ -123,19 +126,13 @@ def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debu
                     print("refcell.unique_species", specie.formula, specie.charge, specie.unique_index)
                 else:
                     print("refcell.unique_species", specie.formula, specie.totcharge, specie.unique_index)
+            
             # Finalize refcell properties and save both cell objects
             refcell.assign_charges_for_refcell(debug=debug)
             refcell.assign_spin(debug=debug)
             refcell.create_bonds(debug=debug)
-            refcell.save(ref_cell_fname)
-    
-    print_refmoleclist(newcell)
-    if hasattr(newcell, "unique_species"):
-        print_unique_species(newcell)
-    if hasattr(newcell, "moleclist"):
-        print_moleclist(newcell)
-    newcell.save(cell_fname)
-
+            newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
+            newcell.unique_species = copy.deepcopy(refcell.unique_species)
 
 def cell2mol_mode (newcell, refcell, sym_ops, mode, debug):
     """Applies cell2mol with specific reconstruction or assignment mode."""
