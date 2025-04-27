@@ -148,17 +148,17 @@ def check_missingH(refmoleclist: list, debug: int=0):
                         if ismissingH:
                             if debug >= 1: print("")
                             if debug >= 1: print(f"WARNING in Missing H function for: {ref.type}, molecule index {idx}, {ref.formula}")
-                            if debug >= 1: print(f"C Atom {kdx} {a.get_parent_index('molecule')} has missing H atoms")
+                            if debug >= 1: print(f"C Atom {kdx} {a.get_parent_index('molecule')} ref_idx={a.get_parent_index('reference')} has missing H atoms")
                             if debug >= 1: print(report)
                             Missing_H_in_C = True
         else:
             for jdx, lig in enumerate(ref.ligands):
                 if lig.natoms == 1 and "O" in lig.labels and lig.denticity <= 1:
                     if any(m.label in Exceptions_for_CoordWater for m in lig.metals): pass
-                    else:
-                        Missing_H_in_CoordWater = True
-                        if debug >= 1: print("")
-                        if debug >= 1: print("WARNING in Missing H function for ligand", lig.natoms, lig.labels)
+                    # else:
+                    #     Missing_H_in_CoordWater = True
+                    #     if debug >= 1: print("")
+                    #     if debug >= 1: print("WARNING in Missing H function for ligand", lig.natoms, lig.labels)
                 elif lig.formula == "CO" or lig.formula == "CN":
                     pass
                 else:
@@ -176,7 +176,7 @@ def check_missingH(refmoleclist: list, debug: int=0):
                                 print(a.label, a.mconnec, a.coord)
                                 if debug >= 1: print("")
                                 if debug >= 1: print(f"WARNING in Missing H function for: {ref.type}, molecule index {idx}, ligand index {jdx}, {lig.formula}")
-                                if debug >= 1: print(f"C Atom {kdx} {a.get_parent_index('molecule')} has missing H atoms")
+                                if debug >= 1: print(f"C Atom {kdx} {a.get_parent_index('molecule')} ref_idx={a.get_parent_index('reference')} has missing H atoms")
                                 if debug >= 1: print(report)
                                 Missing_H_in_C = True
 
