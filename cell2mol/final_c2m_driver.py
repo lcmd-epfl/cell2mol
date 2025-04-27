@@ -4,7 +4,7 @@ from cell2mol.helper import parsing_arguments
 from cell2mol.refcell import process_refcell
 from cell2mol.unitcell import process_unitcell
 from cell2mol.xyz_molecule import get_molecule
-from cell2mol.read_write import prefilter_cif, exit_with_error_input, exit_with_error_exception
+from cell2mol.read_write import screening_cif, prefilter_cif, exit_with_error_input, exit_with_error_exception
 
 def main():
     input, system_type, cell_para, debug_mode = parsing_arguments()
@@ -18,8 +18,11 @@ def main():
     if not os.path.exists(input_path):
         exit_with_error_input(f"Input file not found: {input_path}")
     if extension == ".cif":
+        # Check for radical, disorder, 3D fractional coordinates, and polymeric structure
+        radical, disorder, notfound_atom, polymeric = screening_cif(input_path)        
         cif_okay, error_message = prefilter_cif(input_path)
         if cif_okay:
+        # if not any([notfound_atom]):
             handle_cif_file(input_path, system_type, name, current_dir, debug_mode)
         else:
             exit_with_error_input(f"CIF file is not suitable for processing {error_message}")

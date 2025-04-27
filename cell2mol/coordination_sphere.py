@@ -18,11 +18,14 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
     positions.append(metal.coord)
     if debug >= 2 : print(f"METAL.DEFINE_coordination_geometry: {metal.label} {metal.coord}")
     if debug >= 1 :print(f"METAL.DEFINE_coordination_geometry: coord_group formula {[group.formula for group in coord_group]}")
-    if debug >= 1 :print(f"METAL.DEFINE_coordination_geometry: coord_group hapticity {[group.is_haptic for group in coord_group]}")
-    if debug >= 1 :print(f"METAL.DEFINE_coordination_geometry: coord_group atoms{[[a.label for a in group.atoms] for group in coord_group]}")
+    if debug >= 1 :print(f"METAL.DEFINE_coordination_geometry: coord_group hapticity {[group.is_haptic if group.subtype != 'metal' else False for group in coord_group]}")
+    if debug >= 1 :print(f"METAL.DEFINE_coordination_geometry: coord_group atoms{[[a.label for a in group.atoms] if group.subtype != 'metal' else [group.label] for group in coord_group]}")
 
     for group in coord_group:
-        if group.is_haptic == False:
+        if group.subtype == 'metal':
+            symbols.append(group.label)
+            positions.append(group.coord)    
+        elif group.is_haptic == False:
             for atom in group.atoms:
                 symbols.append(atom.label)
                 positions.append(atom.coord)

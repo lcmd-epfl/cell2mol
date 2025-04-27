@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import time
-from cell2mol.other import handle_error
 from cell2mol.new_cell_reconstruction import *
 from cell2mol.new_charge_assignment import *
 
@@ -19,8 +18,9 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
         tini = time.time()
         if not newcell.has_isolated_H and not newcell.has_missing_H:
             # Cell Reconstruction
-            all_molecules, reconstructed_molecules = reconstuct(refcell, newcell, sym_ops, debug=debug)    
-            all_molecules.extend(reconstructed_molecules)                                       
+            all_molecules, reconstructed_molecules = reconstruct(refcell, newcell, sym_ops, debug=debug)    
+            all_molecules.extend(reconstructed_molecules)         
+
             tend = time.time()
             if newcell.error_get_fragments:     
                 if debug >= 1: print(f"\nCell Reconstruction Failed. Total execution time: {tend - tini:.2f} seconds")

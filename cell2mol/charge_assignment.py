@@ -568,7 +568,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         else:
             combinations = [0,1]
         count = 0   
-        print(f"{combinations=}")
+        #print(f"{combinations=}")
         for com in combinations:
             newlab = local_labels.copy()
             newcoord = local_coords.copy()
@@ -584,16 +584,16 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
             o_s = np.sum(com)
             toallocate = int(0)
-            print(f"{non_local_groups=} {non_local_groups_indices=}")
-            for jdx, a in enumerate(ligand.atoms):
-                if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
-                    print(jdx, a.label, a.mconnec)
-            print("====")
+            # print(f"{non_local_groups=} {non_local_groups_indices=}")
+            # for jdx, a in enumerate(ligand.atoms):
+            #     if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
+            #         print(jdx, a.label, a.mconnec)
+            # print("====")
             for jdx, a in enumerate(ligand.atoms):
                 if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0 and jdx in non_local_groups_indices:
                     print(a.label)
                     if non_local_groups > 1:
-                        print(f"{com=} {toallocate=}")
+                        #print(f"{com=} {toallocate=}")
                         if com[toallocate] == 1:
                             elemlist[jdx] = "H"
                             addedlist[jdx] = 1
@@ -624,10 +624,10 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
             new_prot = protonation(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, o_s, typ="Non-local", parent=specie)
             count+=1
             if new_prot.status == 1 and new_prot.added_atoms == o_s + local_added_atoms:
-                print(f"{new_prot.added_atoms=}")
-                print(f"{o_s=}")
-                print(f"{local_added_atoms=}")
-                print(f"{elemlist=}")
+                # print(f"{new_prot.added_atoms=}")
+                # print(f"{o_s=}")
+                # print(f"{local_added_atoms=}")
+                # print(f"{elemlist=}")
                 protonation_states.append(new_prot)
                 if debug >= 2:  print(f"        GET_PROTONATION_STATES: Protonation SAVED with {added_atoms} atoms added to ligand. status={new_prot.status}")
             else:
