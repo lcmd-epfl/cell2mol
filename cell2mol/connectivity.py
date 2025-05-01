@@ -356,11 +356,15 @@ def get_adjmatrix_from_cif_bonds (labels: list, pos: list,  mol_atom_site_labels
                 if abs(dist - bond_distance) <= 1e-3: # Allow a small tolerance for floating point comparison
                     adjmat[i, j] = 1
                     adjmat[j, i] = 1
+                    #print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is same with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]}")
+
                 else:
                     isgood = False
-                    print(f"Adjacency Matrix: Distance {round(dist, 3)}  {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]}")
+                    print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]}")
             if metal_only:
                 if abs(dist - bond_distance) <= 1e-3:
+                    #print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is same with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]}")
+
                     if (elemdatabase.elementblock[labels[i]] == "d"
                     or elemdatabase.elementblock[labels[i]] == "f"
                     or elemdatabase.elementblock[labels[j]] == "d"

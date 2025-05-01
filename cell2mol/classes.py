@@ -238,13 +238,15 @@ class specie(object):
         if not hasattr(parent,"madjnum"): 
             print(f"SPECIE.INHERIT. {parent_subtype=} does not have madjnum")
             return None 
-        #print(f"SPECIE.INHERIT. found self in parent with {indices=}")
-        #print(f"SPECIE.INHERIT: parent data:\n{parent.labels=}\n{parent.madjmat=}\n{parent.madjnum=}\n{parent.adjmat=}\n{parent.adjnum=}")
+        print(f"SPECIE.INHERIT. found self in parent ({parent_subtype}) with {indices=}")
+        print(f"SPECIE.INHERIT: parent data:\n{parent.labels=}\n{parent.madjmat=}\n{parent.madjnum=}\n{parent.adjmat=}\n{parent.adjnum=}")
+        print(f"SPECIE.INHERIT: {parent.madjmat.shape=} {parent.madjnum.shape=} {parent.adjmat.shape=} {parent.adjnum.shape=}")
         self.madjmat = np.stack(extract_from_list(indices, parent.madjmat, dimension=2), axis=0)
         self.madjnum = np.stack(extract_from_list(indices, parent.madjnum, dimension=1), axis=0)
         self.adjmat  = np.stack(extract_from_list(indices, parent.adjmat, dimension=2), axis=0)
         self.adjnum  = np.stack(extract_from_list(indices, parent.adjnum, dimension=1), axis=0)
-        #print(f"SPECIE.INHERIT: self data:\n{self.labels=}\n{self.madjmat=}\n{self.madjnum=}\n{self.adjmat=}\n{self.adjnum=}")
+        print(f"SPECIE.INHERIT: self data:\n{self.labels=}\n{self.madjmat=}\n{self.madjnum=}\n{self.adjmat=}\n{self.adjnum=}")
+        print(f"SPECIE.INHERIT: {self.madjmat.shape=} {self.madjnum.shape=} {self.adjmat.shape=} {self.adjnum.shape=}")
 
     ############
     def get_adjmatrix(self, geom_bond_cif: list=None):
@@ -412,6 +414,7 @@ class molecule(specie):
         if not hasattr(self,"atoms"): self.set_atoms()
         if not self.has_IA_IIA:        self.ligands = None; self.metals = None
         else: 
+            refcell = self.get_parent("reference")
 
             IA_IIA_metal_indices = []
             for idx, l in enumerate(self.labels):
@@ -457,9 +460,18 @@ class molecule(specie):
                 for m in IA_IIA_metal_indices:                     
                     self.metals.append(self.atoms[m])  
             else :
-                if hasattr(self,"cov_factor"): blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)
-                else:                          blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)      
-                if debug > 0: print(f"MOLECULE.SPLIT_IA_IIA: received {len(blocklist)} blocks")
+                if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
+                    blocklist = split_species(rest_labels, 
+                                            rest_coord, 
+                                            radii=rest_radii, 
+                                            atom_site_labels=rest_atom_site_labels, 
+                                            geom_bond_cif=refcell.geom_bond_cif,
+                                            cov_factor=self.cov_factor, debug=debug)
+                else:                          
+                    blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, debug=debug)                 
+                    
+                # if debug > 0: 
+                print(f"SPLIT COMPLEX: received {len(blocklist)} blocks {blocklist=}")
                 
                 ## Arranges Ligands
                 for b in blocklist:
@@ -494,7 +506,10 @@ class molecule(specie):
 
 
                     newligand.set_adjacency_parameters(self.cov_factor, self.metal_factor)
-                    newligand.set_atoms(atomlist=lig_atoms, atom_site_labels=lig_atom_site_labels)
+                    
+                    newligand.set_atoms(atomlist=lig_atoms, 
+                                        atom_site_labels=lig_atom_site_labels, 
+                                        geom_bond_cif=refcell.geom_bond_cif)
                     newligand.inherit_adjmatrix("molecule")
                     self.ligands.append(newligand)
 
@@ -509,6 +524,8 @@ class molecule(specie):
         if not hasattr(self,"atoms"): self.set_atoms()
         if not self.iscomplex:        self.ligands = None; self.metals = None
         else: 
+            refcell = self.get_parent("reference")
+            
             self.ligands = []
             self.metals  = []
             # Identify Metals and the rest
@@ -551,9 +568,18 @@ class molecule(specie):
                 for m in metal_idx:                     
                     self.metals.append(self.atoms[m])  
             else :
-                if hasattr(self,"cov_factor"): blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)
-                else:                          blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)      
-                if debug > 0: print(f"SPLIT COMPLEX: received {len(blocklist)} blocks")
+                if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
+                    blocklist = split_species(rest_labels, 
+                                            rest_coord, 
+                                            radii=rest_radii, 
+                                            atom_site_labels=rest_atom_site_labels, 
+                                            geom_bond_cif=refcell.geom_bond_cif,
+                                            cov_factor=self.cov_factor, debug=debug)
+                else:                          
+                    blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, debug=debug)                 
+                    
+                # if debug > 0: 
+                print(f"SPLIT COMPLEX: received {len(blocklist)} blocks {blocklist=}")
                 
                 ## Arranges Ligands
                 for b in blocklist:
@@ -592,7 +618,9 @@ class molecule(specie):
                     # Update the ligand with the covalent and metal factors 
                     newligand.set_adjacency_parameters(self.cov_factor, self.metal_factor)
                     # Pass the molecule atoms to the ligand
-                    newligand.set_atoms(atomlist=lig_atoms, atom_site_labels=lig_atom_site_labels)
+                    newligand.set_atoms(atomlist=lig_atoms, 
+                                        atom_site_labels=lig_atom_site_labels, 
+                                        geom_bond_cif=refcell.geom_bond_cif)
                     # Inherit the adjacencies from molecule
                     newligand.inherit_adjmatrix("molecule")
                     # Add ligand to the list. Top-Down hierarchy
@@ -720,6 +748,7 @@ class ligand(specie):
         ## Now we operate at the molecular level. We get the parent molecule, and the indices of the ligand atoms in the molecule
         self.connected_idx = [] 
         if not hasattr(self,"madjnum"): self.inherit_adjmatrix("molecule")
+        print(f"LIGAND.GET_CONNECTED_IDX: {self.formula} {self.madjmat=} {self.madjnum=}")
         for idx, con in enumerate(self.madjnum):
             if con > 0: self.connected_idx.append(idx)
         return self.connected_idx 
@@ -756,6 +785,7 @@ class ligand(specie):
 
     #######################################################
     def split_ligand(self, debug: int=0):
+        if hasattr(self,"cov_factor"):      cov_factor=self.cov_factor
 
         refcell = self.get_parent("reference") 
     
@@ -780,9 +810,17 @@ class ligand(specie):
         if self.atom_site_labels is not None:
             conn_atom_site_labels = extract_from_list(connected_idx, self.atom_site_labels, dimension=1)
         if debug >= 2: print(f"\tLIGAND.SPLIT_LIGAND: {conn_labels=}")
+        if debug >= 2: print(f"\tLIGAND.SPLIT_LIGAND: {conn_atom_site_labels=}")
+        if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
+            blocklist = split_species(conn_labels, 
+                                      conn_coord, 
+                                      radii=conn_radii, 
+                                      atom_site_labels=conn_atom_site_labels, 
+                                      geom_bond_cif=refcell.geom_bond_cif,
+                                      cov_factor=self.cov_factor, debug=debug)
+        else:                          
+            blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, debug=debug)  
 
-        if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=self.cov_factor, debug=debug)
-        else:                          blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, debug=debug)      
         if debug >= 2: print(f"\tLIGAND.SPLIT_LIGAND: {blocklist=}")
         ## Arranges Groups 
         for b in blocklist:
@@ -795,19 +833,22 @@ class ligand(specie):
                 gr_frac_coord   = extract_from_list(b, conn_frac_coord, dimension=1)
             gr_radii        = extract_from_list(b, conn_radii, dimension=1)
             gr_atoms        = extract_from_list(b, conn_atoms, dimension=1)
+            if self.atom_site_labels is not None:
+                gr_atom_site_labels = extract_from_list(b, conn_atom_site_labels, dimension=1)
             # Create Group Object
             if self.frac_coord is not None:
                 newgroup = group(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
             else:
                 newgroup = group(gr_labels, gr_coord, radii=gr_radii)
-            if self.atom_site_labels is not None:
-                newgroup.atom_site_labels = extract_from_list(b, conn_atom_site_labels, dimension=1)
+            
             # For debugging
             newgroup.origin = "split_ligand"
             # Define the ligand as parent of the group. Bottom-Up hierarchy
             newgroup.add_parent(self, indices=gr_indices)
             # Pass the ligand atoms to the groud
-            newgroup.set_atoms(atomlist=gr_atoms, atom_site_labels=conn_atom_site_labels)
+            newgroup.set_atoms(atomlist=gr_atoms, 
+                               atom_site_labels=gr_atom_site_labels, 
+                               geom_bond_cif=refcell.geom_bond_cif)
             # Inherit the adjacencies from molecule
             newgroup.inherit_adjmatrix("ligand")
             # Associate the Groups with the Metals
