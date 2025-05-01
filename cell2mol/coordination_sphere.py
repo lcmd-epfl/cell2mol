@@ -1,7 +1,7 @@
 import numpy as np
 from cosymlib import Geometry
 from cell2mol.other import *
-from cell2mol.connectivity import add_atom, get_adjmatrix
+from cell2mol.connectivity import add_atom, get_adjmatrix, get_adjmatrix_from_cif_bonds
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
@@ -21,26 +21,30 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
     if debug >= 1 :print(f"METAL.DEFINE_coordination_geometry: coord_group hapticity {[group.is_haptic if group.subtype != 'metal' else False for group in coord_group]}")
     if debug >= 1 :print(f"METAL.DEFINE_coordination_geometry: coord_group atoms{[[a.label for a in group.atoms] if group.subtype != 'metal' else [group.label] for group in coord_group]}")
 
+    count = 0
     for group in coord_group:
         if group.subtype == 'metal':
             symbols.append(group.label)
-            positions.append(group.coord)    
+            positions.append(group.coord)
+            count += 1    
         elif group.is_haptic == False:
             for atom in group.atoms:
                 symbols.append(atom.label)
                 positions.append(atom.coord)
+                count += 1
                 if debug >= 2 : print("METAL.DEFINE_coordination_geometry:", atom.label, atom.coord)
         else :
             if debug >= 2 : print(f"METAL.DEFINE_coordination_geometry: {group.haptic_type=}")
             #if debug >= 2 : print(f"METAL.DEFINE_coordination_geometry: {[atom.coord for atom in group.atoms]}")
             haptic_center_coord = compute_centroid(np.array([atom.coord for atom in group.atoms]))
             symbols.append(str(group.haptic_type))
-            positions.append(list(haptic_center_coord))      
+            positions.append(list(haptic_center_coord))
+            count += 1      
             if debug >= 2 : print(f"mid point of {group.haptic_type=}", haptic_center_coord)      
             coord_haptic_type.append(group.haptic_type)             
 
     posgeom_dev = shape_measure(symbols, positions, debug=debug)
-
+    coord_nr = count
     if len(posgeom_dev) > 0:
         coordination_geometry=min(posgeom_dev, key=posgeom_dev.get)
         geom_deviation=min(posgeom_dev.values())
@@ -50,7 +54,7 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
 
     if debug >= 2 :
         # for haptic ligands, it's the mid point of haptic ligands
-        print(f"METAL.DEFINE_coordination_geometry: The number of coordinating points: {len(coord_group)}")
+        print(f"METAL.DEFINE_coordination_geometry: The number of coordinating points: {coord_nr}")
         print(f"METAL.DEFINE_coordination_geometry: {posgeom_dev}")
         print(f"METAL.DEFINE_coordination_geometry: The type of hapticity : {coord_haptic_type}")
     
@@ -58,7 +62,7 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
         print(f"METAL.DEFINE_coordination_geometry: The most likely geometry is '{coordination_geometry}' with deviation value {geom_deviation}")
 
     # return coordination_geometry
-    return coordination_geometry, geom_deviation
+    return coord_nr, coordination_geometry, geom_deviation
 
 #######################################################
 def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:
@@ -82,12 +86,15 @@ def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:
         posgeom_dev = {'Linear' : 0.0}
     else :
         posgeom_dev={}
-        ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)])
-        for idx, rg in enumerate(ref_geom[:,0]):
-            shp_measure = geometry.get_shape_measure(rg, central_atom=1)
-            geom = ref_geom[:,3][idx]
-            posgeom_dev[geom]=round(shp_measure, 3)      
-    
+        try :
+            ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)])
+            for idx, rg in enumerate(ref_geom[:,0]):
+                shp_measure = geometry.get_shape_measure(rg, central_atom=1)
+                geom = ref_geom[:,3][idx]
+                posgeom_dev[geom]=round(shp_measure, 3)      
+        except:
+            print(f"SHAPE_MEASURE: {cn} Vertices not found in shape_structure_references")
+
     return posgeom_dev
 
 #######################################################
@@ -378,7 +385,7 @@ def check_neighboring_atoms_mconnec (idx, group, metal, debug):
 def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
     if debug > 0: print("Entering COORD_CORR_NONHAPTIC:")
-    if not hasattr(group,"metals"): group.get_connected_metals()
+    if not hasattr(group, "metals"): group.get_connected_metals()
     if debug > 1: print(f"group: {[atom.label for atom in group.atoms]}")
     # Pair each atom with its index in the original list
     indexed_atoms = list(enumerate(group.atoms))
@@ -399,20 +406,36 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
         if debug > 0: print(f"\tCoordinating atom label={atom.label} with mconnec={atom.mconnec}, original group index {idx}")
         isremoved = False
         ## Now there is an extra loop for each metal of the group. For bridging ligands
-
+        #print(f"\t{[met in for met in group.metals]=}")
         for jdx, met in enumerate(group.metals):
             if isremoved: continue
             lig     = group.get_parent("ligand")
             ligand_idx = atom.get_parent_index("ligand")
             if debug > 0: print(f"\tevaluating coordination with metal {met.label}")
             if debug > 2: print(f"\n{met}")
+
             tmplabels = [atom.label, met.label]
-            tmpcoord = [atom.coord, met.coord]
-            isconnected, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+            tmpcoord = [atom.coord, met.coord]            
+            
+            refcell = atom.get_parent("reference")
+            atom_site_labels = [atom.atom_site_label, met.atom_site_label]
+
+            if refcell.exist_cif_bond_moiety:
+                isconnected, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, refcell.geom_bond_cif, metal_only=True)
+            else:
+                isconnected, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+
             if isconnected and any(tmpadjnum) > 0: 
-                if debug > 0 : print(f"\tAtom {atom.label} is connected to metal {met.label} (atom {ligand_idx=}) (metal group.metals index {jdx=})")
-                isadded, newlab, newcoord = add_atom(lig.labels, lig.coord, ligand_idx, lig, list([met]), "H", removed_idx, debug=debug)
-                if debug >= 2:print(f"{removed_idx=}")
+                if debug > 0 : 
+                    print(f"\tAtom {atom.label} is connected to metal {met.label} (atom {ligand_idx=}) (metal group.metals index {jdx=})")
+                
+                if refcell.exist_cif_bond_moiety:
+                    isadded  = True
+                    if debug > 0: print(f"\tConnectivity verified for atom {atom.label} with ligand index {ligand_idx} based on CIF bonds")
+                else:
+                    isadded, newlab, newcoord = add_atom(lig.labels, lig.coord, ligand_idx, lig, list([met]), "H", removed_idx, debug=debug)
+                    if debug >= 2:print(f"{removed_idx=}")
+                
                 if isadded:
                     if debug > 0: print(f"\tConnectivity verified for atom {atom.label} with ligand index {ligand_idx}")
                     conn_idx.append(idx)
@@ -426,8 +449,6 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
                     atom.reset_mconnec(met, debug=debug)
                     met.get_coord_sphere()
                     met.get_coord_sphere_formula()
-                    # Group will be redifined using split_group, so we don't need to remove the atom from group 
-                    # group.remove_atom(idx, debug=debug)
             else:
                 if debug > 0 : print(f"\tAtom {atom.label} is not connected to metal {met.label} (atom {ligand_idx=}) (metal group.metals index {jdx=})")
 

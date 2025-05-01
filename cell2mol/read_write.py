@@ -143,7 +143,7 @@ def get_geom_bond (file_path):
                 continue
 
             header_map = {h: idx for idx, h in enumerate(headers)}
-            print("Bond header map:", header_map)
+            # print("Bond header map:", header_map)
 
             for line in lines[start_idx:]:
                 if line.strip().startswith('_') or line.strip() == 'loop_':
@@ -166,8 +166,8 @@ def get_geom_bond (file_path):
     moieties = list(nx.connected_components(G))
     moiety_list = [sorted(list(group)) for group in moieties]
 
-    print("Bond data (first 5):", geom_bond_data[:5])
-    print("Moieties:", moiety_list)
+    # print("Bond data (first 5):", geom_bond_data[:5])
+    # print("Moieties:", moiety_list)
 
     return geom_bond_data, moiety_list    
 
@@ -202,7 +202,7 @@ def get_wyckoff_positions (file_path):
                 continue
 
             header_map = {h: idx for idx, h in enumerate(headers)}
-            print("Atom site header map:", header_map)
+            #print("Atom site header map:", header_map)
 
             for line in lines[start_idx:]:
                 if line.strip().startswith('_') or line.strip() == 'loop_':
@@ -225,10 +225,10 @@ def get_wyckoff_positions (file_path):
     ref_fracs = [[entry[2], entry[3], entry[4]] for entry in atom_site_data]
 
     # --- Preview output ---
-    print("Atom site data (first 5):", atom_site_data[:5])
-    print("Atom labels:", atom_site_labels[:5])
-    print("Element types:", ref_labels[:5])
-    print("Fractional coords:", ref_fracs[:5])
+    # print("Atom site data (first 5):", atom_site_data[:5])
+    # print("Atom labels:", atom_site_labels[:5])
+    # print("Element types:", ref_labels[:5])
+    # print("Fractional coords:", ref_fracs[:5])
 
     return atom_site_labels, ref_labels, ref_fracs
 
@@ -940,26 +940,50 @@ def print_refmoleclist (cell):
     for i, ref in enumerate(cell.refmoleclist):
         if hasattr(ref, "totcharge"):
             if ref.iscomplex:
-                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (Complex)\n{ref}")
+                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (TM complex)\n{ref}")
+            elif ref.has_IA_IIA:
+                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (Complex with Alkali or Alkaline metals)\n{ref}")
             elif hasattr(ref, "smiles"):
                 print(f"Reference Molecule {i} : {ref.formula} {ref.smiles=} {ref.totcharge=} (Non-complex)")
+        elif hasattr(ref, "totcharge_cif"):
+            if ref.iscomplex:
+                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge_cif=} (TM complex)")
+            elif ref.has_IA_IIA:
+                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge_cif=} (Complex with Alkali or Alkaline metals)")
+            elif hasattr(ref, "smiles"):
+                print(f"Reference Molecule {i} : {ref.formula} {ref.totcharge_cif=} (Non-complex)")        
         else:
             if ref.iscomplex:
-                print(f"Reference Molecule {i}: {ref.formula} (Complex)")
+                print(f"Reference Molecule {i}: {ref.formula} (TM complex)\n{ref}")
+            elif ref.has_IA_IIA:
+                print(f"Reference Molecule {i}: {ref.formula} (Complex with Alkali or Alkaline metals)\n{ref}")
             else:
                 print(f"Reference Molecule {i} : {ref.formula} (Non-complex)")
 
-        if ref.iscomplex:
+        if ref.iscomplex or ref.has_IA_IIA:
             for met in ref.metals:
                 if hasattr(met, "charge"):
-                    print(f"\t{met.formula} ({met.subtype}) {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=} {met.charge=}")
+                    print(f"\t{met.formula} ({met.subtype}) metal_OS={met.charge}")
+                elif hasattr(met, "possible_cs"):
+                    print(f"\t{met.formula} ({met.subtype}) metal_possible_OS={met.possible_cs}")
                 else:
-                    print(f"\t{met.formula} ({met.subtype}) {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=}")
+                    print(f"\t{met.formula} ({met.subtype})")
+
+                if hasattr(met, "coord_sphere_formula"):
+                    print(f"\t|--Coordination infomation {met.coord_sphere_formula=}")
+                if hasattr(met, "coord_nr"):
+                    print(f"\t|--without metal-metal bonds: {met.coord_nr=} {met.coord_geometry=} {met.geom_deviation=}")
+                if hasattr(met, "coord_nr_with_metal_bonds"):
+                    print(f"\t|--including metal-metal bonds: bonded metals={[m.label for m in met.metals]} {met.coord_nr_with_metal_bonds=} {met.coord_geometry_with_metal_bonds=} {met.geom_deviation_with_metal_bonds=}")
+
             for lig in ref.ligands:
                 if hasattr(lig, "totcharge"):
                     print(f"\t{lig.formula} ({lig.subtype}) {lig.smiles=} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} {lig.totcharge=}")
-                else:
-                    print(f"\t{lig.formula} ({lig.subtype}) {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=}")
+                elif hasattr(lig, "possible_cs"):
+                    if lig.possible_cs is not None:
+                        print(f"\t{lig.formula} ({lig.subtype}) {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} lig.possible_cs Exists")
+                    else:
+                        print(f"\t{lig.formula} ({lig.subtype}) {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} lig.possible_cs Does not exist")
                 for group in lig.groups:
                     print(f"\t|--(group) {group.labels} {group.is_haptic=} {group.haptic_type=} {group.denticity=} {group.closest_metal.label=}")
                     # for met in group.metals:
@@ -1013,7 +1037,7 @@ def print_moleclist (cell):
         print(f"\nMolecules in {cell.subtype}:")                 
         for i, mol in enumerate(cell.moleclist):
             if hasattr(mol, "totcharge"):
-                if mol.iscomplex:
+                if mol.iscomplex or mol.has_IA_IIA:
                     print(f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex)\n{mol}")
                 elif hasattr(mol, "smiles"):
                     print(f"Unitcell Molecule {i} : {mol.formula} {mol.smiles=} {mol.totcharge=} (Non-complex)")
@@ -1023,12 +1047,22 @@ def print_moleclist (cell):
                 else:
                     print(f"Unitcell Molecule {i} : {mol.formula} (Non-complex)")
 
-            if mol.iscomplex:
+            if mol.iscomplex or mol.has_IA_IIA:
                 for met in mol.metals:
                     if hasattr(met, "charge"):
-                        print(f"\t{met.formula} ({met.subtype}) {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=} {met.charge=}")
+                        print(f"\t{met.formula} ({met.subtype}) metal_OS={met.charge}")
+                    elif hasattr(met, "possible_cs"):
+                        print(f"\t{met.formula} ({met.subtype}) metal_possible_OS={met.possible_cs}")
                     else:
-                        print(f"\t{met.formula} ({met.subtype}) {met.coord_sphere_formula=} {met.coord_geometry=} {met.geom_deviation=} {met.coord_nr=}")
+                        print(f"\t{met.formula} ({met.subtype})")
+                        
+                    if hasattr(met, "coord_sphere_formula"):
+                        print(f"\t|--Coordination infomation {met.coord_sphere_formula=}")
+                    if hasattr(met, "coord_nr"):
+                        print(f"\t|--without metal-metal bonds: {met.coord_nr=} {met.coord_geometry=} {met.geom_deviation=}")
+                    if hasattr(met, "coord_nr_with_metal_bonds"):
+                        print(f"\t|--including metal-metal bonds: bonded metals={[m.label for m in met.metals]} {met.coord_nr_with_metal_bonds=} {met.coord_geometry_with_metal_bonds=} {met.geom_deviation_with_metal_bonds=}")
+                print("")
                 for lig in mol.ligands:
                     if hasattr(lig, "totcharge"):
                         print(f"\t{lig.formula} ({lig.subtype}) {lig.smiles=} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} {lig.totcharge=}")

@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from cell2mol.connectivity import get_adjacency_types, get_element_count, labels2electrons, labels2formula, get_adjmatrix, is_haptic_ring
-from cell2mol.connectivity import get_metal_idxs, get_non_transition_metal_idxs, split_species, get_radii, split_group
+from cell2mol.connectivity import get_metal_idxs, get_non_transition_metal_idxs, split_species, get_radii, split_group, get_alkali_alkaline_earth_metal_idxs
 from cell2mol.connectivity import compare_atoms, compare_species, compare_metals, compare_reference_indices, get_adjmatrix_from_cif_bonds
 from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
@@ -46,6 +46,7 @@ class specie(object):
         self.eleccount         = labels2electrons(labels)   ### Assuming neutral specie (so basically this is the sum of atomic numbers)
         self.natoms            = len(labels)
         self.iscomplex         = any((elemdatabase.elementblock[l] == "d") or (elemdatabase.elementblock[l] == "f") for l in self.labels)
+        self.has_IA_IIA        = any((elemdatabase.elementgroup[l]==1 and l != "H" and l != "D") or (elemdatabase.elementgroup[l]==2) for l in self.labels)
         self.parents           = []
         self.parents_indices   = []
         self.cov_factor        = 1.3
@@ -197,7 +198,8 @@ class specie(object):
                 ## For each l in labels, create an atom class object.
                 ismetal = elemdatabase.elementblock[l] == "d" or elemdatabase.elementblock[l] == "f"
                 # non transition metals
-                if len(get_non_transition_metal_idxs([l])) > 0: ismetal = True
+                # if len(get_non_transition_metal_idxs([l])) > 0: ismetal = True
+                if len(get_alkali_alkaline_earth_metal_idxs([l])) > 0: ismetal = True
                 if ismetal : 
                     if debug >= 2: print(f"SPECIE.SET_ATOMS: {l}")
                 if debug >= 2: print(f"SPECIE.SET_ATOMS: {ismetal=}")
@@ -248,7 +250,7 @@ class specie(object):
     def get_adjmatrix(self, geom_bond_cif: list=None):
         if geom_bond_cif is not None and hasattr(self, "atom_site_labels"):
             print("SPECIE.GET_ADJMATRIX: Based on bond information from CIF")
-            isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds (self.labels, self.atom_site_labels, geom_bond_cif, metal_only= False)
+            isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds (self.labels,  self.coord, self.atom_site_labels, geom_bond_cif, metal_only= False)
         else:
             print("SPECIE.GET_ADJMATRIX: Based on interatomic distances")
             isgood, adjmat, adjnum = get_adjmatrix(self.labels, self.coord, self.cov_factor, self.radii)
@@ -265,7 +267,7 @@ class specie(object):
     def get_metal_adjmatrix(self, geom_bond_cif: list=None):
         if geom_bond_cif is not None and hasattr(self, "atom_site_labels"):
             print("SPECIE.GET_METAL_ADJMATRIX: Based on bond information from CIF")
-            isgood, madjmat, madjnum = get_adjmatrix_from_cif_bonds (self.labels, self.atom_site_labels, geom_bond_cif, metal_only= True)
+            isgood, madjmat, madjnum = get_adjmatrix_from_cif_bonds (self.labels,  self.coord, self.atom_site_labels, geom_bond_cif, metal_only= True)
         else :
             print("SPECIE.GET_METAL_ADJMATRIX: Based on interatomic distances")
             isgood, madjmat, madjnum = get_adjmatrix(self.labels, self.coord, self.cov_factor, self.radii, metal_only=True)
@@ -405,26 +407,32 @@ class molecule(specie):
         if hasattr(self,"metals"):    
             for met in self.metals:
                 met.reset_charge()
-
     ############
-    def split_complex(self, debug: int=0):
+    def split_IA_IIA(self, debug: int=0):
         if not hasattr(self,"atoms"): self.set_atoms()
-        if not self.iscomplex:        self.ligands = None; self.metals = None
+        if not self.has_IA_IIA:        self.ligands = None; self.metals = None
         else: 
+
+            IA_IIA_metal_indices = []
+            for idx, l in enumerate(self.labels):
+                if elemdatabase.elementgroup[l]==1 and l != "H" and l != "D": # Alkali Metals
+                    IA_IIA_metal_indices.append(idx)
+                elif elemdatabase.elementgroup[l]==2: # Alkaline Earth Metals
+                    IA_IIA_metal_indices.append(idx)
+            
             self.ligands = []
             self.metals  = []
+            
             # Identify Metals and the rest
-            metal_idx = list([self.indices[idx] for idx in get_metal_idxs(self.labels, debug=debug)])
-            non_transition_metals_idx = list([self.indices[idx] for idx in get_non_transition_metal_idxs(self.labels, debug=debug)])
-            if len(non_transition_metals_idx) > 0:
-                print(f"MOLECULE.SPLIT COMPLEX: Found non-transition metals in the molecule {self.formula}")
-                print(f"MOLECULE.SPLIT COMPLEX: Non-transition metals found: {[self.labels[idx] for idx in non_transition_metals_idx]}")
-                metal_idx.extend(non_transition_metals_idx)
 
-            rest_idx  = list(idx for idx in self.indices if idx not in metal_idx) 
-            if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: labels={self.labels}")
-            if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: metal_idx={metal_idx}")
-            if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: rest_idx={rest_idx}")
+            if len(IA_IIA_metal_indices) > 0:
+                print(f"MOLECULE.SPLIT_IA_IIA: Alkali or Alkali earth metals in the molecule {self.formula}")
+                print(f"MOLECULE.SPLIT_IA_IIA: {[self.labels[idx] for idx in IA_IIA_metal_indices]}")
+
+            rest_idx  = list(idx for idx in self.indices if idx not in IA_IIA_metal_indices) 
+            if debug > 0 :  print(f"MOLECULE.SPLIT_IA_IIA: labels={self.labels}")
+            if debug > 0 :  print(f"MOLECULE.SPLIT_IA_IIA: metal_idx={IA_IIA_metal_indices}")
+            if debug > 0 :  print(f"MOLECULE.SPLIT_IA_IIA: rest_idx={rest_idx}")
 
             # Split the "rest" to obtain the ligands
             rest_labels  = extract_from_list(rest_idx, self.labels, dimension=1)
@@ -434,6 +442,103 @@ class molecule(specie):
             rest_indices = extract_from_list(rest_idx, self.indices, dimension=1)
             rest_radii   = extract_from_list(rest_idx, self.radii, dimension=1)
             rest_atoms   = extract_from_list(rest_idx, self.atoms, dimension=1)
+            if self.atom_site_labels is not None:  
+                rest_atom_site_labels = extract_from_list(rest_idx, self.atom_site_labels, dimension=1)
+
+            if debug >= 2: 
+                print(f"MOLECULE.SPLIT_IA_IIA: rest labels: {rest_labels}")
+                print(f"MOLECULE.SPLIT_IA_IIA: rest indices: {rest_indices}")
+                print(f"MOLECULE.SPLIT_IA_IIA: rest radii: {rest_radii}")
+
+            if debug > 0: print(f"MOLECULE.SPLIT_IA_IIA: splitting species with {len(rest_labels)} atoms in block")
+            if len(rest_labels) == 0:
+                if debug > 0: print(f"MOLECULE.SPLIT_IA_IIA: No ligands found in the complex {self.formula}")
+                if debug > 0: print(f"MOLECULE.SPLIT_IA_IIA: Returning empty ligand list {self.ligands=}")
+                for m in IA_IIA_metal_indices:                     
+                    self.metals.append(self.atoms[m])  
+            else :
+                if hasattr(self,"cov_factor"): blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)
+                else:                          blocklist = split_species(rest_labels, rest_coord, radii=rest_radii, cov_factor=self.cov_factor, debug=debug)      
+                if debug > 0: print(f"MOLECULE.SPLIT_IA_IIA: received {len(blocklist)} blocks")
+                
+                ## Arranges Ligands
+                for b in blocklist:
+                    if debug > 0: print(f"PREPARING BLOCK: {b}")
+                    lig_indices = extract_from_list(b, rest_indices, dimension=1)
+                    lig_labels  = extract_from_list(b, rest_labels, dimension=1) 
+                    lig_coord   = extract_from_list(b, rest_coord, dimension=1) 
+                    if self.frac_coord is not None:  
+                        lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
+                    lig_radii   = extract_from_list(b, rest_radii, dimension=1) 
+                    lig_atoms   = extract_from_list(b, rest_atoms, dimension=1) 
+                    if self.atom_site_labels is not None:
+                        lig_atom_site_labels = extract_from_list(b, rest_atom_site_labels, dimension=1)
+
+                    if debug > 0: print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
+
+                    if self.frac_coord is not None:  
+                        newligand   = ligand(lig_labels, lig_coord, lig_frac_coord, radii=lig_radii)
+                    else :
+                        newligand   = ligand(lig_labels, lig_coord, radii=lig_radii)
+
+                    newligand.origin = "split_IA_IIA"
+                    newligand.add_parent(self, indices=lig_indices)
+                    
+                    if self.check_parent("unitcell"):
+                        cell_indices = [a.get_parent_index("unitcell") for a in lig_atoms]
+                        newligand.add_parent(self.get_parent("unitcell"), indices=cell_indices)
+
+                    if self.check_parent("reference"):
+                        ref_indices = [a.get_parent_index("reference") for a in lig_atoms]
+                        newligand.add_parent(self.get_parent("reference"), indices=ref_indices)
+
+
+                    newligand.set_adjacency_parameters(self.cov_factor, self.metal_factor)
+                    newligand.set_atoms(atomlist=lig_atoms, atom_site_labels=lig_atom_site_labels)
+                    newligand.inherit_adjmatrix("molecule")
+                    self.ligands.append(newligand)
+
+                ## Arranges Metals
+                for m in IA_IIA_metal_indices:                         
+                    self.metals.append(self.atoms[m])          
+
+            return self.ligands, self.metals
+            
+    ############
+    def split_complex(self, debug: int=0):
+        if not hasattr(self,"atoms"): self.set_atoms()
+        if not self.iscomplex:        self.ligands = None; self.metals = None
+        else: 
+            self.ligands = []
+            self.metals  = []
+            # Identify Metals and the rest
+            metal_idx = list([self.indices[idx] for idx in get_metal_idxs(self.labels, debug=debug)])
+            ia_iia_metal_idx = list([self.indices[idx] for idx in get_alkali_alkaline_earth_metal_idxs(self.labels, debug=debug)])
+
+            non_transition_metals_idx = list([self.indices[idx] for idx in get_non_transition_metal_idxs(self.labels, debug=debug)])
+            if len(non_transition_metals_idx) > 0:
+                print(f"MOLECULE.SPLIT COMPLEX: Found non-transition metals in the molecule {self.formula}")
+                print(f"MOLECULE.SPLIT COMPLEX: Alkali and Alkaline earth metals {[self.labels[idx] for idx in ia_iia_metal_idx]}")
+                print(f"MOLECULE.SPLIT COMPLEX: Non-transition metals found: {[self.labels[idx] for idx in non_transition_metals_idx]}")
+                # metal_idx.extend(non_transition_metals_idx)
+            metal_idx.extend(ia_iia_metal_idx)
+            rest_idx  = list(idx for idx in self.indices if idx not in metal_idx) 
+            if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: labels={self.labels}")
+            if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: metal_idx={metal_idx}")
+            if debug > 0 :  print(f"MOLECULE.SPLIT COMPLEX: rest_idx={rest_idx}")
+
+            # Split the "rest" to obtain the ligands
+            rest_labels  = extract_from_list(rest_idx, self.labels, dimension=1)
+            rest_coord   = extract_from_list(rest_idx, self.coord, dimension=1)
+            rest_indices = extract_from_list(rest_idx, self.indices, dimension=1)
+            rest_radii   = extract_from_list(rest_idx, self.radii, dimension=1)
+            rest_atoms   = extract_from_list(rest_idx, self.atoms, dimension=1)
+            
+            if self.frac_coord is not None:        
+                rest_frac    = extract_from_list(rest_idx, self.frac_coord, dimension=1)
+            if self.atom_site_labels is not None:  
+                rest_atom_site_labels = extract_from_list(rest_idx, self.atom_site_labels, dimension=1)
+
             if debug >= 2: 
                 print(f"SPLIT COMPLEX: rest labels: {rest_labels}")
                 print(f"SPLIT COMPLEX: rest indices: {rest_indices}")
@@ -456,10 +561,12 @@ class molecule(specie):
                     lig_indices = extract_from_list(b, rest_indices, dimension=1)
                     lig_labels  = extract_from_list(b, rest_labels, dimension=1) 
                     lig_coord   = extract_from_list(b, rest_coord, dimension=1) 
-                    if self.frac_coord is not None:  
-                        lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
                     lig_radii   = extract_from_list(b, rest_radii, dimension=1) 
                     lig_atoms   = extract_from_list(b, rest_atoms, dimension=1) 
+                    if self.frac_coord is not None:  
+                        lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
+                    if self.atom_site_labels is not None:
+                        lig_atom_site_labels = extract_from_list(b, rest_atom_site_labels, dimension=1)
                     
                     if debug > 0: print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
                     # Create Ligand Object
@@ -467,6 +574,8 @@ class molecule(specie):
                         newligand   = ligand(lig_labels, lig_coord, lig_frac_coord, radii=lig_radii)
                     else :
                         newligand   = ligand(lig_labels, lig_coord, radii=lig_radii)
+                    
+
                     # For debugging
                     newligand.origin = "split_complex"
                     # Define the molecule as parent of the ligand. Bottom-Up hierarchy
@@ -483,7 +592,7 @@ class molecule(specie):
                     # Update the ligand with the covalent and metal factors 
                     newligand.set_adjacency_parameters(self.cov_factor, self.metal_factor)
                     # Pass the molecule atoms to the ligand
-                    newligand.set_atoms(atomlist=lig_atoms)
+                    newligand.set_atoms(atomlist=lig_atoms, atom_site_labels=lig_atom_site_labels)
                     # Inherit the adjacencies from molecule
                     newligand.inherit_adjmatrix("molecule")
                     # Add ligand to the list. Top-Down hierarchy
@@ -537,17 +646,32 @@ class ligand(specie):
 
     #######################################################
     def get_connected_metals(self, debug: int=0):
-        # metal.groups will be used for the calculation of the relative metal radius 
-        # and define the coordination geometry of the metal /hapicitiy/ hapttype    
+ 
         self.metals = []
+        refcell = self.get_parent("reference")
         mol = self.get_parent("molecule")
-        for met in mol.metals:
-            tmplabels = self.labels.copy()
-            tmpcoord  = self.coord.copy()
-            tmplabels.append(met.label)
-            tmpcoord.append(met.coord)
-            isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
-            if isgood and any(tmpadjnum) > 0: self.metals.append(met)
+        
+        if refcell.exist_cif_bond_moiety:
+            for met in mol.metals:
+                tmplabels = self.labels.copy()
+                tmpcoord  = self.coord.copy()
+                atom_site_labels = [atom.atom_site_label for atom in self.atoms]
+                tmplabels.append(met.label)
+                tmpcoord.append(met.coord)
+                atom_site_labels.append(met.atom_site_label)
+                isgood, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, refcell.geom_bond_cif, metal_only=True)
+                if isgood and any(tmpadjnum) > 0: 
+                    self.metals.append(met)
+                    if debug >= 0: print(f"LIGAND.Get_connected_metals: {self.formula} is connected to {met.label}")
+        else:        
+            for met in mol.metals:
+                tmplabels = self.labels.copy()
+                tmpcoord  = self.coord.copy()
+                tmplabels.append(met.label)
+                tmpcoord.append(met.coord)
+                isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+                if isgood and any(tmpadjnum) > 0: self.metals.append(met)
+
         return self.metals
 
     #######################################################
@@ -632,15 +756,18 @@ class ligand(specie):
 
     #######################################################
     def split_ligand(self, debug: int=0):
-        print(f"LIGAND.SPLIT_LIGAND: splitting {self.formula} into groups")
+
+        refcell = self.get_parent("reference") 
+    
+        if debug > 0: print(f"\nLIGAND.SPLIT_LIGAND: splitting {self.formula} into groups")
+
         # Split the "ligand to obtain the groups
         self.groups = []
+
         # Identify Connected and Unconnected atoms (to the metal)
         if not hasattr(self,"connected_idx"): self.get_connected_idx()
-
-        ## Creates the list of variables
         connected_idx     = self.connected_idx
-        if debug > 0: print(f"\nLIGAND.SPLIT_LIGAND: splitting {self.formula} into groups")
+        
         if debug >= 2:
             print(f"\tLIGAND.SPLIT_LIGAND: {self.indices=}") 
             print(f"\tLIGAND.SPLIT_LIGAND: {connected_idx=}")
@@ -650,6 +777,8 @@ class ligand(specie):
             conn_frac_coord = extract_from_list(connected_idx, self.frac_coord, dimension=1)
         conn_radii      = extract_from_list(connected_idx, self.radii, dimension=1)
         conn_atoms      = extract_from_list(connected_idx, self.atoms, dimension=1)
+        if self.atom_site_labels is not None:
+            conn_atom_site_labels = extract_from_list(connected_idx, self.atom_site_labels, dimension=1)
         if debug >= 2: print(f"\tLIGAND.SPLIT_LIGAND: {conn_labels=}")
 
         if hasattr(self,"cov_factor"): blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=self.cov_factor, debug=debug)
@@ -671,19 +800,28 @@ class ligand(specie):
                 newgroup = group(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
             else:
                 newgroup = group(gr_labels, gr_coord, radii=gr_radii)
+            if self.atom_site_labels is not None:
+                newgroup.atom_site_labels = extract_from_list(b, conn_atom_site_labels, dimension=1)
             # For debugging
             newgroup.origin = "split_ligand"
             # Define the ligand as parent of the group. Bottom-Up hierarchy
             newgroup.add_parent(self, indices=gr_indices)
             # Pass the ligand atoms to the groud
-            newgroup.set_atoms(atomlist=gr_atoms)
+            newgroup.set_atoms(atomlist=gr_atoms, atom_site_labels=conn_atom_site_labels)
             # Inherit the adjacencies from molecule
             newgroup.inherit_adjmatrix("ligand")
             # Associate the Groups with the Metals
             newgroup.get_connected_metals(debug=debug)
             newgroup.get_closest_metal(debug=debug)
             newgroup.get_hapticity(debug=debug)
+            # if refcell.exist_cif_bond_moiety:
+            #     print(f"\tSPLIT_LIGAND: skipping check_coordination for group {newgroup.formula} because it is based on CIF bond information")
+            #     newgroup.checked_coordination = True
+            #     newgroup.get_denticity(debug=debug)
+            #     self.groups.append(newgroup)
+            # else:
             newgroup, conn_idx, final_ligand_indices = newgroup.check_coordination(debug=debug)
+            print(f"\tLIGAND.SPLIT_LIGAND: {conn_idx=}")
             if len(conn_idx) == len(newgroup.atoms):
                 if debug > 1 : print(f"\tLIGAND.SPLIT_LIGAND: new group is found")
                 newgroup.get_denticity(debug=debug)
@@ -771,15 +909,33 @@ class group(specie):
         # metal.groups will be used for the calculation of the relative metal radius 
         # and define the coordination geometry of the metal /hapicitiy/ hapttype    
         self.metals = []
+
+        refcell = self.get_parent("reference")
         lig = self.get_parent("ligand")
+        
         if not hasattr(lig,"metals"): lig.get_connected_metals()
-        for met in lig.metals:
-            tmplabels = self.labels.copy()
-            tmpcoord  = self.coord.copy()
-            tmplabels.append(met.label)
-            tmpcoord.append(met.coord)
-            isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
-            if isgood and any(tmpadjnum) > 0: self.metals.append(met)
+
+        
+        if refcell.exist_cif_bond_moiety:
+            for met in lig.metals:
+                tmplabels = self.labels.copy()
+                tmpcoord  = self.coord.copy()
+                atom_site_labels = [atom.atom_site_label for atom in self.atoms]
+                tmplabels.append(met.label)
+                tmpcoord.append(met.coord)
+                atom_site_labels.append(met.atom_site_label)
+                isgood, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, refcell.geom_bond_cif, metal_only=True)
+                if isgood and any(tmpadjnum) > 0: 
+                    self.metals.append(met)
+                    if debug >= 0: print(f"GROUP.Get_connected_metals: {self.formula} is connected to {met.label}")
+        else:
+            for met in lig.metals:
+                tmplabels = self.labels.copy()
+                tmpcoord  = self.coord.copy()
+                tmplabels.append(met.label)
+                tmpcoord.append(met.coord)
+                isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+                if isgood and any(tmpadjnum) > 0: self.metals.append(met)
         return self.metals
     
     #######################################################
@@ -921,8 +1077,13 @@ class atom(object):
         ## Checks whether two atoms are connected (through the adjacency)
         if not isinstance(other, type(self)): return False
         labels = list([self.label,other.label]) 
-        coords = list([self.coord,other.coord]) 
-        isgood, adjmat, adjnum = get_adjmatrix(labels, coords)
+        coords = list([self.coord,other.coord])
+        refcell = self.get_parent("reference") 
+        if refcell.exist_cif_bond_moiety:
+            atom_site_labels = [self.atom_site_label, other.atom_site_label]
+            isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds(labels, coords, atom_site_labels, refcell.geom_bond_cif)
+        else:    
+            isgood, adjmat, adjnum = get_adjmatrix(labels, coords)
         if isgood and adjnum[0] > 0: return True
         else:                        return False
 
@@ -966,16 +1127,18 @@ class atom(object):
             if c > 0: self.metal_adjacency.append(idx)
 
     #######################################################
-    def get_connected_metals(self, metalist: list, debug: int=0):
-        self.metals = []
-        for met in metalist:
-            tmplabels = self.label.copy()
-            tmpcoord  = self.coord.copy()
-            tmplabels.append(met.label)
-            tmpcoord.append(met.coord)
-            isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
-            if isgood and any(tmpadjnum) > 0: self.metals.append(met)
-        return self.metals
+    # def get_connected_metals(self, metalist: list, debug: int=0):
+        
+    #     self.metals = []
+
+    #     for met in metalist:
+    #         tmplabels = self.label.copy()
+    #         tmpcoord  = self.coord.copy()
+    #         tmplabels.append(met.label)
+    #         tmpcoord.append(met.coord)
+    #         isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+    #         if isgood and any(tmpadjnum) > 0: self.metals.append(met)
+    #     return self.metals
 
     #######################################################
     def get_closest_metal(self, debug: int=0):
@@ -1173,36 +1336,76 @@ class metal(atom):
         # metal.groups will be used for the calculation of the relative metal radius 
         # and define the coordination geometry of the metal /hapicitiy/ hapttype    
         if not self.check_parent("molecule"): return None
+        
+        refcell = self.get_parent("reference")
         mol = self.get_parent("molecule")
         self.groups = []
-        for lig in mol.ligands:
-            for group in lig.groups:
-                if debug > 2: print(group.formula)
-                ligand_indices = [ a.get_parent_index("ligand") for a in group.atoms ]
-                tmplabels = []
-                tmpcoord  = []
-                tmplabels.append(self.label)
-                tmpcoord.append(self.coord)
-                tmplabels.extend(group.labels)
-                tmpcoord.extend(group.coord)
-                if debug > 2: print(tmplabels, tmpcoord)
-                isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
-                # if isgood and any(tmpadjnum) > 0: self.groups.append(group)
-                if isgood:
-                    if debug > 2: print(group.formula, tmpadjmat, tmpadjnum)
-                    if all(tmpadjnum[1:]): 
-                        self.groups.append(group)
-                    elif any(tmpadjnum[1:]): 
-                        if debug > 1: print(f"Metal {self.label} is connected to {group.formula} but not all atoms are connected")
-                        conn_idx = [ idx for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
-                        conn_ligand_indices = [ ligand_indices[idx] for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
-                        if debug > 1: print(f"get_connected_groups {tmpadjnum[1:]=} {conn_idx=} {conn_ligand_indices=} {ligand_indices=}")
-                        splitted_groups = split_group(group, conn_idx, conn_ligand_indices, debug=debug)
-                        for g in splitted_groups:
-                            self.groups.append(g)
-                            if debug > 1: print(f"Metal {self.label} is connected to {g.formula}")
-                    else:
-                        if debug > 1: print(f"Metal {self.label} is not connected to {group.formula}")
+        
+        if refcell.exist_cif_bond_moiety:
+            for lig in mol.ligands:
+                for group in lig.groups:
+                    if debug >= 2: print(group.formula)
+                    ligand_indices = [ a.get_parent_index("ligand") for a in group.atoms ]
+                    tmplabels = []
+                    tmpcoord  = []
+                    atom_site_labels = []
+                    
+                    tmplabels.append(self.label)
+                    tmpcoord.append(self.coord)
+                    atom_site_labels.append(self.atom_site_label)
+                    
+                    tmplabels.extend(group.labels)
+                    tmpcoord.extend(group.coord)
+                    atom_site_labels.extend([atom.atom_site_label for atom in group.atoms])
+                    
+                    print(f"ATOM.Get_connected_groups: {tmplabels=} {atom_site_labels=}")
+                    isgood, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, refcell.geom_bond_cif, metal_only=True)
+                    if isgood :
+                        if debug > 2: print(group.formula, tmpadjmat, tmpadjnum)
+                        if all(tmpadjnum[1:]): 
+                            self.groups.append(group)
+                            if debug >= 0: print(f"ATOM.Get_connected_groups: Metal {self.label} is connected to all atoms in {group.formula}")
+
+                        elif any(tmpadjnum[1:]):
+                            if debug > 1: print(f"Metal {self.label} is connected to {group.formula} but not all atoms are connected")
+                            conn_idx = [ idx for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
+                            conn_ligand_indices = [ ligand_indices[idx] for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
+                            if debug > 1: print(f"get_connected_groups {tmpadjnum[1:]=} {conn_idx=} {conn_ligand_indices=} {ligand_indices=}")
+                            splitted_groups = split_group(group, conn_idx, conn_ligand_indices, debug=debug)
+                            for g in splitted_groups:
+                                self.groups.append(g)
+                                if debug > 1: print(f"Metal {self.label} is connected to {g.formula}")
+                        else:
+                            if debug > 1: print(f"Metal {self.label} is not connected to {group.formula}")    
+        else:
+            for lig in mol.ligands:
+                for group in lig.groups:
+                    if debug > 2: print(group.formula)
+                    ligand_indices = [ a.get_parent_index("ligand") for a in group.atoms ]
+                    tmplabels = []
+                    tmpcoord  = []
+                    tmplabels.append(self.label)
+                    tmpcoord.append(self.coord)
+                    tmplabels.extend(group.labels)
+                    tmpcoord.extend(group.coord)
+                    if debug > 2: print(tmplabels, tmpcoord)
+                    isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+                    # if isgood and any(tmpadjnum) > 0: self.groups.append(group)
+                    if isgood:
+                        if debug > 2: print(group.formula, tmpadjmat, tmpadjnum)
+                        if all(tmpadjnum[1:]): 
+                            self.groups.append(group)
+                        elif any(tmpadjnum[1:]): 
+                            if debug > 1: print(f"Metal {self.label} is connected to {group.formula} but not all atoms are connected")
+                            conn_idx = [ idx for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
+                            conn_ligand_indices = [ ligand_indices[idx] for idx, num in enumerate(tmpadjnum[1:]) if num == 1 ]
+                            if debug > 1: print(f"get_connected_groups {tmpadjnum[1:]=} {conn_idx=} {conn_ligand_indices=} {ligand_indices=}")
+                            splitted_groups = split_group(group, conn_idx, conn_ligand_indices, debug=debug)
+                            for g in splitted_groups:
+                                self.groups.append(g)
+                                if debug > 1: print(f"Metal {self.label} is connected to {g.formula}")
+                        else:
+                            if debug > 1: print(f"Metal {self.label} is not connected to {group.formula}")
         return self.groups
 
     #######################################################
@@ -1232,38 +1435,52 @@ class metal(atom):
     def get_connected_metals(self, debug: int=1):
         self.metals = []
         mol = self.get_parent("molecule")
-        for met in mol.metals:
-            if met == self : continue
-            tmplabels = []
-            tmpcoord  = []
-            tmplabels.append(self.label)
-            tmpcoord.append(self.coord)
-            tmplabels.append(met.label)
-            tmpcoord.append(met.coord)
-
-            if debug > 1: print(tmplabels, tmpcoord)
-
-            isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
-            if isgood:
-                if debug > 1: print(met.label, tmpadjmat, tmpadjnum)
-                if all(tmpadjnum[1:]): 
+        refcell = self.get_parent("reference") 
+        if refcell.exist_cif_bond_moiety:
+            pidx = self.get_parent_index("molecule")
+            #print(f"METAL.Get_connected_metals: {self.label} {pidx=} {mol.metals=}")
+            for met in mol.metals:
+                if met == self : continue
+                met_idx = met.get_parent_index("molecule")
+                if mol.adjmat[pidx, met_idx] == 1:
+                    if debug > 1: print(f"METAL.Get_connected_metals: {self.label} is connected to {met.label}")
                     self.metals.append(met)
                 else:
-                    if debug > 1: print(f"Metal {self.label}  {met.label}")
+                    if debug > 1: print(f"METAL.Get_connected_metals: {self.label} is NOT connected to {met.label}")
+        else:
+            for met in mol.metals:
+                if met == self : continue
+                tmplabels = []
+                tmpcoord  = []
+                tmplabels.append(self.label)
+                tmpcoord.append(self.coord)
+                tmplabels.append(met.label)
+                tmpcoord.append(met.coord)
+
+                if debug > 1: print(tmplabels, tmpcoord)
+
+                isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+                if isgood:
+                    if debug > 1: print(met.label, tmpadjmat, tmpadjnum)
+                    if all(tmpadjnum[1:]): 
+                        self.metals.append(met)
+                    else:
+                        if debug > 1: print(f"Metal {self.label}  {met.label}")
+
         if debug >= 2 : print(f"METAL.Get_connected_metals: {self.label} connected to {len(self.metals)} metals {[m.label for m in self.metals]}")
+        
         return self.metals
     
     #######################################################
     def get_coordination_geometry(self: object, debug: int = 0):
-        coord_group = self.get_connected_groups(debug=debug)
         
-        self.coord_nr = len(coord_group)
-
         if debug >= 1: print(f"\nMETAL.Get_coord_geometry: {self.label}")
-        if debug >= 3 : print(f"METAL.Get_coord_geometry:\n{coord_group=}")
-        if debug >= 1: print(f"METAL.Get_ccoord_geometry: coord_nr={self.coord_nr}")
         
-        self.coord_geometry, self.geom_deviation = define_coordination_geometry(self, coord_group, debug = debug)
+        coord_group = self.get_connected_groups(debug=debug)
+        self.coord_nr, self.coord_geometry, self.geom_deviation = define_coordination_geometry(self, coord_group, debug = debug)
+        
+        if debug >= 3 : print(f"METAL.Get_coord_geometry:\n{coord_group=}")
+        if debug >= 1: print(f"METAL.Get_ccoord_geometry: coord_nr={self.coord_nr}")    
         if debug >= 2: print(f"METAL.Get_coord_geometry: {self.coord_geometry=} {self.geom_deviation=}")
         
         self.rel_metal_radius = self.get_relative_metal_radius(debug = debug)
@@ -1274,10 +1491,11 @@ class metal(atom):
         if len(self.metals) > 0:
             bonded_metals = self.metals
             whole_coord = coord_group + bonded_metals
-            self.coord_nr_with_metal_bonds = len(whole_coord)
+
             if debug >= 1: print(f"\nMETAL.Get_coord_geometry Including metal-metal bonds for: {self.label}")
+            
+            self.coord_nr_with_metal_bonds, self.coord_geometry_with_metal_bonds, self.geom_deviation_with_metal_bonds = define_coordination_geometry(self, whole_coord, debug = debug) 
             if debug >= 1: print(f"METAL.Get_coord_geometry Including metal-metal bonds {self.coord_nr_with_metal_bonds=}") 
-            self.coord_geometry_with_metal_bonds, self.geom_deviation_with_metal_bonds = define_coordination_geometry(self, whole_coord, debug = debug) 
             if debug >= 2: print(f"METAL.Get_coord_geometry Including metal-metal bonds: {self.coord_geometry_with_metal_bonds=} {self.geom_deviation_with_metal_bonds=}")
     
         return self.coord_geometry
@@ -1344,6 +1562,8 @@ class cell(object):
             self.exist_cif_bond_moiety = True
         else:   
             self.exist_cif_bond_moiety = False
+            self.geom_bond_cif = None
+            self.moiety_list_cif = None
         return self.exist_cif_bond_moiety
     
     #######################################################
@@ -1362,7 +1582,8 @@ class cell(object):
         else:                           moleclist = self.moleclist
         for idx, mol in enumerate(moleclist):
             if debug >= 2: print(f"Molecule {idx} formula={mol.formula}")
-            if not mol.iscomplex:
+            if not mol.iscomplex and not mol.has_IA_IIA:
+            # if not mol.iscomplex:
                 found = False
                 for ldx, typ in enumerate(typelist_mols):   # Molecules
                     issame = compare_species(mol, typ[0], debug=0)
@@ -1378,7 +1599,11 @@ class cell(object):
                 mol.unique_index = kdx
                 self.species_list.append(mol)
             else:
-                if not hasattr(mol,"ligands"): mol.split_complex(debug=debug)
+                if not hasattr(mol,"ligands"): 
+                    if mol.iscomplex :
+                        mol.split_complex(debug=debug)
+                    elif mol.has_IA_IIA:
+                        mol.split_IA_IIA(debug=debug)
                 for jdx, lig in enumerate(mol.ligands):     # ligands
                     found = False
                     for ldx, typ in enumerate(typelist_ligs):
@@ -1469,15 +1694,18 @@ class cell(object):
 
             newmolec         = molecule(mol_labels, mol_coord, mol_frac_coord)
             newmolec.add_parent(self, indices=b)
-            newmolec.add_parent(refcell, indices=b)
+            # newmolec.add_parent(refcell, indices=b)
             newmolec.set_adjacency_parameters(cov_factor, metal_factor)
             newmolec.set_atoms(create_adjacencies=True, atom_site_labels=mol_atom_site_labels, geom_bond_cif=geom_bond_cif, debug=debug)
             for atom, idx in zip(newmolec.atoms, b):
-                atom.add_parent(refcell, index=idx)
-
+                # atom.add_parent(refcell, index=idx)
+                atom.add_parent(self, index=idx)
             # This must be below the frac_coord, so they are carried on to the ligands
+            # if newmolec.iscomplex :
             if newmolec.iscomplex: 
                 newmolec.split_complex()
+            elif newmolec.has_IA_IIA:
+                newmolec.split_IA_IIA()
             else:
                 newmolec.add_parent(newmolec, indices=[*range(0,newmolec.natoms,1)])
             self.refmoleclist.append(newmolec)
@@ -1513,6 +1741,17 @@ class cell(object):
                         met.get_connected_metals(debug=debug)                         
                         met.get_coordination_geometry(debug=debug)
                         met.get_coord_sphere_formula(debug=debug)
+                elif ref.has_IA_IIA:
+                    print(f"GETREFS: working with {ref.formula} with alkali or alkali earth metals")
+                    if len(ref.ligands) == 0 :
+                        pass
+                    else:
+                        for lig in ref.ligands:
+                            lig.get_denticity(debug=debug)
+                    for met in ref.metals: 
+                        met.get_connected_metals(debug=debug)                         
+                        met.get_coordination_geometry(debug=debug)
+                        met.get_coord_sphere_formula(debug=debug)
         else:      
             self.has_isolated_H = True
             
@@ -1531,6 +1770,10 @@ class cell(object):
         # Define reference cell
         refcell = cell(self.name, ref_labels, ref_pos, ref_fracs, self.cell_vector, self.cell_param)
         refcell.get_subtype("reference")    
+        
+        atom_site_labels = self.atom_site_labels
+        geom_bond_cif = self.geom_bond_cif
+        print(f"GETREFS: geom_bond_cif={geom_bond_cif}")
 
         blocklist = split_species(ref_labels, ref_pos, cov_factor=cov_factor)
         print(f"GETREFS: blocklist={blocklist}")
@@ -1541,17 +1784,21 @@ class cell(object):
             mol_labels       = extract_from_list(b, ref_labels, dimension=1)
             mol_coord        = extract_from_list(b, ref_pos, dimension=1)
             mol_frac_coord   = extract_from_list(b, ref_fracs, dimension=1)
+            mol_atom_site_labels   = extract_from_list(b, atom_site_labels, dimension=1)
+
             newmolec         = molecule(mol_labels, mol_coord, mol_frac_coord)
             newmolec.add_parent(self, indices=b)
-            newmolec.add_parent(refcell, indices=b)
+            # newmolec.add_parent(refcell, indices=b)
             newmolec.set_adjacency_parameters(cov_factor, metal_factor)
-            newmolec.set_atoms(create_adjacencies=True, debug=debug)
+            newmolec.set_atoms(create_adjacencies=True, atom_site_labels=mol_atom_site_labels, geom_bond_cif=geom_bond_cif, debug=debug)
             for atom, idx in zip(newmolec.atoms, b):
-                atom.add_parent(refcell, index=idx)
-
+                # atom.add_parent(refcell, index=idx)
+                atom.add_parent(self, index=idx)
             # This must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex: 
                 newmolec.split_complex()
+            elif newmolec.has_IA_IIA:
+                newmolec.split_IA_IIA()
             else:
                 newmolec.add_parent(newmolec, indices=[*range(0,newmolec.natoms,1)])
             self.refmoleclist.append(newmolec)
@@ -1584,6 +1831,17 @@ class cell(object):
                         for lig in ref.ligands:
                             lig.get_denticity(debug=debug)
                     for met in ref.metals:
+                        met.get_connected_metals(debug=debug)                         
+                        met.get_coordination_geometry(debug=debug)
+                        met.get_coord_sphere_formula(debug=debug)
+                elif ref.has_IA_IIA:
+                    print(f"GETREFS: working with {ref.formula} with alkali or alkali earth metals")
+                    if len(ref.ligands) == 0 :
+                        pass
+                    else:
+                        for lig in ref.ligands:
+                            lig.get_denticity(debug=debug)
+                    for met in ref.metals: 
                         met.get_connected_metals(debug=debug)                         
                         met.get_coordination_geometry(debug=debug)
                         met.get_coord_sphere_formula(debug=debug)
@@ -1937,8 +2195,8 @@ class cell(object):
                                         issame = compare_reference_indices(ref_lig, lig, debug=debug)
                                         if issame:
                                             set_charge_state (ref_lig, lig, mode=2, debug=debug)
-                                        else:
-                                            print("ERROR: ASSIGN_CHARGES: Ligand", idx, jdx, rdx, lig.formula, ref_lig.totcharge, ref_lig.smiles)
+                                        # else:
+                                        #     print("ERROR: ASSIGN_CHARGES: Ligand", idx, jdx, rdx, lig.formula, ref_lig.totcharge, ref_lig.smiles)
                             for kdx, met in enumerate(mol.metals):
                                 for ref_met in ref.metals:
                                     if (met.formula == ref_met.formula):
@@ -2187,7 +2445,6 @@ class cell(object):
             elif self.missing_H_in_Water:       case = 2
             elif self.missing_H_in_CoordWater:  case = 3
             elif self.missing_H_in_Carbon:      case = 4
-            elif self.disagree_with_cif_formula:case = 9
             else :                              case = 0
         elif mode == "possible_charges":
             print("-------------------------------")

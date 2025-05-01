@@ -40,6 +40,7 @@ def get_possible_charge_state(spec: object, debug: int=0):
         possible_cs = [ch_state]
         return possible_cs
     
+
     if spec.subtype == "group" or (spec.subtype == 'molecule' and spec.iscomplex):  
         return None
     charge_states = []  
@@ -216,6 +217,10 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     natoms   = ligand.natoms
     newlab   = ligand.labels.copy()
     newcoord = ligand.coord.copy()
+    
+    if len(get_non_transition_metal_idxs(newlab)) == natoms:  # metal cluster (e.g. Sb12 in AKEVIX)
+        if debug >= 2: print(f"    POSCHARGE: CANNOT Generate PROTONATION for this specie {specie.formula} ({specie.subtype})")
+        return None
 
     # Variables that control how many atoms have been added.
     tmp_added_atoms = 0
@@ -591,7 +596,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
             # print("====")
             for jdx, a in enumerate(ligand.atoms):
                 if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0 and jdx in non_local_groups_indices:
-                    print(a.label)
+                    # print(a.label)
                     if non_local_groups > 1:
                         #print(f"{com=} {toallocate=}")
                         if com[toallocate] == 1:
@@ -723,7 +728,7 @@ def get_charge_manual(spec, debug: int=0):
     return ch_state
 
 ######################################################
-def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=True, debug: int=0): 
+def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=True, abs_charge=None, debug: int=0): 
     ## Generates the connectivity of a molecule given a desired charge (charge).
     # The molecule is described by a protonation states that has labels, and the atomic cartesian coordinates "coords"
     # The adjacency matrix is also provided in the protonation state(adjmat)
@@ -731,9 +736,10 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
 
     natoms = prot.natoms
     atnums = prot.atnums
+
     if debug >= 2: print(f"\nGET_CHARGE. Starting get_charge with charge {charge} and {prot.formula} {prot.added_atoms=}")
     # prot.coords and prot.cov_factor will not be used
-    mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow)
+    mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow, abs_charge=abs_charge)
     if debug >= 2: print(f"GET_CHARGE.{len(mols)=} received from xyz2mol with charge {charge}")
     
     if len(mols) > 1: 
@@ -928,10 +934,10 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     # Alkali Metals
     at_charge[3] = [1]  # Li
     at_charge[11] = [1]  # Na
-    at_charge[13] = [1]  # K
-    at_charge[31] = [1]  # Rb
-    at_charge[49] = [1]  # Cs
-    at_charge[81] = [1]  # Fr
+    at_charge[19] = [1]  # K
+    at_charge[37] = [1]  # Rb
+    at_charge[55] = [1]  # Cs
+    at_charge[87] = [1]  # Fr
     
     # Alkaline Earth Metals
     at_charge[4] = [2]  # Be
@@ -975,7 +981,7 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     at_charge[80] = [2]  # Hg
 
     # post-transition metals
-    at_charge[13] = [3]  # Al
+    at_charge[13] = [1, 3]  # Al
     at_charge[31] = [3]  # Ga
     at_charge[32] = [2, 4]  # Ge
     at_charge[49] = [3]  # In
@@ -1231,7 +1237,7 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
             ismetal_2 = elemdatabase.elementblock[b.atom2.label] == "d" or elemdatabase.elementblock[b.atom2.label] == "f"
             if ismetal_1 or ismetal_2:
                 pass
-            elif len(get_non_transition_metal_idxs([b.atom1.label, b.atom2.label])) > 0:
+            elif len(get_alkali_alkaline_earth_metal_idxs([b.atom1.label, b.atom2.label])) > 0:
                 pass
             else:
                 begin_idx = b.atom1.get_parent_index("ligand")
@@ -1404,7 +1410,16 @@ class protonation(object):
         self.parent                     = parent
 
         self.radii = get_radii(labels)
-        self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
+        refcell = self.parent.get_parent("reference")
+
+        self.atom_site_labels_indices = [ atom.get_parent_index("reference") for atom in self.parent.atoms]
+        self.atom_site_labels = [refcell.atom_site_labels[idx] for idx in self.atom_site_labels_indices]
+        print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
+        print("PROTONATION.atom_site_labels", self.atom_site_labels)
+        if refcell.exist_cif_bond_moiety:
+            self.status, self.adjmat, self.adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, refcell.geom_bond_cif)
+        else:
+            self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
    
     def reorder(self, map, debug: int=0):
         if debug > 0: print("PROTONATION.REORDER. labels:", self.labels)
@@ -1424,12 +1439,18 @@ class protonation(object):
             self.coords                     = list(np.array(self.coords)[mapext])
             self.atnums                     = list(np.array(self.atnums)[mapext])
             self.radii                      = list(np.array(self.radii)[mapext])
+            self.atom_site_labels           = list(np.array(self.atom_site_labels)[map])
             self.addedlist                  = list(np.array(self.addedlist)[map])
             self.block                      = list(np.array(self.block)[map])
             self.metal_electrons            = list(np.array(self.metal_electrons)[map])
             self.elemlist                   = list(np.array(self.elemlist)[map])
+    
             self.typ                        = "Reordered"
-            self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
+            refcell = self.parent.get_parent("reference")
+            if refcell.exist_cif_bond_moiety:
+                self.status, self.adjmat, self.adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, refcell.geom_bond_cif)
+            else:
+                self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
         return self
 
     def __repr__(self):
@@ -1437,6 +1458,7 @@ class protonation(object):
         to_print += f'------------- Cell2mol Protonation ----------------\n'
         to_print += f' Status                          = {self.status}\n'
         to_print += f' Labels                          = {self.labels}\n'
+        to_print += f' Atom site labels                = {self.atom_site_labels}\n'
         to_print += f' Type                            = {self.typ}\n'
         to_print += f' Atoms added in positions        = {self.addedlist}\n'
         to_print += f' Atoms blocked (no atoms added)  = {self.block}\n'
