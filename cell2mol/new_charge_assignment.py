@@ -120,6 +120,7 @@ def set_charge_state(reference, target, mode, debug: int=0):
 
     final_charge = reference.totcharge
     print("SET_CHARGE_STATE:", reference.charge_state)
+    refcell = reference.get_parent("reference")
 
     if mode == 1 : # For "reference" cell. Their possible charge states are already calculated
         if target.formula in ["O4-Cl", "N3", "I3"]:
@@ -148,20 +149,30 @@ def set_charge_state(reference, target, mode, debug: int=0):
         elif target.subtype == "ligand":
             if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Ligand")
             prot = reference.charge_state.protonation
+            print(f"SET_CHARGE_STATE:{prot=}")
             temp_prot = copy.deepcopy(prot)
+            print(f"{reference.charge_state.uncorr_atom_charges=} {len(reference.charge_state.uncorr_atom_charges)} abs_charge {sum(abs(x) for x in reference.charge_state.uncorr_atom_charges)}")
             temp_prot.parent = target
-
+            abs_charge = sum(abs(x) for x in reference.charge_state.uncorr_atom_charges)
             print(f"SET_CHARGE_STATE:{temp_prot.labels=} {len(temp_prot.labels)=} {len(temp_prot.coords)=} {len(temp_prot.block)=} {temp_prot.added_atoms=}")
             # For "unit" cell
-            ref_data = reference.get_parent_indices("reference")
-            target_data = target.get_parent_indices("reference")
+            ref_indices = reference.get_parent_indices("reference")
+            target_indices = target.get_parent_indices("reference")
+
+
+            ref_data = [refcell.atom_site_labels[idx] for idx in ref_indices]
+            target_data = [refcell.atom_site_labels[idx] for idx in target_indices]
+
+            print(f"SET_CHARGE_STATE:{ref_data=}")
+            print(f"SET_CHARGE_STATE:{target_data=}")
             index_map = {value: index for index, value in enumerate(target_data)}
             sorted_indices = sorted(range(len(ref_data)), key=lambda i: index_map[ref_data[i]])            
             print(f"SET_CHARGE_STATE:{sorted_indices=}")
             reordered_prot = temp_prot.reorder(sorted_indices)
             # reordered_prot.coords = target.coord
+            print(f"SET_CHARGE_STATE:{reordered_prot=}")
             if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {sorted_indices=}")
-            cs = get_charge(reference.charge_state.uncorr_total_charge , reordered_prot)
+            cs = get_charge(reference.charge_state.uncorr_total_charge , reordered_prot, abs_charge=abs_charge)
 
     target.charge_state = cs
     if final_charge != cs.corr_total_charge:
@@ -315,6 +326,7 @@ def create_metal_ligand_bonds (mol, debug: int=0):
                             bond_startatom = met
                             bond_endatom   = at
                         newbond = bond(bond_startatom, bond_endatom, 0)
+                        # Chem.BondType.DATIVE
                         at.add_bond(newbond)
                         met.add_bond(newbond)
                         count += 1 
