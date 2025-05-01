@@ -20,8 +20,8 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
             # Cell Reconstruction
             all_molecules, reconstructed_molecules = reconstruct(refcell, newcell, sym_ops, debug=debug)    
             all_molecules.extend(reconstructed_molecules)         
-            for i, mol in enumerate(all_molecules):
-                writexyz(os.getcwd(), f"{refcell.name}_mol_{i}_{mol.formula}.xyz", mol.labels, mol.coord)
+            # for i, mol in enumerate(all_molecules):
+            #     writexyz(os.getcwd(), f"{refcell.name}_mol_{i}_{mol.formula}.xyz", mol.labels, mol.coord)
             tend = time.time()
             if newcell.error_get_fragments:     
                 if debug >= 1: print(f"\nCell Reconstruction Failed. Total execution time: {tend - tini:.2f} seconds")
