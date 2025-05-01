@@ -53,8 +53,11 @@ def process_refcell(input_path, name, current_dir, debug=0):
                         spin = 1
                     else:
                         spin = 2
-                    writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}.xyz", ref.labels, ref.coord, charge=ref.totcharge_cif, spin=spin)
-                    print(f"Ref molecule {i} {ref.formula} total charge {ref.totcharge_cif} spin multiplicity {spin}")
+                    writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz", ref.labels, ref.coord, charge=ref.totcharge_cif, spin=spin)
+                    print(f"Ref molecule {i} {ref.formula} total charge {ref.totcharge_cif} lowest spin multiplicity {spin}")
+                else:
+                    writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}.xyz", ref.labels, ref.coord, charge="", spin="")
+                    print(f"Ref molecule {i} {ref.formula} without charge and spin information")
 
             if refcell.error_case == 0:
                 get_unique_species_in_reference(refcell, debug) 
@@ -62,7 +65,6 @@ def process_refcell(input_path, name, current_dir, debug=0):
                 print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
             refcell.save(ref_cell_fname)
     
-    if refcell.error_case == 0:                
         # Print summary information
         summary_fname = os.path.join(current_dir, "reference_summary.out")
         with open(summary_fname, "w") as summary:
@@ -98,11 +100,18 @@ def create_reference (input_path, name, cell_vector, cell_param, debug):
 
     if refcell.exist_cif_bond_moiety:
         refcell.get_reference_molecules_from_moiety (ref_labels, ref_fracs, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR, debug=debug)
+        compare_with_CIF(input_path, refcell, debug=debug)
+        if refcell.disagree_with_cif_formula:
+            refcell.error_case = 9
+        else :
+            refcell.error_case = 0
     else:
         refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR, debug=debug)
-    
-    compare_with_CIF(input_path, refcell, debug=debug)
-    refcell.assess_errors(mode="cif_formula") 
+        compare_with_CIF(input_path, refcell, debug=debug)
+        if refcell.has_isolated_H :
+            refcell.error_case = 1
+        else : 
+            refcell.error_case = 0
 
     if refcell.error_case == 0:
         refcell.check_missing_H(debug=debug)  

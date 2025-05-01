@@ -91,8 +91,8 @@ for k in elemdatabase.elementsym:
     except KeyError:
         continue
 
-# print(atomic_valence)
-# print(atomic_valence_electrons)
+# print(f"XYZ2MOL: {atomic_valence=}")
+# print(f"XYZ2MOL: {atomic_valence_electrons=}")
 ###############################
 
 
@@ -186,7 +186,7 @@ def charge_is_OK(
             if q != 0:
                 q_list.append(q)
 
-    return charge == Q
+    return charge == Q , q_list
 
 
 def BO_is_OK(
@@ -198,6 +198,7 @@ def BO_is_OK(
     atoms,
     valences,
     allow_charged_fragments=True,
+    abs_charge=None,
 ):
     """
     Sanity of bond-orders
@@ -221,7 +222,8 @@ def BO_is_OK(
         return False
 
     check_sum = (BO - AC).sum() == sum(DU)
-    check_charge = charge_is_OK(
+    # check_charge = charge_is_OK(
+    check_charge, q_list = charge_is_OK(
         BO,
         AC,
         charge,
@@ -260,7 +262,12 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
     elif atom == 5 and not found:
         charge = 3 - BO_valence
         found = True
-
+    # elif atom == 6 and BO_valence == 2 and not found:
+    #     charge = 0
+    #     found = True
+    # elif atom == 13 and not found and not found:
+    #     charge = 3 - BO_valence
+    #     found = True 
     # Ionic Bonds are not correctly captured, exceptions are needed for atoms with tendency to form them
     elif atom == 15 and BO_valence == 5 and not found:  # PX5
         charge = 0
@@ -478,7 +485,7 @@ def get_UA_pairs(UA, AC, use_graph=True):
     return UA_pairs
 
 
-def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
+def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, abs_charge=None):
     """
     implemenation of algorithm shown in Figure 2
     UA: unsaturated atoms
@@ -585,7 +592,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
                 valences,
                 allow_charged_fragments=allow_charged_fragments,
             )
-            charge_OK = charge_is_OK(
+            charge_OK, q_list = charge_is_OK(
                 BO,
                 AC,
                 charge,
@@ -595,23 +602,33 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
                 valences,
                 allow_charged_fragments=allow_charged_fragments,
             )
-
-            if status:
-                print(f"\tAC2BO: {formula=} status", status, f"{charge=} {count=}")
-                return BO, atomic_valence_electrons
-            elif (
-                BO.sum() >= best_BO.sum()
-                and valences_not_too_large(BO, valences)
-                and charge_OK
-            ):
-                #print(f"\tAC2BO: status", status, "BO.sum()", BO.sum(), "best_BO.sum()", best_BO.sum())
-                best_BO = BO.copy()
-            
-            count += 1
-            if count > max_count :
-                print(f"\tOver maximum counts AC2BO: {formula=} {charge=} {count=}")
-                return best_BO, atomic_valence_electrons
-
+            if abs_charge is not None:
+                if status and (sum(abs(x) for x in q_list) == abs_charge):
+                    print(f"\tAC2BO: {formula=} status", status, f"{q_list=} {abs_charge=} {charge=} {count=} ")
+                    return BO, atomic_valence_electrons
+                elif (
+                    BO.sum() >= best_BO.sum()
+                    and valences_not_too_large(BO, valences)
+                    and charge_OK
+                ):
+                    #print(f"\tAC2BO: status", status, "BO.sum()", BO.sum(), "best_BO.sum()", best_BO.sum())
+                    best_BO = BO.copy()
+                
+                count += 1
+                if count > max_count :
+                    print(f"\tOver maximum counts AC2BO: {formula=} {charge=} {count=}")
+                    return best_BO, atomic_valence_electrons
+            else:
+                if status and charge_OK:
+                    #print(f"\tAC2BO: {formula=} status", status, f"{charge=} {count=}")
+                    return BO, atomic_valence_electrons
+                elif (
+                    BO.sum() >= best_BO.sum()
+                    and valences_not_too_large(BO, valences)
+                    and charge_OK
+                ):
+                    #print(f"\tAC2BO: status", status, "BO.sum()", BO.sum(), "best_BO.sum()", best_BO.sum())
+                    best_BO = BO.copy()
             # if status:
             #     return BO, atomic_valence_electrons
             # if status:
@@ -629,7 +646,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
     return best_BO, atomic_valence_electrons
 
 
-def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
+def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True, abs_charge=None):
     """ """
 
     # convert AC matrix to bond order (BO) matrix
@@ -639,6 +656,7 @@ def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True)
         charge,
         allow_charged_fragments=allow_charged_fragments,
         use_graph=use_graph,
+        abs_charge=None,
     )
     if BO is None:
         return [], None
@@ -867,6 +885,7 @@ def xyz2mol(
     use_huckel=False,
     embed_chiral=True,
     exportBO=False,
+    abs_charge=None,
 ):
     """
     Generate a rdkit molobj from atoms, coordinates and a total_charge.
@@ -900,6 +919,7 @@ def xyz2mol(
         charge,
         allow_charged_fragments=allow_charged_fragments,
         use_graph=use_graph,
+        abs_charge=abs_charge
     )
 
     # Check for stereocenters and chiral centers -> Move to get_charge function
