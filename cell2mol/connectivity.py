@@ -14,7 +14,7 @@ import re
 elemdatabase = ElementData()
 
 #######################################################
-def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: list, element: str="H", removed_idx: list=None, debug: int=0) -> Tuple[bool, list, list]:
+def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: list, element: str="H", removed_idx: list=None, unconditional: bool=False, debug: int=0) -> Tuple[bool, list, list]:
     from cell2mol.other import get_dist
     # This function adds one atom of a given "element" to a given "site=atom index" of a "ligand".
     # It does so at the position of the closest "metal" atom to the "site"
@@ -57,8 +57,12 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
             newcoord_with_metal = newcoord.copy()
             newlab_with_metal.append(tgt.label)
             newcoord_with_metal.append(tgt.coord)
+            #writexyz(os.getcwd(), f"target_atom_{a.label}_{apos[0]}_newcoord_with_H_new{addedHcoords[0]}.xyz", newlab_with_metal, newcoord_with_metal)
             # If no undesired adjacencies have been created, the coordinates are kept
-            if tmpconnec[posadded] <= 1:
+            if  unconditional:
+                isadded = True
+                if debug >= 1: print(f"ADD_ATOM: {element} is added at site {site} of ligand {ligand.formula} to generate a protonation state")
+            elif tmpconnec[posadded] <= 1:
                 isadded = True
                 if debug >= 2: print(f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} is added at site {site}")
             # Otherwise, coordinates are reset
@@ -352,18 +356,18 @@ def get_adjmatrix_from_cif_bonds (labels: list, pos: list,  mol_atom_site_labels
             a = np.array(pos[i])
             b = np.array(pos[j])
             dist = np.linalg.norm(a - b)
+            #print(atom1, atom2, bond_distance , dist, abs(dist - bond_distance), round(abs(dist - bond_distance),3))
             if not metal_only:
-                if abs(dist - bond_distance) <= 1e-3: # Allow a small tolerance for floating point comparison
+                if round(abs(dist - bond_distance),3) <= 1e-3: # Allow a small tolerance for floating point comparison
                     adjmat[i, j] = 1
                     adjmat[j, i] = 1
-                    #print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is same with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]}")
-
+                    #print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is same with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
                 else:
-                    isgood = False
-                    print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]}")
+                #     isgood = False
+                    print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
             if metal_only:
-                if abs(dist - bond_distance) <= 1e-3:
-                    #print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is same with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]}")
+                if round(abs(dist - bond_distance),3) <= 1e-3:
+                    #print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is same with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
 
                     if (elemdatabase.elementblock[labels[i]] == "d"
                     or elemdatabase.elementblock[labels[i]] == "f"
@@ -376,8 +380,8 @@ def get_adjmatrix_from_cif_bonds (labels: list, pos: list,  mol_atom_site_labels
                         adjmat[i, j] = 1
                         adjmat[j, i] = 1    
                 else:
-                    isgood = False
-                    print(f"Adjacency Matrix: Distance {round(dist, 3)}  {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]}")
+                #     isgood = False
+                    print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
 
     for i in range(0, natoms):
         adjnum[i] = np.sum(adjmat[i, :])

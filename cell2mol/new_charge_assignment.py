@@ -9,11 +9,11 @@ import pickle
 
 #######################################################
 def balance_charge(unique_indices: list, unique_species: list, rare: bool="False", predict: bool="False", debug: int=0) -> list:
-
-    # Function to Select the Best Charge Distribution for the unique species.
-    # It accepts multiple charge options for each molecule/ligand/metal (poscharge, etc...).
-    # NO: It should select the best one depending on whether the final metal charge makes sense or not.
-    # In some cases, can accept metal oxidation state = 0, if no other makes sense
+    """Function to Select the Best Charge Distribution for the unique species.
+    It accepts multiple charge options for each molecule/ligand/metal (poscharge, etc...).
+    NO: It should select the best one depending on whether the final metal charge makes sense or not.
+    In some cases, can accept metal oxidation state = 0, if no other makes sense
+    """
     all_possible_m_ox = [0, 1, 2, 3, 4, 5, 6, 7]
     iserror = False
     iterlist = []
@@ -77,7 +77,7 @@ def assign_charge_state_for_unique_species(unique_species, final_charge_tuple, d
 
     for specie, final_charge in zip(unique_species, final_charge_tuple):
         print(specie.unique_index, specie.formula)
-        if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+        if (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA) or (specie.subtype == "ligand"):
             charge_list = [cs.corr_total_charge for cs in specie.possible_cs]
             idx = charge_list.index(final_charge)
             cs = specie.possible_cs[idx]
@@ -90,7 +90,7 @@ def assign_charge_state_for_unique_species(unique_species, final_charge_tuple, d
             # cs = specie.possible_cs[idx]
             specie.set_charge(final_charge) 
     for specie in unique_species:
-        if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+        if (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA) or (specie.subtype == "ligand"):
             print(specie.formula, specie.charge_state, specie.totcharge, specie.smiles)
     return unique_species
 
@@ -139,7 +139,7 @@ def set_charge_state(reference, target, mode, debug: int=0):
     elif mode == 2 : # For "unit" cell. Their charge state are not calculated
         if target.formula in ["O4-Cl", "N3", "I3"]:
             cs = get_charge_manual(target, debug=debug)
-        elif (target.subtype == "molecule" and target.iscomplex == False) :
+        elif (target.subtype == "molecule" and not target.iscomplex and not target.has_IA_IIA) :
             if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie")
             empty_list = [int(0)]*len(target.labels)
             empty_prot = protonation(target.labels, target.coord, target.cov_factor, 
@@ -149,30 +149,45 @@ def set_charge_state(reference, target, mode, debug: int=0):
         elif target.subtype == "ligand":
             if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Ligand")
             prot = reference.charge_state.protonation
-            print(f"SET_CHARGE_STATE:{prot=}")
+            if debug >=1 : print(f"SET_CHARGE_STATE:{prot=}")
+
+            temp_uncorr_atom_charges = reference.charge_state.uncorr_atom_charges
+            abs_charge = sum([abs(chg) for chg in temp_uncorr_atom_charges])
+            if debug >=1 : print(f"SET_CHARGE_STATE: {reference.charge_state.uncorr_atom_charges=} {len(reference.charge_state.uncorr_atom_charges)} {abs_charge=}")
             temp_prot = copy.deepcopy(prot)
-            print(f"{reference.charge_state.uncorr_atom_charges=} {len(reference.charge_state.uncorr_atom_charges)} abs_charge {sum(abs(x) for x in reference.charge_state.uncorr_atom_charges)}")
             temp_prot.parent = target
-            abs_charge = sum(abs(x) for x in reference.charge_state.uncorr_atom_charges)
-            print(f"SET_CHARGE_STATE:{temp_prot.labels=} {len(temp_prot.labels)=} {len(temp_prot.coords)=} {len(temp_prot.block)=} {temp_prot.added_atoms=}")
+
+            print(f"SET_CHARGE_STATE:{temp_prot.labels=} {len(temp_prot.labels)=} {len(temp_prot.coords)=} {len(temp_prot.block)=} {temp_prot.added_atoms=} ")
+            
             # For "unit" cell
             ref_indices = reference.get_parent_indices("reference")
             target_indices = target.get_parent_indices("reference")
 
-
             ref_data = [refcell.atom_site_labels[idx] for idx in ref_indices]
             target_data = [refcell.atom_site_labels[idx] for idx in target_indices]
 
-            print(f"SET_CHARGE_STATE:{ref_data=}")
-            print(f"SET_CHARGE_STATE:{target_data=}")
             index_map = {value: index for index, value in enumerate(target_data)}
             sorted_indices = sorted(range(len(ref_data)), key=lambda i: index_map[ref_data[i]])            
-            print(f"SET_CHARGE_STATE:{sorted_indices=}")
+
+            if debug >=1 : print(f"SET_CHARGE_STATE:{ref_data=}")
+            if debug >=1 : print(f"SET_CHARGE_STATE:{target_data=}")
+            if debug >=1 : print(f"SET_CHARGE_STATE:{sorted_indices=}")
+
             reordered_prot = temp_prot.reorder(sorted_indices)
             # reordered_prot.coords = target.coord
-            print(f"SET_CHARGE_STATE:{reordered_prot=}")
+            if debug >=1 : print(f"SET_CHARGE_STATE: {reordered_prot=}")
+
+            if len(temp_uncorr_atom_charges) == len(sorted_indices):
+                reordered_uncorr_atom_charges = [temp_uncorr_atom_charges[idx] for idx in sorted_indices]
+            else:
+                reordered_uncorr_atom_charges = [temp_uncorr_atom_charges[idx] for idx in sorted_indices]
+                dummy_charges_added_atoms = [temp_uncorr_atom_charges[idx] for idx in range(len(sorted_indices), len(temp_uncorr_atom_charges))]
+                reordered_uncorr_atom_charges.extend(dummy_charges_added_atoms)
+            
+            if debug >=1 :print(f"SET_CHARGE_STATE: {reordered_uncorr_atom_charges=} {len(reordered_uncorr_atom_charges)=}")
+
             if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {sorted_indices=}")
-            cs = get_charge(reference.charge_state.uncorr_total_charge , reordered_prot, abs_charge=abs_charge)
+            cs = get_charge(reference.charge_state.uncorr_total_charge , reordered_prot, ref_uncorr_atom_charges=reordered_uncorr_atom_charges)
 
     target.charge_state = cs
     if final_charge != cs.corr_total_charge:
@@ -310,7 +325,7 @@ def create_bonds_specie (specie, debug: int=0):
 def create_metal_ligand_bonds (mol, debug: int=0):
     # Third Part. Adds Metal-Ligand Bonds, with a zero order:
     from cell2mol.classes import bond
-    if mol.iscomplex:
+    if mol.iscomplex or mol.has_IA_IIA:
         for lig in mol.ligands:
             for at in lig.atoms:
                 count = 0
@@ -338,7 +353,7 @@ def create_metal_ligand_bonds (mol, debug: int=0):
 def create_metal_metal_bonds (mol, debug: int=0):
     from cell2mol.classes import bond
     # Adds Metal-Metal Bonds, with a zero order:
-    if mol.iscomplex:
+    if mol.iscomplex or mol.has_IA_IIA:
         if len(mol.metals) > 1 :
             if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
             if debug >= 2: print(f"CELL.CREATE_BONDS: Metals: {mol.metals}")
@@ -363,7 +378,7 @@ def create_metal_metal_bonds (mol, debug: int=0):
 def assign_charge_to_specie(specie, final_charge, debug: int=0):    
     """Assign the charge to a specific species based on its type."""
     if debug >= 1: print(f"ASSIGN_CHARGE_TO_SPECIE: Unique Species final charges {specie.formula=} {final_charge=}")
-    if (specie.subtype == "molecule" and not specie.iscomplex) or (specie.subtype == "ligand"):
+    if (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA) or (specie.subtype == "ligand"):
         idx = [cs.corr_total_charge for cs in specie.possible_cs].index(final_charge)
         cs = specie.possible_cs[idx]
         specie.charge_state = cs
@@ -379,7 +394,8 @@ def assign_charge_to_specie(specie, final_charge, debug: int=0):
 def validate_reference_molecules(self, debug):
     """Validate reference molecules by checking ligand and metal charges."""
     for idx, ref in enumerate(self.refmoleclist):
-        if ref.iscomplex:
+        if ref.iscomplex or ref.has_IA_IIA:
+            if debug >= 1: print(f"VALIDATE_REFERENCE_MOLECULES: {ref.formula=}")
             self.validate_complex_ligands(ref, idx, debug)
             self.validate_complex_metals(ref, debug)
             prepare_mol(ref)

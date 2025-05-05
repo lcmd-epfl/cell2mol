@@ -238,15 +238,15 @@ class specie(object):
         if not hasattr(parent,"madjnum"): 
             print(f"SPECIE.INHERIT. {parent_subtype=} does not have madjnum")
             return None 
-        print(f"SPECIE.INHERIT. found self in parent ({parent_subtype}) with {indices=}")
-        print(f"SPECIE.INHERIT: parent data:\n{parent.labels=}\n{parent.madjmat=}\n{parent.madjnum=}\n{parent.adjmat=}\n{parent.adjnum=}")
-        print(f"SPECIE.INHERIT: {parent.madjmat.shape=} {parent.madjnum.shape=} {parent.adjmat.shape=} {parent.adjnum.shape=}")
+        # print(f"SPECIE.INHERIT. found self in parent ({parent_subtype}) with {indices=}")
+        # print(f"SPECIE.INHERIT: parent data:\n{parent.labels=}\n{parent.madjmat=}\n{parent.madjnum=}\n{parent.adjmat=}\n{parent.adjnum=}")
+        # print(f"SPECIE.INHERIT: {parent.madjmat.shape=} {parent.madjnum.shape=} {parent.adjmat.shape=} {parent.adjnum.shape=}")
         self.madjmat = np.stack(extract_from_list(indices, parent.madjmat, dimension=2), axis=0)
         self.madjnum = np.stack(extract_from_list(indices, parent.madjnum, dimension=1), axis=0)
         self.adjmat  = np.stack(extract_from_list(indices, parent.adjmat, dimension=2), axis=0)
         self.adjnum  = np.stack(extract_from_list(indices, parent.adjnum, dimension=1), axis=0)
-        print(f"SPECIE.INHERIT: self data:\n{self.labels=}\n{self.madjmat=}\n{self.madjnum=}\n{self.adjmat=}\n{self.adjnum=}")
-        print(f"SPECIE.INHERIT: {self.madjmat.shape=} {self.madjnum.shape=} {self.adjmat.shape=} {self.adjnum.shape=}")
+        # print(f"SPECIE.INHERIT: self data:\n{self.labels=}\n{self.madjmat=}\n{self.madjnum=}\n{self.adjmat=}\n{self.adjnum=}")
+        # print(f"SPECIE.INHERIT: {self.madjmat.shape=} {self.madjnum.shape=} {self.adjmat.shape=} {self.adjnum.shape=}")
 
     ############
     def get_adjmatrix(self, geom_bond_cif: list=None):
@@ -335,7 +335,7 @@ class specie(object):
     def get_possible_cs(self, debug: int=0):
         ## Arranges a list of possible charge_states associated with this species, 
         ## which is later managed at the cell level to determine the good one
-        if self.subtype == "ligand" or (self.subtype == "molecule" and not self.iscomplex):
+        if self.subtype == "ligand" or (self.subtype == "molecule" and not self.iscomplex and not self.has_IA_IIA):
             if not hasattr(self,"protonation_states"): self.get_protonation_states(debug=debug)
             self.possible_cs = get_possible_charge_state(self, debug=debug)  
         return self.possible_cs
@@ -748,7 +748,7 @@ class ligand(specie):
         ## Now we operate at the molecular level. We get the parent molecule, and the indices of the ligand atoms in the molecule
         self.connected_idx = [] 
         if not hasattr(self,"madjnum"): self.inherit_adjmatrix("molecule")
-        print(f"LIGAND.GET_CONNECTED_IDX: {self.formula} {self.madjmat=} {self.madjnum=}")
+        if debug > 2: print(f"LIGAND.GET_CONNECTED_IDX: {self.formula} {self.madjmat=} {self.madjnum=}")
         for idx, con in enumerate(self.madjnum):
             if con > 0: self.connected_idx.append(idx)
         return self.connected_idx 
@@ -1038,7 +1038,7 @@ class bond(object):
         self.atom1      = atom1
         self.atom2      = atom2
         self.order      = bond_order
-        self.distance   = np.linalg.norm(np.array(atom1.coord) - np.array(atom2.coord))
+        self.distance   = round(np.linalg.norm(np.array(atom1.coord) - np.array(atom2.coord)),3)
 
     def __repr__(self):
         to_print = ""
@@ -1052,7 +1052,7 @@ class bond(object):
         to_print += f' Molecule Atom 1 index    = {idx1}\n'
         to_print += f' Molecule Atom 2 index    = {idx2}\n'
         to_print += f' Bond Order               = {self.order}\n'
-        to_print += f' Distance                 = {round(self.distance,3)}\n'
+        to_print += f' Distance                 = {self.distance,3}\n'
         to_print += '----------------------------------------------------\n'
         return to_print
 
@@ -1385,7 +1385,7 @@ class metal(atom):
         if refcell.exist_cif_bond_moiety:
             for lig in mol.ligands:
                 for group in lig.groups:
-                    if debug >= 2: print(group.formula)
+                    if debug > 2: print(group.formula)
                     ligand_indices = [ a.get_parent_index("ligand") for a in group.atoms ]
                     tmplabels = []
                     tmpcoord  = []
@@ -1399,7 +1399,7 @@ class metal(atom):
                     tmpcoord.extend(group.coord)
                     atom_site_labels.extend([atom.atom_site_label for atom in group.atoms])
                     
-                    print(f"ATOM.Get_connected_groups: {tmplabels=} {atom_site_labels=}")
+                    if debug >= 2: print(f"ATOM.Get_connected_groups: {tmplabels=} {atom_site_labels=}")
                     isgood, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, refcell.geom_bond_cif, metal_only=True)
                     if isgood :
                         if debug > 2: print(group.formula, tmpadjmat, tmpadjnum)
@@ -1770,7 +1770,7 @@ class cell(object):
         if isgood:
             self.has_isolated_H = False
             for ref in self.refmoleclist:
-                if debug >= 0: print(f"GETREFS: working with {ref.formula}")
+                if debug >= 0: print(f"GETREFS: working with {ref.formula} with transition metals")
                 if ref.iscomplex: 
                     ref.get_hapticity(debug=debug)
                     if len(ref.ligands) == 0 :
@@ -1863,7 +1863,7 @@ class cell(object):
         if isgood:
             self.has_isolated_H = False
             for ref in self.refmoleclist:
-                if debug >= 0: print(f"GETREFS: working with {ref.formula}")
+                if debug >= 0: print(f"GETREFS: working with {ref.formula} with transition metals")
                 if ref.iscomplex:
                     ref.get_hapticity(debug=debug)
                     if len(ref.ligands) == 0 :
@@ -2194,7 +2194,7 @@ class cell(object):
             for specie, final_charge in zip(self.unique_species, final_charges[0]):
                 assign_charge_to_specie(specie, final_charge, debug=debug)
                 for idx, ref in enumerate(self.refmoleclist):
-                    if ref.iscomplex:
+                    if ref.iscomplex or ref.has_IA_IIA:
                         for jdx, lig in enumerate(ref.ligands):
                             if lig.unique_index == specie.unique_index:
                                 set_charge_state (specie, lig, mode=1, debug=debug)
@@ -2206,11 +2206,11 @@ class cell(object):
                             set_charge_state (specie, ref, mode=1, debug=debug)
   
             for idx, ref in enumerate(self.refmoleclist):
-                if ref.iscomplex: prepare_mol(ref)
+                if ref.iscomplex or ref.has_IA_IIA : prepare_mol(ref)
             
             for idx, ref in enumerate(self.refmoleclist):
                 print(f"ASSIGN_CHARGES: Refenrence Molecule {idx}: {ref.formula}")
-                if ref.iscomplex:
+                if ref.iscomplex or ref.has_IA_IIA:
                     print("ASSIGN_CHARGES: Complex", idx, ref.formula, ref.totcharge)
                     for jdx, lig in enumerate(ref.ligands):
                         print("ASSIGN_CHARGES: Ligand", idx, jdx, lig.formula, lig.totcharge, lig.smiles)
@@ -2221,15 +2221,15 @@ class cell(object):
             
             for idx, mol in enumerate(self.moleclist):
                 print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")
-                if not mol.iscomplex:
+                if not mol.iscomplex and not mol.has_IA_IIA:
                     for ref in self.refmoleclist:
-                        if not ref.iscomplex and (mol.unique_index == ref.unique_index) :
+                        if (not ref.iscomplex and not ref.has_IA_IIA) and (mol.unique_index == ref.unique_index) :
                             issame = compare_reference_indices(ref, mol, debug=debug)
                             if issame:
                                 set_charge_state (ref, mol, mode=2, debug=debug)
                 else:
                     for ref in self.refmoleclist:
-                        if ref.iscomplex and (mol.formula == ref.formula):
+                        if (ref.iscomplex or ref.has_IA_IIA) and (mol.formula == ref.formula):
                             for jdx, lig in enumerate(mol.ligands):
                                 for rdx, ref_lig in enumerate(ref.ligands):
                                     if lig.formula == ref_lig.formula:
@@ -2246,12 +2246,11 @@ class cell(object):
 
 
             for idx, mol in enumerate(self.moleclist):
-                if mol.iscomplex:
-                    prepare_mol(mol)
+                if mol.iscomplex or mol.has_IA_IIA: prepare_mol(mol)
             
             for idx, mol in enumerate(self.moleclist):
                 print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")
-                if mol.iscomplex:
+                if mol.iscomplex or mol.has_IA_IIA:
                     print("ASSIGN_CHARGES: Complex", idx, mol.formula, mol.totcharge)
                     for jdx, lig in enumerate(mol.ligands):
                         print("ASSIGN_CHARGES: Ligand", idx, jdx, lig.formula, lig.totcharge, lig.smiles)
@@ -2264,7 +2263,7 @@ class cell(object):
     
         for specie in self.unique_species:
             for idx, ref in enumerate(self.refmoleclist):
-                if ref.iscomplex:
+                if ref.iscomplex or ref.has_IA_IIA:
                     for jdx, lig in enumerate(ref.ligands):
                         print(lig.unique_index)
                         print(specie.unique_index)
@@ -2278,11 +2277,11 @@ class cell(object):
                         set_charge_state (specie, ref, mode=1, debug=debug)
 
         for idx, ref in enumerate(self.refmoleclist):
-            if ref.iscomplex: prepare_mol(ref)
+            if ref.iscomplex or ref.has_IA_IIA: prepare_mol(ref)
         
         for idx, ref in enumerate(self.refmoleclist):
             print(f"ASSIGN_CHARGES: Refenrence Molecule {idx}: {ref.formula}")
-            if ref.iscomplex:
+            if ref.iscomplex or ref.has_IA_IIA:
                 print("ASSIGN_CHARGES: Complex", idx, ref.formula, ref.totcharge)
                 for jdx, lig in enumerate(ref.ligands):
                     print("ASSIGN_CHARGES: Ligand", idx, jdx, lig.formula, lig.totcharge, lig.smiles)
@@ -2386,7 +2385,7 @@ class cell(object):
         for mol in moleclist:
             if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Bonds for molecule {mol.formula}")
             # First part
-            if not mol.iscomplex: 
+            if not mol.iscomplex and not mol.has_IA_IIA: 
                 result = create_bonds_specie(mol, debug=debug)          ### Creates bonds between molecule.atoms using the molecule.rdkit_object
                 if result == False:
                     if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for molecule {mol.formula}")
@@ -2396,7 +2395,7 @@ class cell(object):
                     if debug >= 1: print(f"CELL.CREATE_BONDS: Bonds created for molecule {mol.formula}")
 
             # Second part
-            if mol.iscomplex:
+            if mol.iscomplex or mol.has_IA_IIA:
                 for lig in mol.ligands:
                     result = create_bonds_specie(lig, debug=debug)      ### Creates bonds between ligand.atoms, which also belong to molecule.atoms, using the ligand.rdkit_object
                     if result == False:
@@ -2407,7 +2406,7 @@ class cell(object):
                     else :
                         if debug >= 1: print(f"CELL.CREATE_BONDS: Bonds created for molecule {lig.formula}")
 
-            if mol.iscomplex:
+            if mol.iscomplex or mol.has_IA_IIA:
                 # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
                 create_metal_ligand_bonds(mol, debug=debug)
                 create_metal_metal_bonds(mol, debug=debug)
