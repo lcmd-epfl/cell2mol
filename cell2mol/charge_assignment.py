@@ -204,12 +204,15 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     if   specie.subtype == "group":                                 return None
     elif specie.subtype == "molecule" and (specie.iscomplex or specie.has_IA_IIA) : return None     
     elif (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA):
-        get_empty_protonation_state(specie, debug=debug)
+        empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
+        return empty_protonation_states
     elif specie.formula in ["O4-Cl", "N3", "I3"] or specie.formula in fullerene: 
-        get_empty_protonation_state(specie, debug=debug)
+        empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
+        return empty_protonation_states
     elif (specie.subtype == "ligand" and specie.get_parent("molecule").has_IA_IIA):
         if not specie.get_parent("molecule").iscomplex:
-             get_empty_protonation_state(specie, debug=debug)
+            empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
+            return empty_protonation_states
         else:
             pass
     else:
