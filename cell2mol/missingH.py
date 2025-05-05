@@ -118,18 +118,23 @@ def check_missingH(refmoleclist: list, debug: int=0):
     # List of Metal Atoms for which O atoms might appear connected directly.
     Exceptions_for_CoordWater = ["Re", "V", "Mo", "W", "Fe", "Tc"]
 
+    # List of fullerenes
+    fullerene = ["C60", "C72", "C80"]
+
     if debug >= 1: print("")
     if debug >= 1: print("##################")
     if debug >= 1: print("Checking Missing H")
     if debug >= 1: print("##################")
     for idx, ref in enumerate(refmoleclist):
-        if not ref.iscomplex:
+        if not ref.iscomplex and not ref.has_IA_IIA:
             if ref.natoms == 1 and "O" in ref.labels: 
                 Missing_H_in_Water = True
                 # Missing_H_in_CoordWater = True
                 if debug >= 1: print(f"WARNING found isolated O atom in the cell. This tends to be a water with missing H, so stopping")
             elif ref.formula == "CO" or ref.formula == "CN":
                 pass
+            elif ref.formula in fullerene:
+                if debug >= 1: print(f"Found fullerene {ref.formula} in the cell. skipping missing H check in carbon atoms")
             else:
                 for kdx, a in enumerate(ref.atoms):
                     if not hasattr(a,"adjacency"): continue 
@@ -161,6 +166,9 @@ def check_missingH(refmoleclist: list, debug: int=0):
                     #     if debug >= 1: print("WARNING in Missing H function for ligand", lig.natoms, lig.labels)
                 elif lig.formula == "CO" or lig.formula == "CN":
                     pass
+                elif ref.formula in fullerene:
+                    pass
+                    if debug >= 1: print(f"Found fullerene {ref.formula} in the cell. skipping missing H check in carbon atoms")               
                 else:
                     for kdx, a in enumerate(lig.atoms):
                         if a.label == "C" and a.mconnec == 0:

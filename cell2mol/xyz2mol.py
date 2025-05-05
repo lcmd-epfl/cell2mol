@@ -186,7 +186,7 @@ def charge_is_OK(
             if q != 0:
                 q_list.append(q)
 
-    return charge == Q , q_list
+    return charge == Q
 
 
 def BO_is_OK(
@@ -198,7 +198,7 @@ def BO_is_OK(
     atoms,
     valences,
     allow_charged_fragments=True,
-    abs_charge=None,
+    uncorr_atom_charges=None,
 ):
     """
     Sanity of bond-orders
@@ -222,8 +222,7 @@ def BO_is_OK(
         return False
 
     check_sum = (BO - AC).sum() == sum(DU)
-    # check_charge = charge_is_OK(
-    check_charge, q_list = charge_is_OK(
+    check_charge = charge_is_OK(
         BO,
         AC,
         charge,
@@ -485,7 +484,7 @@ def get_UA_pairs(UA, AC, use_graph=True):
     return UA_pairs
 
 
-def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, abs_charge=None):
+def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, uncorr_atom_charges=None):
     """
     implemenation of algorithm shown in Figure 2
     UA: unsaturated atoms
@@ -592,7 +591,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, abs_c
                 valences,
                 allow_charged_fragments=allow_charged_fragments,
             )
-            charge_OK, q_list = charge_is_OK(
+            charge_OK = charge_is_OK(
                 BO,
                 AC,
                 charge,
@@ -602,51 +601,26 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, abs_c
                 valences,
                 allow_charged_fragments=allow_charged_fragments,
             )
-            if abs_charge is not None:
-                if status and (sum(abs(x) for x in q_list) == abs_charge):
-                    print(f"\tAC2BO: {formula=} status", status, f"{q_list=} {abs_charge=} {charge=} {count=} ")
-                    return BO, atomic_valence_electrons
-                elif (
-                    BO.sum() >= best_BO.sum()
-                    and valences_not_too_large(BO, valences)
-                    and charge_OK
-                ):
-                    #print(f"\tAC2BO: status", status, "BO.sum()", BO.sum(), "best_BO.sum()", best_BO.sum())
-                    best_BO = BO.copy()
-                
-                count += 1
-                if count > max_count :
-                    print(f"\tOver maximum counts AC2BO: {formula=} {charge=} {count=}")
-                    return best_BO, atomic_valence_electrons
-            else:
-                if status and charge_OK:
-                    #print(f"\tAC2BO: {formula=} status", status, f"{charge=} {count=}")
-                    return BO, atomic_valence_electrons
-                elif (
-                    BO.sum() >= best_BO.sum()
-                    and valences_not_too_large(BO, valences)
-                    and charge_OK
-                ):
-                    #print(f"\tAC2BO: status", status, "BO.sum()", BO.sum(), "best_BO.sum()", best_BO.sum())
-                    best_BO = BO.copy()
-            # if status:
-            #     return BO, atomic_valence_electrons
-            # if status:
-            #     if (
-            #         BO.sum() >= best_BO.sum()
-            #         and valences_not_too_large(BO, valences)
-            #         and charge_OK
-            #         ):
-            #         best_BO = BO.copy()
-            #         print("AC2BO: best bo", best_BO)
-        # print("best bo", best_BO)
-    #print(f"\tAC2BO: return best bo")
-    #print("AC2BO: return best bo", best_BO)
-    #print(f"Failing AC2BO: {formula=} {charge=} {count=}")
+            if status:
+                print(f"\tAC2BO: {formula=} status", status, f"{charge=} {count=}")
+                return BO, atomic_valence_electrons
+            elif (
+                BO.sum() >= best_BO.sum()
+                and valences_not_too_large(BO, valences)
+                and charge_OK
+            ):
+                #print(f"\tAC2BO: status", status, "BO.sum()", BO.sum(), "best_BO.sum()", best_BO.sum())
+                best_BO = BO.copy()
+            
+            count += 1
+            if count > max_count :
+                print(f"\tOver maximum counts AC2BO: {formula=} {charge=} {count=}")
+                return best_BO, atomic_valence_electrons
+            
     return best_BO, atomic_valence_electrons
 
 
-def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True, abs_charge=None):
+def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
     """ """
 
     # convert AC matrix to bond order (BO) matrix
@@ -656,7 +630,6 @@ def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True,
         charge,
         allow_charged_fragments=allow_charged_fragments,
         use_graph=use_graph,
-        abs_charge=None,
     )
     if BO is None:
         return [], None
@@ -885,7 +858,6 @@ def xyz2mol(
     use_huckel=False,
     embed_chiral=True,
     exportBO=False,
-    abs_charge=None,
 ):
     """
     Generate a rdkit molobj from atoms, coordinates and a total_charge.
@@ -918,8 +890,7 @@ def xyz2mol(
         atoms,
         charge,
         allow_charged_fragments=allow_charged_fragments,
-        use_graph=use_graph,
-        abs_charge=abs_charge
+        use_graph=use_graph
     )
 
     # Check for stereocenters and chiral centers -> Move to get_charge function

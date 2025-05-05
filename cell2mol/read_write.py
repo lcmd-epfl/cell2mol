@@ -898,7 +898,7 @@ def parse_formula_with_quantity(formula: str):
 def print_output(moleclist):
     
     for idx, mol in enumerate(moleclist):
-        if mol.iscomplex:
+        if mol.iscomplex or mol.has_IA_IIA:
             if hasattr(mol, "totcharge") and hasattr(mol, "spin"):
                 print(f"{idx}: {mol.subtype}({mol.type}) {mol.formula} {mol.is_haptic=} {mol.totcharge=} {mol.spin=}") #\n   {mol.adjnum=}\n   {mol.madjnum=} \n   {mol.smiles=}")
             else:
@@ -1042,7 +1042,7 @@ def print_moleclist (cell):
                 elif hasattr(mol, "smiles"):
                     print(f"Unitcell Molecule {i} : {mol.formula} {mol.smiles=} {mol.totcharge=} (Non-complex)")
             else:
-                if mol.iscomplex:
+                if mol.iscomplex or mol.has_IA_IIA:
                     print(f"Unitcell Molecule {i}: {mol.formula} (Complex)")
                 else:
                     print(f"Unitcell Molecule {i} : {mol.formula} (Non-complex)")
