@@ -170,15 +170,28 @@ def get_fragments_from_moiety (newcell, updated, indices_in_ref, refcell, cov_fa
     updated_fracs = extract_from_list(updated, newcell.frac_coord, dimension=1)
 
     updated_moieties_list = [[updated[indices_in_ref.index(i)] for i in sublist if i in indices_in_ref] for sublist in moiety_indices]
+    # updated_moieties_indices_in_ref = [[indices_in_ref.index(i) for i in sublist if i in indices_in_ref] for sublist in moiety_indices]      
+    # updated_moieties_list = [[updated[idx] for idx in sublist] for sublist in updated_moieties_indices_in_ref]
+    # if debug >= 2 : print(f"get_fragments: updated_moieties_indices_in_ref", updated_moieties_indices_in_ref)
     if debug >= 2 : print(f"get_fragments: updated_moieties_list", updated_moieties_list)
     tmp_blocklist=[]
-    for updated_moieties in updated_moieties_list:
+    for idx, updated_moieties in enumerate(updated_moieties_list):
         if len(updated_moieties) == 0: continue
+        updated_moiety_ref_indices = moiety_indices[idx]
+        if debug >= 2 : print("get_fragments: updated_moieties", updated_moieties)
         updated_moieties_labels  = extract_from_list(updated_moieties, newcell.labels, dimension=1)
         updated_moieties_coord   = extract_from_list(updated_moieties, newcell.coord, dimension=1)
-        block = split_species(updated_moieties_labels, updated_moieties_coord, indices=updated_moieties, debug=debug)
+        updated_moieties_atom_site_labels = [atom_site_labels[i] for i in updated_moiety_ref_indices]
+        if debug >= 2 : print(f"get_fragments: updated_moieties_labels", updated_moieties_labels)
+        if debug >= 2 : print(f"get_fragments: updated_moieties_atom_site_labels", updated_moieties_atom_site_labels)
+        block = split_species(updated_moieties_labels, 
+                              updated_moieties_coord, 
+                              indices=updated_moieties, 
+                              atom_site_labels=updated_moieties_atom_site_labels, 
+                              geom_bond_cif=geom_bond_cif,
+                              debug=debug)
         tmp_blocklist.extend(block)
-        if debug >= 2 : print("get_fragments: updated_moieties", updated_moieties)
+        
     if debug >= 2 : print("get_fragments: tmp_blocklist", tmp_blocklist)
 
     value_to_index = {val: idx for idx, val in enumerate(updated)}
@@ -461,16 +474,13 @@ def merge_fragments (frags: list, cell_vector: list, refcell: object, cov_factor
                 newmolec.origin = "cell.reconstruct"
                 newmolec.ref_indices = rec_ref_indices
                 newmolec.cell_indices = rec_cell_indices
+                newmolec.atom_site_labels = rec_ref_atom_site_labels
                 newmolec.set_adjacency_parameters(cov_factor, metal_factor)
-                newmolec.set_adj_types()
                 newmolec.set_element_count()
                 newmolec.get_centroid()
-                if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
-                    newmolec.get_adjmatrix(geom_bond_cif=refcell.geom_bond_cif)
-                    newmolec.get_metal_adjmatrix(geom_bond_cif=refcell.geom_bond_cif)
-                else:
-                    newmolec.get_adjmatrix()
-                    newmolec.get_metal_adjmatrix()
+                newmolec.get_adjmatrix(geom_bond_cif=refcell.geom_bond_cif)
+                newmolec.get_metal_adjmatrix(geom_bond_cif=refcell.geom_bond_cif)
+                newmolec.set_adj_types()
                 return newmolec
     return None
 ######################################################
@@ -849,15 +859,17 @@ def get_moleclist (newcell, refcell, all_molecules, debug: int=0):
     for mol in all_molecules:
         newmolec = molecule(mol.labels, mol.coord, mol.frac_coord)
         mol_atom_site_labels = [refcell.atom_site_labels[idx] for idx in mol.ref_indices]
-        print("GET_MOLECLIST: ", mol.formula)
-        print("GET_MOLECLIST: ", mol.ref_indices)
-        print("GET_MOLECLIST: ", mol.labels)
-        print("GET_MOLECLIST: ", mol_atom_site_labels)
+        if debug >=2 : 
+            print("GET_MOLECLIST: ", mol.formula)
+            print("GET_MOLECLIST: ", mol.ref_indices)
+            print("GET_MOLECLIST: ", mol.labels)
+            print("GET_MOLECLIST: ", mol_atom_site_labels)
         
         newmolec.origin = "cell.reconstruct"
         newmolec.set_adjacency_parameters(cov_factor, metal_factor)
-        print(refcell.geom_bond_cif)
-        newmolec.set_atoms(create_adjacencies=True, atom_site_labels=mol_atom_site_labels, geom_bond_cif=refcell.geom_bond_cif, debug=debug)
+        newmolec.set_atoms(create_adjacencies=True, 
+                           atom_site_labels=mol_atom_site_labels, 
+                           geom_bond_cif=refcell.geom_bond_cif, debug=debug)
         newmolec.add_parent(newcell, mol.cell_indices)
         newmolec.add_parent(refcell, mol.ref_indices) 
         for atom, idx in zip(newmolec.atoms, mol.cell_indices):
@@ -866,22 +878,37 @@ def get_moleclist (newcell, refcell, all_molecules, debug: int=0):
             atom.add_parent(refcell, index=idx)  
         if newmolec.iscomplex: 
             newmolec.split_complex()
+        elif newmolec.has_IA_IIA:
+            newmolec.split_IA_IIA()
         else:
             newmolec.add_parent(newmolec, indices=[*range(0,newmolec.natoms,1)])
         newcell.moleclist.append(newmolec)  
 
     for mol in newcell.moleclist:
-        print(mol.formula)
         if mol.iscomplex: 
+            if debug >=1 : print(f"GET_MOLECLIST: working with {mol.formula} with transition metals")
             mol.get_hapticity(debug=debug)
             if len(mol.ligands) == 0 :
-                print(f"GET_MOLECLIST: {mol.formula} is a metal cluster")
+                if debug >=1 : print(f"GET_MOLECLIST: {mol.formula} is a metal cluster")
             else:
                 for lig in mol.ligands:
                     lig.get_denticity(debug=debug)
-            for met in mol.metals:                         
+            for met in mol.metals:
+                met.get_connected_metals(debug=debug)                         
                 met.get_coordination_geometry(debug=debug)
-                met.get_coord_sphere_formula()
+                met.get_coord_sphere_formula(debug=debug)
+        elif mol.has_IA_IIA:
+            if debug >=1 : print(f"GET_MOLECLIST: working with {mol.formula} with alkali or alkali earth metals")
+            if len(mol.ligands) == 0 :
+                pass
+            else:
+                for lig in mol.ligands:
+                    lig.get_denticity(debug=debug)
+            for met in mol.metals: 
+                met.get_connected_metals(debug=debug)                         
+                met.get_coordination_geometry(debug=debug)
+                met.get_coord_sphere_formula(debug=debug)
+
     return newcell
 
 ######################################################
@@ -890,9 +917,9 @@ def get_unique_indices(newcell, reference_species_list, debug: int=0):
     newcell.unique_indices = []
     newcell.species_list = []
     for mol in newcell.moleclist:
-        if not mol.iscomplex:
+        if not mol.iscomplex and not mol.has_IA_IIA:
             for ref in reference_species_list:
-                if (ref.subtype == "molecule") and not ref.iscomplex:
+                if (ref.subtype == "molecule") and not ref.iscomplex and not ref.has_IA_IIA:
                     issame = compare_reference_indices(ref, mol, debug=debug)
                     if issame:
                         mol.unique_index = ref.unique_index 

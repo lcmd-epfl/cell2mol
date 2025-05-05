@@ -40,9 +40,12 @@ def get_possible_charge_state(spec: object, debug: int=0):
         possible_cs = [ch_state]
         return possible_cs
     
-
-    if spec.subtype == "group" or (spec.subtype == 'molecule' and spec.iscomplex):  
+    if spec.subtype == "group" :  
         return None
+    
+    if spec.subtype == 'molecule' and (spec.iscomplex or spec.has_IA_IIA):
+        return None
+    
     charge_states = []  
     ### Evaluates possible charges for each protonation state ###
     print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) ({len(spec.protonation_states)=})\n{spec.protonation_states=}")
@@ -199,16 +202,18 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     ##############################
     if   specie.type != "specie":                                   return None
     if   specie.subtype == "group":                                 return None
-    elif specie.subtype == "molecule" and specie.iscomplex == True: return None     
-    elif (specie.subtype == "molecule" and specie.iscomplex == False) or specie.formula in ["O4-Cl", "N3", "I3"] or specie.formula in fullerene: 
-        if debug >= 2: print(f"\nPOSCHARGE: doing empty PROTONATION for this specie {specie.formula} ({specie.subtype})")
-        #empty_list = list([np.zeros((len(specie.labels)))])
-        empty_list = []
-        for i in range(len(specie.labels)):
-            empty_list.append(int(0))
-        empty_protonation = protonation(specie.labels, specie.coord, specie.cov_factor, int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=specie)
-        if debug >= 2: print("    CREATED EMPTY PROTONATION", empty_protonation)
-        return list([empty_protonation])
+    elif specie.subtype == "molecule" and (specie.iscomplex or specie.has_IA_IIA) : return None     
+    elif (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA):
+        get_empty_protonation_state(specie, debug=debug)
+    elif specie.formula in ["O4-Cl", "N3", "I3"] or specie.formula in fullerene: 
+        get_empty_protonation_state(specie, debug=debug)
+    elif (specie.subtype == "ligand" and specie.get_parent("molecule").has_IA_IIA):
+        if not specie.get_parent("molecule").iscomplex:
+             get_empty_protonation_state(specie, debug=debug)
+        else:
+            pass
+    else:
+        pass  
 
     ## If specie.subtype == "ligand": 
     ligand = specie      ## Change the variable name as it is easier to follow
@@ -243,6 +248,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
     for g in ligand.groups:
         parent_indices = g.get_parent_indices("ligand")
+        if debug > 2: print(f"{parent_indices=}")
         if debug >= 2: print(f"    GET_PROTONATION_STATES: Evaluating group {g.formula} with parent_indices {parent_indices}")
         ########################
         # Cases with Hapticity #
@@ -258,10 +264,13 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 tmp_added_atoms = 0
                 for idx, a in enumerate(ligand.atoms):
                     if idx in parent_indices and a.mconnec == 1:
+                        print (idx, tmp_added_atoms, tobeadded)
                         if tmp_added_atoms < tobeadded:
+                            print(f"        GET_PROTONATION_STATES: Adding H to {idx} with label {a.label}")
                             elemlist[idx] = "H"
                             addedlist[idx] = 1
                             tmp_added_atoms += 1
+                            print(f"{addedlist=} {block=} {added_atoms=} {elemlist=}")
                         else: block[idx] = 1
 
             elif "h7-Cycloheptatrienyl" in g.haptic_type and not Selected_Hapticity:
@@ -514,17 +523,20 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         non_local_groups_indices.append(idx)
                         if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom with no rules")
 
+
         # If, at this stage, we have found that any atom must be added, this is done before entering the non_local part.
         # The block variable makes that more atoms cannot be added to these connected atoms
         for idx, a in enumerate(ligand.atoms):
             if addedlist[idx] != 0 and block[idx] == 0:
                 mol = ligand.get_parent("molecule")
-                isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, mol.metals, elemlist[idx])
+                isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, mol.metals, elemlist[idx], unconditional=True, debug=debug)
                 if isadded:
+                    print(f"        GET_PROTONATION_STATES: Added {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
                     added_atoms += addedlist[idx]
                     block[idx] = 1  # No more elements will be added to those atoms
                     if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
                 else:
+                    print(f"        GET_PROTONATION_STATES: Failed to add {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
                     addedlist[idx] = 0 
                     block[idx] = 1  # No more elements will be added to those atoms
                    
@@ -534,6 +546,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     
     if not needs_nonlocal:
         if debug >= 2: print(f"\nPOSCHARGE: doing Local PROTONATION for this specie {specie.formula} ({specie.subtype})")
+        if debug > 2: print(f"{addedlist=} {block=} {added_atoms=} {elemlist=}")
         new_prot = protonation(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, parent=specie) 
         protonation_states.append(new_prot)
     else:
@@ -603,7 +616,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             elemlist[jdx] = "H"
                             addedlist[jdx] = 1
                             mol = ligand.get_parent("molecule")
-                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], debug=debug)
+                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], unconditional=True, debug=debug)
                             if isadded:
                                 added_atoms += addedlist[jdx]
                                 if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
@@ -615,7 +628,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             elemlist[jdx] = "H"
                             addedlist[jdx] = 1
                             mol = ligand.get_parent("molecule")
-                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], debug=debug)
+                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], unconditional=True, debug=debug)
                             if isadded:
                                 added_atoms += addedlist[jdx]
                                 if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
@@ -728,7 +741,7 @@ def get_charge_manual(spec, debug: int=0):
     return ch_state
 
 ######################################################
-def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=True, abs_charge=None, debug: int=0): 
+def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=True, ref_uncorr_atom_charges=None, debug: int=0): 
     ## Generates the connectivity of a molecule given a desired charge (charge).
     # The molecule is described by a protonation states that has labels, and the atomic cartesian coordinates "coords"
     # The adjacency matrix is also provided in the protonation state(adjmat)
@@ -739,7 +752,7 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
 
     if debug >= 2: print(f"\nGET_CHARGE. Starting get_charge with charge {charge} and {prot.formula} {prot.added_atoms=}")
     # prot.coords and prot.cov_factor will not be used
-    mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow, abs_charge=abs_charge)
+    mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow)
     if debug >= 2: print(f"GET_CHARGE.{len(mols)=} received from xyz2mol with charge {charge}")
     
     if len(mols) > 1: 
@@ -767,23 +780,38 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
                                          {a.GetImplicitValence()=}, {a.GetExplicitValence()=} {a.GetTotalValence()=}")
             return None
     
-    # Smiles are generated with rdkit
-    smiles = Chem.MolToSmiles(mols[0])
-    if debug >= 2: print(f"GET_CHARGE. {smiles=}")
-    # Gets the resulting charges
-    atom_charge = []
-    total_charge = 0
-    for i in range(natoms):
-        a = mols[0].GetAtomWithIdx(i)  # Returns a particular Atom
-        atom_charge.append(a.GetFormalCharge())
-        total_charge += a.GetFormalCharge()
 
-    # Connectivity is checked
-    iscorrect = check_rdkit_obj_connectivity(mols[0], prot.natoms, charge, debug=debug)
-
-    # Charge_state is initiated
-    ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, charge, allow, prot)
+    rdkit_obj = mols[0]
     
+    # Gets the resulting charges
+    atom_charges = []
+    total_charge = 0
+    
+    if ref_uncorr_atom_charges is not None:
+        for i in range(natoms):
+            a = rdkit_obj.GetAtomWithIdx(i)
+            if a.GetFormalCharge() != ref_uncorr_atom_charges[i]:
+                if debug >= 1: print(f"GET_CHARGE. correct atomic charge {i=} {a.GetSymbol()=} from {a.GetFormalCharge()=} to {ref_uncorr_atom_charges[i]=}")
+                a.SetFormalCharge(ref_uncorr_atom_charges[i])
+            atom_charges.append(a.GetFormalCharge())
+            total_charge += a.GetFormalCharge()
+    else:
+        for i in range(natoms):
+            a = rdkit_obj.GetAtomWithIdx(i)  # Returns a particular Atom
+            atom_charges.append(a.GetFormalCharge())
+            total_charge += a.GetFormalCharge()
+
+
+    smiles = Chem.MolToSmiles(rdkit_obj)
+    if debug >= 2: print(f"GET_CHARGE. {smiles=}")
+    if debug >= 2: print(f"GET_CHARGE. {atom_charges=}")
+    if debug >= 2: print(f"GET_CHARGE. {total_charge=}")
+    # Connectivity is checked
+    iscorrect = check_rdkit_obj_connectivity(rdkit_obj, prot.natoms, charge, debug=debug)
+    
+    # Charge_state is initiated
+    ch_state = charge_state(iscorrect, total_charge, atom_charges, rdkit_obj, smiles, charge, allow, prot)
+
     return ch_state
 #######################################################
 def check_rdkit_obj_connectivity(mol: object, natoms: int, ich: int, debug: int=0): 
@@ -1133,7 +1161,7 @@ def set_final_charge (specie, unique_indices, unique_species, final_charge_distr
     final_charge = [final_charge_distribution[i] for i in indices][0] 
     if debug > 1: print("SET_FINAL_CHARGE:", spec, indices, final_charge)
     
-    if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+    if (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA) or (specie.subtype == "ligand"):
         formula = specie.formula
         charge_list = [cs.corr_total_charge for cs in spec.possible_cs]
     
@@ -1147,7 +1175,7 @@ def set_final_charge (specie, unique_indices, unique_species, final_charge_distr
         if debug >= 1: print(f"SET_FINAL_CHARGE: ERROR!! Target charge {final_charge} of {formula} does not exist in {charge_list}." )
         return None
         
-    if (specie.subtype == "molecule" and specie.iscomplex == False) or (specie.subtype == "ligand"):
+    if (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA) or (specie.subtype == "ligand"):
         if debug > 1: print("SET_FINAL_CHARGE:", specie.formula)
         specie.get_protonation_states(debug=debug)
         specie.get_possible_cs(debug=debug)
@@ -1181,11 +1209,11 @@ def set_final_charge (specie, unique_indices, unique_species, final_charge_distr
 def prepare_mols (moleclist: list, unique_indices: list, unique_species: list, final_charge_distribution: list, debug: int=0):
     count = 0 
     for mol in moleclist:
-        if mol.iscomplex == False:
+        if not mol.iscomplex and not mol.has_IA_IIA:
             set_final_charge(mol, unique_indices, unique_species, final_charge_distribution, debug)
             count += 1
         
-        elif mol.iscomplex:
+        else:
             tmp_atcharge = np.zeros((mol.natoms))
             tmp_smiles = []
             
@@ -1416,8 +1444,24 @@ class protonation(object):
         self.atom_site_labels = [refcell.atom_site_labels[idx] for idx in self.atom_site_labels_indices]
         print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
         print("PROTONATION.atom_site_labels", self.atom_site_labels)
+        
         if refcell.exist_cif_bond_moiety:
-            self.status, self.adjmat, self.adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, refcell.geom_bond_cif)
+            self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, refcell.geom_bond_cif)
+            print("PROTONATION.get_adjmatrix_from_cif_bonds", adjmat.shape, adjnum.shape)
+            count = 0 
+            if len(self.addedlist) > 0:
+                for idx, add in enumerate(self.addedlist):
+                    if add != 0:
+                        count += 1 
+                        added_idx = len(self.addedlist) -1 + count
+                        print("PROTONATION.added_idx", f"{idx=} {added_idx=}")
+                        adjmat[idx, added_idx] += 1
+                        adjmat[added_idx, idx] += 1
+                        adjnum[idx] += 1
+                        adjnum[added_idx] += 1
+
+            self.adjmat = adjmat
+            self.adjnum = adjnum        
         else:
             self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
    
@@ -1428,10 +1472,13 @@ class protonation(object):
         ## for protonation states with added atoms, the reorder map will have fewer items. Correct it here 
         mapext = np.copy(map)
         if self.added_atoms > 0 and len(map) < len(self.labels):
-            for ldx in range(0,self.added_atoms):
+            for ldx in range(0, self.added_atoms):
                 mapext = np.append(mapext,len(map)+ldx)
             if debug > 0: print("PROTONATION.REORDER. extended map:", mapext)
-
+        print("PROTONATION.REORDER. extended map:", mapext, len(mapext))
+        print("PROTONATION.REORDER. map:", map, len(map))
+        print("PROTONATION.REORDER. labels:", self.labels, len(self.labels))
+        print("PROTONATION.REORDER. addedlist:", self.addedlist, len(self.addedlist))
         assert len(mapext) == len(self.labels)
         assert len(map)    == len(self.addedlist)
         if len(map) > 0:
@@ -1448,7 +1495,22 @@ class protonation(object):
             self.typ                        = "Reordered"
             refcell = self.parent.get_parent("reference")
             if refcell.exist_cif_bond_moiety:
-                self.status, self.adjmat, self.adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, refcell.geom_bond_cif)
+                self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, refcell.geom_bond_cif)
+                print("PROTONATION.get_adjmatrix_from_cif_bonds", adjmat.shape, adjnum.shape)
+                count = 0 
+                if len(self.addedlist) > 0:
+                    for idx, add in enumerate(self.addedlist):
+                        if add != 0:
+                            count += 1 
+                            added_idx = len(self.addedlist) -1 + count
+                            print("PROTONATION.added_idx", f"{idx=} {added_idx=}")
+                            adjmat[idx, added_idx] += 1
+                            adjmat[added_idx, idx] += 1
+                            adjnum[idx] += 1
+                            adjnum[added_idx] += 1
+
+                self.adjmat = adjmat
+                self.adjnum = adjnum         
             else:
                 self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
         return self
