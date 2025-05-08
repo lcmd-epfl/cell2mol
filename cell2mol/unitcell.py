@@ -57,6 +57,11 @@ def process_unitcell(input_path, name, current_dir, debug=0):
                     print_unique_species(newcell)
                     print_moleclist(newcell)
 
+            summary_fname_ref = os.path.join(current_dir, "reference_summary.out")
+            with open(summary_fname_ref, "a") as summary_ref:
+                with redirect_stdout(summary_ref):
+                    print_refmoleclist(refcell)   
+
             # Handle error cases for the unit cell
             if hasattr(newcell, 'error_case'):
                 error_fname = os.path.join(current_dir, f"unitcell_error_{newcell.error_case}.out")
@@ -107,11 +112,8 @@ def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debu
         mode = "charge_assignment"
         cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
         newcell.assess_errors(mode=mode)
-
-        if newcell.error_case == 0:        
-            mode = "spin_assignment"
-            cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
-
+        
+        if newcell.error_case == 0:   
             # Assign and balance charges
             for specie in newcell.unique_species:
                 for refspecie in refcell.unique_species:
@@ -131,8 +133,41 @@ def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debu
             refcell.assign_charges_for_refcell(debug=debug)
             refcell.assign_spin(debug=debug)
             refcell.create_bonds(debug=debug)
-            newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
-            newcell.unique_species = copy.deepcopy(refcell.unique_species)
+            refcell.check_charge_neutrality(debug=debug)
+            refcell.create_bonds(debug=debug)
+
+            if refcell.error_create_bonds:      
+                if debug >= 1: print(f"Creating bonds Failed")
+            else:
+                if debug >= 1: print("Creating bonds Finished Normally")
+                newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
+                newcell.unique_species = copy.deepcopy(refcell.unique_species)     
+        
+        # if newcell.error_case == 0:        
+        #     mode = "spin_assignment"
+        #     cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
+
+        #     # Assign and balance charges
+        #     for specie in newcell.unique_species:
+        #         for refspecie in refcell.unique_species:
+        #             if specie.unique_index == refspecie.unique_index:
+        #                 if specie.subtype == "metal":
+        #                     assign_charge_to_specie(refspecie, specie.charge, debug=debug)
+        #                 else:
+        #                     assign_charge_to_specie(refspecie, specie.totcharge, debug=debug)
+
+        #     for specie in refcell.unique_species:
+        #         if specie.subtype == "metal":
+        #             print("refcell.unique_species", specie.formula, specie.charge, specie.unique_index)
+        #         else:
+        #             print("refcell.unique_species", specie.formula, specie.totcharge, specie.unique_index)
+            
+        #     # Finalize refcell properties and save both cell objects
+        #     refcell.assign_charges_for_refcell(debug=debug)
+        #     refcell.assign_spin(debug=debug)
+        #     refcell.create_bonds(debug=debug)
+        #     newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
+        #     newcell.unique_species = copy.deepcopy(refcell.unique_species)
 
 def cell2mol_mode (newcell, refcell, sym_ops, mode, debug):
     """Applies cell2mol with specific reconstruction or assignment mode."""
