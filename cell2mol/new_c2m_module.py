@@ -80,15 +80,15 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
             else :
                 
                 if debug >= 1: print(f"Charge Assignment Finished Normally. Total execution time: {tend - tini:.2f} seconds")
+                return newcell
+                # newcell.check_charge_neutrality(debug=debug)
+                # newcell.create_bonds(debug=debug)
 
-                newcell.check_charge_neutrality(debug=debug)
-                newcell.create_bonds(debug=debug)
-
-                if newcell.error_create_bonds:      
-                    if debug >= 1: print(f"Creating bonds Failed")
-                    return newcell
-                else:
-                    if debug >= 1: print("Creating bonds Finished Normally")
+                # if newcell.error_create_bonds:      
+                #     if debug >= 1: print(f"Creating bonds Failed")
+                #     return newcell
+                # else:
+                #     if debug >= 1: print("Creating bonds Finished Normally")
         else:
             return newcell  
 
