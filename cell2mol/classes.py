@@ -2218,46 +2218,47 @@ class cell(object):
                         print("ASSIGN_CHARGES: Metal", idx, kdx, met.formula, met.charge)
                 else:
                     print("ASSIGN_CHARGES: Non-Complex", idx, ref.formula, ref.totcharge, ref.smiles)
-            
-            for idx, mol in enumerate(self.moleclist):
-                print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")
-                if not mol.iscomplex and not mol.has_IA_IIA:
-                    for ref in self.refmoleclist:
-                        if (not ref.iscomplex and not ref.has_IA_IIA) and (mol.unique_index == ref.unique_index) :
-                            issame = compare_reference_indices(ref, mol, debug=debug)
-                            if issame:
-                                set_charge_state (ref, mol, mode=2, debug=debug)
-                else:
-                    for ref in self.refmoleclist:
-                        if (ref.iscomplex or ref.has_IA_IIA) and (mol.formula == ref.formula):
-                            for jdx, lig in enumerate(mol.ligands):
-                                for rdx, ref_lig in enumerate(ref.ligands):
-                                    if lig.formula == ref_lig.formula:
-                                        issame = compare_reference_indices(ref_lig, lig, debug=debug)
-                                        if issame:
-                                            set_charge_state (ref_lig, lig, mode=2, debug=debug)
-                                        # else:
-                                        #     print("ERROR: ASSIGN_CHARGES: Ligand", idx, jdx, rdx, lig.formula, ref_lig.totcharge, ref_lig.smiles)
-                            for kdx, met in enumerate(mol.metals):
-                                for ref_met in ref.metals:
-                                    if (met.formula == ref_met.formula):
-                                        if ref_met.get_parent_index("reference") == met.get_parent_index("reference"):
-                                            met.set_charge(ref_met.charge)
+        return  
+          
+            # for idx, mol in enumerate(self.moleclist):
+            #     print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")
+            #     if not mol.iscomplex and not mol.has_IA_IIA:
+            #         for ref in self.refmoleclist:
+            #             if (not ref.iscomplex and not ref.has_IA_IIA) and (mol.unique_index == ref.unique_index) :
+            #                 issame = compare_reference_indices(ref, mol, debug=debug)
+            #                 if issame:
+            #                     set_charge_state (ref, mol, mode=2, debug=debug)
+            #     else:
+            #         for ref in self.refmoleclist:
+            #             if (ref.iscomplex or ref.has_IA_IIA) and (mol.formula == ref.formula):
+            #                 for jdx, lig in enumerate(mol.ligands):
+            #                     for rdx, ref_lig in enumerate(ref.ligands):
+            #                         if lig.formula == ref_lig.formula:
+            #                             issame = compare_reference_indices(ref_lig, lig, debug=debug)
+            #                             if issame:
+            #                                 set_charge_state (ref_lig, lig, mode=2, debug=debug)
+            #                             # else:
+            #                             #     print("ERROR: ASSIGN_CHARGES: Ligand", idx, jdx, rdx, lig.formula, ref_lig.totcharge, ref_lig.smiles)
+            #                 for kdx, met in enumerate(mol.metals):
+            #                     for ref_met in ref.metals:
+            #                         if (met.formula == ref_met.formula):
+            #                             if ref_met.get_parent_index("reference") == met.get_parent_index("reference"):
+            #                                 met.set_charge(ref_met.charge)
 
 
-            for idx, mol in enumerate(self.moleclist):
-                if mol.iscomplex or mol.has_IA_IIA: prepare_mol(mol)
+            # for idx, mol in enumerate(self.moleclist):
+            #     if mol.iscomplex or mol.has_IA_IIA: prepare_mol(mol)
             
-            for idx, mol in enumerate(self.moleclist):
-                print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")
-                if mol.iscomplex or mol.has_IA_IIA:
-                    print("ASSIGN_CHARGES: Complex", idx, mol.formula, mol.totcharge)
-                    for jdx, lig in enumerate(mol.ligands):
-                        print("ASSIGN_CHARGES: Ligand", idx, jdx, lig.formula, lig.totcharge, lig.smiles)
-                    for kdx, met in enumerate(mol.metals):
-                        print("ASSIGN_CHARGES: Metal", idx, kdx, met.formula, met.charge)
-                else:
-                    print("ASSIGN_CHARGES: Non-Complex", idx, mol.formula, mol.totcharge, mol.smiles)
+            # for idx, mol in enumerate(self.moleclist):
+            #     print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")
+            #     if mol.iscomplex or mol.has_IA_IIA:
+            #         print("ASSIGN_CHARGES: Complex", idx, mol.formula, mol.totcharge)
+            #         for jdx, lig in enumerate(mol.ligands):
+            #             print("ASSIGN_CHARGES: Ligand", idx, jdx, lig.formula, lig.totcharge, lig.smiles)
+            #         for kdx, met in enumerate(mol.metals):
+            #             print("ASSIGN_CHARGES: Metal", idx, kdx, met.formula, met.charge)
+            #     else:
+            #         print("ASSIGN_CHARGES: Non-Complex", idx, mol.formula, mol.totcharge, mol.smiles)
     #######################################################
     def assign_charges_for_refcell(self, debug: int=0):
     
@@ -2517,7 +2518,7 @@ class cell(object):
             elif self.error_get_poscharges :    case = 5
             elif self.error_multiple_distrib :  case = 6
             elif self.error_empty_distrib :     case = 7
-            elif self.error_create_bonds :      case = 8
+            #elif self.error_create_bonds :      case = 8
             else :                              case = 0
             # handle_error(case)
             # print("")

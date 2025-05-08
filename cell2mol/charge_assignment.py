@@ -403,7 +403,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         block[idx] = 1
                 # Oxygen
                 elif a.label == "O" :
-                    if a.connec == 1:
+                    if a.connec == 1 or (a.connec - a.mconnec) == 1:
                         needs_nonlocal = True
                         non_local_groups += 1
                         non_local_groups_indices.append(idx)
@@ -785,7 +785,8 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
     
 
     rdkit_obj = mols[0]
-    
+    if debug >= 0: print(f"GET_CHARGE. {prot.atom_site_labels=}")
+    if debug >= 0: print(f"GET_CHARGE. CHECK. {Chem.MolToSmiles(rdkit_obj)=}")
     # Gets the resulting charges
     atom_charges = []
     total_charge = 0
@@ -794,7 +795,7 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
         for i in range(natoms):
             a = rdkit_obj.GetAtomWithIdx(i)
             if a.GetFormalCharge() != ref_uncorr_atom_charges[i]:
-                if debug >= 1: print(f"GET_CHARGE. correct atomic charge {i=} {a.GetSymbol()=} from {a.GetFormalCharge()=} to {ref_uncorr_atom_charges[i]=}")
+                if debug >= 0: print(f"GET_CHARGE. correct atomic charge {i=} {a.GetSymbol()=} from {a.GetFormalCharge()=} to {ref_uncorr_atom_charges[i]=}")
                 a.SetFormalCharge(ref_uncorr_atom_charges[i])
             atom_charges.append(a.GetFormalCharge())
             total_charge += a.GetFormalCharge()
@@ -806,9 +807,10 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
 
 
     smiles = Chem.MolToSmiles(rdkit_obj)
-    if debug >= 2: print(f"GET_CHARGE. {smiles=}")
-    if debug >= 2: print(f"GET_CHARGE. {atom_charges=}")
-    if debug >= 2: print(f"GET_CHARGE. {total_charge=}")
+
+    if debug >= 0: print(f"GET_CHARGE. {smiles=}")
+    if debug >= 0: print(f"GET_CHARGE. {atom_charges=}")
+    if debug >= 0: print(f"GET_CHARGE. {total_charge=}")
     # Connectivity is checked
     iscorrect = check_rdkit_obj_connectivity(rdkit_obj, prot.natoms, charge, debug=debug)
     
@@ -1297,7 +1299,8 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
     # Creates Molecule
     obj = rwlig.GetMol()
     smiles = Chem.MolToSmiles(obj)
-    
+    print("CORRECT_SMILES: ", smiles)
+
     try:
         Chem.SanitizeMol(obj)
         Chem.DetectBondStereochemistry(obj, -1)
