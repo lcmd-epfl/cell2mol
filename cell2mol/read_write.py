@@ -962,33 +962,46 @@ def print_refmoleclist (cell):
 
         if ref.iscomplex or ref.has_IA_IIA:
             for met in ref.metals:
+                met_info = f"\t{met.formula} ({met.subtype})"
                 if hasattr(met, "charge"):
-                    print(f"\t{met.formula} ({met.subtype}) metal_OS={met.charge}")
+                    met_info += f" metal_OS={met.charge}"
                 elif hasattr(met, "possible_cs"):
-                    print(f"\t{met.formula} ({met.subtype}) metal_possible_OS={met.possible_cs}")
-                else:
-                    print(f"\t{met.formula} ({met.subtype})")
+                    met_info += f" metal_possible_OS={met.possible_cs}"
+                print(met_info)
 
                 if hasattr(met, "coord_sphere_formula"):
-                    print(f"\t|--Coordination infomation {met.coord_sphere_formula=}")
-                if hasattr(met, "coord_nr"):
-                    print(f"\t|--without metal-metal bonds: {met.coord_nr=} {met.coord_geometry=} {met.geom_deviation=}")
-                if hasattr(met, "coord_nr_with_metal_bonds"):
-                    print(f"\t|--including metal-metal bonds: bonded metals={[m.label for m in met.metals]} {met.coord_nr_with_metal_bonds=} {met.coord_geometry_with_metal_bonds=} {met.geom_deviation_with_metal_bonds=}")
+                    print(f"\t|--Coordination information coord_sphere_formula={met.coord_sphere_formula}")
+
+                if all(hasattr(met, attr) for attr in ["coord_nr", "coord_geometry", "geom_deviation"]):
+                    print(f"\t|--without metal-metal bonds: coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}")
+
+                if all(hasattr(met, attr) for attr in ["coord_nr_with_metal_bonds", "coord_geometry_with_metal_bonds", "geom_deviation_with_metal_bonds", "metals"]):
+                    bonded_metals = [m.label for m in met.metals]
+                    print(f"\t|--including metal-metal bonds: bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
 
             for lig in ref.ligands:
-                if hasattr(lig, "totcharge"):
-                    print(f"\t{lig.formula} ({lig.subtype}) {lig.smiles=} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} {lig.totcharge=}")
-                elif hasattr(lig, "possible_cs"):
-                    if lig.possible_cs is not None:
-                        print(f"\t{lig.formula} ({lig.subtype}) {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} lig.possible_cs Exists")
-                    else:
-                        print(f"\t{lig.formula} ({lig.subtype}) {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} lig.possible_cs Does not exist")
-                for group in lig.groups:
-                    print(f"\t|--(group) {group.labels} {group.is_haptic=} {group.haptic_type=} {group.denticity=} {group.closest_metal.label=}")
-                    # for met in group.metals:
-                    #     print(f"\t|--(group.metals){met.label} {met.mconnec=}")
+                lig_info = f"\t{lig.formula} ({lig.subtype})"
+                for attr in ["smiles", "is_haptic", "haptic_type", "denticity", "totcharge"]:
+                    if hasattr(lig, attr):
+                        lig_info += f" {attr}={getattr(lig, attr)}"
 
+                if hasattr(lig, "possible_cs") and not hasattr(lig, "totcharge"):
+                    if lig.possible_cs is not None:
+                        lig_info += " lig.possible_cs Exists"
+                    else:
+                        lig_info += " lig.possible_cs Does not exist"
+
+                print(lig_info)
+
+                for group in lig.groups:
+                    group_info = f"\t|--(group) {group.labels}"
+                    for attr in ["is_haptic", "haptic_type", "denticity"]:
+                        if hasattr(group, attr):
+                            group_info += f" {attr}={getattr(group, attr)}"
+                    if hasattr(group, "closest_metal"):
+                        group_info += f" closest_metal.label={group.closest_metal.label}"
+                    print(group_info)
+                    
 ######################################################
 def print_unique_species (cell):
     if hasattr(cell, "unique_species"):
@@ -1031,8 +1044,7 @@ def print_possible_charges (cell, debug=0):
     else:
         print("\nNo species list found in the cell object.")
 
-######################################################
-def print_moleclist (cell):
+def print_moleclist(cell):
     if hasattr(cell, "moleclist"):
         print(f"\nMolecules in {cell.subtype}:")                 
         for i, mol in enumerate(cell.moleclist):
@@ -1049,29 +1061,45 @@ def print_moleclist (cell):
 
             if mol.iscomplex or mol.has_IA_IIA:
                 for met in mol.metals:
+                    met_info = f"\t{met.formula} ({met.subtype})"
+
                     if hasattr(met, "charge"):
-                        print(f"\t{met.formula} ({met.subtype}) metal_OS={met.charge}")
+                        met_info += f" metal_OS={met.charge}"
                     elif hasattr(met, "possible_cs"):
-                        print(f"\t{met.formula} ({met.subtype}) metal_possible_OS={met.possible_cs}")
-                    else:
-                        print(f"\t{met.formula} ({met.subtype})")
-                        
-                    if hasattr(met, "coord_sphere_formula"):
-                        print(f"\t|--Coordination infomation {met.coord_sphere_formula=}")
-                    if hasattr(met, "coord_nr"):
-                        print(f"\t|--without metal-metal bonds: {met.coord_nr=} {met.coord_geometry=} {met.geom_deviation=}")
-                    if hasattr(met, "coord_nr_with_metal_bonds"):
-                        print(f"\t|--including metal-metal bonds: bonded metals={[m.label for m in met.metals]} {met.coord_nr_with_metal_bonds=} {met.coord_geometry_with_metal_bonds=} {met.geom_deviation_with_metal_bonds=}")
+                        met_info += f" metal_possible_OS={met.possible_cs}"
+                    print(met_info)
+
+                    for attr in ["coord_sphere_formula"]:
+                        if hasattr(met, attr):
+                            print(f"\t|--Coordination information {attr}={getattr(met, attr)}")
+
+                    if all(hasattr(met, attr) for attr in ["coord_nr", "coord_geometry", "geom_deviation"]):
+                        print(f"\t|--without metal-metal bonds: coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}")
+
+                    if all(hasattr(met, attr) for attr in ["coord_nr_with_metal_bonds", "coord_geometry_with_metal_bonds", "geom_deviation_with_metal_bonds", "metals"]):
+                        bonded_metals = [m.label for m in met.metals]
+                        print(f"\t|--including metal-metal bonds: bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
                 print("")
+
                 for lig in mol.ligands:
-                    if hasattr(lig, "totcharge"):
-                        print(f"\t{lig.formula} ({lig.subtype}) {lig.smiles=} {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=} {lig.totcharge=}")
-                    else:
-                        print(f"\t{lig.formula} ({lig.subtype}) {lig.is_haptic=} {lig.haptic_type=} {lig.denticity=}")
+                    lig_info = f"\t{lig.formula} ({lig.subtype})"
+                    for attr in ["smiles", "is_haptic", "haptic_type", "denticity", "totcharge"]:
+                        if hasattr(lig, attr):
+                            lig_info += f" {attr}={getattr(lig, attr)}"
+                    print(lig_info)
+
                     for group in lig.groups:
-                        print(f"\t|--(group){group.labels} {group.is_haptic=} {group.haptic_type=} {group.denticity=} {group.closest_metal.label=}")
+                        group_info = f"\t|--(group){group.labels}"
+                        for attr in ["is_haptic", "haptic_type", "denticity"]:
+                            if hasattr(group, attr):
+                                group_info += f" {attr}={getattr(group, attr)}"
+                        if hasattr(group, "closest_metal"):
+                            group_info += f" closest_metal.label={group.closest_metal.label}"
+                        print(group_info)
+
+                        # Optional: print group-metals connectivity
                         # for met in group.metals:
                         #     print(f"\t|--(group.metals){met.label} {met.mconnec=}")
     else:
         print("\nNo molecules found in the cell object.")
-######################################################
+

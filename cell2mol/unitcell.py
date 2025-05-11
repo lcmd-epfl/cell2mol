@@ -5,8 +5,7 @@ from cell2mol.refcell import process_refcell
 from contextlib import redirect_stdout
 from ase.io import read
 from cell2mol.classes import cell
-from cell2mol.new_c2m_module import cell2mol
-from cell2mol.new_charge_assignment import assign_charge_to_specie
+from cell2mol.final_c2m_module import cell2mol_mode
 from cell2mol.other import handle_error
 from cell2mol.read_write import print_refmoleclist, print_unique_species, print_moleclist
 import copy
@@ -113,71 +112,6 @@ def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debu
         cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
         newcell.assess_errors(mode=mode)
         
-        if newcell.error_case == 0:   
-            # Assign and balance charges
-            for specie in newcell.unique_species:
-                for refspecie in refcell.unique_species:
-                    if specie.unique_index == refspecie.unique_index:
-                        if specie.subtype == "metal":
-                            assign_charge_to_specie(refspecie, specie.charge, debug=debug)
-                        else:
-                            assign_charge_to_specie(refspecie, specie.totcharge, debug=debug)
-
-            for specie in refcell.unique_species:
-                if specie.subtype == "metal":
-                    print("refcell.unique_species", specie.formula, specie.charge, specie.unique_index)
-                else:
-                    print("refcell.unique_species", specie.formula, specie.totcharge, specie.unique_index)
-            
-            # Finalize refcell properties and save both cell objects
-            refcell.assign_charges_for_refcell(debug=debug)
-            refcell.assign_spin(debug=debug)
-            refcell.create_bonds(debug=debug)
-            refcell.check_charge_neutrality(debug=debug)
-            refcell.create_bonds(debug=debug)
-
-            if refcell.error_create_bonds:      
-                if debug >= 1: print(f"Creating bonds Failed")
-            else:
-                if debug >= 1: print("Creating bonds Finished Normally")
-                newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
-                newcell.unique_species = copy.deepcopy(refcell.unique_species)     
-        
-        # if newcell.error_case == 0:        
-        #     mode = "spin_assignment"
-        #     cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
-
-        #     # Assign and balance charges
-        #     for specie in newcell.unique_species:
-        #         for refspecie in refcell.unique_species:
-        #             if specie.unique_index == refspecie.unique_index:
-        #                 if specie.subtype == "metal":
-        #                     assign_charge_to_specie(refspecie, specie.charge, debug=debug)
-        #                 else:
-        #                     assign_charge_to_specie(refspecie, specie.totcharge, debug=debug)
-
-        #     for specie in refcell.unique_species:
-        #         if specie.subtype == "metal":
-        #             print("refcell.unique_species", specie.formula, specie.charge, specie.unique_index)
-        #         else:
-        #             print("refcell.unique_species", specie.formula, specie.totcharge, specie.unique_index)
-            
-        #     # Finalize refcell properties and save both cell objects
-        #     refcell.assign_charges_for_refcell(debug=debug)
-        #     refcell.assign_spin(debug=debug)
-        #     refcell.create_bonds(debug=debug)
-        #     newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
-        #     newcell.unique_species = copy.deepcopy(refcell.unique_species)
-
-def cell2mol_mode (newcell, refcell, sym_ops, mode, debug):
-    """Applies cell2mol with specific reconstruction or assignment mode."""
-    reconstruction = mode == "reconstruction"
-    charge_assignment = mode == "charge_assignment"
-    spin_assignment = mode == "spin_assignment"
-    newcell = cell2mol(newcell, refcell, sym_ops, reconstruction, charge_assignment, spin_assignment, debug=debug)
-    logging.info(f"Completed {mode} mode in cell2mol")
-
-
 if __name__ == "__main__":
     input = sys.argv[1]
     current_dir = os.getcwd()
