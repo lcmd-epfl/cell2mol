@@ -875,7 +875,8 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
     spec = prot.parent
 
     #### Educated Guess on the Maximum Charge one can expect from the spec[1]
-    if   spec.subtype == "molecule":  maxcharge = 3
+    if   spec.subtype == "molecule" and (not spec.iscomplex and not spec.has_IA_IIA): 
+        maxcharge = 3
     elif spec.subtype == "ligand":  
         count_non_connected_O = 0
         for a in spec.atoms:
@@ -884,15 +885,23 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
         if not spec.is_haptic:
             if not hasattr(spec,"denticity"):         spec.get_denticity()
             maxcharge = spec.denticity + count_non_connected_O - prot.added_atoms
-        else: maxcharge = 2
+        else: 
+            maxcharge = 2
 
         # Cases of same atom being connected to more than one metal
-        if any(a.mconnec >= 2 for a in spec.atoms): pass
+        if any(a.mconnec >= 2 for a in spec.atoms): 
+            pass
         else:                                       
-            if maxcharge > spec.natoms: maxcharge = spec.natoms
-        if maxcharge > 4: maxcharge = 4  ## At most, we try range(-4,5,1)
-        if maxcharge < 2: maxcharge = 2  ## At leaest, we try range(-2,3,1)
-
+            if maxcharge > spec.natoms: 
+                maxcharge = spec.natoms
+        if maxcharge > 4: 
+            maxcharge = 4  ## At most, we try range(-4,5,1)
+        if maxcharge < 2: 
+            maxcharge = 2  ## At leaest, we try range(-2,3,1)
+    
+    if prot.added_atoms > 0 :
+        maxcharge = 0
+    
     if debug >= 2: print(f"MAXCHARGE: maxcharge set at {maxcharge}")
     
     # Defines list of charges that will try
@@ -986,7 +995,7 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     at_charge[23] = [1, 2, 3, 4, 5]  # V
     at_charge[24] = [0, 2, 3] # Cr ; including 5 leads to worse results
     at_charge[25] = [1, 2, 3]  # Mn
-    at_charge[26] = [0, 2, 3]  # Fe
+    at_charge[26] = [2, 3]  # Fe
     at_charge[27] = [1, 2, 3]  # Co
     at_charge[28] = [0, 2, 3]  # Ni
     at_charge[29] = [1, 2]  # Cu

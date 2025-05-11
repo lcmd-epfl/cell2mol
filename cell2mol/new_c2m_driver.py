@@ -9,7 +9,7 @@ from cell2mol.new_c2m_module import cell2mol
 from cell2mol.other import handle_error
 from cell2mol.cell_operations import frac2cart_fromparam
 from cell2mol.new_charge_assignment import assign_charge_state_for_unique_species, balance_charge
-from cell2mol.new_cell_reconstruction import determine_wrap_keywords_pbc, modify_cov_factor_due_to_H, modify_cov_factor_due_to_possible_charges
+from cell2mol.new_cell_reconstruction import modify_cov_factor_due_to_H, modify_cov_factor_due_to_possible_charges
 
 if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     

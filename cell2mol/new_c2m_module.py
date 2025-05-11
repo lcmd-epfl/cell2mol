@@ -106,7 +106,3 @@ def cell2mol(newcell: object, refcell: object, sym_ops, reconstruction: bool=Tru
             return newcell
 
     return newcell
-
-
-
-

@@ -13,7 +13,7 @@ def main():
     dir, file = os.path.split(input_path)
     name, extension = os.path.splitext(file)
 
-    print(input, input_path, system_type, cell_para, debug_mode, name, extension)
+    #print(input, input_path, system_type, cell_para, debug_mode, name, extension)
     
     if not os.path.exists(input_path):
         exit_with_error_input(f"Input file not found: {input_path}")

@@ -1,11 +1,12 @@
 import numpy as np
 import copy
-from cell2mol.charge_assignment import protonation, get_charge, get_charge_manual
+from cell2mol.charge_assignment import protonation, get_charge, get_charge_manual, charge_state, check_rdkit_obj_connectivity
 import itertools
 import os
 from cell2mol import __file__
 from cell2mol.spin import generate_feature_vector
 import pickle
+from rdkit import Chem
 
 #######################################################
 def balance_charge(unique_indices: list, unique_species: list, rare: bool="False", predict: bool="False", debug: int=0) -> list:
@@ -96,6 +97,7 @@ def assign_charge_state_for_unique_species(unique_species, final_charge_tuple, d
 
 ######################################################
 def print_possible_and_selected_cs (newcell, refcell, debug: int=0):
+    """Print possible charge states and selected charge state for unique species."""
     if debug >= 1:
         print(f"\npossible charge states and charge of selected charge state for unique species")
         for idx, (specie, select) in enumerate(zip(refcell.unique_species, refcell.selected_cs)):
@@ -114,7 +116,55 @@ def print_possible_and_selected_cs (newcell, refcell, debug: int=0):
             if idx != specie.unique_index:
                 print(f"WARNING: {specie.formula=} {specie.unique_index=} {idx=} from newcell unique indices")
 
+#######################################################
+def get_reordered_protonation (refcell: object, reference: object, target: object):
 
+    temp_prot = copy.deepcopy(reference.charge_state.protonation)
+    temp_prot.parent = target
+
+    ref_indices = reference.get_parent_indices("reference")
+    target_indices = target.get_parent_indices("reference")
+
+    ref_data = [refcell.atom_site_labels[idx] for idx in ref_indices]
+    target_data = [refcell.atom_site_labels[idx] for idx in target_indices]
+
+    index_map = {value: index for index, value in enumerate(target_data)}
+    sorted_indices = sorted(range(len(ref_data)), key=lambda i: index_map[ref_data[i]])            
+
+    reordered_prot = temp_prot.reorder(sorted_indices)
+
+    return reordered_prot
+#######################################################
+def reorder_rdkit_atoms(ref_mol, ref_labels, target_labels):
+    # 1. Create label → atom index map from ref_data
+    label_to_index = {label: idx for idx, label in enumerate(ref_labels)}
+
+    # 2. Create old index → new index map
+    old_to_new = {label_to_index[label]: i for i, label in enumerate(target_labels)}
+    new_to_old = {v: k for k, v in old_to_new.items()}
+
+    # 3. Create editable mol
+    new_mol = Chem.RWMol()
+
+    # 4. Add atoms in new order
+    for new_idx in range(len(target_labels)):
+        old_idx = new_to_old[new_idx]
+        atom = ref_mol.GetAtomWithIdx(old_idx)
+        new_atom = Chem.Atom(atom.GetAtomicNum())
+        new_atom.SetFormalCharge(atom.GetFormalCharge())
+        new_mol.AddAtom(new_atom)
+
+    # 5. Add bonds based on original molecule
+    for bond in ref_mol.GetBonds():
+        begin_old = bond.GetBeginAtomIdx()
+        end_old = bond.GetEndAtomIdx()
+        bond_type = bond.GetBondType()
+        # remap to new indices
+        begin_new = old_to_new[begin_old]
+        end_new = old_to_new[end_old]
+        new_mol.AddBond(begin_new, end_new, bond_type)
+    
+    return new_mol.GetMol()
 ######################################################
 def set_charge_state(reference, target, mode, debug: int=0):
 
@@ -135,8 +185,34 @@ def set_charge_state(reference, target, mode, debug: int=0):
             print(charge_list, final_charge, target.possible_cs)
             idx = charge_list.index(final_charge)
             cs = target.possible_cs[idx]
-
+    
+        target.charge_state = cs
+        if final_charge != cs.corr_total_charge:
+            print(f"SET_CHARGE_STATE: WARNING!!! {target.formula=} {final_charge=} {cs.corr_total_charge=} final_charge != cs.corr_total_charge")
+        print("SET_CHARGE_STATE!!!!", f"{mode=}", cs, cs.smiles)
+        target.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
+        print(f"SET_CHARGE_STATE:{target.formula=} {target.totcharge=} {target.smiles=}")   
+    
     elif mode == 2 : # For "unit" cell. Their charge state are not calculated
+        if (target.subtype == "ligand") or (target.subtype == "molecule" and not target.iscomplex and not target.has_IA_IIA):
+            
+            rdkit_obj = reorder_rdkit_atoms(reference.rdkit_obj, reference.atom_site_labels, target.atom_site_labels)
+            smiles = Chem.MolToSmiles(rdkit_obj)
+            atom_charges = []
+            total_charge = 0
+            
+            for i in range(target.natoms):
+                a = rdkit_obj.GetAtomWithIdx(i)  # Returns a particular Atom
+                atom_charges.append(a.GetFormalCharge())
+                total_charge += a.GetFormalCharge()
+            if total_charge != final_charge:
+                print(f"SET_CHARGE_STATE: WARNING!!! {target.formula=} {total_charge=} {final_charge=}")
+
+            print(f"SET_CHARGE_STATE: {smiles=} {final_charge=}")
+            target.set_charges(total_charge, atom_charges, smiles, rdkit_obj)
+            print(f"SET_CHARGE_STATE:{target.formula=} {target.totcharge=} {target.smiles=}")
+
+    elif mode == 3 : # For "unit" cell. Their charge state are not calculated
         if target.formula in ["O4-Cl", "N3", "I3"]:
             cs = get_charge_manual(target, debug=debug)
         elif (target.subtype == "molecule" and not target.iscomplex and not target.has_IA_IIA) :
@@ -189,12 +265,12 @@ def set_charge_state(reference, target, mode, debug: int=0):
             if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {reference.charge_state.uncorr_total_charge=} Reordered {sorted_indices=}")
             cs = get_charge(reference.charge_state.uncorr_total_charge , reordered_prot, ref_uncorr_atom_charges=reordered_uncorr_atom_charges)
 
-    target.charge_state = cs
-    if final_charge != cs.corr_total_charge:
-        print(f"SET_CHARGE_STATE: WARNING!!! {target.formula=} {final_charge=} {cs.corr_total_charge=} final_charge != cs.corr_total_charge")
-    print("SET_CHARGE_STATE!!!!", f"{mode=}", cs, cs.smiles)
-    target.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
-    print(f"SET_CHARGE_STATE:{target.formula=} {target.totcharge=} {target.smiles=}")
+        target.charge_state = cs
+        if final_charge != cs.corr_total_charge:
+            print(f"SET_CHARGE_STATE: WARNING!!! {target.formula=} {final_charge=} {cs.corr_total_charge=} final_charge != cs.corr_total_charge")
+        print("SET_CHARGE_STATE!!!!", f"{mode=}", cs, cs.smiles)
+        target.set_charges(cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj)
+        print(f"SET_CHARGE_STATE:{target.formula=} {target.totcharge=} {target.smiles=}")
     
 ######################################################
 def prepare_mol (mol):
