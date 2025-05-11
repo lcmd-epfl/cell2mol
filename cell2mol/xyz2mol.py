@@ -522,11 +522,11 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, uncor
                 print('WARNING!! Valence of atom', element, i,\
                     'is', valence,'which is bigger than allowed max',max(atomic_valence[atomicNum]),'. Stopping')
                 possible_valence.append(valence)
-            elif elemdatabase.elementperiod[element] < 3 :
+            elif elemdatabase.elementperiod[element] < 3 : # e.g. HOLMOK
                 print('WARNING!! Valence of atom', element, i,\
                     'is', valence,'which bigger than allowed max',max(atomic_valence[atomicNum]),'. Stopping')
                 possible_valence.append(valence)
-                wrong += 1
+                # wrong += 1
             else:
                 possible_valence.append(valence)
             # sys.exit()

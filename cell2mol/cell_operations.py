@@ -5,7 +5,7 @@ import numpy as np
 #######################################################
 def frac2cart_fromcellvec(frac_coord, cellvec):
     """ Convert fractional coordinates to cartesian coordinates
-    Args:
+    Parameters:
         frac_coord (list): list of fractional coordinates
         cellvec (list): list of cell vectors
     Returns:
@@ -22,7 +22,7 @@ def frac2cart_fromcellvec(frac_coord, cellvec):
 #######################################################
 def frac2cart_fromparam(frac_coord, cellparam):
     """ Convert fractional coordinates to cartesian coordinates
-    Args:
+    Parameters:
         frac_coord (list): list of fractional coordinates
         cellparam (list): list of cell parameters
     Returns:
@@ -86,7 +86,7 @@ def translate(vector, coords, cellvec):
 def cart2frac(cartCoords, cellvec):
     """ Convert cartesian coordinates to fractional coordinates
 
-    Args:
+    Parameters:
         cartCoords (list): list of cartesian coordinates
         cellvec (list): list of cell vectors
     Returns:
@@ -153,7 +153,7 @@ def det3(mat):
 #######################################################
 def translate(vector, coords, cellvec):
     """ Translate coordinates by a vector
-    Args:
+    Parameters:
         vector (list): list of vector components
         coords (list): list of coordinates
         cellvec (list): list of cell vectors
