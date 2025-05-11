@@ -11,7 +11,7 @@ with io.open(path.join(this_directory, "README.md"), encoding="utf-8") as f:
 setup(
     name="cell2mol",
     packages=["cell2mol"],
-    version="1.0",
+    version="2.0",
     description="Generator cell object from a cif file",
     long_description=long_description,
     long_description_content_type="text/markdown",
