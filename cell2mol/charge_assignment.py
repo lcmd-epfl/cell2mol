@@ -997,7 +997,7 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     at_charge[25] = [1, 2, 3]  # Mn
     at_charge[26] = [2, 3]  # Fe
     at_charge[27] = [1, 2, 3]  # Co
-    at_charge[28] = [0, 2, 3]  # Ni
+    at_charge[28] = [2, 3]  # Ni
     at_charge[29] = [1, 2]  # Cu
     at_charge[30] = [2]  # Zn
     # 2nd-row transition metals.
@@ -1006,7 +1006,7 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
     at_charge[41] = [1, 3, 4, 5]  # Nb
     at_charge[42] = [0, 2, 4, 5, 6]  # Mo
     at_charge[43] = [1, 2, 3, 4, 5]  # Tc
-    at_charge[44] = [0, 2, 3, 4]  # Ru
+    at_charge[44] = [2, 3]  # Ru
     at_charge[45] = [1, 2, 3]  # Rh
     at_charge[46] = [0, 2]  # Pd
     at_charge[47] = [1]  # Ag
