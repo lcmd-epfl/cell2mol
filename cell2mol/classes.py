@@ -994,6 +994,9 @@ class group(specie):
 
         ## Carbon-based Haptic Ligands
         if   numC == 2:                   self.haptic_type = ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]; self.is_haptic = True
+        elif is_haptic_ring(self.labels, self.coord): 
+            self.haptic_type = [f"{len(self.labels)}-ring {self.formula}"]
+            self.is_haptic = True
         elif numC == 3 and numO == 0:     self.haptic_type = ["h3-Allyl", "h3-Cp"];                         self.is_haptic = True
         elif numC == 3 and numO == 1:     self.haptic_type = ["h4-Enone"];                                  self.is_haptic = True
         elif numC == 4:                   self.haptic_type = ["h4-Butadiene", "h4-Benzene"];                self.is_haptic = True
@@ -1005,9 +1008,6 @@ class group(specie):
         elif numC == 0 and numAs == 5:    self.haptic_type = ["h5-AsCp"];                                   self.is_haptic = True
         elif numC == 0 and numP == 5:     self.haptic_type = ["h5-Pentaphosphole"];                         self.is_haptic = True
         elif numC == 1 and numP == 1:     self.haptic_type = ["h2-P=C"]; 
-        elif is_haptic_ring(self.labels, self.coord): 
-            self.haptic_type = [f"{len(self.labels)}-ring {self.formula}"]
-            self.is_haptic = True
 
         return self.haptic_type 
 
@@ -1585,11 +1585,11 @@ class cell(object):
         self.natoms     = len(labels)
 
     #######################################################    
-    def get_subtype(self, subtype):
+    def set_subtype(self, subtype):
         self.subtype    = subtype
 
     #######################################################    
-    def get_atom_site_labels(self, atom_site_labels):
+    def set_atom_site_labels(self, atom_site_labels):
         self.atom_site_labels    = atom_site_labels
 
     #######################################################    
@@ -1712,7 +1712,7 @@ class cell(object):
         
         # Define reference cell
         refcell = cell(self.name, ref_labels, ref_pos, ref_fracs, self.cell_vector, self.cell_param)
-        refcell.get_subtype("reference")    
+        refcell.set_subtype("reference")    
         atom_site_labels = self.atom_site_labels
 
         if debug >= 0:
@@ -1810,7 +1810,7 @@ class cell(object):
         
         # Define reference cell
         refcell = cell(self.name, ref_labels, ref_pos, ref_fracs, self.cell_vector, self.cell_param)
-        refcell.get_subtype("reference")    
+        refcell.set_subtype("reference")    
         
         atom_site_labels = self.atom_site_labels
         geom_bond_cif = self.geom_bond_cif

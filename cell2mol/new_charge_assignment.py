@@ -1,15 +1,15 @@
 import numpy as np
 import copy
-from cell2mol.charge_assignment import protonation, get_charge, get_charge_manual, charge_state, check_rdkit_obj_connectivity
+from cell2mol.charge_assignment import protonation, get_charge, get_charge_manual, charge_state, check_rdkit_obj_connectivity, aromatic_info
 import itertools
 import os
 from cell2mol import __file__
 from cell2mol.spin import generate_feature_vector
 import pickle
 from rdkit import Chem
-
+manual_assign = ["O4-Cl", "N3", "I3", "N2", "N-O"]
 #######################################################
-def balance_charge(unique_indices: list, unique_species: list, rare: bool="False", predict: bool="False", debug: int=0) -> list:
+def balance_charge(unique_indices: list, unique_species: list, rare: bool=False, predict: bool=False, aromatic: bool=False, debug: int=0) -> list:
     """Function to Select the Best Charge Distribution for the unique species.
     It accepts multiple charge options for each molecule/ligand/metal (poscharge, etc...).
     NO: It should select the best one depending on whether the final metal charge makes sense or not.
@@ -20,6 +20,7 @@ def balance_charge(unique_indices: list, unique_species: list, rare: bool="False
     iterlist = []
     for idx, spec in enumerate(unique_species):
         toadd = []
+
         if spec.subtype == "metal":
             if rare == True:
                 rare_m_ox = [x for x in all_possible_m_ox if x not in spec.possible_cs]
@@ -36,11 +37,40 @@ def balance_charge(unique_indices: list, unique_species: list, rare: bool="False
             if len(spec.possible_cs) == 1:
                 toadd.append(spec.possible_cs[0].corr_total_charge)
             elif len(spec.possible_cs) > 1:
-                for tch in spec.possible_cs:
-                    toadd.append(tch.corr_total_charge)   
+                if not aromatic:
+                    for tch in spec.possible_cs:
+                        toadd.append(tch.corr_total_charge)
+                else:
+                    aromatic_counts = []
+                    for cs in spec.possible_cs:
+                        aromatic_dict = aromatic_info(cs.rdkit_obj)
+                        aromatic_counts.append(aromatic_dict["Aromatic atoms"])
+
+                    print(f"aromatic_counts: {aromatic_counts}")
+
+                    if len(set(aromatic_counts)) == 1 and aromatic_counts[0] == 0:
+                        for tch in spec.possible_cs:
+                            toadd.append(tch.corr_total_charge)
+                        pass  # all values are 0 — skip
+                    else:
+                        max_aromatic = max(aromatic_counts)
+                        max_indices = [i for i, val in enumerate(aromatic_counts) if val == max_aromatic]
+
+                        if len(max_indices) == 1:
+                            idx = max_indices[0]
+                            cs = spec.possible_cs[idx]
+                            print(f"   Unique most aromatic cs at index {idx}: {cs.smiles} (aromatic atoms: {max_aromatic})")
+                            toadd.append(cs.corr_total_charge)
+                        else:
+                            print(f"   Multiple cs with same max aromatic atoms ({max_aromatic}), appending all")
+                            for idx in max_indices:
+                                cs = spec.possible_cs[idx]
+                                print(f"    - Index {idx}: {cs.smiles}")
+                                toadd.append(cs.corr_total_charge)
             elif len(spec.possible_cs) == 0:
                 iserror = True
                 toadd.append("-")
+                
         iterlist.append(toadd)
 
     if debug >= 2: print("BALANCE: iterlist", iterlist)
@@ -71,9 +101,13 @@ def balance_charge(unique_indices: list, unique_species: list, rare: bool="False
         if debug >= 1: print("Error found in BALANCE: one species has no possible charges")
         final_charge_distribution = []
 
-    return final_charge_distribution, final_charges
-######################################################
+    if debug:
+        print(f"Final Charge Distribution: {final_charge_distribution}")
+        print(f"Final Charges: {final_charges}")
 
+    return final_charge_distribution, final_charges
+
+######################################################
 def assign_charge_state_for_unique_species(unique_species, final_charge_tuple, debug: int=0):
 
     for specie, final_charge in zip(unique_species, final_charge_tuple):
@@ -173,14 +207,14 @@ def set_charge_state(reference, target, mode, debug: int=0):
     refcell = reference.get_parent("reference")
 
     if mode == 1 : # For "reference" cell. Their possible charge states are already calculated
-        if target.formula in ["O4-Cl", "N3", "I3"]:
+        if target.formula in manual_assign:
             cs = get_charge_manual(target, debug=debug)
         else :
             if not hasattr(target, "possible_cs"): 
                 target.get_possible_cs(debug=debug)
             else:
                 if debug >= 1: print("SET_CHARGE_STATE: possible_cs of reference already exists")
-            print(f"{target.formula=} {target.possible_cs=}")
+            print(f"SET_CHARGE_STATE: {mode=} {target.formula=} {target.possible_cs=}")
             charge_list = [cs.corr_total_charge for cs in target.possible_cs]
             print(charge_list, final_charge, target.possible_cs)
             idx = charge_list.index(final_charge)
@@ -214,7 +248,9 @@ def set_charge_state(reference, target, mode, debug: int=0):
 
     elif mode == 3 : # For "unit" cell. Their charge state are not calculated
         if target.formula in ["O4-Cl", "N3", "I3"]:
+            # TODO  : This is temporary solution. It should be refined
             cs = get_charge_manual(target, debug=debug)
+
         elif (target.subtype == "molecule" and not target.iscomplex and not target.has_IA_IIA) :
             if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie")
             empty_list = [int(0)]*len(target.labels)
@@ -342,7 +378,7 @@ def create_bonds_specie (specie, debug: int=0):
                 
                 if hasattr(specie.atoms[idx], "bonds"):
                     if debug >=1 : 
-                        print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
+                        print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, np.round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
                 else:
                     if specie.natoms == 1:
                         if debug >=1: print(f"\tNO BONDS CREATED for {specie.atoms[idx].label} because it is the only atom in {specie.subtype} object")
@@ -385,7 +421,7 @@ def create_bonds_specie (specie, debug: int=0):
                 if idx not in non_bonded_atoms:
                     if hasattr(specie.atoms[idx], "bonds"):
                         if debug >=2: 
-                            print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
+                            print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, np.round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
                     else:
                         if specie.natoms == 1:
                             if debug >=1: print(f"\tNO BONDS CREATED for {specie.atoms[idx].label} because it is the only atom in {specie.subtype} object")

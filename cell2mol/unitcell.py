@@ -43,7 +43,7 @@ def process_unitcell(input_path, name, current_dir, debug=0):
 
             # Create and process unit cell
             newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
-            newcell.get_subtype("unitcell")
+            newcell.set_subtype("unitcell")
             perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debug)
             refcell.save(ref_cell_fname)
             newcell.save(cell_fname)
@@ -67,6 +67,12 @@ def process_unitcell(input_path, name, current_dir, debug=0):
                 with open(error_fname, "w") as error_output:
                     with redirect_stdout(error_output):
                         handle_error(newcell.error_case)
+                        
+            if hasattr(refcell, 'error_case') and refcell.error_case != 0:
+                error_fname_ref = os.path.join(current_dir, f"refcell_error_{refcell.error_case}.out")
+                with open(error_fname_ref, "w") as error_output_ref:
+                    with redirect_stdout(error_output_ref):
+                        handle_error(refcell.error_case)
 
             return newcell
 
