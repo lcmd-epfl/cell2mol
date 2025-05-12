@@ -87,30 +87,46 @@ def charge_assignment(newcell, refcell, debug):
     else:
         newcell.error_get_poscharges = False
 
-        # Print possible and selected charge states
-        print_possible_and_selected_cs(newcell, refcell, debug=debug)
+    # Print possible and selected charge states
+    print_possible_and_selected_cs(newcell, refcell, debug=debug)
 
-        # Balance charges for the unit cell
-        final_charge_distribution, final_charges = balance_charge(
-            newcell.unique_indices,
-            refcell.unique_species,
-            debug=debug,
-        )
+    # Balance charges for the unit cell
+    final_charge_distribution, final_charges = balance_charge(
+        newcell.unique_indices,
+        refcell.unique_species,
+        debug=debug,
+    )
 
-        if debug:
-            print(f"Final Charge Distribution: {final_charge_distribution}")
-            print(f"Final Charges: {final_charges}")
-
-        # Handle multiple or no charge distributions
-        dist_count = len(final_charge_distribution)
-        newcell.error_multiple_distrib = dist_count > 1
-        newcell.error_empty_distrib = dist_count == 0
-
+    # Handle multiple or no charge distributions
+    dist_count = len(final_charge_distribution)
+    newcell.error_multiple_distrib = dist_count > 1
+    newcell.error_empty_distrib = dist_count == 0
+    
+    if dist_count != 1:
+        # Attempt to balance charges again with more specific conditions
         if newcell.error_multiple_distrib and debug:
             print("More than one possible distribution found.")
+            second_final_charge_distribution, second_final_charges = balance_charge(
+                newcell.unique_indices,
+                refcell.unique_species,
+                aromatic=True, debug=debug,
+            )    
         elif newcell.error_empty_distrib and debug:
             print("No valid distribution found.")
+            second_final_charge_distribution, second_final_charges = balance_charge(
+                newcell.unique_indices,
+                refcell.unique_species,
+                rare=True, debug=debug,
+            )           
+        second_dist_count = len(second_final_charge_distribution)
+        newcell.error_multiple_distrib = second_dist_count > 1
+        newcell.error_empty_distrib = second_dist_count == 0    
 
+        if second_dist_count == 1:
+            final_charge_distribution = second_final_charge_distribution
+            final_charges = second_final_charges
+            print("Using the second distribution found.")
+            
     # If any error was flagged, report failure
     if any([
         newcell.error_get_poscharges,
@@ -132,6 +148,7 @@ def charge_assignment(newcell, refcell, debug):
     refcell.create_bonds(debug=debug)
 
     if refcell.error_create_bonds:
+        refcell.error_case = 8
         print_elapsed("Creating bonds Failed for reference cell.", start_time)
         return newcell, refcell
 
