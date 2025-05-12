@@ -90,8 +90,8 @@ def create_reference (input_path, name, cell_vector, cell_param, debug):
 
     # Generate the reference cell object
     refcell = cell(name, ref_labels, ref_pos, ref_fracs, cell_vector, cell_param)
-    refcell.get_atom_site_labels(atom_site_labels)
-    refcell.get_subtype("reference")
+    refcell.set_atom_site_labels(atom_site_labels)
+    refcell.set_subtype("reference")
 
     # Read the CIF file and extract bond information if exists
     geom_bond_cif, moiety_list_cif  = get_geom_bond (input_path)

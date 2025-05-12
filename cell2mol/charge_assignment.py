@@ -29,23 +29,20 @@ if "ipykernel" in sys.modules:
 rdBase.DisableLog("rdApp.*")
 
 fullerene = ["C60", "C72", "C80"]
+manual_assign = ["O4-Cl", "N3", "I3", "N2", "N-O"]
 #######################################################
 def get_possible_charge_state(spec: object, debug: int=0): 
     if not hasattr(spec,"protonation_states"): spec.get_protonation_states(debug=debug)
     if spec.protonation_states is None: 
         return None
-     
-    if spec.formula in ["O4-Cl", "N3", "I3", "N2"]:
+    if spec.formula in manual_assign:
         ch_state = get_charge_manual(spec, debug=debug)
         possible_cs = [ch_state]
         return possible_cs
-    
     if spec.subtype == "group" :  
         return None
-    
     if spec.subtype == 'molecule' and (spec.iscomplex or spec.has_IA_IIA):
         return None
-    
     charge_states = []  
     ### Evaluates possible charges for each protonation state ###
     print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) ({len(spec.protonation_states)=})\n{spec.protonation_states=}")
@@ -63,19 +60,10 @@ def get_possible_charge_state(spec: object, debug: int=0):
                 if debug >= 2: print(f"    POSCHARGE: charge {ich} failed {ch_state}")
         charge_states.extend(charge_states_for_one_prot)
     if debug >= 2: print(f"POSCHARGE: {len(charge_states)=}")
-    ### After collecting charge states, then best ones are selected 
-    if spec.subtype == "ligand":
-        if spec.is_nitrosyl:
-            if   spec.NO_type == "Linear": possible_cs = [charge_states[2]]      ## When Nitrosyl, we sistematically get the correct charge_distribution in [2] (charge = 1)and [0] (charge = 0)for Linear and Bent respectively
-            elif spec.NO_type == "Bent":   possible_cs = [charge_states[0]]       
-        else: 
-            # spec.get_connected_atoms()
-            # if [a.label for a in spec.connected_atoms] == ['S', 'S'] :
-            #     possible_cs = [charge_states[0], charge_states[3]] # charge 0 and 2
-            # else :
-            possible_cs = select_charge_distr(charge_states, debug=debug)   ## For ligands other than nitrosyl
-    else:     possible_cs = select_charge_distr(charge_states, debug=debug)     ## For organic molecules
+    
+    possible_cs = select_charge_distr(charge_states, debug=debug)  
     if debug >= 1: print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) {possible_cs=}")
+    
     ### Return possible charge states
     if len(possible_cs) == 0:    return None
     else:                        return possible_cs
@@ -93,6 +81,7 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
     uncorr_abs_atcharge = []
     uncorr_zwitt = []
     coincide = []
+    aromatic_atoms = []
     charge_states =[ch for ch in charge_states if ch is not None]
 
     if len(charge_states) == 0: return []
@@ -103,22 +92,29 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
         uncorr_abs_atcharge.append(chs.uncorr_abs_atcharge)
         uncorr_zwitt.append(chs.uncorr_zwitt)
         coincide.append(chs.coincide)
+        aromatic_dict = aromatic_info(chs.rdkit_obj)
+        aromatic_atoms.append(aromatic_dict["Aromatic atoms"])
+
 
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_total: {uncorr_total}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_abs_total: {uncorr_abs_total}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_abs_atcharge: {uncorr_abs_atcharge}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_zwitt: {uncorr_zwitt}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: coincide: {coincide}")
+    if debug >= 2: print(f"    NEW SELECT FUNCTION: aromatic_atoms: {aromatic_atoms}")
 
     minoftot = np.min(uncorr_abs_total)
     minofabs = np.min(uncorr_abs_atcharge)
+    maxofaromatic = np.max(aromatic_atoms)
     listofmintot = [i for i, x in enumerate(uncorr_abs_total) if x == minoftot]
     listofminabs = [i for i, x in enumerate(uncorr_abs_atcharge) if x == minofabs]
+    listofmaxaromatic = [i for i, x in enumerate(aromatic_atoms) if x == maxofaromatic]
     if debug >= 2: print(f"    NEW SELECT FUNCTION: listofmintot: {listofmintot}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: listofminabs: {listofminabs}")
+    if debug >= 2: print(f"    NEW SELECT FUNCTION: listofmaxaromatic: {listofmaxaromatic}")
     # Searches for entries that have the smallest total charge(appear in listofmintot),
     # and smallest number of charges(appear in listofminabs)
-
+    
     ####################
     # building tmplist #
     ####################
@@ -147,7 +143,36 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
         for idx in range(0, nlists):
             if ((idx in listofminabs) or (idx in listofmintot)): 
                 tmplist.append(idx)
- 
+
+    if debug >= 2: print("    NEW SELECT FUNCTION: We now select from the maxima of aromaticity:")
+    if len(listofmaxaromatic) == nlists:
+        if debug >= 2: print("    NEW SELECT FUNCTION: All entries have the same aromaticity. pass ")
+        pass
+    elif len(listofmaxaromatic) == 1:
+        for idx in range(0, nlists):
+            if (idx in listofmaxaromatic) and coincide[idx]:
+                if (idx not in tmplist): 
+                    tmplist.append(idx)         
+                else : 
+                    if debug >= 2: print("    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {tmplist=}")   
+    elif len(listofmaxaromatic) > 1:
+        for idx in range(0, nlists):
+            if (idx in listofmaxaromatic) and coincide[idx] :
+                if (idx in tmplist):
+                   if debug >= 2: print("    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {tmplist=}")   
+                else :
+                    if debug >= 2: print("    NEW SELECT FUNCTION: Check to tmplist", f"{idx=} {tmplist=}")    
+    # for idx in tmplist:
+        # if len(listofmaxaromatic) < nlists and len(listofmaxaromatic) >= 1:
+        #     if idx not in listofmaxaromatic:
+        #         if debug >= 2: 
+        #             print(f"    NEW SELECT FUNCTION: {idx=}  Not in {listofmaxaromatic=}")
+        #             print(f"    {idx=} {tmplist=} {uncorr_abs_total[idx]=} {uncorr_abs_atcharge[idx]=} {aromatic_atoms[idx]=}")    
+        #         if aromatic_atoms[idx] == 0:
+        #             tmplist.remove(idx)
+        #             if debug >= 2: print(f"    NEW SELECT FUNCTION: {idx=} Removed from tmplist, resulting {tmplist=}")
+        #         else:
+        #             if debug >= 2: print(f"    NEW SELECT FUNCTION: {idx=} kept from tmplist, resulting {tmplist=}")
     ####################
     # tmplist is built #
     ####################
@@ -206,7 +231,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     elif (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA):
         empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
         return empty_protonation_states
-    elif specie.formula in ["O4-Cl", "N3", "I3"] or specie.formula in fullerene: 
+    elif specie.formula in manual_assign or specie.formula in fullerene: 
         empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
         return empty_protonation_states
     elif (specie.subtype == "ligand" and specie.get_parent("molecule").has_IA_IIA):
@@ -415,10 +440,10 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
                 # Sulfur and Selenium
                 elif a.label == "S" or a.label == "Se":
-                    if a.connec == 1:
+                    if a.connec == 1 or (a.connec - a.mconnec) == 1:
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
-                    elif a.connec == 2:
+                    elif a.connec == 2 or (a.connec - a.mconnec) == 2:
                         needs_nonlocal = True
                         non_local_groups += 1
                         non_local_groups_indices.append(idx)
@@ -508,13 +533,13 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
                 # Silicon
                 elif a.label == "Si":
-                    if a.connec < 4:
+                    if (a.connec - a.mconnec) < 4:
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
                     else: block[idx]
                 # Boron
                 elif a.label == "B":
-                    if a.connec < 4:
+                    if (a.connec - a.mconnec) < 4:
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
                     else: block[idx]
@@ -668,6 +693,7 @@ def move_element(lst, old_index, new_index):
 #######################################################
 def get_charge_manual(spec, debug: int=0):
     print(spec.parents)
+
     if spec.formula == "O4-Cl":
         smiles = "[O-]Cl(=O)(=O)=O"
         charge = -1
@@ -680,11 +706,7 @@ def get_charge_manual(spec, debug: int=0):
                 new_order = move_element(order, 1, idx)
                 break  # Stop once we find and move Cl
 
-        # Debug output if needed
-        if debug >= 2:
-            print(f"O4-Cl: {new_order=}")
-
-    elif spec.formula == "N3":
+    if spec.formula == "N3":
         smiles = "[N-]=[N+]=[N-]" 
         charge = -1
         order = [0, 1, 2]
@@ -700,10 +722,8 @@ def get_charge_manual(spec, debug: int=0):
             if adjacent_labels.count("N") == 2:
                 new_order = move_element(order, 1, idx)
                 break  # Found the target atom, no need to check further
-
-        if debug >= 2: print(f"N3: new_order={new_order}")
         
-    elif spec.formula == "I3":
+    if spec.formula == "I3":
         smiles = "I[I-]I"
         charge = -1
         order = [0, 1, 2]
@@ -719,13 +739,36 @@ def get_charge_manual(spec, debug: int=0):
             if adjacent_labels.count("I") == 2:
                 new_order = move_element(order, 1, idx)
                 break  # Found the target atom, no need to check further
-
-        if debug >= 2: print(f"I3: new_order={new_order}")
-    elif spec.formula == "N2":
+        
+    if spec.formula == "N2":
         smiles = "N#N"
         charge = 0
         order = [0, 1]
         new_order = order
+
+    if spec.formula == "N-O":
+        if spec.NO_type == "Linear":
+            # smiles = "N#[O+]" # nitrosyl cation (linear)
+            # charge = +1
+            # order = [0, 1]
+            # new_order = order
+            smiles = "[N]=O" # nitrosyl radical
+            charge = 0
+            order = [0, 1]
+            new_order = order  
+        elif spec.NO_type == "Bent": 
+            smiles = "[N-]=O" # nitrosyl anion (bent)
+            charge = -1
+            order = [0, 1]
+            new_order = order  
+
+        for idx, atom in enumerate(spec.atoms):
+            if atom.label == "O":
+                new_order = move_element(order, 1, idx)
+                break  # Stop once we find and move Cl
+
+    if debug >= 2: 
+        print(f"get_charge_manual: {spec.formula=} {smiles=}, {charge=}, {new_order=}")
 
     temp_mol = Chem.MolFromSmiles(smiles, sanitize=False)
     mol = Chem.RenumberAtoms(temp_mol, new_order)
@@ -741,8 +784,22 @@ def get_charge_manual(spec, debug: int=0):
     allow = True
     prot = spec.get_protonation_states()[0]
     ch_state = charge_state(iscorrect, total_charge, atom_charge, mol, smiles, charge, allow, prot)
+    
     return ch_state
-
+########################################################
+# def aromatic_info(smiles):
+#     mol = Chem.MolFromSmiles(smiles)
+#     if mol is None:
+#         return "Invalid SMILES"
+def aromatic_info(mol: object):
+    print(f"aromatic_info: {mol=} {Chem.MolToSmiles(mol)}")
+    aromatic_atoms = sum(1 for atom in mol.GetAtoms() if atom.GetIsAromatic())
+    aromatic_rings = Chem.GetSSSR(mol)  # SSSR = smallest set of smallest rings
+    return {
+        "Aromatic atoms": aromatic_atoms,
+        "Number of rings": len(Chem.GetSymmSSSR(mol)),
+        "Aromatic rings": Chem.GetSSSR(mol),
+    }
 ######################################################
 def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=True, ref_uncorr_atom_charges=None, debug: int=0): 
     ## Generates the connectivity of a molecule given a desired charge (charge).
@@ -899,8 +956,8 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
         if maxcharge < 2: 
             maxcharge = 2  ## At leaest, we try range(-2,3,1)
     
-    if prot.added_atoms > 0 :
-        maxcharge = 0
+        if (not spec.is_nitrosyl) and prot.added_atoms > 0 :
+            maxcharge = 0
     
     if debug >= 2: print(f"MAXCHARGE: maxcharge set at {maxcharge}")
     
