@@ -984,7 +984,7 @@ class group(specie):
         if not hasattr(self,"atoms"): self.set_atoms()
         self.is_haptic   = False ## old self.hapticity
         self.haptic_type = []    ## old self.hapttype
-    
+        totnum = len(self.labels)
         numC  = self.labels.count("C")  # Carbon is the most common connected atom in ligands with hapticity
         numAs = self.labels.count("As") # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
         numP  = self.labels.count("P")  
@@ -993,21 +993,32 @@ class group(specie):
     
 
         ## Carbon-based Haptic Ligands
-        if   numC == 2:                   self.haptic_type = ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]; self.is_haptic = True
+        if   numC == 2 and totnum ==2:                   
+            self.haptic_type = ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]; self.is_haptic = True
+        elif numC == 3 and numO == 0 and totnum ==3:      
+            self.haptic_type = ["h3-Allyl", "h3-Cp"];                         self.is_haptic = True
+        elif numC == 3 and numO == 1 and totnum ==4:     
+            self.haptic_type = ["h4-Enone"];                                  self.is_haptic = True
+        elif numC == 4 and totnum ==4:                   
+            self.haptic_type = ["h4-Butadiene", "h4-Benzene"];                self.is_haptic = True
+        elif numC == 5 and totnum ==5:                   
+            self.haptic_type = ["h5-Cp"];                                     self.is_haptic = True
+        elif numC == 6 and totnum ==6:                   
+            self.haptic_type = ["h6-Benzene"];                                self.is_haptic = True
+        elif numC == 7 and totnum ==7:                   
+            self.haptic_type = ["h7-Cycloheptatrienyl"];                      self.is_haptic = True
+        elif numC == 8 and totnum ==8:                   
+            self.haptic_type = ["h8-Cyclooctatetraenyl"];                     self.is_haptic = True
+        # Other less common types of haptic ligands
+        elif numC == 0 and numAs == 5 and totnum ==5:      
+            self.haptic_type = ["h5-AsCp"];                                   self.is_haptic = True
+        elif numC == 0 and numP == 5 and totnum ==5:     
+            self.haptic_type = ["h5-Pentaphosphole"];                         self.is_haptic = True
+        elif numC == 1 and numP == 1 and totnum ==2:      
+            self.haptic_type = ["h2-P=C"]; self.is_haptic = True
         elif is_haptic_ring(self.labels, self.coord): 
             self.haptic_type = [f"{len(self.labels)}-ring {self.formula}"]
             self.is_haptic = True
-        elif numC == 3 and numO == 0:     self.haptic_type = ["h3-Allyl", "h3-Cp"];                         self.is_haptic = True
-        elif numC == 3 and numO == 1:     self.haptic_type = ["h4-Enone"];                                  self.is_haptic = True
-        elif numC == 4:                   self.haptic_type = ["h4-Butadiene", "h4-Benzene"];                self.is_haptic = True
-        elif numC == 5:                   self.haptic_type = ["h5-Cp"];                                     self.is_haptic = True
-        elif numC == 6:                   self.haptic_type = ["h6-Benzene"];                                self.is_haptic = True
-        elif numC == 7:                   self.haptic_type = ["h7-Cycloheptatrienyl"];                      self.is_haptic = True
-        elif numC == 8:                   self.haptic_type = ["h8-Cyclooctatetraenyl"];                     self.is_haptic = True
-        # Other less common types of haptic ligands
-        elif numC == 0 and numAs == 5:    self.haptic_type = ["h5-AsCp"];                                   self.is_haptic = True
-        elif numC == 0 and numP == 5:     self.haptic_type = ["h5-Pentaphosphole"];                         self.is_haptic = True
-        elif numC == 1 and numP == 1:     self.haptic_type = ["h2-P=C"]; 
 
         return self.haptic_type 
 
@@ -2560,7 +2571,7 @@ class cell(object):
             elif self.error_get_poscharges :    case = 5
             elif self.error_multiple_distrib :  case = 6
             elif self.error_empty_distrib :     case = 7
-            #elif self.error_create_bonds :      case = 8
+            # elif self.error_create_bonds :      case = 8
             else :                              case = 0
             # handle_error(case)
             # print("")

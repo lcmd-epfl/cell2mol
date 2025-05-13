@@ -428,7 +428,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         block[idx] = 1
                 # Oxygen
                 elif a.label == "O" :
-                    if a.connec == 1 or (a.connec - a.mconnec) == 1:
+                    if a.connec == 2 and (a.connec - a.mconnec) == 1:
                         needs_nonlocal = True
                         non_local_groups += 1
                         non_local_groups_indices.append(idx)
@@ -440,10 +440,10 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
                 # Sulfur and Selenium
                 elif a.label == "S" or a.label == "Se":
-                    if a.connec == 1 or (a.connec - a.mconnec) == 1:
+                    if a.connec == 1 :
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
-                    elif a.connec == 2 or (a.connec - a.mconnec) == 2:
+                    elif a.connec == 2 and (a.connec - a.mconnec) == 1:
                         needs_nonlocal = True
                         non_local_groups += 1
                         non_local_groups_indices.append(idx)
@@ -522,6 +522,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         iscarbene, tmp_element, tmp_added, tmp_metal = check_carbenes(a, ligand)
                         if debug >= 2: print(f"        GET_PROTONATION_STATES: Evaluating as carbene and {iscarbene}")
                         if iscarbene:
+                            ligand.hasNHC = True
                             # Carbene identified
                             elemlist[idx] = tmp_element
                             addedlist[idx] = tmp_added
@@ -806,13 +807,21 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
     # The molecule is described by a protonation states that has labels, and the atomic cartesian coordinates "coords"
     # The adjacency matrix is also provided in the protonation state(adjmat)
     #:return charge_state which is an object with the necessary information for other functions to handle the result
-
+    
+    # allow_carbenes = False
+    # if hasattr( prot.parent, "hasNHC"):
+    #     # If the ligand has NHC, we need to set the charge to 0
+    #     # This is a workaround for the fact that NHCs are not handled well in RDKit
+    #     allow_carbenes = True
+    #     print(f"GET_CHARGE. NHC detected in {prot.parent.formula}. allowing carbenes.")
+    #     prot = get_empty_protonation_state(prot.parent, debug=debug)[0]
+        
     natoms = prot.natoms
     atnums = prot.atnums
-
     if debug >= 2: print(f"\nGET_CHARGE. Starting get_charge with charge {charge} and {prot.formula} {prot.added_atoms=}")
     # prot.coords and prot.cov_factor will not be used
     mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow)
+    #mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow, allow_carbenes=allow_carbenes)
     if debug >= 2: print(f"GET_CHARGE.{len(mols)=} received from xyz2mol with charge {charge}")
     
     if len(mols) > 1: 
@@ -869,7 +878,7 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
     if debug >= 0: print(f"GET_CHARGE. {atom_charges=}")
     if debug >= 0: print(f"GET_CHARGE. {total_charge=}")
     # Connectivity is checked
-    iscorrect = check_rdkit_obj_connectivity(rdkit_obj, prot.natoms, charge, debug=debug)
+    iscorrect = check_rdkit_obj_connectivity(rdkit_obj, natoms, charge, debug=debug)
     
     # Charge_state is initiated
     ch_state = charge_state(iscorrect, total_charge, atom_charges, rdkit_obj, smiles, charge, allow, prot)
@@ -930,7 +939,7 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
     ### Determines which charges are worth trying for a given specie and a protonation state
     lchar = []
     spec = prot.parent
-
+    
     #### Educated Guess on the Maximum Charge one can expect from the spec[1]
     if   spec.subtype == "molecule" and (not spec.iscomplex and not spec.has_IA_IIA): 
         maxcharge = 3
@@ -956,7 +965,9 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
         if maxcharge < 2: 
             maxcharge = 2  ## At leaest, we try range(-2,3,1)
     
-        if (not spec.is_nitrosyl) and prot.added_atoms > 0 :
+        if hasattr(spec,"hasNHC"):
+            pass
+        elif (not spec.is_nitrosyl) and prot.added_atoms > 0 :
             maxcharge = 0
     
     if debug >= 2: print(f"MAXCHARGE: maxcharge set at {maxcharge}")
