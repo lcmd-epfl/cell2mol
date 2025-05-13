@@ -60,8 +60,12 @@ def get_atomic_valences(k):
         return [6, 5, 3]  # [5,4,3]
     if k == 51:  # Sb
         return [6, 5, 3]  # [5,4,3]
-    if k in [16, 34]:  # S, Se
-        return [6, 3, 2, 1]  # [6,4,2]
+    if k == 16 : #S
+        return [2, 4, 6]
+    if k == 34:  # Se
+        return [2]
+    # if k in [16, 34]:  # S, Se
+    #     return [6, 3, 2, 1]  # [6,4,2]
     if k in [17]:  # Cl
         return [1, 7]
     if k in [53]:  # I
@@ -161,6 +165,7 @@ def charge_is_OK(
     atoms,
     valences,
     allow_charged_fragments=True,
+    allow_carbenes=True,
 ):
     # total charge
     Q = 0
@@ -176,9 +181,10 @@ def charge_is_OK(
             Q += q
             if atom == 6:
                 number_of_single_bonds_to_C = list(BO[i, :]).count(1)
-                if number_of_single_bonds_to_C == 2 and BO_valences[i] == 2:
+                if not allow_carbenes and number_of_single_bonds_to_C == 2 and BO_valences[i] == 2:
                     Q += 1
                     q = 2
+                    print("Carbenes are not allowed in this molecule")
                 if number_of_single_bonds_to_C == 3 and Q + 1 < charge:
                     Q += 2
                     q = 1
@@ -198,7 +204,7 @@ def BO_is_OK(
     atoms,
     valences,
     allow_charged_fragments=True,
-    uncorr_atom_charges=None,
+    allow_carbenes=True,
 ):
     """
     Sanity of bond-orders
@@ -231,6 +237,7 @@ def BO_is_OK(
         atoms,
         valences,
         allow_charged_fragments,
+        allow_carbenes=True
     )
 
     if check_charge and check_sum:
@@ -427,21 +434,39 @@ def set_atomic_charges(
     return mol
 
 
-def set_atomic_radicals(mol, atoms, atomic_valence_electrons, BO_valences):
-    """
+# def set_atomic_radicals(mol, atoms, atomic_valence_electrons, BO_valences):
+#     """
 
-    The number of radical electrons = absolute atomic charge
+#     The number of radical electrons = absolute atomic charge
 
-    """
+#     """
+#     for i, atom in enumerate(atoms):
+#         a = mol.GetAtomWithIdx(i)
+#         charge = get_atomic_charge(atom, atomic_valence_electrons[atom], BO_valences[i])
+
+#         if abs(charge) > 0:
+#             a.SetNumRadicalElectrons(abs(int(charge)))
+
+#     return mol
+
+def set_atomic_radicals(
+    mol, atoms, atomic_valence_electrons, BO_valences, use_atom_maps=True
+):
+    """The number of radical electrons = absolute atomic charge."""
+    atomic_valence[8] = [2, 1]
+    atomic_valence[7] = [3, 2]
+    atomic_valence[6] = [4, 2]
+
     for i, atom in enumerate(atoms):
         a = mol.GetAtomWithIdx(i)
+        if use_atom_maps:
+            a.SetAtomMapNum(i + 1)
         charge = get_atomic_charge(atom, atomic_valence_electrons[atom], BO_valences[i])
 
         if abs(charge) > 0:
             a.SetNumRadicalElectrons(abs(int(charge)))
 
     return mol
-
 
 def get_bonds(UA, AC):
     """ """
@@ -484,7 +509,7 @@ def get_UA_pairs(UA, AC, use_graph=True):
     return UA_pairs
 
 
-def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, uncorr_atom_charges=None):
+def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allow_carbenes=True):
     """
     implemenation of algorithm shown in Figure 2
     UA: unsaturated atoms
@@ -510,6 +535,14 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, uncor
                 "Has no possible valences assigned in database",
             )
         possible_valence = [x for x in atomic_valence[atomicNum] if x >= valence]
+        # if atomicNum == 6 and valence == 1:
+        #     if 2 in possible_valence:
+        #         possible_valence.remove(2)
+        # if atomicNum == 6 and not allow_carbenes and valence == 2:
+        #     if 2 in possible_valence:
+        #         possible_valence.remove(2)
+        # if atomicNum == 6 and valence == 2:
+        #     possible_valence.append(3)
         if atomicNum == 7:
             #print("Possible valences for:", atomicNum,"are",possible_valence, valence)
             if valence not in possible_valence:
@@ -570,6 +603,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, uncor
                 atoms,
                 valences,
                 allow_charged_fragments=allow_charged_fragments,
+                allow_carbenes=allow_carbenes,
             )
         else:
             check_bo = None
@@ -590,6 +624,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, uncor
                 atoms,
                 valences,
                 allow_charged_fragments=allow_charged_fragments,
+                allow_carbenes=allow_carbenes,
             )
             charge_OK = charge_is_OK(
                 BO,
@@ -600,6 +635,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, uncor
                 atoms,
                 valences,
                 allow_charged_fragments=allow_charged_fragments,
+                allow_carbenes=allow_carbenes,
             )
             if status:
                 print(f"\tAC2BO: {formula=} status", status, f"{charge=} {count=}")
@@ -620,7 +656,7 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, uncor
     return best_BO, atomic_valence_electrons
 
 
-def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True):
+def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allow_carbenes=True):
     """ """
 
     # convert AC matrix to bond order (BO) matrix
@@ -630,6 +666,7 @@ def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True)
         charge,
         allow_charged_fragments=allow_charged_fragments,
         use_graph=use_graph,
+        allow_carbenes=allow_carbenes,
     )
     if BO is None:
         return [], None
@@ -858,6 +895,7 @@ def xyz2mol(
     use_huckel=False,
     embed_chiral=True,
     exportBO=False,
+    allow_carbenes=False
 ):
     """
     Generate a rdkit molobj from atoms, coordinates and a total_charge.
@@ -890,7 +928,8 @@ def xyz2mol(
         atoms,
         charge,
         allow_charged_fragments=allow_charged_fragments,
-        use_graph=use_graph
+        use_graph=use_graph,
+        allow_carbenes=False
     )
 
     # Check for stereocenters and chiral centers -> Move to get_charge function
