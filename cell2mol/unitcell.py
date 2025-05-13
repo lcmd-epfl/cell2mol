@@ -52,6 +52,7 @@ def process_unitcell(input_path, name, current_dir, debug=0):
             summary_fname = os.path.join(current_dir, "unitcell_summary.out")
             with open(summary_fname, "w") as summary:
                 with redirect_stdout(summary):
+                    print(name)
                     print_refmoleclist(newcell)
                     print_unique_species(newcell)
                     print_moleclist(newcell)
@@ -69,7 +70,7 @@ def process_unitcell(input_path, name, current_dir, debug=0):
                         handle_error(newcell.error_case)
                         
             if hasattr(refcell, 'error_case') and refcell.error_case != 0:
-                error_fname_ref = os.path.join(current_dir, f"refcell_error_{refcell.error_case}.out")
+                error_fname_ref = os.path.join(current_dir, f"reference_error_{refcell.error_case}.out")
                 with open(error_fname_ref, "w") as error_output_ref:
                     with redirect_stdout(error_output_ref):
                         handle_error(refcell.error_case)

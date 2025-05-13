@@ -69,6 +69,7 @@ def process_refcell(input_path, name, current_dir, debug=0):
         summary_fname = os.path.join(current_dir, "reference_summary.out")
         with open(summary_fname, "w") as summary:
             with redirect_stdout(summary):
+                print(name)
                 print_refmoleclist(refcell)
                 print_unique_species(refcell)
                 print_possible_charges(refcell)
