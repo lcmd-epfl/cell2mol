@@ -12,3 +12,4 @@ huckelpy>=0.2
 pointgroup>=0.4
 scipy
 scikit-learn
+pydantic
