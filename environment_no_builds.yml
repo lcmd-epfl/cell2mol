@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - annotated-types=0.7.0
   - anyio=4.7.0
   - appnope=0.1.2
   - argon2-cffi=21.3.0
@@ -145,6 +146,8 @@ dependencies:
   - pure_eval=0.2.2
   - pycairo=1.28.0
   - pycparser=2.21
+  - pydantic=2.11.4
+  - pydantic-core=2.33.2
   - pygments=2.19.1
   - pyparsing=3.2.3
   - pysocks=1.7.1
@@ -184,6 +187,7 @@ dependencies:
   - tornado=6.4.2
   - traitlets=5.14.3
   - typing-extensions=4.13.2
+  - typing-inspection=0.4.0
   - typing_extensions=4.13.2
   - tzdata=2025b
   - unicodedata2=16.0.0
