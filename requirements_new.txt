@@ -1,0 +1,14 @@
+python < 3.12
+numpy
+networkx
+rdkit
+ase
+cosymlib
+matplotlib
+PyYAML>=5.1
+symgroupy>=0.5.9
+wfnsympy>=0.3.5
+huckelpy>=0.2
+pointgroup>=0.4
+scipy
+scikit-learn
