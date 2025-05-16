@@ -150,14 +150,14 @@ def classify_fragments(blocklist: list, refmoleclist: list, debug: int=0):
     ## Prepares Blocks
     for b in blocklist:
         if debug >= 2: print(f"CLASSIFY_FRAGMENTS, preparing block\n{b.formula}")
-        if not hasattr(b,"centroid"):         b.get_centroid()
-        if not hasattr(b,"element_count"):    b.set_element_count()
-        if not hasattr(b,"numH"):             b.numH = b.set_element_count()[4] + b.set_element_count()[3] #"Hidrogen + Deuterium atoms"
+        if b.centroid is None:         b.get_centroid()
+        if b.element_count is None:    b.set_element_count()
+        if b.numH is None:             b.numH = b.set_element_count()[4] + b.set_element_count()[3] #"Hidrogen + Deuterium atoms"
     ## Prepares Reference Molecules
     for ref in refmoleclist:
         if debug >= 2: print(f"CLASSIFY_FRAGMENTS, preparing reference\n{ref.formula}")
-        if not hasattr(ref,"element_count"):  ref.set_element_count()
-        if not hasattr(ref,"numH"):           ref.numH = ref.set_element_count()[4] + ref.set_element_count()[3] #"Hidrogen + Deuterium atoms"
+        if ref.element_count is None:  ref.set_element_count()
+        if ref.numH is None:           ref.numH = ref.set_element_count()[4] + ref.set_element_count()[3] #"Hidrogen + Deuterium atoms"
 
     # Classifies blocks and puts them in 3 bags. (1) Full molecules, (2) partial molecules=fragments, (3) Hydrogens
     for idx, block in enumerate(blocklist):
@@ -234,7 +234,7 @@ def fragments_reconstruct(moleclist: list, fraglist: list, Hlist: list, refmolec
     # The latter have been constructed by merging fragments, and do not have cell as parent, but have the cell_indices stored in mol.cell_indices
     # Here we homogenize the situation by adding the cell_indices variable to all molecules
     for mol in moleclist:
-        if not hasattr(mol,"cell_indices"): 
+        if mol.cell_indices is None: 
             if mol.check_parent("cell"):
                 mol.cell_indices = mol.get_parent_indices("cell")
 
@@ -287,7 +287,7 @@ def sequential(fragmentlist: list, refmoleclist: list, cellvec: list, factor: fl
     # Lists (list1 and list2) are created here depending on variable "typ"
     ###################################################
     for frag in fragmentlist:
-        if not hasattr(frag,"frac_centroid"): frag.get_centroid()
+        if frag.frac_centroid is None: frag.get_centroid()
         frag.tmatrix = tmatgenerator(frag.frac_centroid, threshold_tmat)
 
     remlist = []

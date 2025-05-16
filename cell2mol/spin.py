@@ -53,9 +53,9 @@ def assign_spin_complexes (mol:object, debug: int=0) -> None:
     """ Assigns spin multiplicity of the transition metal complexes.
     """
     for metal in mol.metals:
-        if not hasattr(metal,"spin"): metal.get_spin(debug=debug)
+        if metal.spin is None: metal.get_spin(debug=debug)
     for ligand in mol.ligands:
-        if not hasattr(ligand, "is_nitrosyl"): ligand.evaluate_as_nitrosyl()
+        if ligand.is_nitrosyl is None: ligand.evaluate_as_nitrosyl()
     
     metals_spin = [metal.spin for metal in mol.metals]
     if debug >=2: print(f"ASSIGN_SPIN_COMPLEXES: {metals_spin=}")

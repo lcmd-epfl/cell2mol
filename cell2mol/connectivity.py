@@ -626,8 +626,8 @@ def compare_metals (at1, at2, check_coordinates: bool=False, debug: int=0):
         if debug > 0: print("COMPARE_METALS. Different label")
         return False
 
-    if not hasattr(at1,"coord_sphere_formula"): at1.get_coord_sphere_formula()
-    if not hasattr(at2,"coord_sphere_formula"): at2.get_coord_sphere_formula()
+    if at1.coord_sphere_formula is None: at1.get_coord_sphere_formula()
+    if at2.coord_sphere_formula is None: at2.get_coord_sphere_formula()
     if (at1.coord_sphere_formula != at2.coord_sphere_formula):
         if debug > 0: print("COMPARE_METALS. Different coordination sphere")
         if debug > 0: print(at1.coord_sphere_formula)
