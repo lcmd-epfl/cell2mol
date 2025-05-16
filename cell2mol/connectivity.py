@@ -795,7 +795,7 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
         if debug > 1: print(f"GROUP.SPLIT_GROUP: {gr_labels=}")
         if debug > 1: print(f"GROUP.SPLIT_GROUP: {gr_atom_site_labels=}")
         # Create Group Object
-        newgroup = group(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
+        newgroup = group.from_positional(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
         if debug > 1: print(f"GROUP.SPLIT_GROUP: {newgroup.labels=}")
         # For debugging
         newgroup.origin = "split_group"

@@ -66,7 +66,7 @@ def get_fragments (newcell, updated, indices_in_ref, cov_factor: float=1.3, meta
         ref_indices = extract_from_list(b, indices_in_ref, dimension=1)
         
         # Creates Molecule Object
-        newmolec    = molecule(mol_labels, mol_coord)
+        newmolec    = molecule.from_positional(mol_labels, mol_coord)
         
         # For debugging
         newmolec.origin = "cell.get_fragments"
@@ -229,7 +229,7 @@ def merge_fragments(frags: list, cell_vector: list, cov_factor: float=1.3, metal
         else:
             if len(blocklist) != 1: continue
             if len(blocklist) == 1: 
-                newmolec = molecule(reclabels, reccoord)
+                newmolec = molecule.from_positional(reclabels, reccoord)
                 newmolec.origin = "cell.reconstruct"
                 newmolec.ref_indices = rec_ref_indices
                 newmolec.set_fractional_coord(recfracs)

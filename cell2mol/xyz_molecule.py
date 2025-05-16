@@ -25,7 +25,7 @@ def get_molecule (input_path, name, current_dir, debug=2):
             structure = read(input_path)
             labels = structure.get_chemical_symbols()
             coords = structure.get_positions()
-            newmolec = molecule(labels, coords)
+            newmolec = molecule.from_positional(labels, coords)
             newmolec.set_adjacency_parameters(cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR)
             newmolec.set_atoms(create_adjacencies=True, debug=debug)
             if newmolec.iscomplex: 
