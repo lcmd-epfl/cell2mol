@@ -1,7 +1,9 @@
-from typing import Any, Literal
+from __future__ import annotations
+from typing import Any, Literal, Optional
 from typing_extensions import deprecated
 import numpy as np
 import os
+from numpy.typing import NDArray
 
 from pydantic import Field, computed_field
 from cell2mol.connectivity import (
@@ -69,53 +71,112 @@ from cell2mol.utils import BaseModel
 elemdatabase = ElementData()
 import pickle
 
+Spin = Literal[0, 1]
+HapticType = str
+Type = Literal["cell", "specie", "bond"]
+SubType = Literal["specie", "reference", "molecule", "cell", "group", "ligand"]
+NOType = Literal["Linear", "Bent"]
 
 ##################################
 ####  CLASSES FOR CELL2MOL 2  ####
 ##################################
-class specie(object):
-    def __init__(
-        self, labels: list, coord: list, frac_coord: list = None, radii: list = None
-    ) -> None:
-        # Sanity Checks
-        assert len(labels) == len(coord)
-        if frac_coord is not None:
-            self.frac_coord = frac_coord
-            assert len(coord) == len(frac_coord)
+class specie(BaseModel):
+    # Positional arguments
+    labels: list[str]
+    coord: list[list[float]]
+    frac_coord: list[list[float]] | None = None
+    radii: list[float] | None = None
 
-        # Optional Information
-        if radii is not None:
-            self.radii = radii
+    # Optional arguments
+    parents: list["specie"] = Field(default_factory=list)
+    parents_indices: list[list[int]] = Field(default_factory=list)
+    cov_factor: float = Field(default=1.3)
+    metal_factor: float = Field(default=1.0)
+
+    # Defined in other methods
+    adj_types: object | None = None # TOFIX romaingrx: NDarray not pydantic compatible
+    adjmat: list | None = None
+    adjnum: list | None = None
+    atnums: list | None = None
+    atom_site_labels: list | None = None
+    atomic_charges: list | None = None
+    atoms: list | None = None
+    centroid: list | None = None
+    element_count: int | None = None
+    frac_centroid: list | None = None
+    madjmat: list | None = None
+    madjnum: list | None = None
+    possible_cs: list | None = None
+    protonation_states: list | None = None
+    rdkit_obj: object | None = None
+    smiles: str | None = None
+    subtype: SubType | None = None
+    totcharge: int | None = None
+    
+    # TODO romaingrx: need clarification where we need this, it seems to be used
+    # for molecules and ligands
+    origin: str | None = None
+
+    # Frozen fields
+    type: str = Field(default="specie", frozen=True)
+    version: str = Field(default="2.0", frozen=True)
+
+    @computed_field
+    @property
+    def formula(self) -> str:
+        return labels2formula(self.labels)
+
+    @computed_field
+    @property
+    def eleccount(self) -> int:
+        # Assuming neutral specie (so basically this is the sum of atomic numbers)
+        return labels2electrons(self.labels)
+
+    @computed_field
+    @property
+    def natoms(self) -> int:
+        return len(self.labels)
+
+    @computed_field
+    @property
+    def iscomplex(self) -> bool:
+        return any(
+            (elemdatabase.elementblock[label] == "d")
+            or (elemdatabase.elementblock[label] == "f")
+            for label in self.labels
+        )
+
+    @computed_field
+    @property
+    def has_IA_IIA(self) -> bool:
+        return any(
+            (elemdatabase.elementgroup[label] == 1 and label != "H" and label != "D")
+            or (elemdatabase.elementgroup[label] == 2)
+            for label in self.labels
+        )
+
+    @computed_field
+    @property
+    def indices(self) -> list[int]:
+        ## Indices might be the atom ordering within a given specie. e.g. 1st, 2nd, 3rd atom of a specie.
+        return list(range(self.natoms))
+
+    def model_post_init(self, context: Any) -> None:
+        super().model_post_init(context)
+        assert len(self.labels) == len(self.coord)
+        if self.frac_coord is not None:
+            assert len(self.coord) == len(self.frac_coord)
+        if self.radii is not None:
+            assert len(self.labels) == len(self.radii)
         else:
-            self.radii = get_radii(labels)
+            self.radii = get_radii(self.labels)
 
-        self.type = "specie"
-        self.version = "2.0"
-        self.labels = labels
-        self.coord = coord
-        self.frac_coord = frac_coord
-        self.formula = labels2formula(labels)
-        self.eleccount = labels2electrons(
-            labels
-        )  ### Assuming neutral specie (so basically this is the sum of atomic numbers)
-        self.natoms = len(labels)
-        self.iscomplex = any(
-            (elemdatabase.elementblock[l] == "d")
-            or (elemdatabase.elementblock[l] == "f")
-            for l in self.labels
-        )
-        self.has_IA_IIA = any(
-            (elemdatabase.elementgroup[l] == 1 and l != "H" and l != "D")
-            or (elemdatabase.elementgroup[l] == 2)
-            for l in self.labels
-        )
-        self.parents = []
-        self.parents_indices = []
-        self.cov_factor = 1.3
-        self.metal_factor = 1.0
-        self.indices = [
-            *range(0, self.natoms, 1)
-        ]  ## Indices might be the atom ordering within a given specie. e.g. 1st, 2nd, 3rd atom of a specie.
+    @classmethod
+    @deprecated("Use specie() with the keyword arguments instead.")
+    def from_positional(
+        cls, labels: list, coord: list, frac_coord: list = None, radii: list = None
+    ) -> None:
+        return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
 
     ############
     def add_parent(self, parent: object, indices: list, overwrite: bool = True):
@@ -561,13 +622,24 @@ class specie(object):
 ### MOLECULE ##
 ###############
 class molecule(specie):
-    def __init__(
-        self, labels: list, coord: list, frac_coord: list = None, radii: list = None
-    ) -> None:
-        self.subtype = "molecule"
-        if frac_coord is not None:
-            self.frac_coord = frac_coord
-        specie.__init__(self, labels, coord, frac_coord, radii)
+    """
+    A molecule is a specie that contains other specie objects.
+    """
+
+    haptic_type: HapticType | None = None
+    is_haptic: bool | None = None
+    ligands : list | None = None
+    metals : list["atom"] | None = None
+    spin : Spin | None = None
+
+    subtype: SubType = Field(default="molecule", frozen=True)
+
+    @classmethod
+    @deprecated("Use molecule() with the keyword arguments instead.")
+    def from_positional(
+        cls, labels: list, coord: list, frac_coord: list = None, radii: list = None
+    ) -> "molecule":
+        return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
 
     def __repr__(self):
         to_print = ""
@@ -720,11 +792,11 @@ class molecule(specie):
                         print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
 
                     if self.frac_coord is not None:
-                        newligand = ligand(
+                        newligand = ligand.from_positional(
                             lig_labels, lig_coord, lig_frac_coord, radii=lig_radii
                         )
                     else:
-                        newligand = ligand(lig_labels, lig_coord, radii=lig_radii)
+                        newligand = ligand.from_positional(lig_labels, lig_coord, radii=lig_radii)
 
                     newligand.origin = "split_IA_IIA"
                     newligand.add_parent(self, indices=lig_indices)
@@ -885,11 +957,11 @@ class molecule(specie):
                         print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
                     # Create Ligand Object
                     if self.frac_coord is not None:
-                        newligand = ligand(
+                        newligand = ligand.from_positional(
                             lig_labels, lig_coord, lig_frac_coord, radii=lig_radii
                         )
                     else:
-                        newligand = ligand(lig_labels, lig_coord, radii=lig_radii)
+                        newligand = ligand.from_positional(lig_labels, lig_coord, radii=lig_radii)
 
                     # For debugging
                     newligand.origin = "split_complex"
@@ -964,13 +1036,24 @@ class molecule(specie):
 ### LIGAND ####
 ###############
 class ligand(specie):
-    def __init__(
-        self, labels: list, coord: list, frac_coord: list = None, radii: list = None
+    NO_type : NOType | None = None
+    connected_atoms: list['atom'] | None = None
+    connected_idx : list[int] | None = None
+    denticity : int | None = None
+    groups : list['group'] | None = None
+    haptic_type : HapticType | None = None
+    is_haptic : bool | None = None 
+    is_nitrosyl : bool | None = None 
+    metals : list['metal'] | None = None
+
+    subtype : SubType = Field(default="ligand", frozen=True)
+
+    @classmethod
+    @deprecated("Use ligand(**kwargs) with keyword arguments")
+    def from_positional(
+        cls, labels: list, coord: list, frac_coord: list = None, radii: list = None
     ) -> None:
-        self.subtype = "ligand"
-        if frac_coord is not None:
-            self.frac_coord = frac_coord
-        specie.__init__(self, labels, coord, frac_coord, radii)
+        return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
         # self.evaluate_as_nitrosyl() ### move to the split_complexes function
 
     #######################################################
@@ -1208,9 +1291,9 @@ class ligand(specie):
                 )
             # Create Group Object
             if self.frac_coord is not None:
-                newgroup = group(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
+                newgroup = group.from_positional(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
             else:
-                newgroup = group(gr_labels, gr_coord, radii=gr_radii)
+                newgroup = group.from_positional(gr_labels, gr_coord, radii=gr_radii)
 
             # For debugging
             newgroup.origin = "split_ligand"
@@ -1288,13 +1371,20 @@ class ligand(specie):
 #### GROUP ####
 ###############
 class group(specie):
-    def __init__(
-        self, labels: list, coord: list, frac_coord: list = None, radii: list = None
+    checked_coordination: bool | None = None
+    closest_metal: Optional["metal"] = None
+    haptic_type: HapticType | None = None
+    is_haptic: bool | None = None
+    metals: list["metal"] | None = None
+
+    subtype: SubType = Field(default="group", frozen=True)
+
+    @classmethod
+    @deprecated("Use group(**kwargs) with keyword arguments")
+    def from_positional(
+        cls, labels: list, coord: list, frac_coord: list = None, radii: list = None
     ) -> None:
-        self.subtype = "group"
-        if frac_coord is not None:
-            self.frac_coord = frac_coord
-        specie.__init__(self, labels, coord, frac_coord, radii)
+        return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
 
     #######################################################
     def __repr__(self):
@@ -2003,8 +2093,8 @@ class metal(atom):
     metals: list[object] = Field(default_factory=list)
     groups: list[object] = Field(default_factory=list)
     coord_nr: int | None = None
-    coord_geometry:  object | Literal["Undefined"] | None = None
-    geom_deviation:  float | Literal["Undefined"] | None = None
+    coord_geometry: object | Literal["Undefined"] | None = None
+    geom_deviation: float | Literal["Undefined"] | None = None
     rel_metal_radius: float | None = None
     metal_factor: float | None = None
     cov_factor: float | None = None
@@ -2016,14 +2106,14 @@ class metal(atom):
     coord_sphere_formula: str | None = None
     unique_index: int | None = None
     possible_cs: list[object] = Field(default_factory=list)
-    
-    
 
     subtype: str = Field(default="metal", frozen=True)
 
     @classmethod
     @deprecated("Use metal() with the keyword arguments instead.")
-    def from_positional(cls, label: str, coord: list, frac_coord: list=None, radii: float=None) -> None:
+    def from_positional(
+        cls, label: str, coord: list, frac_coord: list = None, radii: float = None
+    ) -> None:
         return cls(label=label, coord=coord, frac_coord=frac_coord, radii=radii)
 
     #######################################################
@@ -2410,7 +2500,7 @@ class cell(object):
         self.natoms = len(labels)
 
     #######################################################
-    def set_subtype(self, subtype):
+    def set_subtype(self, subtype: SubType):
         self.subtype = subtype
 
     #######################################################
@@ -2608,7 +2698,7 @@ class cell(object):
             mol_frac_coord = extract_from_list(b, ref_fracs, dimension=1)
             mol_atom_site_labels = extract_from_list(b, atom_site_labels, dimension=1)
 
-            newmolec = molecule(mol_labels, mol_coord, mol_frac_coord)
+            newmolec = molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
             newmolec.add_parent(self, indices=b)
             # newmolec.add_parent(refcell, indices=b)
             newmolec.set_adjacency_parameters(cov_factor, metal_factor)
@@ -2724,7 +2814,7 @@ class cell(object):
             mol_frac_coord = extract_from_list(b, ref_fracs, dimension=1)
             mol_atom_site_labels = extract_from_list(b, atom_site_labels, dimension=1)
 
-            newmolec = molecule(mol_labels, mol_coord, mol_frac_coord)
+            newmolec = molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
             newmolec.add_parent(self, indices=b)
             # newmolec.add_parent(refcell, indices=b)
             newmolec.set_adjacency_parameters(cov_factor, metal_factor)
@@ -2876,7 +2966,7 @@ class cell(object):
             mol_coord = extract_from_list(b, self.coord, dimension=1)
             mol_frac_coord = extract_from_list(b, self.frac_coord, dimension=1)
             # Creates Molecule Object
-            newmolec = molecule(mol_labels, mol_coord, mol_frac_coord)
+            newmolec = molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
             # For debugging
             newmolec.origin = "cell.get_moleclist"
             # Adds cell as parent of the molecule, with indices b
@@ -2972,7 +3062,7 @@ class cell(object):
                 #########################################
                 ## In principle, this is not necessary ##
                 #########################################
-                # newmolec = molecule(mol.labels, mol.coord)
+                # newmolec = molecule.from_positional(mol.labels, mol.coord)
                 # newmolec.add_parent(self,mol_indices)
                 # newmolec.set_fractional_coord(mol.frac_coord)
                 # newmolec.set_atoms(debug=debug, create_adjacencies=True)
@@ -3003,7 +3093,7 @@ class cell(object):
             ## For consistency, we create the molecules once again, even if mol is already a molecule-class object.
             ## One must follow the same structure as in self.get_moleclist()
             for mol in reconstructed_molecules:
-                newmolec = molecule(mol.labels, mol.coord)
+                newmolec = molecule.from_positional(mol.labels, mol.coord)
                 newmolec.origin = "cell.reconstruct"
                 newmolec.set_adjacency_parameters(cov_factor, metal_factor)
                 newmolec.set_atoms(create_adjacencies=True, debug=debug)

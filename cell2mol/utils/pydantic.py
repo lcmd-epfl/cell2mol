@@ -15,3 +15,4 @@ class BaseModel(pydantic.BaseModel, ABC):
     @abstractmethod
     def from_positional(cls, *args, **kwargs):
         raise NotImplementedError("This method should be implemented by the subclass")
+

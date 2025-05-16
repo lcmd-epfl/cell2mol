@@ -511,7 +511,7 @@ def combine(tobemerged: list, references: list, cellvec: list, threshold_tmat: f
                     reordered_frac_cood = [newmolec.frac_coord[i] for i in map12]
                     reordered_cell_indices = [newmolec.cell_indices[i] for i in map12]
 
-                    reordered_newmolec = molecule(reordered_labels, reordered_coord, reordered_radii)
+                    reordered_newmolec = molecule.from_positional(reordered_labels, reordered_coord, reordered_radii)
                     reordered_newmolec.cell_indices = reordered_cell_indices
                     reordered_newmolec.set_fractional_coord(reordered_frac_cood)
                     reordered_newmolec.set_adjacency_parameters(cov_factor, metal_factor)
@@ -582,7 +582,7 @@ def merge_fragments(frags: list, refs: list, cellvec: list, cov_factor: float=1.
         else:
             if len(blocklist) != 1: continue
             if len(blocklist) == 1: 
-                newmolec = molecule(reclabels, reccoord)
+                newmolec = molecule.from_positional(reclabels, reccoord)
                 newmolec.cell_indices = blocklist[0]
                 newmolec.set_adjacency_parameters(cov_factor, metal_factor)
                 newmolec.set_adj_types()
