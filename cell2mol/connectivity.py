@@ -664,16 +664,16 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
         return False
 
     # 3) the number of atoms of each type
-    if not hasattr(mol1,"element_count"): mol1.set_element_count()
-    if not hasattr(mol2,"element_count"): mol2.set_element_count()
+    if mol1.element_count is None: mol1.set_element_count()
+    if mol2.element_count is None: mol2.set_element_count()
     for kdx, elem in enumerate(mol1.element_count):
         if elem != mol2.element_count[kdx]: 
             if debug > 0: print(f"COMPARE_SPECIES. FALSE, different {elem} count:")
             return False       
     # writexyz(os.getcwd(), f"reordered.xyz", mol1.labels, mol1.coord)
     # 4) the number of adjacencies between each pair of element types
-    if not hasattr(mol1,"adj_types"):     mol1.set_adj_types()
-    if not hasattr(mol2,"adj_types"):     mol2.set_adj_types()
+    if mol1.adj_types is None:     mol1.set_adj_types()
+    if mol2.adj_types is None:     mol2.set_adj_types()
     if debug == 2: print(f"{mol1.adj_types=}")
     if debug == 2: print(f"{mol2.adj_types=}")
 

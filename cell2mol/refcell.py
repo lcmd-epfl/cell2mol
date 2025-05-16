@@ -95,11 +95,12 @@ def create_reference (input_path, name, cell_vector, cell_param, debug):
     refcell.set_subtype("reference")
 
     # Read the CIF file and extract bond information if exists
-    geom_bond_cif, moiety_list_cif  = get_geom_bond (input_path)
+    geom_bond_cif, moiety_list_cif  = get_geom_bond(input_path)
     refcell.get_cif_bond_moiety(geom_bond_cif, moiety_list_cif)
     print(f"refcell.exist_cif_bond_moiety: {refcell.exist_cif_bond_moiety}")
 
     if refcell.exist_cif_bond_moiety:
+        print(ref_labels)
         refcell.get_reference_molecules_from_moiety (ref_labels, ref_fracs, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR, debug=debug)
         compare_with_CIF(input_path, refcell, debug=debug)
         if refcell.disagree_with_cif_formula:
