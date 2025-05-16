@@ -750,7 +750,7 @@ def print_molecule(mol, name, ext, folder):
                 print(mol.natoms, file=fil)
                 if hasattr(mol, "totcharge") and hasattr(mol, "spin"):
                     print(mol.totcharge, mol.spin, file=fil)
-                if hasattr(mol, "totcharge") and not hasattr(mol, "spin"):
+                if hasattr(mol, "totcharge") and mol.spin is None:
                     print(mol.totcharge, "SPIN", file=fil)
                 # if not hasattr(mol, 'totcharge') and not hasattr(mol, 'spin'):
                 else:
@@ -985,7 +985,7 @@ def print_refmoleclist (cell):
                     if hasattr(lig, attr):
                         lig_info += f" {attr}={getattr(lig, attr)}"
 
-                if hasattr(lig, "possible_cs") and not hasattr(lig, "totcharge"):
+                if hasattr(lig, "possible_cs") and lig.totcharge is None:
                     if lig.possible_cs is not None:
                         lig_info += " lig.possible_cs Exists"
                     else:
