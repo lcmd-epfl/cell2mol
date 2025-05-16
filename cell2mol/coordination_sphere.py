@@ -385,7 +385,7 @@ def check_neighboring_atoms_mconnec (idx, group, metal, debug):
 def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
     if debug > 0: print("Entering COORD_CORR_NONHAPTIC:")
-    if not hasattr(group, "metals"): group.get_connected_metals()
+    if group.metals is None: group.get_connected_metals()
     if debug > 1: print(f"group: {[atom.label for atom in group.atoms]}")
     # Pair each atom with its index in the original list
     indexed_atoms = list(enumerate(group.atoms))
