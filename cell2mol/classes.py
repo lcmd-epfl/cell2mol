@@ -3,7 +3,6 @@ from typing import Any, Literal, Optional
 from typing_extensions import deprecated
 import numpy as np
 import os
-from numpy.typing import NDArray
 
 from pydantic import Field, computed_field
 from cell2mol.connectivity import (
@@ -76,6 +75,8 @@ HapticType = str
 Type = Literal["cell", "specie", "bond"]
 SubType = Literal["specie", "reference", "molecule", "cell", "group", "ligand"]
 NOType = Literal["Linear", "Bent"]
+NDArray = Any
+
 
 ##################################
 ####  CLASSES FOR CELL2MOL 2  ####
@@ -94,8 +95,8 @@ class specie(BaseModel):
     metal_factor: float = Field(default=1.0)
 
     # Defined in other methods
-    adj_types: object | None = None # TOFIX romaingrx: NDarray not pydantic compatible
-    adjmat: list | None = None
+    adj_types: NDArray | None = None  # TOFIX romaingrx: NDarray not pydantic compatible
+    adjmat: NDArray | None = None
     adjnum: list | None = None
     atnums: list | None = None
     atom_site_labels: list | None = None
@@ -104,7 +105,7 @@ class specie(BaseModel):
     centroid: list | None = None
     element_count: int | None = None
     frac_centroid: list | None = None
-    madjmat: list | None = None
+    madjmat: NDArray | None = None
     madjnum: list | None = None
     possible_cs: list | None = None
     protonation_states: list | None = None
@@ -112,7 +113,7 @@ class specie(BaseModel):
     smiles: str | None = None
     subtype: SubType | None = None
     totcharge: int | None = None
-    
+
     # TODO romaingrx: need clarification where we need this, it seems to be used
     # for molecules and ligands
     origin: str | None = None
@@ -334,7 +335,7 @@ class specie(BaseModel):
     ############
     def set_atoms(
         self,
-        atomlist: list = None,
+        atomlist: list | None = None,
         create_adjacencies: bool = False,
         atom_site_labels: list = None,
         geom_bond_cif: list = None,
@@ -405,9 +406,9 @@ class specie(BaseModel):
                 at.set_atom_site_label(atom_site_labels[idx])
 
         if create_adjacencies:
-            if not hasattr(self, "adjmat"):
+            if self.adjmat is None:
                 self.get_adjmatrix(geom_bond_cif)
-            if not hasattr(self, "madjmat"):
+            if self.madjmat is None:
                 self.get_metal_adjmatrix(geom_bond_cif)
             if self.adjmat is not None and self.madjmat is not None:
                 for idx, at in enumerate(self.atoms):
@@ -566,7 +567,7 @@ class specie(BaseModel):
         if self.subtype == "ligand" or (
             self.subtype == "molecule" and not self.iscomplex and not self.has_IA_IIA
         ):
-            if not hasattr(self, "protonation_states"):
+            if self.protonation_states is None:
                 self.get_protonation_states(debug=debug)
             self.possible_cs = get_possible_charge_state(self, debug=debug)
         return self.possible_cs
@@ -628,9 +629,9 @@ class molecule(specie):
 
     haptic_type: HapticType | None = None
     is_haptic: bool | None = None
-    ligands : list | None = None
-    metals : list["atom"] | None = None
-    spin : Spin | None = None
+    ligands: list | None = None
+    metals: list["atom"] | None = None
+    spin: Spin | None = None
 
     subtype: SubType = Field(default="molecule", frozen=True)
 
@@ -796,7 +797,9 @@ class molecule(specie):
                             lig_labels, lig_coord, lig_frac_coord, radii=lig_radii
                         )
                     else:
-                        newligand = ligand.from_positional(lig_labels, lig_coord, radii=lig_radii)
+                        newligand = ligand.from_positional(
+                            lig_labels, lig_coord, radii=lig_radii
+                        )
 
                     newligand.origin = "split_IA_IIA"
                     newligand.add_parent(self, indices=lig_indices)
@@ -961,7 +964,9 @@ class molecule(specie):
                             lig_labels, lig_coord, lig_frac_coord, radii=lig_radii
                         )
                     else:
-                        newligand = ligand.from_positional(lig_labels, lig_coord, radii=lig_radii)
+                        newligand = ligand.from_positional(
+                            lig_labels, lig_coord, radii=lig_radii
+                        )
 
                     # For debugging
                     newligand.origin = "split_complex"
@@ -1017,7 +1022,7 @@ class molecule(specie):
         self.haptic_type = []
         if self.iscomplex:
             for lig in self.ligands:
-                if not hasattr(lig, "is_haptic"):
+                if lig.is_haptic is None:
                     lig.get_hapticity(debug=debug)
                 if lig.is_haptic:
                     self.is_haptic = True
@@ -1036,17 +1041,18 @@ class molecule(specie):
 ### LIGAND ####
 ###############
 class ligand(specie):
-    NO_type : NOType | None = None
-    connected_atoms: list['atom'] | None = None
-    connected_idx : list[int] | None = None
-    denticity : int | None = None
-    groups : list['group'] | None = None
-    haptic_type : HapticType | None = None
-    is_haptic : bool | None = None 
-    is_nitrosyl : bool | None = None 
-    metals : list['metal'] | None = None
+    NO_type: NOType | None = None
+    connected_atoms: list["atom"] | None = None
+    connected_idx: list[int] | None = None
+    denticity: int | None = None
+    groups: list["group"] | None = None
+    haptic_type: HapticType | None = None
+    is_haptic: bool | None = None
+    is_nitrosyl: bool | None = None
+    metals: list["metal"] | None = None
+    unique_index: int | None = None
 
-    subtype : SubType = Field(default="ligand", frozen=True)
+    subtype: SubType = Field(default="ligand", frozen=True)
 
     @classmethod
     @deprecated("Use ligand(**kwargs) with keyword arguments")
@@ -1220,7 +1226,7 @@ class ligand(specie):
 
     #######################################################
     def split_ligand(self, debug: int = 0):
-        if hasattr(self, "cov_factor"):
+        if self.cov_factor is not None:
             cov_factor = self.cov_factor
 
         refcell = self.get_parent("reference")
@@ -1232,7 +1238,7 @@ class ligand(specie):
         self.groups = []
 
         # Identify Connected and Unconnected atoms (to the metal)
-        if not hasattr(self, "connected_idx"):
+        if self.connected_idx is None:
             self.get_connected_idx()
         connected_idx = self.connected_idx
 
@@ -1291,7 +1297,9 @@ class ligand(specie):
                 )
             # Create Group Object
             if self.frac_coord is not None:
-                newgroup = group.from_positional(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
+                newgroup = group.from_positional(
+                    gr_labels, gr_coord, gr_frac_coord, radii=gr_radii
+                )
             else:
                 newgroup = group.from_positional(gr_labels, gr_coord, radii=gr_radii)
 
@@ -1351,7 +1359,7 @@ class ligand(specie):
 
     #######################################################
     def get_hapticity(self, debug: int = 0):
-        if not hasattr(self, "groups"):
+        if self.groups is None:
             self.split_ligand(debug=debug)
         self.is_haptic = False
         self.haptic_type = []
@@ -1376,6 +1384,7 @@ class group(specie):
     haptic_type: HapticType | None = None
     is_haptic: bool | None = None
     metals: list["metal"] | None = None
+    denticity: int | None = None
 
     subtype: SubType = Field(default="group", frozen=True)
 
@@ -1459,7 +1468,7 @@ class group(specie):
         refcell = self.get_parent("reference")
         lig = self.get_parent("ligand")
 
-        if not hasattr(lig, "metals"):
+        if lig.metals is None:
             lig.get_connected_metals()
 
         if refcell.exist_cif_bond_moiety:
@@ -1573,7 +1582,7 @@ class group(specie):
 
     #######################################################
     def get_denticity(self, debug: int = 0):
-        if not hasattr(self, "checked_coordination"):
+        if self.checked_coordination is None:
             self.check_coordination(debug=debug)
         self.denticity = 0
         for a in self.atoms:
@@ -2566,7 +2575,7 @@ class cell(object):
                 mol.unique_index = kdx
                 self.species_list.append(mol)
             else:
-                if not hasattr(mol, "ligands"):
+                if mol.ligands is None:
                     if mol.iscomplex:
                         mol.split_complex(debug=debug)
                     elif mol.has_IA_IIA:
@@ -2574,9 +2583,9 @@ class cell(object):
                 for jdx, lig in enumerate(mol.ligands):  # ligands
                     found = False
                     for ldx, typ in enumerate(typelist_ligs):
-                        if not hasattr(lig, "is_nitrosyl"):
+                        if lig.is_nitrosyl is None:
                             lig.evaluate_as_nitrosyl()
-                        if not hasattr(typ[0], "is_nitrosyl"):
+                        if typ[0].is_nitrosyl is None:
                             typ[0].evaluate_as_nitrosyl()
                         if lig.is_nitrosyl and typ[0].is_nitrosyl:
                             if lig.NO_type == typ[0].NO_type:
@@ -2708,6 +2717,7 @@ class cell(object):
                 geom_bond_cif=geom_bond_cif,
                 debug=debug,
             )
+            print(newmolec.madjmat)
             for atom, idx in zip(newmolec.atoms, b):
                 # atom.add_parent(refcell, index=idx)
                 atom.add_parent(self, index=idx)
@@ -3106,14 +3116,14 @@ class cell(object):
 
     #######################################################
     def reset_charge_assignment(self, debug: int = 0):
-        if not hasattr(self, "moleclist"):
+        if self.moleclist is None:
             return None
         for mol in self.moleclist:
             mol.reset_charge()
 
     #######################################################
     def get_selected_cs(self, debug: int = 0):
-        if not hasattr(self, "unique_species"):
+        if self.unique_species is None:
             self.get_unique_species(debug=debug)
 
         self.selected_cs = []
