@@ -76,6 +76,7 @@ Type = Literal["cell", "specie", "bond"]
 SubType = Literal["specie", "reference", "molecule", "cell", "group", "ligand"]
 NOType = Literal["Linear", "Bent"]
 NDArray = Any
+ChargeState = object
 
 
 ##################################
@@ -107,12 +108,14 @@ class specie(BaseModel):
     frac_centroid: list | None = None
     madjmat: NDArray | None = None
     madjnum: list | None = None
-    possible_cs: list | None = None
     protonation_states: list | None = None
     rdkit_obj: object | None = None
     smiles: str | None = None
     subtype: SubType | None = None
     totcharge: int | None = None
+
+    charge_state: ChargeState | None = None
+    possible_cs: list[ChargeState] | None = None
 
     # TODO romaingrx: need clarification where we need this, it seems to be used
     # for molecules and ligands
@@ -265,7 +268,7 @@ class specie(BaseModel):
 
     ############
     def get_atomic_numbers(self):
-        if not hasattr(self, "atoms"):
+        if self.atoms is None:
             self.set_atoms()
         self.atnums = []
         for at in self.atoms:
@@ -279,7 +282,7 @@ class specie(BaseModel):
 
     ############
     def set_adj_types(self):
-        if not hasattr(self, "adjmat"):
+        if self.adjmat is None:
             self.get_adjmatrix()
         self.adj_types = get_adjacency_types(self.labels, self.adjmat)
         return self.adj_types
@@ -323,7 +326,7 @@ class specie(BaseModel):
         ## Sets atomic charges
         if atomic_charges is not None:
             self.atomic_charges = atomic_charges
-            if not hasattr(self, "atoms"):
+            if self.atoms is None:
                 self.set_atoms()
             for idx, a in enumerate(self.atoms):
                 a.set_charge(self.atomic_charges[idx])
@@ -427,7 +430,7 @@ class specie(BaseModel):
             return None
         parent = self.get_parent(parent_subtype)
         indices = self.get_parent_indices(parent_subtype)
-        if not hasattr(parent, "madjnum"):
+        if parent.madjnum is None:
             print(f"SPECIE.INHERIT. {parent_subtype=} does not have madjnum")
             return None
         # print(f"SPECIE.INHERIT. found self in parent ({parent_subtype}) with {indices=}")
@@ -505,7 +508,7 @@ class specie(BaseModel):
         done = False
         if hasattr(substructure, "subtype") and hasattr(self, "subtype"):
             if substructure.subtype == "ligand" and self.subtype == "molecule":
-                if not hasattr(self, "ligands"):
+                if self.ligands is None:
                     self.split_complex()
                 if self.ligands is not None:
                     for l in self.ligands:
@@ -514,11 +517,11 @@ class specie(BaseModel):
                             occurrence += 1
                     done = True
             elif substructure.subtype == "group" and self.subtype == "ligand":
-                if not hasattr(self, "ligands"):
+                if self.ligands is None:
                     self.split_complex()
                 if self.ligands is not None:
                     for l in self.ligands:
-                        if not hasattr(l, "groups"):
+                        if l.groups is None:
                             self.split_ligand()
                         for g in l.groups:
                             issame = compare_species(substructure, g, debug=1)
@@ -528,7 +531,7 @@ class specie(BaseModel):
         ## Atoms in Species
         if not done:
             if substructure.type == "atom" and self.type == "specie":
-                if not hasattr(self, "atoms"):
+                if self.atoms is None:
                     self.set_atoms()
                 for at in self.atoms:
                     issame = compare_atoms(substructure, at)
@@ -540,22 +543,22 @@ class specie(BaseModel):
     def get_protonation_states(self, debug: int = 0):
         # !!! WARNING. FUNCTION defined at the "specie" level, but will only do something for ligands and organic (iscomplex == False) molecules
         if self.subtype == "group":
-            if not hasattr(self, "denticity"):
+            if self.denticity is None:
                 self.get_denticity()
-            if not hasattr(self, "is_haptic"):
+            if self.is_haptic is None:
                 self.get_hapticity()
             self.protonation_states = None
         elif self.subtype == "ligand":
-            # if not hasattr(self,"groups"): self.split_ligand()
-            if not hasattr(self, "is_haptic"):
+            # if self.groups is None: self.split_ligand()
+            if self.is_haptic is None:
                 self.get_hapticity()
-            if not hasattr(self, "denticity"):
+            if self.denticity is None:
                 self.get_denticity()
-            if not hasattr(self, "is_nitrosyl"):
+            if self.is_nitrosyl is None:
                 self.evaluate_as_nitrosyl()
             self.protonation_states = get_protonation_states_specie(self, debug=debug)
         else:
-            if not hasattr(self, "is_haptic"):
+            if self.is_haptic is None:
                 self.get_hapticity()
             self.protonation_states = get_protonation_states_specie(self, debug=debug)
         return self.protonation_states
@@ -632,8 +635,13 @@ class molecule(specie):
     ligands: list | None = None
     metals: list["atom"] | None = None
     spin: Spin | None = None
+    ref_indices: list[int] | None = None
+    cell_indices: list[int] | None = None
 
-    subtype: SubType = Field(default="molecule", frozen=True)
+    smiles: str | list[str] | None = None
+    smiles_with_H: list[str] | None = None
+
+    subtype: SubType = Field(default="molecule")
 
     @classmethod
     @deprecated("Use molecule() with the keyword arguments instead.")
@@ -681,7 +689,7 @@ class molecule(specie):
 
     ############
     def split_IA_IIA(self, debug: int = 0):
-        if not hasattr(self, "atoms"):
+        if self.atoms is None:
             self.set_atoms()
         if not self.has_IA_IIA:
             self.ligands = None
@@ -840,7 +848,7 @@ class molecule(specie):
 
     ############
     def split_complex(self, debug: int = 0):
-        if not hasattr(self, "atoms"):
+        if self.atoms is None:
             self.set_atoms()
         if not self.iscomplex:
             self.ligands = None
@@ -1016,7 +1024,7 @@ class molecule(specie):
 
     #######################################################
     def get_hapticity(self, debug: int = 0):
-        if not hasattr(self, "ligands"):
+        if self.ligands is None:
             self.split_complex(debug=debug)
         self.is_haptic = False
         self.haptic_type = []
@@ -1052,7 +1060,7 @@ class ligand(specie):
     metals: list["metal"] | None = None
     unique_index: int | None = None
 
-    subtype: SubType = Field(default="ligand", frozen=True)
+    subtype: SubType = Field(default="ligand")
 
     @classmethod
     @deprecated("Use ligand(**kwargs) with keyword arguments")
@@ -1126,9 +1134,9 @@ class ligand(specie):
         # Function that determines whether the M-N-O angle of a Nitrosyl "ligand" is "Bent" or "Linear"
         # Each case is treated differently
         #:return NO_type: "Linear" or "Bent"
-        if not hasattr(self, "atoms"):
+        if self.atoms is None:
             self.set_atoms()
-        if not hasattr(self, "metals"):
+        if self.metals is None:
             self.get_connected_metals()
 
         for idx, a in enumerate(self.atoms):
@@ -1167,7 +1175,7 @@ class ligand(specie):
         ## Remember madjmat should not be computed at the ligand level. Since the metal is not there.
         ## Now we operate at the molecular level. We get the parent molecule, and the indices of the ligand atoms in the molecule
         self.connected_idx = []
-        if not hasattr(self, "madjnum"):
+        if self.madjnum is None:
             self.inherit_adjmatrix("molecule")
         if debug > 2:
             print(
@@ -1180,9 +1188,9 @@ class ligand(specie):
 
     #######################################################
     def get_connected_atoms(self, debug: int = 0):
-        if not hasattr(self, "atoms"):
+        if self.atoms is None:
             self.set_atoms()
-        if not hasattr(self, "connected_idx"):
+        if self.connected_idx is None:
             self.get_connected_idx()
         self.connected_atoms = []
         for idx, at in enumerate(self.atoms):
@@ -1194,15 +1202,15 @@ class ligand(specie):
 
     #######################################################
     def check_coordination(self, debug: int = 0):
-        if not hasattr(self, "groups"):
+        if self.groups is None:
             self.split_ligand(debug=debug)
         for g in self.groups:
-            if not hasattr(g, "checked_coordination"):
+            if g.checked_coordination is None:
                 g.check_coordination(debug=debug)
 
     #######################################################
     def get_denticity(self, debug: int = 0):
-        if not hasattr(self, "groups"):
+        if self.groups is None:
             self.split_ligand(debug=debug)
         if debug > 1:
             print(
@@ -1364,7 +1372,7 @@ class ligand(specie):
         self.is_haptic = False
         self.haptic_type = []
         for gr in self.groups:
-            if not hasattr(gr, "is_haptic"):
+            if gr.is_haptic is None:
                 gr.get_hapticity(debug=debug)
             if gr.is_haptic:
                 self.is_haptic = True
@@ -1386,7 +1394,7 @@ class group(specie):
     metals: list["metal"] | None = None
     denticity: int | None = None
 
-    subtype: SubType = Field(default="group", frozen=True)
+    subtype: SubType = Field(default="group")
 
     @classmethod
     @deprecated("Use group(**kwargs) with keyword arguments")
@@ -1413,7 +1421,7 @@ class group(specie):
             )
         if index > self.natoms:
             return None
-        if not hasattr(self, "atoms"):
+        if self.atoms is None:
             self.set_atoms()
         self.atoms.pop(index)
         self.labels.pop(index)
@@ -1507,7 +1515,7 @@ class group(specie):
 
     #######################################################
     def get_hapticity(self, debug: int = 0):
-        if not hasattr(self, "atoms"):
+        if self.atoms is None:
             self.set_atoms()
         self.is_haptic = False  ## old self.hapticity
         self.haptic_type = []  ## old self.hapttype
@@ -1565,9 +1573,9 @@ class group(specie):
 
     #######################################################
     def check_coordination(self, debug: int = 0):
-        if not hasattr(self, "is_haptic"):
+        if self.is_haptic is None:
             self.get_hapticity()
-        if not hasattr(self, "atoms"):
+        if self.atoms is None:
             self.set_atoms()
         if self.is_haptic:
             self, conn_idx, final_ligand_indices = coordination_correction_for_haptic(
@@ -1641,8 +1649,9 @@ class atom(BaseModel):
     adjacency: list[object] = Field(default_factory=list)
     metal_adjacency: list[object] = Field(default_factory=list)
     closest_metal: object | None = None
-
     metal_factor: float | None = None
+    charge: int | None = None
+    bonds: list[object] | None = None
 
     version: str = Field(default="2.0", frozen=True)
     type: str = Field(default="atom", frozen=True)
@@ -1747,7 +1756,7 @@ class atom(BaseModel):
 
     #######################################################
     def add_bond(self, newbond: object, debug: int = 0):
-        if not hasattr(self, "bonds"):
+        if self.bonds is None:
             self.bonds = []
         at1 = newbond.atom1
         at2 = newbond.atom2
@@ -2107,16 +2116,16 @@ class metal(atom):
     rel_metal_radius: float | None = None
     metal_factor: float | None = None
     cov_factor: float | None = None
-    charge: int | None = None
     bond_order: int | None = None
     bond_type: str | None = None
     bond_distance: float | None = None
-    coord_sphere: list[atom] = Field(default_factory=list)
+    coord_sphere: list[atom] | None = None
     coord_sphere_formula: str | None = None
     unique_index: int | None = None
-    possible_cs: list[object] = Field(default_factory=list)
+    charge: int | None = None
+    possible_cs: list[int] | None = None
 
-    subtype: str = Field(default="metal", frozen=True)
+    subtype: SubType = Field(default="metal")
 
     @classmethod
     @deprecated("Use metal() with the keyword arguments instead.")
@@ -2141,7 +2150,7 @@ class metal(atom):
             return None
         mol = self.get_parent("molecule")
         pidx = self.get_parent_index("molecule")
-        # if not hasattr(mol,"adjmat"): mol.get_adjmatrix()
+        # if mol.adjmat is None: mol.get_adjmatrix()
         # adjmat = mol.adjmat.copy()
 
         ## Cordination sphere defined as a collection of atoms
@@ -2153,7 +2162,7 @@ class metal(atom):
 
     #######################################################
     def get_coord_sphere_formula(self, debug: int = 1):
-        if not hasattr(self, "coord_sphere"):
+        if self.coord_sphere is None:
             self.get_coord_sphere()
         self.coord_sphere_formula = labels2formula(
             list([at.label for at in self.coord_sphere])
@@ -2306,7 +2315,7 @@ class metal(atom):
 
     #######################################################
     def get_relative_metal_radius(self, debug: int = 0):
-        if not hasattr(self, "groups"):
+        if self.groups is None:
             self.get_connected_groups(debug=debug)
         diff_list = []
         for group in self.groups:
@@ -2420,7 +2429,7 @@ class metal(atom):
         if debug >= 2:
             print(f"METAL.Get_coord_geometry: {self.rel_metal_radius=}")
 
-        if not hasattr(self, "metals"):
+        if self.metals is None:
             self.get_connected_metals(debug=debug)
 
         if len(self.metals) > 0:
@@ -2907,7 +2916,7 @@ class cell(object):
     ):
         if debug > 3:
             print(f"Entered CELL.MOLECLIST with debug={debug}")
-        if not hasattr(self, "labels") or not hasattr(self, "coord"):
+        if self.labels is None or self.coord is None:
             if debug > 3:
                 print(
                     f"CELL.MOLECLIST. Labels or coordinates not found. Returning None"
@@ -3027,7 +3036,7 @@ class cell(object):
     def reconstruct(
         self, cov_factor: float = None, metal_factor: float = None, debug: int = 0
     ):
-        if not hasattr(self, "refmoleclist"):
+        if self.refmoleclist is None:
             print("CELL.RECONSTRUCT. CELL missing list of reference molecules")
             return
         if cov_factor is None:
@@ -3048,7 +3057,7 @@ class cell(object):
 
         ## Classifies fragments
         # for f in fragments:
-        #     if not hasattr(f,"frac_coord"):       f.get_fractional_coord(self.cellvec)
+        #     if f.frac_coord is None:       f.get_fractional_coord(self.cellvec)
         molecules, fragments, hydrogens = classify_fragments(
             fragments, self.refmoleclist, debug=debug
         )
@@ -3198,7 +3207,7 @@ class cell(object):
     #######################################################
     #######################################################
     def assign_charges(self, debug: int = 0):
-        # if not hasattr(self,"unique_species"): self.get_unique_species(debug=debug)
+        # if self.unique_species is None: self.get_unique_species(debug=debug)
         # if debug >= 1: print(f"{len(self.unique_species)} Species (Metal or Ligand or Molecules) to Characterize")
 
         # selected_cs = self.get_selected_cs(debug=debug)
@@ -3471,7 +3480,7 @@ class cell(object):
             moleclist = self.moleclist
         totcharge_list = []
         for mol in moleclist:
-            if not hasattr(mol, "totcharge"):
+            if mol.totcharge is None:
                 if debug >= 1:
                     print(f"CELL.CHECK_CHARGE_NEUTRALITY: Charges not assigned yet")
                 self.is_neutral = None
@@ -3506,11 +3515,11 @@ class cell(object):
         ############
 
         # (0) Makes sure the cell is reconstructed
-        # if not hasattr(self,"is_fragmented"): self.reconstruct(debug=debug)
+        # if self.is_fragmented is None: self.reconstruct(debug=debug)
         # if self.is_fragmented: return # Stopping. self.is_fragmented must be false to determine the charges of the cell
 
         # (1) Indentify unique chemical species
-        if not hasattr(self, "unique_species"):
+        if self.unique_species is None:
             self.get_unique_species(debug=debug)
         if debug >= 1:
             print(
@@ -3580,7 +3589,7 @@ class cell(object):
 
     #######################################################
     def create_bonds(self, debug: int = 0):
-        # if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)
+        # if self.error_prepare_mols is None: self.assign_charges(debug=debug)
         # if self.error_prepare_mols: return # Stopping. self.error_prepare_mols must be false to create the spin
 
         if self.subtype == "reference":
@@ -3660,7 +3669,7 @@ class cell(object):
 
     #######################################################
     def assign_spin(self, debug: int = 0) -> object:
-        # if not hasattr(self,"error_prepare_mols"): self.assign_charges(debug=debug)
+        # if self.error_prepare_mols is None: self.assign_charges(debug=debug)
         # if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to assign the spin
 
         if debug >= 1:
@@ -3676,7 +3685,7 @@ class cell(object):
         for mol in moleclist:
             if mol.iscomplex:
                 for metal in mol.metals:
-                    if not hasattr(metal, "coord_nr"):
+                    if metal.coord_nr is None:
                         metal.get_coordination_geometry()
                         metal.get_coord_sphere_formula()
                     metal.get_spin(debug=debug)
@@ -3684,7 +3693,7 @@ class cell(object):
 
     #######################################################
     def predict_metal_ox(self, debug: int = 0):
-        # if not hasattr(self,"error_prepare_mols"): self.assign_charges()
+        # if self.error_prepare_mols is None: self.assign_charges()
         # if self.error_prepare_mols: return None # Stopping. self.error_prepare_mols must be false to assign the spin
         if self.subtype == "reference":
             moleclist = self.refmoleclist
@@ -3694,7 +3703,7 @@ class cell(object):
         for mol in moleclist:
             if mol.iscomplex:
                 for metal in mol.metals:
-                    if not hasattr(metal, "coord_nr"):
+                    if metal.coord_nr is None:
                         metal.get_coordination_geometry(debug=debug)
                         metal.get_coord_sphere_formula()
                     metal.predict_charge(debug=debug)

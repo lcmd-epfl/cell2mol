@@ -32,7 +32,7 @@ fullerene = ["C60", "C72", "C80"]
 manual_assign = ["O4-Cl", "N3", "I3", "N2", "N-O"]
 #######################################################
 def get_possible_charge_state(spec: object, debug: int=0): 
-    if not hasattr(spec,"protonation_states"): spec.get_protonation_states(debug=debug)
+    if spec.protonation_states is None: spec.get_protonation_states(debug=debug)
     if spec.protonation_states is None: 
         return None
     if spec.formula in manual_assign:
@@ -949,7 +949,7 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
             if a.label == "O" and a.mconnec == 0 and a.connec == 1:
                 count_non_connected_O += 1
         if not spec.is_haptic:
-            if not hasattr(spec,"denticity"):         spec.get_denticity()
+            if spec.denticity is None:         spec.get_denticity()
             maxcharge = spec.denticity + count_non_connected_O - prot.added_atoms
         else: 
             maxcharge = 2
@@ -1036,7 +1036,7 @@ def get_metal_poscharges(metal: object, debug: int=0) -> list:
    
     # metalloids = ["B", "Si", "Ge", "As", "Sb", "Te", "Po"]
     mol = metal.get_parent("molecule")
-    if not hasattr(mol,"is_haptic"): mol.get_hapticity()
+    if mol.is_haptic is None: mol.get_hapticity()
     atnum = elemdatabase.elementnr[metal.label]
 
     at_charge = defaultdict(list)

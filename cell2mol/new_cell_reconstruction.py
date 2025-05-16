@@ -437,11 +437,11 @@ def merge_fragments (frags: list, cell_vector: list, refcell: object, cov_factor
     if move_frag.natoms == 1 and (move_frag.set_element_count()[4] + move_frag.set_element_count()[3] == 1):
         full=True
 
-    move_frag.tmatrix = tmatgenerator(move_frag.frac_centroid, full=full)
+    tmatrix = tmatgenerator(move_frag.frac_centroid, full=full)
 
-    if len(move_frag.tmatrix) == 0: return None
+    if len(tmatrix) == 0: return None
 
-    for t in move_frag.tmatrix:
+    for t in tmatrix:
         if debug >= 2: print("MERGE_FRAGMENTS: translation", t)
         ## Applies Translations and each time, it checks if a bigger molecule is formed
         ## meaning that the translation was successful

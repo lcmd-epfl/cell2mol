@@ -137,7 +137,7 @@ def check_missingH(refmoleclist: list, debug: int=0):
                 if debug >= 1: print(f"Found fullerene {ref.formula} in the cell. skipping missing H check in carbon atoms")
             else:
                 for kdx, a in enumerate(ref.atoms):
-                    if not hasattr(a,"adjacency"): continue 
+                    if a.adjacency is None: continue 
                     if a.label == "C":
                         bonded_atom_coord = []
                         bonded_atom_labels = []

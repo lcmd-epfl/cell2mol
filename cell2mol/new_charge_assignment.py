@@ -210,7 +210,7 @@ def set_charge_state(reference, target, mode, debug: int=0):
         if target.formula in manual_assign:
             cs = get_charge_manual(target, debug=debug)
         else :
-            if not hasattr(target, "possible_cs"): 
+            if target.possible_cs is None: 
                 target.get_possible_cs(debug=debug)
             else:
                 if debug >= 1: print("SET_CHARGE_STATE: possible_cs of reference already exists")
