@@ -262,11 +262,13 @@ def get_radii(labels: list) -> np.ndarray:
     for l in labels:
         if l[-1].isdigit(): label = l[:-1]
         else: label = l
-        radii.append(elemdatabase.CovalentRadius3[label])
-        # if elemdatabase.elementgroup[label] == 1 and label != "H":
-        #     radii.append(elemdatabase.CovalentRadius2[label])
-        # else:
-        #     radii.append(elemdatabase.CovalentRadius3[label])
+        # radii.append(elemdatabase.CovalentRadius3[label])
+        if elemdatabase.elementgroup[label] == 1 and label != "H":
+            radii.append(elemdatabase.CovalentRadius2[label])
+        elif elemdatabase.elementgroup[label] == 2:
+            radii.append(elemdatabase.CovalentRadius2[label])
+        else:
+            radii.append(elemdatabase.CovalentRadius3[label])
     return np.array(radii)
 
 ####################################
@@ -277,7 +279,8 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
     adjmat = np.zeros((natoms, natoms))
     adjnum = np.zeros((natoms))
 
-    add_factor = 0.3
+    add_factor = 0.45
+    #add_factor = 0.3
     # Sometimes argument radii np.ndarry, or list
     with warnings.catch_warnings():
         warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -293,9 +296,9 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
                 b = np.array(pos[j])
                 dist = np.linalg.norm(a - b)
 
-                thres = (radii[i] + radii[j]) * cov_factor
-                if thres - (radii[i] + radii[j]) > 0.8:
-                    thres = (radii[i] + radii[j]) + add_factor
+                thres = min((radii[i] + radii[j]) * cov_factor, (radii[i] + radii[j]) + add_factor)
+                # if thres - (radii[i] + radii[j]) > 0.8:
+                #     thres = (radii[i] + radii[j]) + add_factor
 
                 if dist <= clash_threshold:
                     isgood = False # invalid molecule
@@ -356,31 +359,25 @@ def get_adjmatrix_from_cif_bonds (labels: list, pos: list,  mol_atom_site_labels
             a = np.array(pos[i])
             b = np.array(pos[j])
             dist = np.linalg.norm(a - b)
-            #print(atom1, atom2, bond_distance , dist, abs(dist - bond_distance), round(abs(dist - bond_distance),3))
             if not metal_only:
-                if round(abs(dist - bond_distance),3) <= 1e-3: # Allow a small tolerance for floating point comparison
+                # Allow a small tolerance for floating point comparison
+                if round(abs(dist - bond_distance),3) <= 1e-3: 
                     adjmat[i, j] = 1
                     adjmat[j, i] = 1
-                    #print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is same with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
                 else:
-                #     isgood = False
                     print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
             if metal_only:
                 if round(abs(dist - bond_distance),3) <= 1e-3:
-                    #print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is same with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
-
                     if (elemdatabase.elementblock[labels[i]] == "d"
                     or elemdatabase.elementblock[labels[i]] == "f"
                     or elemdatabase.elementblock[labels[j]] == "d"
                     or elemdatabase.elementblock[labels[j]] == "f"):
                         adjmat[i, j] = 1
                         adjmat[j, i] = 1
-                    # elif len(get_non_transition_metal_idxs([labels[i], labels[j]])) > 0:
                     elif len(get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])) > 0:
                         adjmat[i, j] = 1
                         adjmat[j, i] = 1    
                 else:
-                #     isgood = False
                     print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
 
     for i in range(0, natoms):
@@ -765,18 +762,20 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
     if debug > 1: print(f"GROUP.SPLIT_GROUP: {original_group.atoms=}")
     conn_labels  = extract_from_list(conn_idx, original_group.labels, dimension=1)
     conn_coord   = extract_from_list(conn_idx, original_group.coord, dimension=1)
-    conn_frac_coord   = extract_from_list(conn_idx, original_group.frac_coord, dimension=1)
+    frac_coord = getattr(original_group, "frac_coord", None)
+    conn_frac_coord = extract_from_list(conn_idx, frac_coord, dimension=1) if frac_coord is not None else None
     conn_radii   = extract_from_list(conn_idx, original_group.radii, dimension=1)
     conn_atoms   = extract_from_list(conn_idx, original_group.atoms, dimension=1)
-    conn_atom_site_labels = extract_from_list(conn_idx, original_group.atom_site_labels, dimension=1)
+    atom_site_labels = getattr(original_group, "atom_site_labels", None)
+    conn_atom_site_labels = extract_from_list(conn_idx, atom_site_labels, dimension=1) if atom_site_labels is not None else None
 
     if debug > 1: print(f"GROUP.SPLIT_GROUP: {conn_labels=}")
 
     cov_factor=original_group.get_parent("ligand").cov_factor
     refcell = original_group.get_parent("reference")
-
-    if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
-        blocklist = split_species(conn_labels, conn_coord, atom_site_labels=conn_atom_site_labels, geom_bond_cif=refcell.geom_bond_cif, debug=debug)
+    geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+    if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False) and geom_bond_cif is not None:
+        blocklist = split_species(conn_labels, conn_coord, atom_site_labels=conn_atom_site_labels, geom_bond_cif=geom_bond_cif, debug=debug)
     else :
         blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=cov_factor, debug=debug)      
     if debug > 0: print(f"GROUP.SPLIT_GROUP: {blocklist=}")
@@ -788,10 +787,11 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
         ligand_idx      = extract_from_list(b, final_ligand_indices, dimension=1)
         gr_labels       = extract_from_list(b, conn_labels, dimension=1)
         gr_coord        = extract_from_list(b, conn_coord, dimension=1)
-        gr_frac_coord   = extract_from_list(b, conn_frac_coord, dimension=1)
+        gr_frac_coord   = extract_from_list(b, conn_frac_coord, dimension=1) if frac_coord is not None else None
         gr_radii        = extract_from_list(b, conn_radii, dimension=1)
         gr_atoms        = extract_from_list(b, conn_atoms, dimension=1)
-        gr_atom_site_labels = extract_from_list(b, conn_atom_site_labels, dimension=1)
+        gr_atom_site_labels = extract_from_list(b, conn_atom_site_labels, dimension=1) if atom_site_labels is not None else None
+
         if debug > 1: print(f"GROUP.SPLIT_GROUP: {gr_labels=}")
         if debug > 1: print(f"GROUP.SPLIT_GROUP: {gr_atom_site_labels=}")
         # Create Group Object

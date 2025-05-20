@@ -419,8 +419,12 @@ def set_atomic_charges(
         q += charge
         if atom == 6:
             number_of_single_bonds_to_C = list(BO_matrix[i, :]).count(1)
-            if number_of_single_bonds_to_C == 2 and BO_valences[i] == 2:
-                q += 1
+            # if number_of_single_bonds_to_C == 2 and BO_valences[i] == 2:
+            #     q += 1
+            #     charge = 0
+            if BO_valences[i] == 2:
+                print("set_atomic_charges", "carbon atom SetNumRadicalElectrons 2")
+                a.SetNumRadicalElectrons(2)
                 charge = 0
             if number_of_single_bonds_to_C == 3 and q + 1 < mol_charge:
                 q += 2
@@ -535,14 +539,14 @@ def AC2BO(AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allow
                 "Has no possible valences assigned in database",
             )
         possible_valence = [x for x in atomic_valence[atomicNum] if x >= valence]
-        # if atomicNum == 6 and valence == 1:
-        #     if 2 in possible_valence:
-        #         possible_valence.remove(2)
-        # if atomicNum == 6 and not allow_carbenes and valence == 2:
-        #     if 2 in possible_valence:
-        #         possible_valence.remove(2)
-        # if atomicNum == 6 and valence == 2:
-        #     possible_valence.append(3)
+        if atomicNum == 6 and valence == 1:
+            if 2 in possible_valence:
+                possible_valence.remove(2)
+        if atomicNum == 6 and not allow_carbenes and valence == 2:
+            if 2 in possible_valence:
+                possible_valence.remove(2)
+        if atomicNum == 6 and valence == 2:
+            possible_valence.append(3)
         if atomicNum == 7:
             #print("Possible valences for:", atomicNum,"are",possible_valence, valence)
             if valence not in possible_valence:
