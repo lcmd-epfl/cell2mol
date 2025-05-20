@@ -207,7 +207,9 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
         elif len(list_for_tgt_charge) > 1:
             good_states.append(list_for_tgt_charge[0])
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Case 2, more than one entry for {tgt_charge} in tmplist. Taking first")
-
+            # for tgt_charge in list_for_tgt_charge:
+            #     good_states.append(tgt_charge)
+            # if debug >= 2: print(f"    NEW SELECT FUNCTION: Case 2, more than one entry for {tgt_charge} in tmplist. Considering all")
     return good_states
 #######################################################
 def get_empty_protonation_state (specie: object, debug: int=2) -> list:
@@ -793,7 +795,7 @@ def get_charge_manual(spec, debug: int=0):
 #     if mol is None:
 #         return "Invalid SMILES"
 def aromatic_info(mol: object):
-    print(f"aromatic_info: {mol=} {Chem.MolToSmiles(mol)}")
+    #print(f"aromatic_info: {mol=} {Chem.MolToSmiles(mol)}")
     aromatic_atoms = sum(1 for atom in mol.GetAtoms() if atom.GetIsAromatic())
     aromatic_rings = Chem.GetSSSR(mol)  # SSSR = smallest set of smallest rings
     return {
@@ -851,8 +853,10 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
     
 
     rdkit_obj = mols[0]
-    if debug >= 0: print(f"GET_CHARGE. {prot.atom_site_labels=}")
-    if debug >= 0: print(f"GET_CHARGE. CHECK. {Chem.MolToSmiles(rdkit_obj)=}")
+    
+    if debug >= 2: 
+        if hasattr(prot, "atom_site_labels"): print(f"GET_CHARGE. {prot.atom_site_labels=}")
+    if debug >= 2: print(f"GET_CHARGE. CHECK. {Chem.MolToSmiles(rdkit_obj)=}")
     # Gets the resulting charges
     atom_charges = []
     total_charge = 0
@@ -874,9 +878,9 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
 
     smiles = Chem.MolToSmiles(rdkit_obj)
 
-    if debug >= 0: print(f"GET_CHARGE. {smiles=}")
-    if debug >= 0: print(f"GET_CHARGE. {atom_charges=}")
-    if debug >= 0: print(f"GET_CHARGE. {total_charge=}")
+    if debug >= 2: print(f"GET_CHARGE. {smiles=}")
+    if debug >= 2: print(f"GET_CHARGE. {atom_charges=}")
+    if debug >= 2: print(f"GET_CHARGE. {total_charge=}")
     # Connectivity is checked
     iscorrect = check_rdkit_obj_connectivity(rdkit_obj, natoms, charge, debug=debug)
     
@@ -1522,14 +1526,15 @@ class protonation(object):
 
         self.radii = get_radii(labels)
         refcell = self.parent.get_parent("reference")
-
-        self.atom_site_labels_indices = [ atom.get_parent_index("reference") for atom in self.parent.atoms]
-        self.atom_site_labels = [refcell.atom_site_labels[idx] for idx in self.atom_site_labels_indices]
-        print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
-        print("PROTONATION.atom_site_labels", self.atom_site_labels)
+        geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+        if refcell is not None :
+            self.atom_site_labels_indices = [ atom.get_parent_index("reference") for atom in self.parent.atoms]
+            self.atom_site_labels = [refcell.atom_site_labels[idx] for idx in self.atom_site_labels_indices]
+            print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
+            print("PROTONATION.atom_site_labels", self.atom_site_labels)
         
-        if refcell.exist_cif_bond_moiety:
-            self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, refcell.geom_bond_cif)
+        if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
+            self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, geom_bond_cif)
             print("PROTONATION.get_adjmatrix_from_cif_bonds", adjmat.shape, adjnum.shape)
             count = 0 
             if len(self.addedlist) > 0:
@@ -1569,7 +1574,8 @@ class protonation(object):
             self.coords                     = list(np.array(self.coords)[mapext])
             self.atnums                     = list(np.array(self.atnums)[mapext])
             self.radii                      = list(np.array(self.radii)[mapext])
-            self.atom_site_labels           = list(np.array(self.atom_site_labels)[map])
+            if hasattr(self, "atom_site_labels"):
+                self.atom_site_labels           = list(np.array(self.atom_site_labels)[map])
             self.addedlist                  = list(np.array(self.addedlist)[map])
             self.block                      = list(np.array(self.block)[map])
             self.metal_electrons            = list(np.array(self.metal_electrons)[map])
@@ -1577,8 +1583,9 @@ class protonation(object):
     
             self.typ                        = "Reordered"
             refcell = self.parent.get_parent("reference")
-            if refcell.exist_cif_bond_moiety:
-                self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, refcell.geom_bond_cif)
+            geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
+                self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, geom_bond_cif)
                 print("PROTONATION.get_adjmatrix_from_cif_bonds", adjmat.shape, adjnum.shape)
                 count = 0 
                 if len(self.addedlist) > 0:
@@ -1603,7 +1610,8 @@ class protonation(object):
         to_print += f'------------- Cell2mol Protonation ----------------\n'
         to_print += f' Status                          = {self.status}\n'
         to_print += f' Labels                          = {self.labels}\n'
-        to_print += f' Atom site labels                = {self.atom_site_labels}\n'
+        if hasattr(self, "atom_site_labels"):
+            to_print += f' Atom site labels                = {self.atom_site_labels}\n'
         to_print += f' Type                            = {self.typ}\n'
         to_print += f' Atoms added in positions        = {self.addedlist}\n'
         to_print += f' Atoms blocked (no atoms added)  = {self.block}\n'

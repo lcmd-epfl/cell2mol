@@ -940,23 +940,26 @@ def print_refmoleclist (cell):
     for i, ref in enumerate(cell.refmoleclist):
         if hasattr(ref, "totcharge"):
             if ref.iscomplex:
-                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (TM complex)\n{ref}")
+                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (TM complex)")
             elif ref.has_IA_IIA:
-                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (Complex with Alkali or Alkaline metals)\n{ref}")
-            elif hasattr(ref, "smiles"):
-                print(f"Reference Molecule {i} : {ref.formula} {ref.smiles=} {ref.totcharge=} (Non-complex)")
+                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (Complex with Alkali or Alkaline metals)")
+            else:
+                if hasattr(ref, "smiles"):
+                    print(f"Reference Molecule {i} : {ref.formula} {ref.totcharge=} (Non-complex) {ref.smiles=}")
+                else:
+                    print(f"Reference Molecule {i} : {ref.formula} {ref.totcharge=} (Non-complex)")
         elif hasattr(ref, "totcharge_cif"):
             if ref.iscomplex:
                 print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge_cif=} (TM complex)")
             elif ref.has_IA_IIA:
                 print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge_cif=} (Complex with Alkali or Alkaline metals)")
-            elif hasattr(ref, "smiles"):
+            else:
                 print(f"Reference Molecule {i} : {ref.formula} {ref.totcharge_cif=} (Non-complex)")        
         else:
             if ref.iscomplex:
-                print(f"Reference Molecule {i}: {ref.formula} (TM complex)\n{ref}")
+                print(f"Reference Molecule {i}: {ref.formula} (TM complex)")
             elif ref.has_IA_IIA:
-                print(f"Reference Molecule {i}: {ref.formula} (Complex with Alkali or Alkaline metals)\n{ref}")
+                print(f"Reference Molecule {i}: {ref.formula} (Complex with Alkali or Alkaline metals)")
             else:
                 print(f"Reference Molecule {i} : {ref.formula} (Non-complex)")
 
@@ -973,15 +976,15 @@ def print_refmoleclist (cell):
                     print(f"\t|--Coordination information coord_sphere_formula={met.coord_sphere_formula}")
 
                 if all(hasattr(met, attr) for attr in ["coord_nr", "coord_geometry", "geom_deviation"]):
-                    print(f"\t|--without metal-metal bonds: coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}")
+                    print(f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}")
 
                 if all(hasattr(met, attr) for attr in ["coord_nr_with_metal_bonds", "coord_geometry_with_metal_bonds", "geom_deviation_with_metal_bonds", "metals"]):
                     bonded_metals = [m.label for m in met.metals]
-                    print(f"\t|--including metal-metal bonds: bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
+                    print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
 
             for lig in ref.ligands:
                 lig_info = f"\t{lig.formula} ({lig.subtype})"
-                for attr in ["smiles", "is_haptic", "haptic_type", "denticity", "totcharge"]:
+                for attr in ["smiles", "denticity", "totcharge"]:
                     if hasattr(lig, attr):
                         lig_info += f" {attr}={getattr(lig, attr)}"
 
@@ -995,11 +998,17 @@ def print_refmoleclist (cell):
 
                 for group in lig.groups:
                     group_info = f"\t|--(group) {group.labels}"
-                    for attr in ["is_haptic", "haptic_type", "denticity"]:
+                    for attr in ["denticity"]:
                         if hasattr(group, attr):
                             group_info += f" {attr}={getattr(group, attr)}"
-                    if hasattr(group, "closest_metal"):
-                        group_info += f" closest_metal.label={group.closest_metal.label}"
+                    for attr in ["is_haptic", "haptic_type"]:
+                        if hasattr(group, attr):
+                            if group.is_haptic:
+                                group_info += f" {attr}={getattr(group, attr)}"
+                    if hasattr(group, "metals"):
+                        group_info += f" connected_metals={[m.label for m in group.metals]}"
+                    # if hasattr(group, "closest_metal"):
+                    #     group_info += f" closest_metal.label={group.closest_metal.label}"
                     print(group_info)
                     
 ######################################################
@@ -1043,19 +1052,27 @@ def print_possible_charges (cell, debug=0):
                     print(f"\t{specie.unique_index=} {specie.formula}, {specie.subtype}  No possible cs") #[p.subtype for p in specie.parents])    
     else:
         print("\nNo species list found in the cell object.")
-
+    print("")
+######################################################
 def print_moleclist(cell):
     if hasattr(cell, "moleclist"):
         print(f"\nMolecules in {cell.subtype}:")                 
         for i, mol in enumerate(cell.moleclist):
             if hasattr(mol, "totcharge"):
-                if mol.iscomplex or mol.has_IA_IIA:
-                    print(f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex)\n{mol}")
-                elif hasattr(mol, "smiles"):
-                    print(f"Unitcell Molecule {i} : {mol.formula} {mol.smiles=} {mol.totcharge=} (Non-complex)")
+                if mol.iscomplex:
+                    print(f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (TM complex)")
+                elif mol.has_IA_IIA:
+                    print(f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex with Alkali or Alkaline metals)")
+                else:
+                    if hasattr(mol, "smiles"):
+                        print(f"Reference Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex) {mol.smiles=}")
+                    else:
+                        print(f"Reference Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex)")
             else:
-                if mol.iscomplex or mol.has_IA_IIA:
-                    print(f"Unitcell Molecule {i}: {mol.formula} (Complex)")
+                if mol.iscomplex:
+                    print(f"Unitcell Molecule {i}: {mol.formula} (TM complex)")
+                elif mol.has_IA_IIA:
+                    print(f"Unitcell Molecule {i}: {mol.formula} (Complex with Alkali or Alkaline metals)")
                 else:
                     print(f"Unitcell Molecule {i} : {mol.formula} (Non-complex)")
 
@@ -1074,27 +1091,33 @@ def print_moleclist(cell):
                             print(f"\t|--Coordination information {attr}={getattr(met, attr)}")
 
                     if all(hasattr(met, attr) for attr in ["coord_nr", "coord_geometry", "geom_deviation"]):
-                        print(f"\t|--without metal-metal bonds: coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}")
+                        print(f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}")
 
                     if all(hasattr(met, attr) for attr in ["coord_nr_with_metal_bonds", "coord_geometry_with_metal_bonds", "geom_deviation_with_metal_bonds", "metals"]):
                         bonded_metals = [m.label for m in met.metals]
-                        print(f"\t|--including metal-metal bonds: bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
+                        print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
                 print("")
 
                 for lig in mol.ligands:
                     lig_info = f"\t{lig.formula} ({lig.subtype})"
-                    for attr in ["smiles", "is_haptic", "haptic_type", "denticity", "totcharge"]:
+                    for attr in ["smiles", "denticity", "totcharge"]:
                         if hasattr(lig, attr):
                             lig_info += f" {attr}={getattr(lig, attr)}"
                     print(lig_info)
 
                     for group in lig.groups:
                         group_info = f"\t|--(group){group.labels}"
-                        for attr in ["is_haptic", "haptic_type", "denticity"]:
+                        for attr in ["denticity"]:
                             if hasattr(group, attr):
                                 group_info += f" {attr}={getattr(group, attr)}"
-                        if hasattr(group, "closest_metal"):
-                            group_info += f" closest_metal.label={group.closest_metal.label}"
+                        for attr in ["is_haptic", "haptic_type"]:
+                            if hasattr(group, attr):
+                                if group.is_haptic:
+                                    group_info += f" {attr}={getattr(group, attr)}"
+                        if hasattr(group, "metals"):
+                            group_info += f" connected_metals={[m.label for m in group.metals]}"
+                        # if hasattr(group, "closest_metal"):
+                        #     group_info += f" closest_metal.label={group.closest_metal.label}"
                         print(group_info)
 
                         # Optional: print group-metals connectivity

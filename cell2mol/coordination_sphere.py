@@ -418,9 +418,11 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
             tmpcoord = [atom.coord, met.coord]            
             
             refcell = atom.get_parent("reference")
-            atom_site_labels = [atom.atom_site_label, met.atom_site_label]
-
-            if refcell.exist_cif_bond_moiety:
+            if hasattr(atom, "atom_site_label") and hasattr(met, "atom_site_label"):
+                atom_site_labels = [atom.atom_site_label, met.atom_site_label]
+            else :
+                atom_site_labels = None
+            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
                 isconnected, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, refcell.geom_bond_cif, metal_only=True)
             else:
                 isconnected, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
@@ -429,7 +431,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
                 if debug > 0 : 
                     print(f"\tAtom {atom.label} is connected to metal {met.label} (atom {ligand_idx=}) (metal group.metals index {jdx=})")
                 
-                if refcell.exist_cif_bond_moiety:
+                if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
                     isadded  = True
                     if debug > 0: print(f"\tConnectivity verified for atom {atom.label} with ligand index {ligand_idx} based on CIF bonds")
                 else:
