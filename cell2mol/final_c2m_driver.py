@@ -7,7 +7,7 @@ from cell2mol.xyz_molecule import get_molecule
 from cell2mol.read_write import screening_cif, prefilter_cif, exit_with_error_input, exit_with_error_exception
 
 def main():
-    input, system_type, cell_para, debug_mode = parsing_arguments()
+    input, system_type, cell_para, input_charge, debug_mode = parsing_arguments()
     current_dir = os.getcwd()
     input_path = os.path.normpath(input)
     dir, file = os.path.split(input_path)
@@ -27,7 +27,7 @@ def main():
         else:
             exit_with_error_input(f"CIF file is not suitable for processing {error_message}")
     elif extension == ".xyz":
-        handle_xyz_file(input_path, system_type, name, cell_para, current_dir, debug_mode)
+        handle_xyz_file(input_path, system_type, name, cell_para, input_charge, current_dir, debug_mode)
     else:
         exit_with_error_input(f"Invalid file extension: {input_path}")
 
@@ -48,7 +48,7 @@ def handle_cif_file(input_path, system_type, name, current_dir, debug_mode):
         exit_with_error_input("Invalid system type for .cif file", {"system_type": system_type})
 
 
-def handle_xyz_file(input_path, system_type, name, cell_para, current_dir, debug_mode):
+def handle_xyz_file(input_path, system_type, name, cell_para, input_charge, current_dir, debug_mode):
     if system_type == "unitcell":
         if cell_para is None:
             exit_with_error_input("Cell parameters must be provided for .xyz file of a unit cell")
@@ -58,7 +58,7 @@ def handle_xyz_file(input_path, system_type, name, cell_para, current_dir, debug
             # if users provide smiles, we check compare_species in connectivity module
     elif system_type == "molecule":
         print("Processing molecule from .xyz file")
-        get_molecule(input_path, name, current_dir, debug_mode)
+        get_molecule(input_path, name, input_charge, current_dir, debug_mode)
     else:
         exit_with_error_input("Invalid system type for .xyz file", {"system_type": system_type})
 

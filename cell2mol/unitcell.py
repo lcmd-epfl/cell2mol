@@ -60,6 +60,7 @@ def process_unitcell(input_path, name, current_dir, debug=0):
             summary_fname_ref = os.path.join(current_dir, "reference_summary.out")
             with open(summary_fname_ref, "a") as summary_ref:
                 with redirect_stdout(summary_ref):
+                    print("************ After charge assignment of unit cell ************")
                     print_refmoleclist(refcell)   
 
             # Handle error cases for the unit cell
