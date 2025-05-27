@@ -7,7 +7,7 @@ from cell2mol.xyz_molecule import get_molecule
 from cell2mol.read_write import screening_cif, prefilter_cif, exit_with_error_input, exit_with_error_exception
 
 def main():
-    input, system_type, cell_para, input_charge, debug_mode = parsing_arguments()
+    input, system_type, cif_bond_info, cell_para, input_charge, debug_mode = parsing_arguments()
     current_dir = os.getcwd()
     input_path = os.path.normpath(input)
     dir, file = os.path.split(input_path)
@@ -23,7 +23,7 @@ def main():
         cif_okay, error_message = prefilter_cif(input_path)
         if cif_okay:
         # if not any([notfound_atom]):
-            handle_cif_file(input_path, system_type, name, current_dir, debug_mode)
+            handle_cif_file(input_path, system_type, name, current_dir, cif_bond_info, debug_mode)
         else:
             exit_with_error_input(f"CIF file is not suitable for processing {error_message}")
     elif extension == ".xyz":
@@ -31,17 +31,17 @@ def main():
     else:
         exit_with_error_input(f"Invalid file extension: {input_path}")
 
-def handle_cif_file(input_path, system_type, name, current_dir, debug_mode):
+def handle_cif_file(input_path, system_type, name, current_dir, cif_bond_info, debug_mode):
     if system_type == "reference":
         print("Processing reference (Wyckoff sites) from .cif file")
         try:
-            process_refcell(input_path, name, current_dir, debug_mode)
+            process_refcell(input_path, name, current_dir, cif_bond_info, debug_mode)
         except Exception as e:
             exit_with_error_exception(e)
     elif system_type == "unitcell":
         print("Processing unit cell from .cif file")
         try:
-            process_unitcell(input_path, name, current_dir, debug_mode)
+            process_unitcell(input_path, name, current_dir, cif_bond_info, debug_mode)
         except Exception as e:
             exit_with_error_exception(e)
     else:
