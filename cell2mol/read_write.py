@@ -391,19 +391,22 @@ def extract_moiety(file_path: str) -> list:
     uploaded_file_path = Path(file_path)
     with uploaded_file_path.open("r", encoding="utf-8") as file:
         cif_data_uploaded = file.read()
+    try:
+        # Extract the moiety block
+        moiety_match_uploaded = re.search(r"_chemical_formula_moiety\s*;\s*(.*?)\s*;", cif_data_uploaded, re.DOTALL)
+        moiety_string_uploaded = moiety_match_uploaded.group(1) if moiety_match_uploaded else ""
 
-    # Extract the moiety block
-    moiety_match_uploaded = re.search(r"_chemical_formula_moiety\s*;\s*(.*?)\s*;", cif_data_uploaded, re.DOTALL)
-    moiety_string_uploaded = moiety_match_uploaded.group(1) if moiety_match_uploaded else ""
+        # # Split and parse moieties
+        moieties_uploaded = moiety_string_uploaded.split(',')
+        moieties_uploaded = [moiety.replace('\n', '') for moiety in moieties_uploaded]
 
-    # # Split and parse moieties
-    moieties_uploaded = moiety_string_uploaded.split(',')
-    moieties_uploaded = [moiety.replace('\n', '') for moiety in moieties_uploaded]
+        moiety_tuples = [parse_moiety(m.strip()) for m in moieties_uploaded]
+        moiety_dicts = [ {'formula': f, 'ratio': s, 'charge': c, 'type': t} for f, s, c, t in moiety_tuples ]
 
-    moiety_tuples = [parse_moiety(m.strip()) for m in moieties_uploaded]
-    moiety_dicts = [ {'formula': f, 'ratio': s, 'charge': c, 'type': t} for f, s, c, t in moiety_tuples ]
-
-    # print("moiety_dicts=",moiety_dicts)
+        # print("moiety_dicts=",moiety_dicts)
+    except:
+        print("Error parsing moiety information from CIF file.")
+        moiety_dicts = []
     return moiety_dicts
 
 ##########################
@@ -995,21 +998,21 @@ def print_refmoleclist (cell):
                         lig_info += " lig.possible_cs Does not exist"
 
                 print(lig_info)
-
-                for group in lig.groups:
-                    group_info = f"\t|--(group) {group.labels}"
-                    for attr in ["denticity"]:
-                        if hasattr(group, attr):
-                            group_info += f" {attr}={getattr(group, attr)}"
-                    for attr in ["is_haptic", "haptic_type"]:
-                        if hasattr(group, attr):
-                            if group.is_haptic:
+                if hasattr(lig, "groups"):
+                    for group in lig.groups:
+                        group_info = f"\t|--(group) {group.labels}"
+                        for attr in ["denticity"]:
+                            if hasattr(group, attr):
                                 group_info += f" {attr}={getattr(group, attr)}"
-                    if hasattr(group, "metals"):
-                        group_info += f" connected_metals={[m.label for m in group.metals]}"
-                    # if hasattr(group, "closest_metal"):
-                    #     group_info += f" closest_metal.label={group.closest_metal.label}"
-                    print(group_info)
+                        for attr in ["is_haptic", "haptic_type"]:
+                            if hasattr(group, attr):
+                                if group.is_haptic:
+                                    group_info += f" {attr}={getattr(group, attr)}"
+                        if hasattr(group, "metals"):
+                            group_info += f" connected_metals={[m.label for m in group.metals]}"
+                        # if hasattr(group, "closest_metal"):
+                        #     group_info += f" closest_metal.label={group.closest_metal.label}"
+                        print(group_info)
                     
 ######################################################
 def print_unique_species (cell):
@@ -1104,25 +1107,25 @@ def print_moleclist(cell):
                         if hasattr(lig, attr):
                             lig_info += f" {attr}={getattr(lig, attr)}"
                     print(lig_info)
-
-                    for group in lig.groups:
-                        group_info = f"\t|--(group){group.labels}"
-                        for attr in ["denticity"]:
-                            if hasattr(group, attr):
-                                group_info += f" {attr}={getattr(group, attr)}"
-                        for attr in ["is_haptic", "haptic_type"]:
-                            if hasattr(group, attr):
-                                if group.is_haptic:
+                    if hasattr(lig, "groups"):
+                        for group in lig.groups:
+                            group_info = f"\t|--(group){group.labels}"
+                            for attr in ["denticity"]:
+                                if hasattr(group, attr):
                                     group_info += f" {attr}={getattr(group, attr)}"
-                        if hasattr(group, "metals"):
-                            group_info += f" connected_metals={[m.label for m in group.metals]}"
-                        # if hasattr(group, "closest_metal"):
-                        #     group_info += f" closest_metal.label={group.closest_metal.label}"
-                        print(group_info)
+                            for attr in ["is_haptic", "haptic_type"]:
+                                if hasattr(group, attr):
+                                    if group.is_haptic:
+                                        group_info += f" {attr}={getattr(group, attr)}"
+                            if hasattr(group, "metals"):
+                                group_info += f" connected_metals={[m.label for m in group.metals]}"
+                            # if hasattr(group, "closest_metal"):
+                            #     group_info += f" closest_metal.label={group.closest_metal.label}"
+                            print(group_info)
 
-                        # Optional: print group-metals connectivity
-                        # for met in group.metals:
-                        #     print(f"\t|--(group.metals){met.label} {met.mconnec=}")
+                            # Optional: print group-metals connectivity
+                            # for met in group.metals:
+                            #     print(f"\t|--(group.metals){met.label} {met.mconnec=}")
     else:
         print("\nNo molecules found in the cell object.")
 

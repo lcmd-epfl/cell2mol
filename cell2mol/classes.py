@@ -249,8 +249,9 @@ class specie(object):
         # print(f"SPECIE.INHERIT: {self.madjmat.shape=} {self.madjnum.shape=} {self.adjmat.shape=} {self.adjnum.shape=}")
 
     ############
-    def get_adjmatrix(self, geom_bond_cif: list=None):
-        if geom_bond_cif is not None and hasattr(self, "atom_site_labels"):
+    def get_adjmatrix(self, geom_bond_cif: list=None, debug: int=0):
+        refcell = self.get_parent("reference")
+        if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False) and geom_bond_cif is not None and hasattr(self, "atom_site_labels"):
             print("SPECIE.GET_ADJMATRIX: Based on bond information from CIF")
             isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds (self.labels,  self.coord, self.atom_site_labels, geom_bond_cif, metal_only= False)
         else:
@@ -266,8 +267,9 @@ class specie(object):
         return self.adjmat, self.adjnum
 
     ############
-    def get_metal_adjmatrix(self, geom_bond_cif: list=None):
-        if geom_bond_cif is not None and hasattr(self, "atom_site_labels"):
+    def get_metal_adjmatrix(self, geom_bond_cif: list=None, debug: int=0):
+        refcell = self.get_parent("reference")
+        if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False) and geom_bond_cif is not None and hasattr(self, "atom_site_labels"):
             print("SPECIE.GET_METAL_ADJMATRIX: Based on bond information from CIF")
             isgood, madjmat, madjnum = get_adjmatrix_from_cif_bonds (self.labels,  self.coord, self.atom_site_labels, geom_bond_cif, metal_only= True)
         else :
@@ -881,47 +883,68 @@ class molecule(specie):
             print("Non-Complex",  self.formula, self.totcharge, self.smiles)
     #################   
     def create_bonds (self, debug: int=0):
+
         if not self.iscomplex and not self.has_IA_IIA: 
             result = create_bonds_specie(self, debug=debug)          ### Creates bonds between molecule.atoms using the molecule.rdkit_object
             if result == False:
-                if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for molecule {self.formula}")
+                if debug >= 1: print(f"MOLECULE.CREATE_BONDS: error creating bonds for molecule {self.formula}")
                 self.error_create_bonds = True
                 return # Exit the function entirely if creating bonds fails for a non-complex molecule
             else :
-                if debug >= 1: print(f"CELL.CREATE_BONDS: Bonds created for molecule {self.formula}")
+                if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Bonds created for molecule {self.formula}")
 
         # Second part
         if self.iscomplex or self.has_IA_IIA:
             for lig in self.ligands:
                 result = create_bonds_specie(lig, debug=debug)      ### Creates bonds between ligand.atoms, which also belong to molecule.atoms, using the ligand.rdkit_object
                 if result == False:
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for ligand {lig.formula}")
+                    if debug >= 1: print(f"MOLECULE.CREATE_BONDS: error creating bonds for ligand {lig.formula}")
                     self.error_create_bonds = True
                     return # Exit the function entirely if creating bonds fails for any ligand
                 
                 else :
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: Bonds created for molecule {lig.formula}")
-
-        if self.iscomplex or self.has_IA_IIA:
-            # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
-            create_metal_ligand_bonds(self, debug=debug)
-            create_metal_metal_bonds(self, debug=debug)
-
-            # Fourth part : correction smiles of ligands
+                    if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Bonds created for molecule {lig.formula}")
+        
+        if self.iscomplex or self.has_IA_IIA:    
             self.smiles_with_H = [lig.smiles for lig in self.ligands]
             self.smiles = []
+            fix_zwitterions_ligands = []
+            # Fourth part : correction smiles of ligands
             for lig in self.ligands:
-                print(f"CELL.CREATE_BONDS: Correcting Smiles for ligand {lig.formula}")
-                result = correct_smiles_ligand(lig, debug=debug)
+                print(f"MOLECULE.CREATE_BONDS: Correcting Smiles for ligand {lig.formula}")
+                result, fix_zwitterions = correct_smiles_ligand(lig, debug=debug)
                 if result == False:
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: error correcting smiles for ligand {lig.formula}")
+                    if debug >= 1: print(f"MOLECULE.CREATE_BONDS: error correcting smiles for ligand {lig.formula}")
                     self.error_create_bonds = True
                     return # Exit the function entirely 
                 else :
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: Smiles corrected for ligand {lig.formula}")
-                    self.smiles.append(lig.smiles)    
-        
+                    if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Smiles corrected for ligand {lig.formula}")
+                    if fix_zwitterions :
+                        fix_zwitterions_ligands.append(lig)
+                    else:
+                        self.smiles.append(lig.smiles)    
+            
+            if debug >= 1:print(f"MOLECULE.CREATE_BONDS: {len(fix_zwitterions_ligands)} zwitterion ligands found in the complex")
+            for lig in fix_zwitterions_ligands:
+                for atom in lig.atoms:
+                    atom.bonds = []
+                if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Re-running create_bonds_specie for ligand {lig.formula} due to zwitterion correction.")
+                result = create_bonds_specie(lig, debug=debug)
+                if result == False:
+                    if debug >= 1: print(f"MOLECULE.CREATE_BONDS: error re-creating bonds for ligand {lig.formula}")
+                    self.error_create_bonds = True
+                    return
+                else :
+                    if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Bonds re-created for ligand {lig.formula} after zwitterion correction.")
+                    self.smiles.append(lig.smiles)
+
+        # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
+        if self.iscomplex or self.has_IA_IIA:
+            create_metal_ligand_bonds(self, debug=debug)
+            create_metal_metal_bonds(self, debug=debug)
+
         self.error_create_bonds = False
+
 ###############
 ### LIGAND ####
 ###############
@@ -1055,6 +1078,12 @@ class ligand(specie):
 
     #######################################################
     def split_ligand(self, debug: int=0):
+        def is_single_sublist(intermediate_list):
+            return (
+                isinstance(intermediate_list, list) and
+                len(intermediate_list) == 1 and
+                isinstance(intermediate_list[0], list)
+            )
         if hasattr(self,"cov_factor"):      cov_factor=self.cov_factor
 
         refcell = self.get_parent("reference") 
@@ -1066,7 +1095,7 @@ class ligand(specie):
         self.groups = []
 
         # Identify Connected and Unconnected atoms (to the metal)
-        if not hasattr(self,"connected_idx"): self.get_connected_idx()
+        if not hasattr(self,"connected_idx"): self.get_connected_idx(debug=debug)
         connected_idx     = self.connected_idx
         
         if debug >= 2:
@@ -1135,21 +1164,33 @@ class ligand(specie):
             #     newgroup.get_denticity(debug=debug)
             #     self.groups.append(newgroup)
             # else:
-            newgroup, conn_idx, final_ligand_indices = newgroup.check_coordination(debug=debug)
-            print(f"\tLIGAND.SPLIT_LIGAND: {conn_idx=}")
-            if len(conn_idx) == len(newgroup.atoms):
-                if debug > 1 : print(f"\tLIGAND.SPLIT_LIGAND: new group is found")
-                newgroup.get_denticity(debug=debug)
-                # Top-down hierarchy
-                self.groups.append(newgroup)
-            elif len(conn_idx) == 0:
-                if debug > 1 : print(f"\tLIGAND.SPLIT_LIGAND: no group is found")
-                continue
+            newgroup, final_group_indices, final_ligand_indices = newgroup.check_coordination(debug=debug)
+            print(f"\tLIGAND.SPLIT_LIGAND: {newgroup.formula} {newgroup.labels}")
+            print(f"\tLIGAND.SPLIT_LIGAND: {final_group_indices=}")
+            print(f"\tLIGAND.SPLIT_LIGAND: {final_ligand_indices=}")
+            if not is_single_sublist(final_group_indices): # atoms in new group are connected to different metals
+                if debug > 1 : print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.formula} with {final_group_indices=} {[met.label for met in newgroup.metals]}")
+                for conn_idx in final_group_indices:
+                    if debug > 1 : print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.labels} with {conn_idx=}")
+                    splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices, debug=debug)
+                    for g in splitted_groups:
+                        self.groups.append(g)
             else:
-                if debug > 1 : print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.formula} with {conn_idx=}")
-                splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices, debug=debug)
-                for g in splitted_groups:
-                    self.groups.append(g)
+                if debug > 1 : print(f"\tGROUP {newgroup.formula} with {final_group_indices=} connected to {[met.label for met in newgroup.metals]}")
+                conn_idx = final_group_indices[0]
+                if len(conn_idx) == len(newgroup.atoms):
+                    if debug > 1 : print(f"\tLIGAND.SPLIT_LIGAND: new group is found")
+                    newgroup.get_denticity(debug=debug)
+                    # Top-down hierarchy
+                    self.groups.append(newgroup)
+                elif len(conn_idx) == 0:
+                    if debug > 1 : print(f"\tLIGAND.SPLIT_LIGAND: no group is found")
+                    continue
+                else:
+                    if debug > 1 : print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.formula} with {conn_idx=}")
+                    splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices, debug=debug)
+                    for g in splitted_groups:
+                        self.groups.append(g)
         if debug > 0 : print(f"\tLIGAND.SPLIT_LIGAND: found groups {[ group.formula for group in self.groups]}")
         if debug > 3 : print(f"{self.groups}")
         return self.groups
@@ -1509,14 +1550,14 @@ class atom(object):
     
     #######################################################
     def reset_mconnec(self, met, diff: int=-1, debug: int=0):
-        if debug > 0: print(f"ATOM.RESET_MCONN: resetting mconnec (and connec) for atom {self.label=}")
-        if debug > 0: print(f"ATOM.RESET_MCONN: initial {self.connec=} {self.mconnec=}")
-        if debug > 0 : print(f"ATOM.RESET_MCONN: initial = {self.adjacency=} {self.metal_adjacency=}")
+        if debug >= 2: print(f"ATOM.RESET_MCONN: resetting mconnec (and connec) for atom {self.label=}")
+        if debug >= 2: print(f"ATOM.RESET_MCONN: initial {self.connec=} {self.mconnec=}")
+        if debug >= 2 : print(f"ATOM.RESET_MCONN: initial = {self.adjacency=} {self.metal_adjacency=}")
         self.mconnec += diff
         self.connec  += diff
 
-        if debug > 0: print(f"ATOM.RESET_MCONN: initial {met.connec=} {met.mconnec=}")
-        if debug > 0 : print(f"ATOM.RESET_MCONN: initial = {met.adjacency=} {met.metal_adjacency=}")
+        if debug >= 2: print(f"ATOM.RESET_MCONN: initial {met.connec=} {met.mconnec=}")
+        if debug >= 2: print(f"ATOM.RESET_MCONN: initial = {met.adjacency=} {met.metal_adjacency=}")
 
         # Correct Metal Data
         met.mconnec += diff                             # Corrects data of metal object
@@ -1528,21 +1569,21 @@ class atom(object):
             lig     = self.get_parent("ligand")
             lig_idx = self.get_parent_index("ligand")
 
-            if debug > 0: print(f"ATOM.RESET_MCONN: resetting mconnec (and connec) for atom {self.label=} in ligadn {lig_idx=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: updating ligand atoms and madjnum")
-            if debug > 0: print(f"ATOM.RESET_MCONN: {lig.natoms=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: {lig.labels=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.madjnum=} {len(lig.madjnum)}") 
+            if debug > 2: print(f"ATOM.RESET_MCONN: resetting mconnec (and connec) for atom {self.label=} in ligadn {lig_idx=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: updating ligand atoms and madjnum")
+            if debug > 2: print(f"ATOM.RESET_MCONN: {lig.natoms=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: {lig.labels=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {lig.madjnum=} {len(lig.madjnum)}") 
             # Nothing in madjmat of the ligand object, all zeros
-            # if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.madjmat=} {(lig.madjmat).shape}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: updating ligand atoms and adjnum")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.adjnum=} {len(lig.adjnum)}") 
-            # if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.adjmat=} {(lig.adjmat).shape}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.atoms[lig_idx].connec=} {lig.atoms[lig_idx].mconnec=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.madjnum[lig_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.adjnum[lig_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {met.connec=} {met.mconnec=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {lig.madjmat[lig_idx]=} {lig.adjmat[lig_idx]=}")
+            # if debug > 2: print(f"ATOM.RESET_MCONN: initial {lig.madjmat=} {(lig.madjmat).shape}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: updating ligand atoms and adjnum")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {lig.adjnum=} {len(lig.adjnum)}") 
+            # if debug > 2: print(f"ATOM.RESET_MCONN: initial {lig.adjmat=} {(lig.adjmat).shape}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {lig.atoms[lig_idx].connec=} {lig.atoms[lig_idx].mconnec=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {lig.madjnum[lig_idx]=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {lig.adjnum[lig_idx]=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {met.connec=} {met.mconnec=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {lig.madjmat[lig_idx]=} {lig.adjmat[lig_idx]=}")
             # Correct Ligand Data
             lig.madjnum[lig_idx] += diff                    # Corrects data in metal_adjacency number of the ligand class
             #lig.madjmat[lig_idx,met_idx] += diff            # Corrects data in metal_adjacency matrix
@@ -1554,14 +1595,14 @@ class atom(object):
             # lig.adjmat[lig_idx,met_idx]  += diff            # Corrects data in adjacency matrix
             # lig.adjmat[met_idx,lig_idx]  += diff            # Corrects data in adjacency matrix
             # we should delete the adjacencies, but not a priority 
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.madjnum=}")
-            # if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.madjmat=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.adjnum=}")  
-            # if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.adjmat=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.atoms[lig_idx].connec=} {lig.atoms[lig_idx].mconnec=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.atoms[lig_idx].adjacency=} {lig.atoms[lig_idx].metal_adjacency=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.madjnum[lig_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {lig.adjnum[lig_idx]=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {lig.madjnum=}")
+            # if debug > 2: print(f"ATOM.RESET_MCONN: final {lig.madjmat=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: final {lig.adjnum=}")  
+            # if debug > 2: print(f"ATOM.RESET_MCONN: final {lig.adjmat=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {lig.atoms[lig_idx].connec=} {lig.atoms[lig_idx].mconnec=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {lig.atoms[lig_idx].adjacency=} {lig.atoms[lig_idx].metal_adjacency=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {lig.madjnum[lig_idx]=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {lig.adjnum[lig_idx]=}")
             lig.get_connected_idx(debug=debug)
             lig.get_connected_atoms(debug=debug)
 
@@ -1570,24 +1611,24 @@ class atom(object):
             mol     = self.get_parent("molecule")
             mol_idx = self.get_parent_index("molecule")
             met_idx = met.get_parent_index("molecule")
-            if debug > 0: print(f"ATOM.RESET_MCONN: resetting mconnec (and connec) for atom {self.label=} in molecule {mol_idx=} with metal {met_idx=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: updating molecule atoms and madjnum")
-            if debug > 0: print(f"ATOM.RESET_MCONN: {mol.natoms=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: {mol.labels=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.madjnum=} {len(mol.madjnum)}") 
-            #if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.madjmat=} {(mol.madjmat).shape}") # Nothing in madjmat of the ligand object, all zeros
-            if debug > 0: print(f"ATOM.RESET_MCONN: updating molecule atoms and adjnum")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.adjnum=} {len(mol.adjnum)}") 
-            #if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.adjmat=} {(mol.adjmat).shape}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.atoms[mol_idx].mconnec=} {mol.atoms[mol_idx].connec=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {met.mconnec=} {met.connec=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: resetting mconnec (and connec) for atom {self.label=} in molecule {mol_idx=} with metal {met_idx=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: updating molecule atoms and madjnum")
+            if debug > 2: print(f"ATOM.RESET_MCONN: {mol.natoms=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: {mol.labels=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: initial {mol.madjnum=} {len(mol.madjnum)}") 
+            #if debug >= 2: print(f"ATOM.RESET_MCONN: initial {mol.madjmat=} {(mol.madjmat).shape}") # Nothing in madjmat of the ligand object, all zeros
+            if debug >= 2: print(f"ATOM.RESET_MCONN: updating molecule atoms and adjnum")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: initial {mol.adjnum=} {len(mol.adjnum)}") 
+            #if debug >= 2: print(f"ATOM.RESET_MCONN: initial {mol.adjmat=} {(mol.adjmat).shape}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: initial {mol.atoms[mol_idx].mconnec=} {mol.atoms[mol_idx].connec=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: initial {met.mconnec=} {met.connec=}")
 
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.madjnum[mol_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.adjnum[mol_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.madjnum[met_idx]=} {mol.madjnum[mol_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.adjnum[met_idx]=} {mol.adjnum[mol_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.madjmat[met_idx,mol_idx]=} {mol.madjmat[mol_idx,met_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: initial {mol.adjmat[met_idx,mol_idx]=} {mol.adjmat[mol_idx,met_idx]=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {mol.madjnum[mol_idx]=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {mol.adjnum[mol_idx]=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {mol.madjnum[met_idx]=} {mol.madjnum[mol_idx]=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {mol.adjnum[met_idx]=} {mol.adjnum[mol_idx]=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {mol.madjmat[met_idx,mol_idx]=} {mol.madjmat[mol_idx,met_idx]=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: initial {mol.adjmat[met_idx,mol_idx]=} {mol.adjmat[mol_idx,met_idx]=}")
 
             # Correct Molecule Data
             # mol.atoms[mol_idx].mconnec += diff              # Corrects data of atom object in molecule class
@@ -1608,16 +1649,16 @@ class atom(object):
 
             met.set_adjacencies(mol.adjmat[met_idx], mol.madjmat[met_idx], mol.adjnum[met_idx], mol.madjnum[met_idx])
 
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.atoms[mol_idx].connec=} {mol.atoms[mol_idx].mconnec=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.atoms[mol_idx].adjacency=} {mol.atoms[mol_idx].metal_adjacency=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {met.connec=} {met.mconnec=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {met.adjacency=} {met.metal_adjacency=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.madjnum[mol_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.adjnum[mol_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.madjnum[met_idx]=} {mol.madjnum[mol_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.adjnum[met_idx]=} {mol.adjnum[mol_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.madjmat[met_idx,mol_idx]=} {mol.madjmat[mol_idx,met_idx]=}")
-            if debug > 0: print(f"ATOM.RESET_MCONN: final {mol.adjmat[met_idx,mol_idx]=} {mol.adjmat[mol_idx,met_idx]=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {mol.atoms[mol_idx].connec=} {mol.atoms[mol_idx].mconnec=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {mol.atoms[mol_idx].adjacency=} {mol.atoms[mol_idx].metal_adjacency=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {met.connec=} {met.mconnec=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {met.adjacency=} {met.metal_adjacency=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {mol.madjnum[mol_idx]=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {mol.adjnum[mol_idx]=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {mol.madjnum[met_idx]=} {mol.madjnum[mol_idx]=}")
+            if debug >= 2: print(f"ATOM.RESET_MCONN: final {mol.adjnum[met_idx]=} {mol.adjnum[mol_idx]=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: final {mol.madjmat[met_idx,mol_idx]=} {mol.madjmat[mol_idx,met_idx]=}")
+            if debug > 2: print(f"ATOM.RESET_MCONN: final {mol.adjmat[met_idx,mol_idx]=} {mol.adjmat[mol_idx,met_idx]=}")
 
 ###############
 #### METAL ####
@@ -1810,7 +1851,7 @@ class metal(atom,specie):
         self.coord_nr, self.coord_geometry, self.geom_deviation = define_coordination_geometry(self, coord_group, debug = debug)
         
         if debug >= 3 : print(f"METAL.Get_coord_geometry:\n{coord_group=}")
-        if debug >= 1: print(f"METAL.Get_ccoord_geometry: coord_nr={self.coord_nr}")    
+        if debug >= 1: print(f"METAL.Get_coord_geometry: coord_nr={self.coord_nr}")    
         if debug >= 2: print(f"METAL.Get_coord_geometry: {self.coord_geometry=} {self.geom_deviation=}")
         
         self.rel_metal_radius = self.get_relative_metal_radius(debug = debug)
@@ -1882,20 +1923,19 @@ class cell(object):
         self.atom_site_labels    = atom_site_labels
 
     #######################################################    
-    def get_cif_bond_moiety (self, geom_bond_cif=None, moiety_list_cif=None):
+    def get_cif_bond_moiety (self, cif_bond_info: bool, geom_bond_cif=None, moiety_list_cif=None):
         """
         Get the bond moiety from the cif file.
         """
-        if geom_bond_cif is not None and moiety_list_cif is not None:
+        self.geom_bond_cif = geom_bond_cif
+        self.moiety_list_cif = moiety_list_cif
+
+        if cif_bond_info:
             self.exist_cif_bond_moiety = True
-            self.geom_bond_cif = geom_bond_cif
-            self.moiety_list_cif = moiety_list_cif
             moiety_indices = get_moiety_indices_from_labels(self.atom_site_labels, moiety_list_cif)
             self.moiety_indices = moiety_indices
         else:   
             self.exist_cif_bond_moiety = False
-            self.geom_bond_cif = None
-            self.moiety_list_cif = None
             self.moiety_indices = None
         return self.exist_cif_bond_moiety
     
@@ -2017,8 +2057,13 @@ class cell(object):
         blocklist = self.moiety_indices
 
         if debug >= 2: print(f"GETREFS: blocklist={blocklist}")
+        if debug >= 2: print(f"GETREFS: Generate Adjacency matrix based on bond information from CIF")
 
         self.refmoleclist = []
+        if blocklist is None:
+            print(f"GETREFS: No moiety indices found in the CIF file")
+            return self.refmoleclist
+        
         for b in blocklist:
             mol_labels       = extract_from_list(b, ref_labels, dimension=1)
             mol_coord        = extract_from_list(b, ref_pos, dimension=1)
@@ -2108,11 +2153,15 @@ class cell(object):
         atom_site_labels = self.atom_site_labels
         geom_bond_cif = self.geom_bond_cif
         if debug >= 2: print(f"GETREFS: geom_bond_cif={geom_bond_cif}")
-
+        if debug >= 2: print(f"GETREFS: Generate Adjacency matrix based on interatomic distances")
         blocklist = split_species(ref_labels, ref_pos, cov_factor=cov_factor)
         if debug >= 2: print(f"GETREFS: blocklist={blocklist}")
 
         self.refmoleclist = []
+        if blocklist is None:
+            print(f"GETREFS: No blocklist found")
+            return self.refmoleclist
+        
         # Get reference molecules
         for b in blocklist:
             mol_labels       = extract_from_list(b, ref_labels, dimension=1)
@@ -2128,6 +2177,7 @@ class cell(object):
             for atom, idx in zip(newmolec.atoms, b):
                 # atom.add_parent(refcell, index=idx)
                 atom.add_parent(self, index=idx)
+            print(newmolec.formula, newmolec.madjnum)
             # This must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex: 
                 newmolec.split_complex()
@@ -2681,50 +2731,58 @@ class cell(object):
         if self.subtype == "reference": moleclist = self.refmoleclist
         else:                           moleclist = self.moleclist
 
+        temp = []
         for mol in moleclist:
             if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Bonds for molecule {mol.formula}")
-            # First part
-            if not mol.iscomplex and not mol.has_IA_IIA: 
-                result = create_bonds_specie(mol, debug=debug)          ### Creates bonds between molecule.atoms using the molecule.rdkit_object
-                if result == False:
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for molecule {mol.formula}")
-                    self.error_create_bonds = True
-                    return # Exit the function entirely if creating bonds fails for a non-complex molecule
-                else :
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: Bonds created for molecule {mol.formula}")
+            mol.create_bonds(debug=debug)  
+            temp.append(mol.error_create_bonds)
+        if any(temp):
+            self.error_create_bonds = True
+        else:
+            self.error_create_bonds = False
 
-            # Second part
-            if mol.iscomplex or mol.has_IA_IIA:
-                for lig in mol.ligands:
-                    result = create_bonds_specie(lig, debug=debug)      ### Creates bonds between ligand.atoms, which also belong to molecule.atoms, using the ligand.rdkit_object
-                    if result == False:
-                        if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for ligand {lig.formula}")
-                        self.error_create_bonds = True
-                        return # Exit the function entirely if creating bonds fails for any ligand
+        #     # First part
+        #     if not mol.iscomplex and not mol.has_IA_IIA: 
+        #         result = create_bonds_specie(mol, debug=debug)          ### Creates bonds between molecule.atoms using the molecule.rdkit_object
+        #         if result == False:
+        #             if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for molecule {mol.formula}")
+        #             self.error_create_bonds = True
+        #             return # Exit the function entirely if creating bonds fails for a non-complex molecule
+        #         else :
+        #             if debug >= 1: print(f"CELL.CREATE_BONDS: Bonds created for molecule {mol.formula}")
+
+        #     # Second part
+        #     if mol.iscomplex or mol.has_IA_IIA:
+        #         for lig in mol.ligands:
+        #             result = create_bonds_specie(lig, debug=debug)      ### Creates bonds between ligand.atoms, which also belong to molecule.atoms, using the ligand.rdkit_object
+        #             if result == False:
+        #                 if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for ligand {lig.formula}")
+        #                 self.error_create_bonds = True
+        #                 return # Exit the function entirely if creating bonds fails for any ligand
                     
-                    else :
-                        if debug >= 1: print(f"CELL.CREATE_BONDS: Bonds created for molecule {lig.formula}")
+        #             else :
+        #                 if debug >= 1: print(f"CELL.CREATE_BONDS: Bonds created for molecule {lig.formula}")
 
-            if mol.iscomplex or mol.has_IA_IIA:
-                # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
-                create_metal_ligand_bonds(mol, debug=debug)
-                create_metal_metal_bonds(mol, debug=debug)
+        #     if mol.iscomplex or mol.has_IA_IIA:
+        #         # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
+        #         create_metal_ligand_bonds(mol, debug=debug)
+        #         create_metal_metal_bonds(mol, debug=debug)
 
-                # Fourth part : correction smiles of ligands
-                mol.smiles_with_H = [lig.smiles for lig in mol.ligands]
-                mol.smiles = []
-                for lig in mol.ligands:
-                    print(f"CELL.CREATE_BONDS: Correcting Smiles for ligand {lig.formula}")
-                    result = correct_smiles_ligand(lig, debug=debug)
-                    if result == False:
-                        if debug >= 1: print(f"CELL.CREATE_BONDS: error correcting smiles for ligand {lig.formula}")
-                        self.error_create_bonds = True
-                        return # Exit the function entirely 
-                    else :
-                        if debug >= 1: print(f"CELL.CREATE_BONDS: Smiles corrected for ligand {lig.formula}")
-                        mol.smiles.append(lig.smiles)    
+        #         # Fourth part : correction smiles of ligands
+        #         mol.smiles_with_H = [lig.smiles for lig in mol.ligands]
+        #         mol.smiles = []
+        #         for lig in mol.ligands:
+        #             print(f"CELL.CREATE_BONDS: Correcting Smiles for ligand {lig.formula}")
+        #             result = correct_smiles_ligand(lig, debug=debug)
+        #             if result == False:
+        #                 if debug >= 1: print(f"CELL.CREATE_BONDS: error correcting smiles for ligand {lig.formula}")
+        #                 self.error_create_bonds = True
+        #                 return # Exit the function entirely 
+        #             else :
+        #                 if debug >= 1: print(f"CELL.CREATE_BONDS: Smiles corrected for ligand {lig.formula}")
+        #                 mol.smiles.append(lig.smiles)    
         
-        self.error_create_bonds = False
+        # self.error_create_bonds = False
                 
 
     #######################################################

@@ -17,7 +17,7 @@ METAL_FACTOR = 1.0
 # Set up logging for debug information
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def process_unitcell(input_path, name, current_dir, debug=0):
+def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
     # Set up file paths
     cell_fname = os.path.join(current_dir, f"Cell_{name}.cell")
     ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
@@ -25,8 +25,8 @@ def process_unitcell(input_path, name, current_dir, debug=0):
     
     # Process reference cell 
     logging.info("Starting the cell2mol process for the reference cell")
-    refcell = process_refcell(input_path, name, current_dir, debug=debug)
-    
+    refcell = process_refcell(input_path, name, current_dir, cif_bond_info, debug=debug)
+
     if refcell.error_case != 0:
         logging.error("Error encountered while processing the reference cell")
         return refcell
