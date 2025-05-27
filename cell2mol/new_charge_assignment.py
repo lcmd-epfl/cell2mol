@@ -446,11 +446,11 @@ def create_metal_ligand_bonds (mol, debug: int=0):
         for lig in mol.ligands:
             for at in lig.atoms:
                 count = 0
+                index_1 = at.get_parent_index("molecule")
                 for met in mol.metals: 
-                    isconnected = at.check_connectivity(met, debug=debug)
+                    index_2 = met.get_parent_index("molecule")
+                    isconnected = mol.madjmat[index_1, index_2] ==1
                     if isconnected:
-                        index_1 = at.get_parent_index("molecule")
-                        index_2 = met.get_parent_index("molecule")
                         if index_1 < index_2 : 
                             bond_startatom = at
                             bond_endatom   = met
@@ -463,8 +463,8 @@ def create_metal_ligand_bonds (mol, debug: int=0):
                         met.add_bond(newbond)
                         count += 1 
                 if count != at.mconnec: 
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for atom: \n{at}\n of ligand: \n{lig}\n")
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
+                    if debug >= 1: print(f"\tCREATE_METAL_LIGAND_BONDS: error creating bonds for atom: \n{at}\n of ligand: \n{lig}\n")
+                    if debug >= 1: print(f"\tCREATE_METAL_LIGAND_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
 
 ######################################################
 def create_metal_metal_bonds (mol, debug: int=0):
@@ -472,15 +472,15 @@ def create_metal_metal_bonds (mol, debug: int=0):
     # Adds Metal-Metal Bonds, with a zero order:
     if mol.iscomplex or mol.has_IA_IIA:
         if len(mol.metals) > 1 :
-            if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
-            if debug >= 2: print(f"CELL.CREATE_BONDS: Metals: {mol.metals}")
+            if debug >= 1: print(f"\tCREATE_METAL_METAL_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
+            if debug >= 2: print(f"\tCREATE_METAL_METAL_BONDS: Metals: {mol.metals}")
             for idx, met1 in enumerate(mol.metals):
+                index_1 = met1.get_parent_index("molecule")
                 for jdx, met2 in enumerate(mol.metals):
                     if idx <= jdx: continue
-                    isconnected = met1.check_connectivity(met2, debug=debug)
+                    index_2 = met2.get_parent_index("molecule")
+                    isconnected = mol.madjmat[index_1, index_2] == 1
                     if isconnected:
-                        index_1 = met1.get_parent_index("molecule")
-                        index_2 = met2.get_parent_index("molecule")
                         if index_1 < index_2 : 
                             bond_startatom = met1
                             bond_endatom   = met2
