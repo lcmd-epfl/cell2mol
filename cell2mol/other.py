@@ -12,11 +12,11 @@ def extract_from_list(entrylist: list, old_array: list, dimension: int=2, debug:
                 new_array[idx, jdx] = old_array[row][col]
     elif dimension == 1:
         new_array = np.empty((length), dtype=object)
-        if debug >=2 : print(f"EXTRACT_FROM_LIST. received: {entrylist=} {old_array=}")
+        if debug > 2 : print(f"EXTRACT_FROM_LIST. received: {entrylist=} {old_array=}")
         for idx, val in enumerate(entrylist):
-            if debug >=2: print(f"EXTRACT_FROM_LIST. received: {idx=} {val=} {old_array[val]=}")
+            if debug > 2: print(f"EXTRACT_FROM_LIST. received: {idx=} {val=} {old_array[val]=}")
             new_array[idx] = old_array[val]
-        if debug >=2 : print(f"EXTRACT_FROM_LIST. {new_array=}")
+        if debug > 2 : print(f"EXTRACT_FROM_LIST. {new_array=}")
     return list(new_array)
     #return list([np.stack(list(new_array), axis=0)])
 

@@ -44,7 +44,18 @@ def parsing_arguments():
         nargs=6,
         help="Cell parameters (a, b, c, alpha, beta, gamma) for .xyz file",
     )
-
+    parser.add_argument(
+        "--charge",
+        dest="charge",
+        type=int,
+        help="Total charge of a molecule in .xyz file",
+    )
+    parser.add_argument(
+        "--cif_bond_info",
+        dest="cif_bond_info",
+        type=bool,
+        help="Generate adjacency matrix based on CIF bond information",
+    )
     parser.add_argument(
         "-v",
         "--verbose",
@@ -67,8 +78,12 @@ def parsing_arguments():
             parser.error("Cell parameters must be provided for .xyz file of an unit cell")
         cell_para = np.array(args.cell_para)
 
+    # if args.filename.endswith(".xyz") and args.system_type == "molecule":
+    #     if args.charge is None:
+    #         parser.error("Total charge must be provided for .xyz file of a molecule")
+
     debug_mode = determine_debug_level(args.verbose, args.quiet)
-    return args.filename, args.system_type, cell_para, debug_mode
+    return args.filename, args.system_type, args.cif_bond_info, cell_para, args.charge, debug_mode
 
 def determine_debug_level(isverbose, isquiet):
     if isverbose and not isquiet:
