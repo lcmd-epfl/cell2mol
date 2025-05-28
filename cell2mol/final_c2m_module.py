@@ -104,14 +104,14 @@ def charge_assignment(newcell, refcell, debug):
     
     if dist_count != 1:
         # Attempt to balance charges again with more specific conditions
-        if newcell.error_multiple_distrib and debug:
+        if newcell.error_multiple_distrib :
             print("More than one possible distribution found.")
             second_final_charge_distribution, second_final_charges = balance_charge(
                 newcell.unique_indices,
                 refcell.unique_species,
                 aromatic=True, debug=debug,
             )    
-        elif newcell.error_empty_distrib and debug:
+        elif newcell.error_empty_distrib :
             print("No valid distribution found.")
             second_final_charge_distribution, second_final_charges = balance_charge(
                 newcell.unique_indices,
