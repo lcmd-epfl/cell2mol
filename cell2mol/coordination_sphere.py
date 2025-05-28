@@ -406,7 +406,8 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
     ## First Correction (former verify_connectivity)
     conn_idx = []
-    conn_idx_by_metal = {met: [] for met in group.metals}
+    # conn_idx_by_metal = {met.atom_site_label : [] for met in group.metals}
+    conn_idx_by_metal = {jdx : [] for jdx, met in enumerate(group.metals)}
     final_ligand_indices = []
     good_atoms = []
     removed_idx = []
@@ -451,7 +452,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
                     conn_idx.append(idx)
                     final_ligand_indices.append(atom.get_parent_index("ligand"))
                     good_atoms.append(atom)
-                    conn_idx_by_metal[met].append(idx)
+                    conn_idx_by_metal[jdx].append(idx)
                 else:
                     if debug > 0: print(f"\tCORRECT mconnec of atom {atom.label} with ligand index {ligand_idx}")
                     isremoved = True
@@ -467,9 +468,10 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
     print(f"conn_idx before set: {conn_idx=}")
     conn_idx = sorted(list(set(conn_idx)))
     split_groups = []
-    for metal, indices in conn_idx_by_metal.items():
+    for jdx, indices in conn_idx_by_metal.items():
+        metal = group.metals[jdx]
         if indices:
-            print(f"metal {metal.label} connected to {[group.atoms[i].label for i in indices]}")
+            print(f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].label for i in indices]}")
             new_group = [i for i in indices]
             split_groups.append(new_group)
     print(f"conn_idx: {conn_idx=}")
