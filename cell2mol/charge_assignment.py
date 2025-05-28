@@ -207,7 +207,9 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
         elif len(list_for_tgt_charge) > 1:
             good_states.append(list_for_tgt_charge[0])
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Case 2, more than one entry for {tgt_charge} in tmplist. Taking first")
-
+            # for tgt_charge in list_for_tgt_charge:
+            #     good_states.append(tgt_charge)
+            # if debug >= 2: print(f"    NEW SELECT FUNCTION: Case 2, more than one entry for {tgt_charge} in tmplist. Considering all")
     return good_states
 #######################################################
 def get_empty_protonation_state (specie: object, debug: int=2) -> list:
@@ -272,16 +274,21 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
     if debug >= 2: print(f"\nPOSCHARGE: doing PROTONATION for this specie {specie.formula} ({specie.subtype})")
     # Program runs sequentially for each group of the ligand
-    if debug >= 2: print(f"{ligand.groups=}")
+    if debug >= 2: print(f"   group formula {[g.formula for g in ligand.groups]=}")
 
     for g in ligand.groups:
         parent_indices = g.get_parent_indices("ligand")
         if debug > 2: print(f"{parent_indices=}")
         if debug >= 2: print(f"    GET_PROTONATION_STATES: Evaluating group {g.formula} with parent_indices {parent_indices}")
+        if debug >= 2: print(f"        GET_PROTONATION_STATES: {g.formula} with metals {[metal.atom_site_label for metal in g.metals]}")
         ########################
         # Cases with Hapticity #
         ########################
-        if g.is_haptic:
+        IA_IIA = get_alkali_alkaline_earth_metal_idxs([metal.label for metal in g.metals])
+        if len(IA_IIA) == len(g.metals):
+            for idx in parent_indices:
+                block[idx] = 1
+        elif g.is_haptic:
             Selected_Hapticity = False
             if debug >= 2: print("        GET_PROTONATION_STATES: addressing group with hapticity:", g.haptic_type)
             if debug >= 2: print("        GET_PROTONATION_STATES: and parent indices:", parent_indices)
@@ -455,13 +462,14 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         block[idx] = 1
                 # Hydrides
                 elif a.label == "H":
-                    if a.connec == 0:
+                    print(f"        GET_PROTONATION_STATES: {a.label} atom with {a.connec} connections and {a.mconnec} metal connections")
+                    if a.connec <= 1:
                         elemlist[idx] = "Cl"
                         addedlist[idx] = 1
-                    elif a.connec == 1:
-                        elemlist[idx] = "Cl"
-                        addedlist[idx] = 1
-                    elif a.connec > 1:
+                    # elif a.connec == 1:
+                    #     elemlist[idx] = "Cl"
+                    #     addedlist[idx] = 1
+                    elif (a.connec - a.mconnec) > 1:
                         block[idx] = 1
                 # Nitrogen
                 elif a.label == "N":
@@ -522,7 +530,6 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         iscarbene, tmp_element, tmp_added, tmp_metal = check_carbenes(a, ligand)
                         if debug >= 2: print(f"        GET_PROTONATION_STATES: Evaluating as carbene and {iscarbene}")
                         if iscarbene:
-                            ligand.hasNHC = True
                             # Carbene identified
                             elemlist[idx] = tmp_element
                             addedlist[idx] = tmp_added
@@ -558,12 +565,12 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         for idx, a in enumerate(ligand.atoms):
             if addedlist[idx] != 0 and block[idx] == 0:
                 mol = ligand.get_parent("molecule")
-                isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, mol.metals, elemlist[idx], unconditional=True, debug=debug)
+                for i in range(addedlist[idx]):
+                    isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, mol.metals, elemlist[idx], unconditional=True, debug=debug)
                 if isadded:
-                    print(f"        GET_PROTONATION_STATES: Added {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
+                    if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
                     added_atoms += addedlist[idx]
                     block[idx] = 1  # No more elements will be added to those atoms
-                    if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
                 else:
                     print(f"        GET_PROTONATION_STATES: Failed to add {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
                     addedlist[idx] = 0 
@@ -679,7 +686,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 if debug >= 2:  print(f"        GET_PROTONATION_STATES: Protonation SAVED with {added_atoms} atoms added to ligand. status={new_prot.status}")
             else:
                 if debug >= 2:  print(f"        GET_PROTONATION_STATES: Protonation DISCARDED. Steric Clashes found when adding atoms. status={new_prot.status}")
-    if debug >= 2: print(f"        GET_PROTONATION_STATES:{protonation_states=}")            
+    if debug > 2: print(f"        GET_PROTONATION_STATES:{protonation_states=}")            
     return protonation_states 
 #######################################################
 def move_to_front(lst, index):
@@ -793,7 +800,7 @@ def get_charge_manual(spec, debug: int=0):
 #     if mol is None:
 #         return "Invalid SMILES"
 def aromatic_info(mol: object):
-    print(f"aromatic_info: {mol=} {Chem.MolToSmiles(mol)}")
+    #print(f"aromatic_info: {mol=} {Chem.MolToSmiles(mol)}")
     aromatic_atoms = sum(1 for atom in mol.GetAtoms() if atom.GetIsAromatic())
     aromatic_rings = Chem.GetSSSR(mol)  # SSSR = smallest set of smallest rings
     return {
@@ -807,14 +814,6 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
     # The molecule is described by a protonation states that has labels, and the atomic cartesian coordinates "coords"
     # The adjacency matrix is also provided in the protonation state(adjmat)
     #:return charge_state which is an object with the necessary information for other functions to handle the result
-    
-    # allow_carbenes = False
-    # if hasattr( prot.parent, "hasNHC"):
-    #     # If the ligand has NHC, we need to set the charge to 0
-    #     # This is a workaround for the fact that NHCs are not handled well in RDKit
-    #     allow_carbenes = True
-    #     print(f"GET_CHARGE. NHC detected in {prot.parent.formula}. allowing carbenes.")
-    #     prot = get_empty_protonation_state(prot.parent, debug=debug)[0]
         
     natoms = prot.natoms
     atnums = prot.atnums
@@ -832,6 +831,11 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
     else :
         pass
 
+    rdkit_obj = mols[0]
+    if debug >= 2: print(f"GET_CHARGE. CHECK. {Chem.MolToSmiles(rdkit_obj)=}")
+    if debug >= 2:
+        if hasattr(prot, "atom_site_labels"): print(f"GET_CHARGE. {prot.atom_site_labels=}")
+
     if embed_chiral:
         is_okay = []
         for mol in mols:
@@ -842,17 +846,14 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
         else:
             if debug >=2 : print(f"GET_CHARGE. Some mols have wrong chirality")
             for mol in mols:
+                print(f"{mol=}")
                 for i in range(natoms):
                     a = mol.GetAtomWithIdx(i)
                     # if a.GetExplicitValence() != a.GetTotalValence():
-                    if debug >=2 : print(f"GET_CHARGE. {i} {a.GetSymbol()=}, {a.GetFormalCharge()=}, \
+                    if debug > 2 : print(f"GET_CHARGE. {i} {a.GetSymbol()=}, {a.GetFormalCharge()=}, \
                                          {a.GetImplicitValence()=}, {a.GetExplicitValence()=} {a.GetTotalValence()=}")
             return None
-    
 
-    rdkit_obj = mols[0]
-    if debug >= 0: print(f"GET_CHARGE. {prot.atom_site_labels=}")
-    if debug >= 0: print(f"GET_CHARGE. CHECK. {Chem.MolToSmiles(rdkit_obj)=}")
     # Gets the resulting charges
     atom_charges = []
     total_charge = 0
@@ -874,9 +875,9 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
 
     smiles = Chem.MolToSmiles(rdkit_obj)
 
-    if debug >= 0: print(f"GET_CHARGE. {smiles=}")
-    if debug >= 0: print(f"GET_CHARGE. {atom_charges=}")
-    if debug >= 0: print(f"GET_CHARGE. {total_charge=}")
+    if debug >= 2: print(f"GET_CHARGE. {smiles=}")
+    if debug >= 2: print(f"GET_CHARGE. {atom_charges=}")
+    if debug >= 2: print(f"GET_CHARGE. {total_charge=}")
     # Connectivity is checked
     iscorrect = check_rdkit_obj_connectivity(rdkit_obj, natoms, charge, debug=debug)
     
@@ -965,9 +966,7 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
         if maxcharge < 2: 
             maxcharge = 2  ## At leaest, we try range(-2,3,1)
     
-        if hasattr(spec,"hasNHC"):
-            pass
-        elif (not spec.is_nitrosyl) and prot.added_atoms > 0 :
+        if (not spec.is_nitrosyl) and prot.added_atoms > 0 :
             maxcharge = 0
     
     if debug >= 2: print(f"MAXCHARGE: maxcharge set at {maxcharge}")
@@ -1015,15 +1014,26 @@ def check_carbenes(atom: object, ligand: object, debug: int=0) -> Tuple[bool, st
     # Initial attempt with Carbenes, but they are much more complex
     # Looks for Neighbouring N atoms
     list_of_coord_atoms = []
-    for adj in atom.adjacency:
-        list_of_coord_atoms.append(ligand.get_parent("molecule").labels[adj])
-    numN = list_of_coord_atoms.count("N")
+    adj_indices = [adj for adj in atom.adjacency]  # Get the adjacency of the atom
+    metal_adj_indices = [m_adj for m_adj in atom.metal_adjacency]  # Get the adjacency of the atom with respect to the metal
 
-    if numN == 2:  # it is an N-Heterocyclic carbenes
+    for adj in adj_indices:
+        if adj in metal_adj_indices:
+            # If the atom is connected to the metal, we do not consider it
+            continue
+        list_of_coord_atoms.append(ligand.get_parent("molecule").labels[adj])
+    #numN = list_of_coord_atoms.count("N")
+    print(f"CHECK_CARBENES: {atom.label} has {list_of_coord_atoms}. Checking for carbenes")
+    # if numN == 2:  # it is an N-Heterocyclic carbenes
+    #     iscarbene = True
+    #     element = "H"
+    #     addedlist = 1
+    # el
+    if len(list_of_coord_atoms) == 2 :
         iscarbene = True
         element = "H"
-        addedlist = 1
-
+        addedlist = 2
+        metal_electrons = 2
     return iscarbene, element, addedlist, metal_electrons
 
 #######################################################
@@ -1374,20 +1384,25 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
         rdkit_atom.SetHybridization(hyb)
             
     # Creates Molecule
-    obj = rwlig.GetMol()
-    smiles = Chem.MolToSmiles(obj)
-    print("CORRECT_SMILES: ", smiles)
-
+    temp_obj = rwlig.GetMol()
+    print("CORRECT_SMILES: after removing additional elements", Chem.MolToSmiles(temp_obj))
+    
+    obj, fix_zwitterions = fix_zwitterions_in_adjacent_atoms(temp_obj, debug=debug)
+    print("CORRECT_SMILES: fixing the zwitterions", fix_zwitterions, Chem.MolToSmiles(obj))
     try:
         Chem.SanitizeMol(obj)
         Chem.DetectBondStereochemistry(obj, -1)
         Chem.AssignStereochemistry(obj, flagPossibleStereoCenters=True, force=True)
         Chem.AssignAtomChiralTagsFromStructure(obj, -1)
-        
+        smiles = Chem.MolToSmiles(obj)
         if debug >= 1: print(f"{ligand.formula=} Before correction: {ligand.smiles=} / After correction: {smiles=}")
         ligand.smiles = smiles
         ligand.rdkit_obj = obj
         
+        if fix_zwitterions:
+            corr_atom_charges = [a.GetFormalCharge() for a in Chem.RWMol(obj).GetAtoms()]
+            ligand.set_charges(atomic_charges=corr_atom_charges)
+
         ## visulize a corrected rdkit object
         # if debug >=2:
         #     from IPython.display import display
@@ -1397,12 +1412,93 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
 
         #     print(f"{ligand.formula=} {smiles=}")
         #     display(mol_with_atom_index(obj))
-        return True
+        return True, fix_zwitterions
 
     except rdkit.Chem.rdchem.AtomValenceException as e:
         print(f"Failed to process molecule: {e}")
-        return False
+        return False, fix_zwitterions
 
+###########################################################
+def fix_zwitterions_in_adjacent_atoms(mol, debug=0):
+    """
+    Fixes zwitterionic artifacts by adjusting formal charges between adjacent atoms
+    with opposite charges in an RDKit molecule object.
+
+    Parameters:
+        mol: Input molecule (RDKit).
+        debug (int): If > 0, prints debug info.
+
+    Returns:
+        Chem.Mol: Corrected molecule with minimized zwitterionic character.
+    """
+    rw_mol = Chem.RWMol(mol)
+    fix_zwitterions = False
+    for atom in rw_mol.GetAtoms():
+        fcharge = atom.GetFormalCharge()
+
+        if fcharge > 0:
+            atom_idx = atom.GetIdx()
+            atom_label = atom.GetSymbol()
+            neighbors = atom.GetNeighbors()
+            neighbor_labels = [n.GetSymbol() for n in neighbors]
+            neighbor_indices = [n.GetIdx() for n in neighbors]
+
+            if debug:
+                print(f"\nPositive atom: {atom_label} (idx={atom_idx}, charge={fcharge})")
+                print(f"\tNeighbors: {list(zip(neighbor_labels, neighbor_indices))}")
+
+            # Skip nitrosyl groups: N+ with two O neighbors
+            is_nitrosyl = (
+                atom_label == 'N' and
+                len(neighbors) == 3 and
+                neighbor_labels.count('O') == 2
+            )
+            if is_nitrosyl:
+                if debug:
+                    print(f"\tSkipping nitrosyl group.")
+                continue
+
+            for neighbor in neighbors:
+                n_fcharge = neighbor.GetFormalCharge()
+                n_label = neighbor.GetSymbol()
+                neighbor_idx = neighbor.GetIdx()
+
+                if n_fcharge < 0:
+                    fix_zwitterions = True
+                    if debug:
+                        print(f"\tFound neighbor with negative charge {n_label} (idx={neighbor_idx}, charge={n_fcharge})")
+
+                    # Calculate how much to adjust by (minimum charge that can be neutralized)
+                    diff = min(fcharge, abs(n_fcharge))
+
+                    atom.SetFormalCharge(fcharge - diff)
+                    neighbor.SetFormalCharge(n_fcharge + diff)
+
+                    if debug:
+                        print(f"\tAdjusted charges: atom {atom_idx} ({fcharge} → {atom.GetFormalCharge()}), "
+                              f"neighbor {neighbor_idx} ({n_fcharge} → {neighbor.GetFormalCharge()})")
+
+                    # Estimate radical electrons
+                    valence_electrons = elemdatabase.valenceelectrons[n_label]
+                    num_radicals = valence_electrons - neighbor.GetFormalCharge() - neighbor.GetDegree()
+                    neighbor.SetNumRadicalElectrons(num_radicals)
+
+                    if debug:
+                        print(f"\tSet radical electrons: {num_radicals} "
+                              f"(valence: {valence_electrons}, formal charge: {neighbor.GetFormalCharge()}, directly-bonded neighbors: {neighbor.GetDegree()})")
+
+                    #Adjust bond to SINGLE if possible
+                    bond = rw_mol.GetBondBetweenAtoms(atom_idx, neighbor_idx)
+                    print(f"\tBond type between atom {atom_idx} and {neighbor.GetIdx()}: {bond.GetBondType()}")
+                    if bond and bond.GetBondType() != "SINGLE":
+                        if debug:
+                            print(f"\tSet bond between {atom_idx} and {neighbor_idx} from {bond.GetBondType()} to SINGLE")
+                        bond.SetBondType(Chem.BondType.SINGLE)
+                    else:
+                        if debug:
+                            print(f"\tNo bond found between {atom_idx} and {neighbor_idx}")
+
+    return rw_mol.GetMol(), fix_zwitterions
 
 #######################################################
 def get_smiles_complex (mol: object, debug: int=0) -> Tuple[str, object]:
@@ -1522,14 +1618,15 @@ class protonation(object):
 
         self.radii = get_radii(labels)
         refcell = self.parent.get_parent("reference")
-
-        self.atom_site_labels_indices = [ atom.get_parent_index("reference") for atom in self.parent.atoms]
-        self.atom_site_labels = [refcell.atom_site_labels[idx] for idx in self.atom_site_labels_indices]
-        print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
-        print("PROTONATION.atom_site_labels", self.atom_site_labels)
+        geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+        if refcell is not None :
+            self.atom_site_labels_indices = [ atom.get_parent_index("reference") for atom in self.parent.atoms]
+            self.atom_site_labels = [refcell.atom_site_labels[idx] for idx in self.atom_site_labels_indices]
+            print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
+            print("PROTONATION.atom_site_labels", self.atom_site_labels)
         
-        if refcell.exist_cif_bond_moiety:
-            self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, refcell.geom_bond_cif)
+        if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
+            self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, geom_bond_cif)
             print("PROTONATION.get_adjmatrix_from_cif_bonds", adjmat.shape, adjnum.shape)
             count = 0 
             if len(self.addedlist) > 0:
@@ -1569,7 +1666,8 @@ class protonation(object):
             self.coords                     = list(np.array(self.coords)[mapext])
             self.atnums                     = list(np.array(self.atnums)[mapext])
             self.radii                      = list(np.array(self.radii)[mapext])
-            self.atom_site_labels           = list(np.array(self.atom_site_labels)[map])
+            if hasattr(self, "atom_site_labels"):
+                self.atom_site_labels           = list(np.array(self.atom_site_labels)[map])
             self.addedlist                  = list(np.array(self.addedlist)[map])
             self.block                      = list(np.array(self.block)[map])
             self.metal_electrons            = list(np.array(self.metal_electrons)[map])
@@ -1577,8 +1675,9 @@ class protonation(object):
     
             self.typ                        = "Reordered"
             refcell = self.parent.get_parent("reference")
-            if refcell.exist_cif_bond_moiety:
-                self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, refcell.geom_bond_cif)
+            geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
+                self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, geom_bond_cif)
                 print("PROTONATION.get_adjmatrix_from_cif_bonds", adjmat.shape, adjnum.shape)
                 count = 0 
                 if len(self.addedlist) > 0:
@@ -1603,7 +1702,8 @@ class protonation(object):
         to_print += f'------------- Cell2mol Protonation ----------------\n'
         to_print += f' Status                          = {self.status}\n'
         to_print += f' Labels                          = {self.labels}\n'
-        to_print += f' Atom site labels                = {self.atom_site_labels}\n'
+        if hasattr(self, "atom_site_labels"):
+            to_print += f' Atom site labels                = {self.atom_site_labels}\n'
         to_print += f' Type                            = {self.typ}\n'
         to_print += f' Atoms added in positions        = {self.addedlist}\n'
         to_print += f' Atoms blocked (no atoms added)  = {self.block}\n'

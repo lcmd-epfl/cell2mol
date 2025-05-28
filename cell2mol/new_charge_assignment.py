@@ -9,7 +9,7 @@ import pickle
 from rdkit import Chem
 manual_assign = ["O4-Cl", "N3", "I3", "N2", "N-O"]
 #######################################################
-def balance_charge(unique_indices: list, unique_species: list, rare: bool=False, predict: bool=False, aromatic: bool=False, debug: int=0) -> list:
+def balance_charge(unique_indices: list, unique_species: list, input_charge: int=0, rare: bool=False, predict: bool=False, aromatic: bool=False, debug: int=0) -> list:
     """Function to Select the Best Charge Distribution for the unique species.
     It accepts multiple charge options for each molecule/ligand/metal (poscharge, etc...).
     NO: It should select the best one depending on whether the final metal charge makes sense or not.
@@ -94,7 +94,7 @@ def balance_charge(unique_indices: list, unique_species: list, rare: bool=False,
             for idx, d in enumerate(alldistr):
                 if debug >= 2: print(f"BALANCE: distribution={d}")
                 charges_sum = np.sum(d)
-                if charges_sum == 0:
+                if charges_sum == input_charge:
                     final_charge_distribution.append(d)
                     final_charges.append(distr)
     elif iserror:
@@ -330,17 +330,22 @@ def prepare_mol (mol):
     mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge, smiles=tmp_smiles)
 
 ######################################################
-def create_bonds_specie (specie, debug: int=0):
+def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
     from cell2mol.classes import bond
     if debug >= 1: print(f"CREATE_bonds_specie: {specie.formula=}, {specie.subtype=} {specie.smiles=}")
     n_atoms = specie.natoms # e.g. 9 
-    n_atoms_rdkit = specie.rdkit_obj.GetNumAtoms() # e.g.10 
+    if rdkit_obj is not None:
+        rdkit_obj = rdkit_obj
+    else :
+        rdkit_obj = specie.rdkit_obj
+
+    n_atoms_rdkit = rdkit_obj.GetNumAtoms() # e.g.10 
     if debug >= 1: print(f"CREATE_bonds_specie: {specie.formula=}, {specie.subtype=}")
 
     if n_atoms == n_atoms_rdkit:
         if debug >= 2: print(f"\tNumber of atoms in {specie.subtype} object and RDKit object are equal: {n_atoms} {n_atoms_rdkit}")
 
-        for idx, rdkit_atom in enumerate(specie.rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8
+        for idx, rdkit_atom in enumerate(rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8
             if debug >= 2: print(f"\t{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
             if len(rdkit_atom.GetBonds()) == 0:
                 if debug >= 1: print(f"\tNO BONDS CREATED for {specie.atoms[idx].label} due to no bonds in {specie.subtype} RDKit object")
@@ -349,7 +354,7 @@ def create_bonds_specie (specie, debug: int=0):
                     bond_startatom = b.GetBeginAtomIdx()
                     bond_endatom   = b.GetEndAtomIdx()
                     bond_order     = b.GetBondTypeAsDouble()
-                    if specie.atoms[bond_endatom].label == "D" and specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol() == "H":
+                    if specie.atoms[bond_endatom].label == "D" and rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol() == "H":
                         if bond_endatom == idx:
                             start = bond_endatom
                             end   = bond_startatom
@@ -361,8 +366,8 @@ def create_bonds_specie (specie, debug: int=0):
                         new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
                         specie.atoms[idx].add_bond(new_bond)
 
-                    elif specie.atoms[bond_endatom].label != specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
-                        if debug >= 1: print(f"\tError with Bond EndAtom", specie.atoms[bond_endatom].label, specie.rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
+                    elif specie.atoms[bond_endatom].label != rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
+                        if debug >= 1: print(f"\tError with Bond EndAtom", specie.atoms[bond_endatom].label, rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol())
                     else:
                         if bond_endatom == idx:
                             start = bond_endatom
@@ -389,11 +394,11 @@ def create_bonds_specie (specie, debug: int=0):
     else:
         if debug >= 1: print(f"\tNumber of atoms in {specie.subtype} object and RDKit object are different: {n_atoms} {n_atoms_rdkit}")
         if debug >= 2: print(f"\t{[(i, atom.label) for i, atom in enumerate(specie.atoms)]}")
-        if debug >= 2: print(f"\t{[(i, atom.GetSymbol()) for i, atom in enumerate(specie.rdkit_obj.GetAtoms())]}")       
+        if debug >= 2: print(f"\t{[(i, atom.GetSymbol()) for i, atom in enumerate(rdkit_obj.GetAtoms())]}")       
         non_bonded_atoms = list(range(0, n_atoms_rdkit))[n_atoms:]
         if debug >= 2: print(f"\tNON_BONDED_ATOMS", non_bonded_atoms)
 
-        for idx, rdkit_atom in enumerate(specie.rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+        for idx, rdkit_atom in enumerate(rdkit_obj.GetAtoms()): # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
             if debug >= 2: print(f"\t{idx=}", rdkit_atom.GetSymbol(), "Number of bonds :", len(rdkit_atom.GetBonds()))
             if len(rdkit_atom.GetBonds()) == 0:
                 if debug >= 1: print(f"\tNO BONDS CREATED for {rdkit_atom.GetSymbol()} due to no bonds in {specie.subtype} RDKit object")
@@ -441,11 +446,11 @@ def create_metal_ligand_bonds (mol, debug: int=0):
         for lig in mol.ligands:
             for at in lig.atoms:
                 count = 0
+                index_1 = at.get_parent_index("molecule")
                 for met in mol.metals: 
-                    isconnected = at.check_connectivity(met, debug=debug)
+                    index_2 = met.get_parent_index("molecule")
+                    isconnected = mol.madjmat[index_1, index_2] ==1
                     if isconnected:
-                        index_1 = at.get_parent_index("molecule")
-                        index_2 = met.get_parent_index("molecule")
                         if index_1 < index_2 : 
                             bond_startatom = at
                             bond_endatom   = met
@@ -458,8 +463,8 @@ def create_metal_ligand_bonds (mol, debug: int=0):
                         met.add_bond(newbond)
                         count += 1 
                 if count != at.mconnec: 
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: error creating bonds for atom: \n{at}\n of ligand: \n{lig}\n")
-                    if debug >= 1: print(f"CELL.CREATE_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
+                    if debug >= 1: print(f"\tCREATE_METAL_LIGAND_BONDS: error creating bonds for atom: \n{at}\n of ligand: \n{lig}\n")
+                    if debug >= 1: print(f"\tCREATE_METAL_LIGAND_BONDS: count differs from atom.mconnec: {count}, {at.mconnec}")
 
 ######################################################
 def create_metal_metal_bonds (mol, debug: int=0):
@@ -467,15 +472,15 @@ def create_metal_metal_bonds (mol, debug: int=0):
     # Adds Metal-Metal Bonds, with a zero order:
     if mol.iscomplex or mol.has_IA_IIA:
         if len(mol.metals) > 1 :
-            if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
-            if debug >= 2: print(f"CELL.CREATE_BONDS: Metals: {mol.metals}")
+            if debug >= 1: print(f"\tCREATE_METAL_METAL_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
+            if debug >= 2: print(f"\tCREATE_METAL_METAL_BONDS: Metals: {mol.metals}")
             for idx, met1 in enumerate(mol.metals):
+                index_1 = met1.get_parent_index("molecule")
                 for jdx, met2 in enumerate(mol.metals):
                     if idx <= jdx: continue
-                    isconnected = met1.check_connectivity(met2, debug=debug)
+                    index_2 = met2.get_parent_index("molecule")
+                    isconnected = mol.madjmat[index_1, index_2] == 1
                     if isconnected:
-                        index_1 = met1.get_parent_index("molecule")
-                        index_2 = met2.get_parent_index("molecule")
                         if index_1 < index_2 : 
                             bond_startatom = met1
                             bond_endatom   = met2

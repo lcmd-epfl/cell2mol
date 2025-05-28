@@ -15,13 +15,14 @@ VERSION = "2.0"
 COV_FACTOR = 1.3
 METAL_FACTOR = 1.0
 
-def process_refcell(input_path, name, current_dir, debug=0):
+def process_refcell(input_path, name, current_dir, cif_bond_info, debug=0):
     """
     Process the reference molecules from a CIF file and generate a reference cell object.
     Args:
         input_path (str): Path to the CIF file (downloaded from CSD).
         name (str): CSD refcode.
         current_dir (str): Current working directory.
+        cif_bond_info (bool): Whether to use bond information from the CIF file.
         debug (int, optional): Debug level (default is 0).
     Returns:
         refcell (object): Reference cell object containing the reference molecules and their information.
@@ -41,23 +42,23 @@ def process_refcell(input_path, name, current_dir, debug=0):
             cell_param = structure.cell.cellpar()      
 
             # Create the reference cell
-            refcell = create_reference(input_path, name, cell_vector, cell_param, debug)
+            refcell = create_reference(input_path, name, cell_vector, cell_param, cif_bond_info, debug)
         
-            for i, ref in enumerate(refcell.refmoleclist):
-                if hasattr(ref, "totcharge_cif"):   
-                    N = 0
-                    for atom in ref.labels:
-                        N += elemdatabase.elementnr[atom]
-                    N -= ref.totcharge_cif
-                    if N % 2 == 0:
-                        spin = 1
-                    else:
-                        spin = 2
-                    writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz", ref.labels, ref.coord, charge=ref.totcharge_cif, spin=spin)
-                    print(f"Ref molecule {i} {ref.formula} total charge {ref.totcharge_cif} lowest spin multiplicity {spin}")
-                else:
-                    writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}.xyz", ref.labels, ref.coord, charge="", spin="")
-                    print(f"Ref molecule {i} {ref.formula} without charge and spin information")
+            # for i, ref in enumerate(refcell.refmoleclist):
+            #     if hasattr(ref, "totcharge_cif"):   
+            #         N = 0
+            #         for atom in ref.labels:
+            #             N += elemdatabase.elementnr[atom]
+            #         N -= ref.totcharge_cif
+            #         if N % 2 == 0:
+            #             spin = 1
+            #         else:
+            #             spin = 2
+            #         writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz", ref.labels, ref.coord, charge=ref.totcharge_cif, spin=spin)
+            #         print(f"Ref molecule {i} {ref.formula} total charge {ref.totcharge_cif} lowest spin multiplicity {spin}")
+            #     else:
+            #         writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}.xyz", ref.labels, ref.coord, charge="", spin="")
+            #         print(f"Ref molecule {i} {ref.formula} without charge and spin information")
 
             if refcell.error_case == 0:
                 get_unique_species_in_reference(refcell, debug) 
@@ -80,7 +81,7 @@ def process_refcell(input_path, name, current_dir, debug=0):
 
     return refcell
 
-def create_reference (input_path, name, cell_vector, cell_param, debug):
+def create_reference (input_path, name, cell_vector, cell_param, cif_bond_info, debug):
     """Create the reference cell object."""
     
     tini = time.time()
@@ -95,24 +96,35 @@ def create_reference (input_path, name, cell_vector, cell_param, debug):
     refcell.set_subtype("reference")
 
     # Read the CIF file and extract bond information if exists
+    # if cif_bond_info:
     geom_bond_cif, moiety_list_cif  = get_geom_bond (input_path)
-    refcell.get_cif_bond_moiety(geom_bond_cif, moiety_list_cif)
+    refcell.get_cif_bond_moiety(cif_bond_info, geom_bond_cif, moiety_list_cif)
+    # else:
+    #     refcell.get_cif_bond_moiety()
     print(f"refcell.exist_cif_bond_moiety: {refcell.exist_cif_bond_moiety}")
 
-    if refcell.exist_cif_bond_moiety:
+    if cif_bond_info:
         refcell.get_reference_molecules_from_moiety (ref_labels, ref_fracs, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR, debug=debug)
-        compare_with_CIF(input_path, refcell, debug=debug)
-        if refcell.disagree_with_cif_formula:
-            refcell.error_case = 9
-        else :
-            refcell.error_case = 0
+        if refcell.refmoleclist == []:
+            print("No reference molecules found in the CIF file.")
+            refcell.error_case = 1
+        else:
+            compare_with_CIF(input_path, refcell, debug=debug)
+            if refcell.disagree_with_cif_formula:
+                refcell.error_case = 9
+            else:
+                refcell.error_case = 0
     else:
         refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR, debug=debug)
-        compare_with_CIF(input_path, refcell, debug=debug)
-        if refcell.has_isolated_H :
+        if refcell.refmoleclist == []:
+            print("No reference molecules found in the CIF file.")
             refcell.error_case = 1
-        else : 
-            refcell.error_case = 0
+        else:        
+            compare_with_CIF(input_path, refcell, debug=debug)
+            if refcell.has_isolated_H:
+                refcell.error_case = 1
+            else : 
+                refcell.error_case = 0
 
     if refcell.error_case == 0:
         refcell.check_missing_H(debug=debug)  
