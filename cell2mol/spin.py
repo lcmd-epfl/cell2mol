@@ -76,6 +76,7 @@ def generate_feature_vector (metal: object, target_prop: str, debug: int = 0) ->
     """ Generate feature vector for a given transition metal coordination complex
     Args:
         metal (obj): metal atom object
+        target_prop (str): target property to predict, either "m_ox" for metal oxidation state or "spin" for spin multiplicity
     Returns:
         feature (np.ndarray): feature vector
     """
