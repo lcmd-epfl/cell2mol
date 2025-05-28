@@ -295,16 +295,22 @@ class specie(BaseModel):
 
     ############
     def reset_charge(self):
-        if hasattr(self, "totcharge"):
-            delattr(self, "totcharge")
-        if hasattr(self, "atomic_charges"):
-            delattr(self, "atomic")
-        if hasattr(self, "smiles"):
-            delattr(self, "smiles")
-        if hasattr(self, "rdkit_obj"):
-            delattr(self, "rdkit_obj")
-        if hasattr(self, "poscharges"):
-            delattr(self, "poscharges")
+        # if hasattr(self, "totcharge"):
+        #     delattr(self, "totcharge")
+        # if hasattr(self, "atomic_charges"):
+        #     delattr(self, "atomic")
+        # if hasattr(self, "smiles"):
+        #     delattr(self, "smiles")
+        # if hasattr(self, "rdkit_obj"):
+        #     delattr(self, "rdkit_obj")
+        # if hasattr(self, "poscharges"):
+        #     delattr(self, "poscharges")
+        self.totcharge = None
+        self.atomic_charges = None
+        self.smiles = None
+        self.rdkit_obj = None
+        self.possible_cs = None
+  
         for a in self.atoms:
             a.reset_charge()
 
@@ -643,6 +649,7 @@ class molecule(specie):
 
     smiles: str | list[str] | None = None
     smiles_with_H: list[str] | None = None
+    error_create_bonds : bool = False
 
     subtype: SubType = Field(default="molecule")
 
@@ -683,10 +690,10 @@ class molecule(specie):
         specie.reset_charge(
             self
         )  ## First uses the generic specie class function for itself and its atoms
-        if hasattr(self, "ligands"):  ## Second removes for the child classes
+        if self.ligands is not None:  ## Second removes for the child classes
             for lig in self.ligands:
                 lig.reset_charge()
-        if hasattr(self, "metals"):
+        if self.metals is not None:
             for met in self.metals:
                 met.reset_charge()
 
@@ -2075,10 +2082,8 @@ class atom(BaseModel):
 
     #######################################################
     def reset_charge(self) -> None:
-        if hasattr(self, "charge"):
-            delattr(self, "charge")
-        if hasattr(self, "poscharges"):
-            delattr(self, "charge")
+        self.charge = None
+        self.possible_cs = None
 
     #######################################################
     def set_charge(self, charge: int) -> None:
@@ -2293,7 +2298,7 @@ class atom(BaseModel):
 ###############
 #### METAL ####
 ###############
-class metal(atom, specie):
+class metal(atom):
     metals: list[object] = Field(default_factory=list)
     groups: list[object] = Field(default_factory=list)
     coord_nr: int | None = None
@@ -2704,6 +2709,7 @@ class cell(object):
         else:   
             self.exist_cif_bond_moiety = False
             self.moiety_indices = None
+        
         return self.exist_cif_bond_moiety
 
     #######################################################
