@@ -1,10 +1,17 @@
 import numpy as np
+import os
+import yaml
 from cosymlib import Geometry
 from cell2mol.other import *
 from cell2mol.connectivity import add_atom, get_adjmatrix, get_adjmatrix_from_cif_bonds
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
+#######################################################
+# global ideal_structures
+# file_path = os.path.dirname(os.path.abspath(__file__)) + '/ideal_structures_center.yaml'
+# with open(file_path, 'r') as stream:c
+#     ideal_structures = yaml.safe_load(stream)
 #######################################################
 ###     Define coordination geometry from groups    ### 
 #######################################################
@@ -399,6 +406,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
     ## First Correction (former verify_connectivity)
     conn_idx = []
+    conn_idx_by_metal = {met: [] for met in group.metals}
     final_ligand_indices = []
     good_atoms = []
     removed_idx = []
@@ -418,9 +426,11 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
             tmpcoord = [atom.coord, met.coord]            
             
             refcell = atom.get_parent("reference")
-            atom_site_labels = [atom.atom_site_label, met.atom_site_label]
-
-            if refcell.exist_cif_bond_moiety:
+            if hasattr(atom, "atom_site_label") and hasattr(met, "atom_site_label"):
+                atom_site_labels = [atom.atom_site_label, met.atom_site_label]
+            else :
+                atom_site_labels = None
+            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
                 isconnected, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, refcell.geom_bond_cif, metal_only=True)
             else:
                 isconnected, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
@@ -429,7 +439,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
                 if debug > 0 : 
                     print(f"\tAtom {atom.label} is connected to metal {met.label} (atom {ligand_idx=}) (metal group.metals index {jdx=})")
                 
-                if refcell.exist_cif_bond_moiety:
+                if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
                     isadded  = True
                     if debug > 0: print(f"\tConnectivity verified for atom {atom.label} with ligand index {ligand_idx} based on CIF bonds")
                 else:
@@ -441,6 +451,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
                     conn_idx.append(idx)
                     final_ligand_indices.append(atom.get_parent_index("ligand"))
                     good_atoms.append(atom)
+                    conn_idx_by_metal[met].append(idx)
                 else:
                     if debug > 0: print(f"\tCORRECT mconnec of atom {atom.label} with ligand index {ligand_idx}")
                     isremoved = True
@@ -452,10 +463,44 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
             else:
                 if debug > 0 : print(f"\tAtom {atom.label} is not connected to metal {met.label} (atom {ligand_idx=}) (metal group.metals index {jdx=})")
 
+    
+    print(f"conn_idx before set: {conn_idx=}")
     conn_idx = sorted(list(set(conn_idx)))
+    split_groups = []
+    for metal, indices in conn_idx_by_metal.items():
+        if indices:
+            print(f"metal {metal.label} connected to {[group.atoms[i].label for i in indices]}")
+            new_group = [i for i in indices]
+            split_groups.append(new_group)
+    print(f"conn_idx: {conn_idx=}")
+    print(f"split_groups: {split_groups=}")
+    final_group_indices = extract_final_indices(original_indices, split_groups)
+    print(f"final_group_indices: {final_group_indices=}")
+    return group, final_group_indices, final_ligand_indices
+    
+    
+    #return group, split_groups, final_ligand_indices
+    #return group, split_groups[0], final_ligand_indices
+    # return group, conn_idx, final_ligand_indices
 
-    return group, conn_idx, final_ligand_indices
+def extract_final_indices(initial_list, intermediate_list):
+    result = []
+    seen = set()
 
+    # Normalize flat list to nested list
+    if intermediate_list and isinstance(intermediate_list[0], int):
+        intermediate_list = [[i] for i in intermediate_list]
+
+    for sublist in intermediate_list:
+        group = []
+        for idx in sublist:
+            if idx not in seen:
+                group.append(initial_list[idx])
+                seen.add(idx)
+        if group:
+            result.append(group)
+
+    return result
 
 #######################################################    
 def coordination_correction_for_haptic (group: object, debug: int=0):
@@ -490,6 +535,6 @@ def coordination_correction_for_haptic (group: object, debug: int=0):
             final_ligand_indices.append(atom.get_parent_index("ligand"))
 
     conn_idx = sorted(list(set(conn_idx)))
-
+    conn_idx = [conn_idx]
     return group, conn_idx, final_ligand_indices
 #######################################################
