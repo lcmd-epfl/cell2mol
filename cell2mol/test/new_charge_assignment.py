@@ -65,7 +65,7 @@ def get_charge(charge: int, prot: object, allow: bool=True, debug: int=0):
     iscorrect = check_rdkit_obj_connectivity(mols[0], prot.natoms, charge, debug=debug)
 
     # Charge_state is initiated
-    ch_state = charge_state(iscorrect, total_charge, atom_charge, mols[0], smiles, charge, allow, prot)
+    ch_state = charge_state.from_positional(iscorrect, total_charge, atom_charge, mols[0], smiles, charge, allow, prot)
 
     return ch_state
     
