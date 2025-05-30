@@ -254,7 +254,7 @@ def set_charge_state(reference, target, mode, debug: int=0):
         elif (target.subtype == "molecule" and not target.iscomplex and not target.has_IA_IIA) :
             if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie")
             empty_list = [int(0)]*len(target.labels)
-            empty_prot = protonation(target.labels, target.coord, target.cov_factor, 
+            empty_prot = protonation.from_positional(target.labels, target.coord, target.cov_factor, 
                                     int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=target)
             cs = get_charge(final_charge, empty_prot)
 
@@ -363,7 +363,7 @@ def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
                             end   = bond_endatom         
                         # create new bond object
                         if debug >=2: print(f"\tBOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
-                        new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
+                        new_bond = bond.from_positional(specie.atoms[start], specie.atoms[end], bond_order)
                         specie.atoms[idx].add_bond(new_bond)
 
                     elif specie.atoms[bond_endatom].label != rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol():
@@ -378,7 +378,7 @@ def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
 
                         # create new bond object
                         if debug >=2: print(f"\tBOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
-                        new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
+                        new_bond = bond.from_positional(specie.atoms[start], specie.atoms[end], bond_order)
                         specie.atoms[idx].add_bond(new_bond)
                 
                 if hasattr(specie.atoms[idx], "bonds"):
@@ -420,7 +420,7 @@ def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
 
                         # create new bond object
                         if debug >=2: print(f"\tBOND CREATED", idx, start, end, bond_order, specie.atoms[start].label, specie.atoms[end].label)
-                        new_bond = bond(specie.atoms[start], specie.atoms[end], bond_order)
+                        new_bond = bond.from_positional(specie.atoms[start], specie.atoms[end], bond_order)
                         specie.atoms[idx].add_bond(new_bond)
                 
                 if idx not in non_bonded_atoms:
@@ -457,7 +457,7 @@ def create_metal_ligand_bonds (mol, debug: int=0):
                         else:
                             bond_startatom = met
                             bond_endatom   = at
-                        newbond = bond(bond_startatom, bond_endatom, 0)
+                        newbond = bond.from_positional(bond_startatom, bond_endatom, 0)
                         # Chem.BondType.DATIVE
                         at.add_bond(newbond)
                         met.add_bond(newbond)
@@ -487,7 +487,7 @@ def create_metal_metal_bonds (mol, debug: int=0):
                         else:
                             bond_startatom = met2
                             bond_endatom   = met1
-                        newbond = bond(bond_startatom, bond_endatom, 0)
+                        newbond = bond.from_positional(bond_startatom, bond_endatom, 0)
                         met1.add_bond(newbond) 
                         met2.add_bond(newbond) 
 ######################################################

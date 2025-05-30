@@ -1902,7 +1902,8 @@ class bond(BaseModel):
     # Required constructor parameters
     atom1: object
     atom2: object
-    order: int = Field(default=1, alias="bond_order")  # Using alias to match original parameter name
+    # TOFIX @choglass: Is it int? It seems that we assign floats in new_charge_assignment.py#409
+    order: float = Field(default=1, alias="bond_order")  # Using alias to match original parameter name
     
     # Computed attribute with proper default
     distance: float | None = None
@@ -1936,7 +1937,7 @@ class bond(BaseModel):
     @classmethod
     @deprecated("Use bond() with the keyword arguments instead.")
     def from_positional(
-        cls, atom1: object, atom2: object, bond_order: int = 1
+        cls, atom1: object, atom2: object, bond_order: float = 1
     ) -> "bond":
         return cls(atom1=atom1, atom2=atom2, bond_order=bond_order)
 
@@ -1963,7 +1964,7 @@ class atom(BaseModel):
     closest_metal: object | None = None
     metal_factor: float | None = None
     charge: int | None = None
-    bonds: list[object] | None = None
+    bonds: list[object] = Field(default_factory=list)
 
     version: str = Field(default="2.0", frozen=True)
     type: str = Field(default="atom", frozen=True)
@@ -2069,8 +2070,6 @@ class atom(BaseModel):
 
     #######################################################
     def add_bond(self, newbond: object, debug: int = 0):
-        if self.bonds is None:
-            self.bonds = []
         at1 = newbond.atom1
         at2 = newbond.atom2
         found = False
@@ -2745,6 +2744,13 @@ class cell(BaseModel):
     
     # Error assessment
     error_case: str | None = None
+
+    # TOFIX @choglass: See if we keep here, it's assigned in refcell.py#146
+    chemical_name: str | None = None
+    reported_metal_os: str | None = None
+    moiety_dicts: list[object] | None = None
+    # refcell.py#186
+    disagree_with_cif_formula: bool | None = None
     
     # Frozen fields
     version: str = Field(default="2.0", frozen=True)
@@ -2931,7 +2937,7 @@ class cell(BaseModel):
         ref_pos = frac2cart_fromparam(ref_fracs, self.cell_param)
 
         # Define reference cell
-        refcell = cell(
+        refcell = cell.from_positional(
             self.name, ref_labels, ref_pos, ref_fracs, self.cell_vector, self.cell_param
         )
         refcell.set_subtype("reference")
@@ -3051,7 +3057,7 @@ class cell(BaseModel):
         ref_pos = frac2cart_fromparam(ref_fracs, self.cell_param)
 
         # Define reference cell
-        refcell = cell(
+        refcell = cell.from_positional(
             self.name, ref_labels, ref_pos, ref_fracs, self.cell_vector, self.cell_param
         )
         refcell.set_subtype("reference")

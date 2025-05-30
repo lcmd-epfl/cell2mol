@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import yaml
-# from cosymlib import Geometry
+from cosymlib import Geometry
 from cell2mol.other import *
 from cell2mol.connectivity import add_atom, get_adjmatrix, get_adjmatrix_from_cif_bonds
 from cell2mol.elementdata import ElementData
@@ -83,9 +83,9 @@ def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:
     connectivity= [[1, i] for i in range(2, cn+2)]
     if debug >= 2: print(f"SHAPE_MEASURE: coordination number of metal center {cn}")
     if debug >= 2: print(f"SHAPE_MEASURE: connectivity of metal center(1) {connectivity}")
-    # geometry = Geometry(positions=positions, 
-    #                     symbols=symbols, 
-    #                     connectivity=connectivity)            
+    geometry = Geometry(positions=positions, 
+                        symbols=symbols, 
+                        connectivity=connectivity)            
     
     if cn == 0 : 
         posgeom_dev = {}
@@ -96,8 +96,7 @@ def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:
         try :
             ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)])
             for idx, rg in enumerate(ref_geom[:,0]):
-                # shp_measure = geometry.get_shape_measure(rg, central_atom=1)
-                shp_measure = 0.0
+                shp_measure = geometry.get_shape_measure(rg, central_atom=1)
                 geom = ref_geom[:,3][idx]
                 posgeom_dev[geom]=round(shp_measure, 3)      
         except:
