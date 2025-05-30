@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import numpy as np  
+from cell2mol.types import Type
 from cell2mol.elementdata import ElementData
 from cell2mol.connectivity import *
 from collections import defaultdict
@@ -8,6 +9,14 @@ import itertools
 import sys
 from cell2mol.hungarian import reorder
 from cell2mol.xyz2mol import xyz2mol, chiral_stereo_check
+from cell2mol.utils.pydantic import BaseModel
+
+# Pydantic imports for the converted classes
+from pydantic import Field, computed_field
+from typing import Any, Optional
+from typing_extensions import deprecated
+from numpy.typing import NDArray
+
 elemdatabase = ElementData()
 
 #############################
@@ -246,7 +255,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         pass  
 
     ## If specie.subtype == "ligand": 
-    ligand = specie      ## Change the variable name as it is easier to follow
+    ligand = specie      ## Change the variable name as it is easier to follow
     protonation_states = []
 
     natoms   = ligand.natoms
@@ -1026,7 +1035,7 @@ def check_carbenes(atom: object, ligand: object, debug: int=0) -> Tuple[bool, st
     print(f"CHECK_CARBENES: {atom.label} has {list_of_coord_atoms}. Checking for carbenes")
     # if numN == 2:  # it is an N-Heterocyclic carbenes
     #     iscarbene = True
-    #     element = "H"
+    #     element = "H" 
     #     addedlist = 1
     # el
     if len(list_of_coord_atoms) == 2 :
@@ -1598,53 +1607,100 @@ def reorder_protonation (prot, map, debug: int=0):
     return reordered_protonation
 
 #######################################################
-class protonation(object):
-    def __init__(self, labels, coord, cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, tmpsmiles=" ", o_s=int(0), typ="Local", parent: object=None):
-        self.labels                     = labels
-        self.coords                     = coord
-        self.natoms                     = len(labels)
-        self.formula                    = labels2formula(labels)
-        self.added_atoms                = added_atoms
-        self.addedlist                  = addedlist
-        self.block                      = block
-        self.metal_electrons            = metal_electrons 
-        self.elemlist                   = elemlist
-        self.typ                        = typ
-        self.cov_factor                 = cov_factor
-        self.o_s                         = o_s
-        self.tmpsmiles                  = tmpsmiles
-        self.atnums                     = [elemdatabase.elementnr[l] for l in labels]  # from xyz2mol
-        self.parent                     = parent
+class protonation(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+    
+    # Required constructor parameters
+    labels: list[str]
+    coords: list[list[float]]  # Note: renamed from 'coord' to match usage
+    cov_factor: float
+    added_atoms: int
+    addedlist: list[int]
+    block: list[int]
+    metal_electrons: list[int]
+    elemlist: list[str]
+    
+    # Optional constructor parameters with defaults
+    tmpsmiles: str = Field(default=" ")
+    o_s: int = Field(default=0)
+    typ: str = Field(default="Local")
+    parent: object | None = Field(default=None)
+    
+    # Computed attributes with proper defaults
+    natoms: int | None = None
+    formula: str | None = None
+    atnums: list[int] | None = None
+    radii: list[float] | None = None
+    
+    # Conditionally set attributes with None defaults (eliminates hasattr need)
+    atom_site_labels_indices: list[int] | None = None
+    atom_site_labels: list[str] | None = None
+    status: bool | None = None
+    adjmat: NDArray | None = None
+    adjnum: NDArray | None = None
+    
+    # Frozen fields
+    version: str = Field(default="2.0", frozen=True)
+    type: Type = Field(default="protonation")
 
-        self.radii = get_radii(labels)
-        refcell = self.parent.get_parent("reference")
-        geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
-        if refcell is not None :
-            self.atom_site_labels_indices = [ atom.get_parent_index("reference") for atom in self.parent.atoms]
-            self.atom_site_labels = [refcell.atom_site_labels[idx] for idx in self.atom_site_labels_indices]
-            print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
-            print("PROTONATION.atom_site_labels", self.atom_site_labels)
+    @computed_field
+    @property
+    def computed_natoms(self) -> int:
+        return len(self.labels)
+
+    @computed_field  
+    @property
+    def computed_formula(self) -> str:
+        return labels2formula(self.labels)
+
+    @computed_field
+    @property
+    def computed_atnums(self) -> list[int]:
+        return [elemdatabase.elementnr[l] for l in self.labels]
+
+    @computed_field
+    @property
+    def computed_radii(self) -> list[float]:
+        return get_radii(self.labels)
+
+    def model_post_init(self, __context: Any) -> None:
+        # Set computed values
+        self.natoms = self.computed_natoms
+        self.formula = self.computed_formula
+        self.atnums = self.computed_atnums
+        self.radii = self.computed_radii
         
-        if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
-            self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, geom_bond_cif)
-            print("PROTONATION.get_adjmatrix_from_cif_bonds", adjmat.shape, adjnum.shape)
-            count = 0 
-            if len(self.addedlist) > 0:
-                for idx, add in enumerate(self.addedlist):
-                    if add != 0:
-                        count += 1 
-                        added_idx = len(self.addedlist) -1 + count
-                        print("PROTONATION.added_idx", f"{idx=} {added_idx=}")
-                        adjmat[idx, added_idx] += 1
-                        adjmat[added_idx, idx] += 1
-                        adjnum[idx] += 1
-                        adjnum[added_idx] += 1
+        # Handle conditional attribute setting based on parent
+        if self.parent is not None:
+            refcell = self.parent.get_parent("reference")
+            geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+            
+            if refcell is not None:
+                self.atom_site_labels_indices = [atom.get_parent_index("reference") for atom in self.parent.atoms]
+                self.atom_site_labels = [refcell.atom_site_labels[idx] for idx in self.atom_site_labels_indices]
+                print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
+                print("PROTONATION.atom_site_labels", self.atom_site_labels)
+            
+            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
+                self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, geom_bond_cif)
+                print("PROTONATION.get_adjmatrix_from_cif_bonds", adjmat.shape, adjnum.shape)
+                count = 0 
+                if len(self.addedlist) > 0:
+                    for idx, add in enumerate(self.addedlist):
+                        if add != 0:
+                            count += 1 
+                            added_idx = len(self.addedlist) -1 + count
+                            print("PROTONATION.added_idx", f"{idx=} {added_idx=}")
+                            adjmat[idx, added_idx] += 1
+                            adjmat[added_idx, idx] += 1
+                            adjnum[idx] += 1
+                            adjnum[added_idx] += 1
 
-            self.adjmat = adjmat
-            self.adjnum = adjnum        
-        else:
-            self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
-   
+                self.adjmat = adjmat
+                self.adjnum = adjnum        
+            else:
+                self.status, self.adjmat, self.adjnum = get_adjmatrix(self.labels, self.coords, self.cov_factor, self.radii)
+
     def reorder(self, map, debug: int=0):
         if debug > 0: print("PROTONATION.REORDER. labels:", self.labels)
         if debug > 0: print("PROTONATION.REORDER. received map:", map)
@@ -1666,7 +1722,8 @@ class protonation(object):
             self.coords                     = list(np.array(self.coords)[mapext])
             self.atnums                     = list(np.array(self.atnums)[mapext])
             self.radii                      = list(np.array(self.radii)[mapext])
-            if hasattr(self, "atom_site_labels"):
+            # No more hasattr check needed - atom_site_labels is always defined (can be None)
+            if self.atom_site_labels is not None:
                 self.atom_site_labels           = list(np.array(self.atom_site_labels)[map])
             self.addedlist                  = list(np.array(self.addedlist)[map])
             self.block                      = list(np.array(self.block)[map])
@@ -1702,7 +1759,8 @@ class protonation(object):
         to_print += f'------------- Cell2mol Protonation ----------------\n'
         to_print += f' Status                          = {self.status}\n'
         to_print += f' Labels                          = {self.labels}\n'
-        if hasattr(self, "atom_site_labels"):
+        # No more hasattr check needed - atom_site_labels is always defined (can be None)
+        if self.atom_site_labels is not None:
             to_print += f' Atom site labels                = {self.atom_site_labels}\n'
         to_print += f' Type                            = {self.typ}\n'
         to_print += f' Atoms added in positions        = {self.addedlist}\n'
@@ -1710,31 +1768,88 @@ class protonation(object):
         to_print += f'---------------------------------------------------\n'
         return to_print
 
-
-
+    @classmethod
+    @deprecated("Use protonation() with the keyword arguments instead.")
+    def from_positional(
+        cls, 
+        labels: list[str], 
+        coord: list[list[float]], 
+        cov_factor: float, 
+        added_atoms: int, 
+        addedlist: list[int], 
+        block: list[int], 
+        metal_electrons: list[int], 
+        elemlist: list[str], 
+        tmpsmiles: str = " ", 
+        o_s: int = 0, 
+        typ: str = "Local", 
+        parent: object = None
+    ) -> "protonation":
+        return cls(
+            labels=labels,
+            coords=coord,  # Note: using coords here to match the field name
+            cov_factor=cov_factor,
+            added_atoms=added_atoms,
+            addedlist=addedlist,
+            block=block,
+            metal_electrons=metal_electrons,
+            elemlist=elemlist,
+            tmpsmiles=tmpsmiles,
+            o_s=o_s,
+            typ=typ,
+            parent=parent
+        )
 
 #######################################################
-class charge_state(object):
-    def __init__(self, status, uncorr_total_charge, uncorr_atom_charges, rdkit_obj: object, smiles: str, charge_tried: int, allow: bool, protonation: object):
-        self.status                     = status
-        self.uncorr_total_charge        = uncorr_total_charge
-        self.uncorr_atom_charges        = uncorr_atom_charges
-        self.rdkit_obj                  = rdkit_obj
-        self.smiles                     = smiles
-        self.charge_tried               = charge_tried
-        self.allow                      = allow
-        self.uncorr_abstotal, self.uncorr_abs_atcharge, self.uncorr_zwitt = eval_chargelist(uncorr_atom_charges)
-        self.protonation                = protonation
+class charge_state(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+    
+    # Required constructor parameters
+    status: bool
+    uncorr_total_charge: int
+    uncorr_atom_charges: list[int]
+    rdkit_obj: object
+    smiles: str
+    charge_tried: int
+    allow: bool
+    protonation: object  # protonation object
+    
+    # Computed attributes with proper defaults
+    uncorr_abstotal: float | None = None
+    uncorr_abs_atcharge: float | None = None
+    uncorr_zwitt: bool | None = None
+    coincide: bool | None = None
+    
+    # Copied from protonation with proper defaults
+    addedlist: list[int] | None = None
+    metal_electrons: list[int] | None = None
+    elemlist: list[str] | None = None
+    
+    # Initialized attributes with defaults
+    corr_total_charge: int = Field(default=0)
+    corr_atom_charges: list[int] = Field(default_factory=list)
+    
+    # Final computed attributes with proper defaults
+    corr_abstotal: float | None = None
+    corr_abs_atcharge: float | None = None
+    corr_zwitt: bool | None = None
+    
+    # Frozen fields
+    version: str = Field(default="2.0", frozen=True)
+    type: str = Field(default="charge_state", frozen=True)
+
+    def model_post_init(self, __context: Any) -> None:
+        # Compute initial derived values
+        self.uncorr_abstotal, self.uncorr_abs_atcharge, self.uncorr_zwitt = eval_chargelist(self.uncorr_atom_charges)
         
-        if uncorr_total_charge == charge_tried:   self.coincide = True
-        else:                                     self.coincide = False
-
-        self.addedlist                  = protonation.addedlist
-        self.metal_electrons            = protonation.metal_electrons
-        self.elemlist                   = protonation.elemlist
-        self.corr_total_charge          = int(0)
-        self.corr_atom_charges          = []
-
+        # Set coincide flag
+        self.coincide = (self.uncorr_total_charge == self.charge_tried)
+        
+        # Copy attributes from protonation
+        self.addedlist = self.protonation.addedlist
+        self.metal_electrons = self.protonation.metal_electrons
+        self.elemlist = self.protonation.elemlist
+        
         # Corrects the Charge of atoms with addedH
         count = 0 
         if len(self.addedlist) > 0:
@@ -1766,5 +1881,28 @@ class charge_state(object):
         to_print += f'---------------------------------------------------\n'
         return to_print
 
+    @classmethod
+    @deprecated("Use charge_state() with the keyword arguments instead.")
+    def from_positional(
+        cls,
+        status: bool,
+        uncorr_total_charge: int,
+        uncorr_atom_charges: list[int],
+        rdkit_obj: object,
+        smiles: str,
+        charge_tried: int,
+        allow: bool,
+        protonation: object
+    ) -> "charge_state":
+        return cls(
+            status=status,
+            uncorr_total_charge=uncorr_total_charge,
+            uncorr_atom_charges=uncorr_atom_charges,
+            rdkit_obj=rdkit_obj,
+            smiles=smiles,
+            charge_tried=charge_tried,
+            allow=allow,
+            protonation=protonation
+        )
 
 #######################################################
