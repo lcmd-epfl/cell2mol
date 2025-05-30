@@ -42,7 +42,7 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
             cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops = get_cell_parameters(structure) 
 
             # Create and process unit cell
-            newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
+            newcell = cell.from_positional(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
             newcell.set_subtype("unitcell")
             perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debug)
             refcell.save(ref_cell_fname)

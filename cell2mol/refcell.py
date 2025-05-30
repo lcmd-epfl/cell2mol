@@ -91,7 +91,7 @@ def create_reference (input_path, name, cell_vector, cell_param, cif_bond_info, 
     ref_pos = frac2cart_fromparam(ref_fracs, cell_param)
 
     # Generate the reference cell object
-    refcell = cell(name, ref_labels, ref_pos, ref_fracs, cell_vector, cell_param)
+    refcell = cell.from_positional(name, ref_labels, ref_pos, ref_fracs, cell_vector, cell_param)
     refcell.set_atom_site_labels(atom_site_labels)
     refcell.set_subtype("reference")
 
@@ -136,7 +136,7 @@ def create_reference (input_path, name, cell_vector, cell_param, cif_bond_info, 
     
     return refcell
 
-def compare_with_CIF (input_path, refcell, debug=0):
+def compare_with_CIF (input_path, refcell: cell, debug=0):
     """Extract chemical name, metal oxidation state, and moiety information from the CIF file."""
 
     chemical_name = extract_chemical_name(input_path)

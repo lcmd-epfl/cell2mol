@@ -102,7 +102,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     ref_pos = frac2cart_fromparam(ref_fracs, cell_param)
     
     # Create reference cell object
-    refcell = cell(name, ref_labels, ref_pos, ref_fracs, cell_vector, cell_param)
+    refcell = cell.from_positional(name, ref_labels, ref_pos, ref_fracs, cell_vector, cell_param)
     refcell.set_subtype("reference")
     refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=cov_factor, debug=debug)
 
@@ -123,7 +123,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
 
     ##########################################
     # Define new cell object for the unit cell
-    newcell = cell(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
+    newcell = cell.from_positional(name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param)
     newcell.set_subtype("unitcell")
     
     if refcell.error_case != 0:

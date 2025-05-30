@@ -227,7 +227,7 @@ def get_empty_protonation_state (specie: object, debug: int=2) -> list:
     empty_list = []
     for i in range(len(specie.labels)):
         empty_list.append(int(0))
-    empty_protonation = protonation(specie.labels, specie.coord, specie.cov_factor, int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=specie)
+    empty_protonation = protonation.from_positional(specie.labels, specie.coord, specie.cov_factor, int(0), empty_list, empty_list, empty_list, empty_list, typ="Empty", parent=specie)
     if debug >= 2: print("    CREATED EMPTY PROTONATION", empty_protonation)
     
     return list([empty_protonation])
@@ -592,7 +592,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     if not needs_nonlocal:
         if debug >= 2: print(f"\nPOSCHARGE: doing Local PROTONATION for this specie {specie.formula} ({specie.subtype})")
         if debug > 2: print(f"{addedlist=} {block=} {added_atoms=} {elemlist=}")
-        new_prot = protonation(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, parent=specie) 
+        new_prot = protonation.from_positional(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, parent=specie) 
         protonation_states.append(new_prot)
     else:
         if debug >= 2: print(f"\nPOSCHARGE: doing Non-local PROTONATION for this specie {specie.formula} ({specie.subtype})")
@@ -684,7 +684,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                     toallocate += 1
 
             smi = " "
-            new_prot = protonation(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, o_s, typ="Non-local", parent=specie)
+            new_prot = protonation.from_positional(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, smi, o_s, typ="Non-local", parent=specie)
             count+=1
             if new_prot.status == 1 and new_prot.added_atoms == o_s + local_added_atoms:
                 # print(f"{new_prot.added_atoms=}")
@@ -800,7 +800,7 @@ def get_charge_manual(spec, debug: int=0):
     iscorrect = True
     allow = True
     prot = spec.get_protonation_states()[0]
-    ch_state = charge_state(iscorrect, total_charge, atom_charge, mol, smiles, charge, allow, prot)
+    ch_state = charge_state.from_positional(iscorrect, total_charge, atom_charge, mol, smiles, charge, allow, prot)
     
     return ch_state
 ########################################################
@@ -891,7 +891,7 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
     iscorrect = check_rdkit_obj_connectivity(rdkit_obj, natoms, charge, debug=debug)
     
     # Charge_state is initiated
-    ch_state = charge_state(iscorrect, total_charge, atom_charges, rdkit_obj, smiles, charge, allow, prot)
+    ch_state = charge_state.from_positional(iscorrect, total_charge, atom_charges, rdkit_obj, smiles, charge, allow, prot)
 
     return ch_state
 #######################################################
@@ -1345,11 +1345,12 @@ def prepare_mols (moleclist: list, unique_indices: list, unique_species: list, f
 #######################################################
 def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
     ## Receives a ligand class object and constructs the smiles and the rdkit_obj object from scratch, using atoms and bond information
+
      
     Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
     #### Creates an empty editable molecule
     rwlig = Chem.RWMol()    
- 
+
     # Adds atoms with their formal charge 
     for jdx, atom in enumerate(ligand.atoms):        
         rdkit_atom = Chem.Atom(atom.atnum)
@@ -1360,6 +1361,11 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
     # Sets bond information and hybridization
     for jdx, atom in enumerate(ligand.atoms):
         nbonds = 0
+
+        # TOFIX @choglass: What to do if bonds are set to `None`?
+        if atom.bonds is None:
+            raise ValueError("Ligand atom bonds are not set")
+
         for b in atom.bonds:
             # if debug >=2 : print(b.atom1.label, b.atom2.label, b.order)
             ismetal_1 = elemdatabase.elementblock[b.atom1.label] == "d" or elemdatabase.elementblock[b.atom1.label] == "f"
@@ -1599,7 +1605,7 @@ def reorder_protonation (prot, map, debug: int=0):
         reordered_elemlist                   = [prot.elemlist[i] for i in map]
 
 
-    reordered_protonation = protonation(reordered_labels, reordered_coords, prot.cov_factor, prot.added_atoms,
+    reordered_protonation = protonation.from_positional(reordered_labels, reordered_coords, prot.cov_factor, prot.added_atoms,
                                         reordered_addedlist, reordered_block, reordered_metal_electrons, reordered_elemlist, 
                                         tmpsmiles=prot.tmpsmiles, o_s=prot.o_s, typ="Reordered", parent=prot.parent)
     print("CREATED REORDERED PROTONATION", reordered_protonation)

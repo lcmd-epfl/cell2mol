@@ -87,8 +87,8 @@ if __name__ == "__main__" or __name__ == "cell2mol.c2m_driver":
     writexyz(current_dir, "Cell_{}_ase.xyz".format(name), atomic_labels, cartesian_coords)
     writexyz(current_dir, "Cell_{}_cif2cell.xyz".format(name), labels, pos)
     # Initiates cell
-    # newcell = cell(name, labels, pos, cellvec, cellparam)
-    newcell = cell(name, atomic_labels, cartesian_coords, cellvec, cellparam)
+    # newcell = cell.from_positional(name, labels, pos, cellvec, cellparam)
+    newcell = cell.from_positional(name, atomic_labels, cartesian_coords, cellvec, cellparam)
     # Loads the reference molecules and checks_missing_H
     # TODO : reconstruct the unit cell without using reference molecules
     # TODO : reconstruct the unit cell using (only reconstruction of) reference molecules and Space group
