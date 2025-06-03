@@ -29,7 +29,7 @@ def assign_spin_metal (metal:object, debug: int=0) -> None:
         elif valence_elec in [1, 9]:                                       return 2
         elif valence_elec in [2, 3] and metal.get_parent("molecule").is_haptic == False :         return (valence_elec + 1)
         elif valence_elec in [4, 5, 6, 7, 8] or (valence_elec in [2, 3] and metal.get_parent("molecule").is_haptic == True) :
-            if hasattr(metal, "coord_geometry") and metal.coord_geometry != "Undefined":  
+            if metal.coord_geometry is not None and metal.coord_geometry != "Undefined":  
                 # Predict spin multiplicity of metal based on Random forest model
                 feature = generate_feature_vector (metal, target_prop="spin", debug=debug)
                 path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), "total_spin_3131.pkl")

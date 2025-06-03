@@ -42,20 +42,30 @@ def balance_charge(unique_indices: list, unique_species: list, input_charge: int
                         toadd.append(tch.corr_total_charge)
                 else:
                     aromatic_counts = []
+                    aromatic_ring = []
+
                     for cs in spec.possible_cs:
                         aromatic_dict = aromatic_info(cs.rdkit_obj)
                         aromatic_counts.append(aromatic_dict["Aromatic atoms"])
+                        aromatic_ring.append(aromatic_dict["Number of rings"])
 
-                    print(f"aromatic_counts: {aromatic_counts}")
+                    print(f"aromatic_counts: {spec.formula} {aromatic_counts}")
+                    print(f"aromatic_ring: {spec.formula} {aromatic_ring}")
 
                     if len(set(aromatic_counts)) == 1 and aromatic_counts[0] == 0:
                         for tch in spec.possible_cs:
                             toadd.append(tch.corr_total_charge)
                         pass  # all values are 0 — skip
                     else:
+                        # max_aromatic = max(aromatic_counts)
+                        # max_indices = [i for i, val in enumerate(aromatic_counts) if val == max_aromatic]
+                        # First select by max aromatic atoms
                         max_aromatic = max(aromatic_counts)
-                        max_indices = [i for i, val in enumerate(aromatic_counts) if val == max_aromatic]
+                        primary_indices = [i for i, val in enumerate(aromatic_counts) if val == max_aromatic]
 
+                        # Among those, select by max aromatic rings
+                        max_ring = max([aromatic_ring[i] for i in primary_indices])
+                        max_indices = [i for i in primary_indices if aromatic_ring[i] == max_ring]
                         if len(max_indices) == 1:
                             idx = max_indices[0]
                             cs = spec.possible_cs[idx]
@@ -112,7 +122,7 @@ def assign_charge_state_for_unique_species(unique_species, final_charge_tuple, d
 
     for specie, final_charge in zip(unique_species, final_charge_tuple):
         print(specie.unique_index, specie.formula)
-        if (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA) or (specie.subtype == "ligand"):
+        if (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA and not specie.has_post_transition_metal) or (specie.subtype == "ligand"):
             charge_list = [cs.corr_total_charge for cs in specie.possible_cs]
             idx = charge_list.index(final_charge)
             cs = specie.possible_cs[idx]
@@ -125,7 +135,7 @@ def assign_charge_state_for_unique_species(unique_species, final_charge_tuple, d
             # cs = specie.possible_cs[idx]
             specie.set_charge(final_charge) 
     for specie in unique_species:
-        if (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA) or (specie.subtype == "ligand"):
+        if (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA and not specie.has_post_transition_metal) or (specie.subtype == "ligand"):
             print(specie.formula, specie.charge_state, specie.totcharge, specie.smiles)
     return unique_species
 
@@ -228,8 +238,8 @@ def set_charge_state(reference, target, mode, debug: int=0):
         print(f"SET_CHARGE_STATE:{target.formula=} {target.totcharge=} {target.smiles=}")   
     
     elif mode == 2 : # For "unit" cell. Their charge state are not calculated
-        if (target.subtype == "ligand") or (target.subtype == "molecule" and not target.iscomplex and not target.has_IA_IIA):
-            
+        if (target.subtype == "ligand") or (target.subtype == "molecule" and not target.iscomplex and not target.has_IA_IIA and not target.has_post_transition_metal):
+
             rdkit_obj = reorder_rdkit_atoms(reference.rdkit_obj, reference.atom_site_labels, target.atom_site_labels)
             smiles = Chem.MolToSmiles(rdkit_obj)
             atom_charges = []
@@ -251,7 +261,7 @@ def set_charge_state(reference, target, mode, debug: int=0):
             # TODO  : This is temporary solution. It should be refined
             cs = get_charge_manual(target, debug=debug)
 
-        elif (target.subtype == "molecule" and not target.iscomplex and not target.has_IA_IIA) :
+        elif (target.subtype == "molecule" and not target.iscomplex and not target.has_IA_IIA and not target.has_post_transition_metal):
             if debug >=1 : print(f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie")
             empty_list = [int(0)]*len(target.labels)
             empty_prot = protonation.from_positional(target.labels, target.coord, target.cov_factor, 
@@ -314,7 +324,7 @@ def prepare_mol (mol):
     tmp_smiles = []
     
     for lig in mol.ligands: 
-        if hasattr(lig, "smiles"):
+        if lig.smiles is not None:
             print(f"prepare_mol: {lig.formula=} {lig.smiles=}")
         else:
             print(f"prepare_mol: {lig.formula=}")
@@ -381,7 +391,7 @@ def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
                         new_bond = bond.from_positional(specie.atoms[start], specie.atoms[end], bond_order)
                         specie.atoms[idx].add_bond(new_bond)
                 
-                if hasattr(specie.atoms[idx], "bonds"):
+                if specie.atoms[idx].bonds is not None:
                     if debug >=1 : 
                         print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, np.round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
                 else:
@@ -424,7 +434,7 @@ def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
                         specie.atoms[idx].add_bond(new_bond)
                 
                 if idx not in non_bonded_atoms:
-                    if hasattr(specie.atoms[idx], "bonds"):
+                    if specie.atoms[idx].bonds is not None:
                         if debug >=2: 
                             print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, np.round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
                     else:
@@ -442,7 +452,7 @@ def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
 def create_metal_ligand_bonds (mol, debug: int=0):
     # Third Part. Adds Metal-Ligand Bonds, with a zero order:
     from cell2mol.classes import bond
-    if mol.iscomplex or mol.has_IA_IIA:
+    if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
         for lig in mol.ligands:
             for at in lig.atoms:
                 count = 0
@@ -470,7 +480,7 @@ def create_metal_ligand_bonds (mol, debug: int=0):
 def create_metal_metal_bonds (mol, debug: int=0):
     from cell2mol.classes import bond
     # Adds Metal-Metal Bonds, with a zero order:
-    if mol.iscomplex or mol.has_IA_IIA:
+    if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
         if len(mol.metals) > 1 :
             if debug >= 1: print(f"\tCREATE_METAL_METAL_BONDS: Creating Metal-Metal Bonds for molecule {mol.formula}")
             if debug >= 2: print(f"\tCREATE_METAL_METAL_BONDS: Metals: {mol.metals}")
@@ -495,7 +505,7 @@ def create_metal_metal_bonds (mol, debug: int=0):
 def assign_charge_to_specie(specie, final_charge, debug: int=0):    
     """Assign the charge to a specific species based on its type."""
     if debug >= 1: print(f"ASSIGN_CHARGE_TO_SPECIE: Unique Species final charges {specie.formula=} {final_charge=}")
-    if (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA) or (specie.subtype == "ligand"):
+    if (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA and not specie.has_post_transition_metal) or (specie.subtype == "ligand"):
         idx = [cs.corr_total_charge for cs in specie.possible_cs].index(final_charge)
         cs = specie.possible_cs[idx]
         specie.charge_state = cs
@@ -511,7 +521,7 @@ def assign_charge_to_specie(specie, final_charge, debug: int=0):
 def validate_reference_molecules(self, debug):
     """Validate reference molecules by checking ligand and metal charges."""
     for idx, ref in enumerate(self.refmoleclist):
-        if ref.iscomplex or ref.has_IA_IIA:
+        if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
             if debug >= 1: print(f"VALIDATE_REFERENCE_MOLECULES: {ref.formula=}")
             self.validate_complex_ligands(ref, idx, debug)
             self.validate_complex_metals(ref, debug)

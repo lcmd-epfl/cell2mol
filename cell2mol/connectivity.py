@@ -209,6 +209,14 @@ def get_non_transition_metal_idxs(labels: list, debug: int=0):
             non_transition_metal_indices.append(idx)
     return non_transition_metal_indices
 
+#################################
+def get_post_transition_metal_idxs(labels: list, debug: int=0):
+    """ Post-Transition Metals """
+    post_transition_metal_indices = []
+    for idx, l in enumerate(labels):
+        if l in ["Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"]: # Post-Transition Metals
+            post_transition_metal_indices.append(idx)
+    return post_transition_metal_indices
 
 ################################
 def get_metal_species(labels: list):
@@ -282,6 +290,9 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
     madjmat = np.zeros((natoms, natoms))
     madjnum = np.zeros((natoms))
 
+    metal_idxs = get_metal_idxs(labels)
+    alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
+
     add_factor = 0.45
     #add_factor = 0.3
     # Sometimes argument radii np.ndarry, or list
@@ -325,6 +336,10 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
                     elif len(get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])) > 0:
                         madjmat[i, j] = 1
                         madjmat[j, i] = 1    
+                    if len(metal_idxs)== 0 and len(alkali_alkaline_earth_metal_idxs) == 0:
+                        if len(get_post_transition_metal_idxs([labels[i], labels[j]])) > 0:
+                            madjmat[i, j] = 1
+                            madjmat[j, i] = 1
 
     # Corrects valence violations
     isgood_valence, adjmat, madjmat = correct_valence_violation(adjmat, madjmat, labels, pos, radii)
@@ -346,6 +361,63 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
 
 ####################################
 def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: list):
+    from cell2mol.xyz2mol import atomic_valence
+    natoms = len(labels)
+    isgood = True
+    #Checks if the valence of the atoms is correct
+    metal_idxs = get_metal_idxs(labels)
+    non_transition_metal_idxs = get_non_transition_metal_idxs(labels)
+    post_transition_metal_idxs = get_post_transition_metal_idxs(labels)
+    alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
+    allowed = set(metal_idxs) | set(post_transition_metal_idxs) | set(alkali_alkaline_earth_metal_idxs)  
+
+    for i in range(0, natoms):
+        indices = np.where(adjmat[i, :] != 0)[0]
+        num_in_allowed = len(set(indices) & allowed)
+        if num_in_allowed == len(indices):
+            continue # all connected atoms are metals
+        a = np.array(pos[i])
+        valence = np.sum(adjmat[i, :])
+        atomicNum = elemdatabase.elementnr[labels[i]]
+        if atomic_valence[atomicNum] == []:
+            max_valence = 0
+        else:
+            max_valence = max(atomic_valence[atomicNum]) 
+        if valence - num_in_allowed > max_valence:
+            print("Adjacency Matrix: Atom", i, labels[i], "has", valence, "valence bigger than allowed max valence", max_valence , "with metal bonding",  num_in_allowed, "in allowed total valence", valence)    
+            # if (i in alkali_alkaline_earth_metal_idxs or 
+            #     i in post_transition_metal_idxs or 
+            #     i in non_transition_metal_idxs):
+            if i in alkali_alkaline_earth_metal_idxs or i in post_transition_metal_idxs:
+                for j in indices:
+                    b = np.array(pos[j])
+                    dist = np.linalg.norm(a - b)
+                    margin = dist - (radii[i] + radii[j])
+                    print("Adjacency Matrix: Atom", i, labels[i], "is connected to", j, labels[j], "distance", round(dist, 3), "bond margin", round(margin, 3))                       
+            else:
+                connections = []                        
+                for j in indices:
+                    b = np.array(pos[j])
+                    dist = np.linalg.norm(a - b)
+                    margin = dist - (radii[i] + radii[j])
+                    connections.append((j, margin))
+                    print("Adjacency Matrix: Atom", i, labels[i], "is connected to", j, labels[j], "distance", round(dist, 3), "bond margin", round(margin, 3))
+                sorted_connections = sorted(connections, key=lambda x: x[1], reverse=True)
+                num_to_remove = len(connections) - max_valence - num_in_allowed
+                for idx in range(num_to_remove):
+                    j, rem = sorted_connections[idx]
+                    if rem > 0.2: # Only remove bonds with a significant margin
+                        adjmat[i, j] = 0
+                        adjmat[j, i] = 0
+                        madjmat[i, j] = 0
+                        madjmat[j, i] = 0
+                        print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+                    else:
+                        print(f"Adjacency Matrix: Not removing bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+    return isgood, adjmat, madjmat
+
+####################################
+def correct_valence_violation_v1(adjmat, madjmat, labels: list, pos: list, radii: list):
 
     from cell2mol.xyz2mol import atomic_valence
     natoms = len(labels)
@@ -353,10 +425,14 @@ def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: l
     #Checks if the valence of the atoms is correct
     metal_idxs = get_metal_idxs(labels)
     non_transition_metal_idxs = get_non_transition_metal_idxs(labels)
+    post_transition_metal_idxs = get_post_transition_metal_idxs(labels)
     alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
-    allowed = set(metal_idxs) | set(non_transition_metal_idxs) | set(alkali_alkaline_earth_metal_idxs)
+    allowed = set(metal_idxs) | set(post_transition_metal_idxs) | set(alkali_alkaline_earth_metal_idxs)
+    
     for i in range(0, natoms):
         indices = np.where(adjmat[i, :] != 0)[0]
+        num_in_allowed = len(set(indices) & allowed)
+
         a = np.array(pos[i])
         if set(indices).issubset(allowed):
             pass
@@ -367,9 +443,12 @@ def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: l
                 max_valence = 0
             else:
                 max_valence = max(atomic_valence[atomicNum])    
+            num_in_allowed = sum(1 for j in indices if j in allowed)
             
-            if valence > max_valence:
-                print("Adjacency Matrix: Atom", i, labels[i], "has", valence, "valence bigger than allowed max valence", max_valence)
+            if valence - num_in_allowed > max_valence:
+                print(num_in_allowed)
+            #if valence > max_valence:
+                print("Adjacency Matrix: Atom", i, labels[i], "has", valence, "valence bigger than allowed max valence", max_valence)                
                 if i in non_transition_metal_idxs:
                     for j in indices:
                         if j in metal_idxs or j in alkali_alkaline_earth_metal_idxs:
@@ -387,7 +466,24 @@ def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: l
                     if new_valence > max_valence:
                         print("Adjacency Matrix: Atom", i, labels[i], "still has", new_valence, "valence bigger than allowed max valence", max_valence)
                         print("Adjacency Matrix: Atom", i, labels[i], "is a non-transition metal with valence bigger than allowed max valence", max_valence, "and is connected to", newindices, [labels[j] for j in newindices])
-                        isgood = False
+                        #isgood = False
+                        connections = []                        
+                        for j in indices:
+                            b = np.array(pos[j])
+                            dist = np.linalg.norm(a - b)
+                            margin = dist - (radii[i] + radii[j])
+                            connections.append((j, margin))
+                            print("Adjacency Matrix: Atom", i, labels[i], "is connected to", j, labels[j], "distance", round(dist, 3), "bond margin", round(margin, 3))
+                        sorted_connections = sorted(connections, key=lambda x: x[1], reverse=True)
+                        num_to_remove = len(connections) - max_valence
+                        for idx in range(num_to_remove):
+                            j, rem = sorted_connections[idx]
+                            adjmat[i, j] = 0
+                            adjmat[j, i] = 0
+                            madjmat[i, j] = 0
+                            madjmat[j, i] = 0
+                            print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+
                     else:
                         print("Adjacency Matrix: Atom", i, labels[i], "is a non-transition metal with valence bigger than allowed max valence", max_valence, \
                               "and is now connected to", newindices, new_valence, [labels[j] for j in newindices], "after removing bonds to metals")

@@ -20,6 +20,7 @@ from cell2mol.connectivity import (
     get_radii,
     split_group,
     get_alkali_alkaline_earth_metal_idxs,
+    get_post_transition_metal_idxs,
 )
 from cell2mol.connectivity import (
     compare_atoms,
@@ -153,6 +154,16 @@ class specie(BaseModel):
             or (elemdatabase.elementgroup[label] == 2)
             for label in self.labels
         )
+    
+    @computed_field
+    @property
+    def has_post_transition_metal(self) -> bool:
+        post_transition_metals = {"Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"}
+        return (
+            not self.iscomplex 
+            and not self.has_IA_IIA 
+            and any(label in post_transition_metals for label in self.labels)
+        )
 
     @computed_field
     @property
@@ -196,7 +207,7 @@ class specie(BaseModel):
             self.parents_indices.append(indices)
 
         # 2nd-evaluates parents of parent
-        if hasattr(parent, "parents"):
+        if hasattr(parent,"parents"):
             for jdx, p2 in enumerate(parent.parents):
                 append = True
                 for idx, p in enumerate(self.parents):
@@ -240,7 +251,7 @@ class specie(BaseModel):
         from cell2mol.other import compute_centroid
 
         self.centroid = compute_centroid(np.array(self.coord))
-        if hasattr(self, "frac_coord"):
+        if self.frac_coord is not None:
             self.frac_centroid = compute_centroid(np.array(self.frac_coord))
             # If fractional coordinates exists, then also computes their centroid
         return self.centroid
@@ -290,16 +301,6 @@ class specie(BaseModel):
 
     ############
     def reset_charge(self):
-        # if hasattr(self, "totcharge"):
-        #     delattr(self, "totcharge")
-        # if hasattr(self, "atomic_charges"):
-        #     delattr(self, "atomic")
-        # if hasattr(self, "smiles"):
-        #     delattr(self, "smiles")
-        # if hasattr(self, "rdkit_obj"):
-        #     delattr(self, "rdkit_obj")
-        # if hasattr(self, "poscharges"):
-        #     delattr(self, "poscharges")
         self.totcharge = None
         self.atomic_charges = None
         self.smiles = None
@@ -356,6 +357,10 @@ class specie(BaseModel):
         ## If not, that is, if the atom objects must be created from scratch....
         else:
             self.atoms = []
+            
+            metal_idxs = get_metal_idxs(self.labels)
+            alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(self.labels)
+
             for idx, l in enumerate(self.labels):
                 if debug >= 2:
                     print(f"SPECIE.SET_ATOMS: creating atom for label {l}")
@@ -368,6 +373,10 @@ class specie(BaseModel):
                 # if len(get_non_transition_metal_idxs([l])) > 0: ismetal = True
                 if len(get_alkali_alkaline_earth_metal_idxs([l])) > 0:
                     ismetal = True
+                if len(metal_idxs)== 0 and len(alkali_alkaline_earth_metal_idxs) == 0:
+                    if len(get_post_transition_metal_idxs([l])) > 0:
+                        ismetal = True
+
                 if ismetal:
                     if debug >= 2:
                         print(f"SPECIE.SET_ATOMS: {l}")
@@ -455,7 +464,7 @@ class specie(BaseModel):
     ############
     def get_adjmatrix(self, geom_bond_cif: list=None, debug: int=0):
         refcell = self.get_parent("reference")
-        if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False) and geom_bond_cif is not None and hasattr(self, "atom_site_labels"):
+        if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False) and geom_bond_cif is not None and self.atom_site_labels is not None:
 
             print("SPECIE.GET_ADJMATRIX: Based on bond information from CIF")
             isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds(
@@ -482,7 +491,7 @@ class specie(BaseModel):
     ############
     def get_metal_adjmatrix(self, geom_bond_cif: list=None, debug: int=0):
         refcell = self.get_parent("reference")
-        if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False) and geom_bond_cif is not None and hasattr(self, "atom_site_labels"):
+        if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False) and geom_bond_cif is not None and self.atom_site_labels is not None:
             print("SPECIE.GET_METAL_ADJMATRIX: Based on bond information from CIF")
             isgood, madjmat, madjnum = get_adjmatrix_from_cif_bonds(
                 self.labels,
@@ -598,29 +607,33 @@ class specie(BaseModel):
         return self
 
     ############
+    def __str__(self):
+        # This will make print(object) behave like before
+        return self.__repr__()
+
     def __repr__(self, indirect: bool = False):
         to_print = ""
         if not indirect:
             to_print += f"------------- Cell2mol SPECIE Object --------------\n"
         to_print += f" Version                      = {self.version}\n"
         to_print += f" Type                         = {self.type}\n"
-        if hasattr(self, "subtype"):
+        if self.subtype is not None:
             to_print += f" Sub-Type                     = {self.subtype}\n"
         to_print += f" Number of Atoms              = {self.natoms}\n"
         to_print += f" Formula                      = {self.formula}\n"
         to_print += f" Covalent Radii Factor        = {self.cov_factor}\n"
         to_print += f" Metal Radii Factor           = {self.metal_factor}\n"
-        if hasattr(self, "adjmat"):
+        if self.adjmat is not None:
             to_print += f" Has Adjacency Matrix         = YES\n"
         else:
             to_print += f" Has Adjacency Matrix         = NO \n"
-        if hasattr(self, "totcharge"):
+        if self.totcharge is not None:
             to_print += f" Total Charge                 = {self.totcharge}\n"
-        if hasattr(self, "spin"):
+        if self.subtype == "molecule" and self.spin is not None:
             to_print += f" Spin                         = {self.spin}\n"
-        if hasattr(self, "smiles"):
+        if self.smiles is not None:
             to_print += f" Smiles                       = {self.smiles}\n"
-        if hasattr(self, "origin"):
+        if self.origin is not None:
             to_print += f" Origin                       = {self.origin}\n"
         if not indirect:
             to_print += "---------------------------------------------------\n"
@@ -642,6 +655,9 @@ class molecule(specie):
     spin: Spin | None = None
     ref_indices: list[int] | None = None
     cell_indices: list[int] | None = None
+    
+    unique_index: int | None = None
+    totcharge_cif : int | None = None
 
     smiles: str | list[str] | None = None
     smiles_with_H: list[str] | None = None
@@ -660,10 +676,10 @@ class molecule(specie):
         to_print = ""
         to_print += f"------------- Cell2mol MOLECULE Object --------------\n"
         to_print += specie.__repr__(self, indirect=True)
-        if hasattr(self, "ligands"):
+        if self.ligands is not None:
             if self.ligands is not None:
                 to_print += f" Number of Ligands            = {len(self.ligands)}\n"
-        if hasattr(self, "metals"):
+        if self.metals is not None:
             if self.metals is not None:
                 to_print += f" Number of Metals             = {len(self.metals)}\n"
         to_print += "---------------------------------------------------\n"
@@ -693,6 +709,159 @@ class molecule(specie):
             for met in self.metals:
                 met.reset_charge()
 
+    ############
+    def split_post_transition_metal(self, debug: int = 0):
+        if self.atoms is None:
+            self.set_atoms()
+        if not self.has_post_transition_metal:
+            self.ligands = None
+            self.metals = None
+        else:
+            refcell = self.get_parent("reference")
+            geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+
+            post_transition_metal_indices = []
+            for idx, l in enumerate(self.labels):
+                if l in ["Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"]:
+                    post_transition_metal_indices.append(idx)
+
+            self.ligands = []
+            self.metals = []
+
+            # Identify Metals and the rest
+
+            if len(post_transition_metal_indices) > 0:
+                print(
+                    f"MOLECULE.SPLIT_POST_TRANSITION_METAL: Post-transition metals in the molecule {self.formula}"
+                )
+                print(
+                    f"MOLECULE.SPLIT_POST_TRANSITION_METAL: {[self.labels[idx] for idx in post_transition_metal_indices]}"
+                )
+
+            rest_idx = list(
+                idx for idx in self.indices if idx not in post_transition_metal_indices
+            )
+            if debug > 0:
+                print(f"MOLECULE.SPLIT_POST_TRANSITION_METAL: labels={self.labels}")
+            if debug > 0:
+                print(f"MOLECULE.SPLIT_POST_TRANSITION_METAL: metal_idx={post_transition_metal_indices}")
+            if debug > 0:
+                print(f"MOLECULE.SPLIT_POST_TRANSITION_METAL: rest_idx={rest_idx}")
+
+            # Split the "rest" to obtain the ligands
+            rest_labels = extract_from_list(rest_idx, self.labels, dimension=1)
+            rest_coord = extract_from_list(rest_idx, self.coord, dimension=1)
+            if self.frac_coord is not None:
+                rest_frac = extract_from_list(rest_idx, self.frac_coord, dimension=1)
+            rest_indices = extract_from_list(rest_idx, self.indices, dimension=1)
+
+            rest_radii = extract_from_list(rest_idx, self.radii, dimension=1)
+            rest_atoms = extract_from_list(rest_idx, self.atoms, dimension=1)
+            if self.atom_site_labels is not None:
+                rest_atom_site_labels = extract_from_list(
+                    rest_idx, self.atom_site_labels, dimension=1
+                )
+
+            if debug >= 2:
+                print(f"MOLECULE.SPLIT_POST_TRANSITION_METAL: rest labels: {rest_labels}")
+                print(f"MOLECULE.SPLIT_POST_TRANSITION_METAL: rest indices: {rest_indices}")
+                print(f"MOLECULE.SPLIT_POST_TRANSITION_METAL: rest radii: {rest_radii}")
+
+            if debug > 0:
+                print(
+                    f"MOLECULE.SPLIT_POST_TRANSITION_METAL: splitting species with {len(rest_labels)} atoms in block"
+                )
+            if len(rest_labels) == 0:
+
+                if debug > 0:
+                    print(
+                        f"MOLECULE.SPLIT_POST_TRANSITION_METAL: No ligands found in the complex {self.formula}"
+                    )
+                if debug > 0:
+                    print(
+                        f"MOLECULE.SPLIT_POST_TRANSITION_METAL: Returning empty ligand list {self.ligands=}"
+                    )
+                for m in post_transition_metal_indices:
+                    self.metals.append(self.atoms[m])
+            else:
+                if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
+                    blocklist = split_species(
+                        rest_labels,
+                        rest_coord,
+                        radii=rest_radii,
+                        atom_site_labels=rest_atom_site_labels,
+                        geom_bond_cif=refcell.geom_bond_cif,
+                        cov_factor=self.cov_factor,
+                        debug=debug,
+                    )
+                else:
+                    blocklist = split_species(
+                        rest_labels, rest_coord, radii=rest_radii, debug=debug
+                    )
+
+                # if debug > 0:
+                print(f"MOLECULE.SPLIT_POST_TRANSITION_METAL: received {len(blocklist)} blocks {blocklist=}")
+
+                ## Arranges Ligands
+                for b in blocklist:
+                    if debug > 0:
+                        print(f"PREPARING BLOCK: {b}")
+                    lig_indices = extract_from_list(b, rest_indices, dimension=1)
+                    lig_labels = extract_from_list(b, rest_labels, dimension=1)
+                    lig_coord = extract_from_list(b, rest_coord, dimension=1)
+                    if self.frac_coord is not None:
+                        lig_frac_coord = extract_from_list(b, rest_frac, dimension=1)
+
+                    lig_radii = extract_from_list(b, rest_radii, dimension=1)
+                    lig_atoms = extract_from_list(b, rest_atoms, dimension=1)
+                    if self.atom_site_labels is not None:
+                        lig_atom_site_labels = extract_from_list(
+                            b, rest_atom_site_labels, dimension=1
+                        )
+
+
+                    if debug > 0:
+                        print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
+
+                    if self.frac_coord is not None:
+                        newligand = ligand.from_positional(
+                            lig_labels, lig_coord, lig_frac_coord, radii=lig_radii
+                        )
+                    else:
+                        newligand = ligand.from_positional(
+                            lig_labels, lig_coord, radii=lig_radii
+                        )
+
+                    newligand.origin = "split_post_transition_metal"
+                    newligand.add_parent(self, indices=lig_indices)
+
+                    if self.check_parent("unitcell"):
+                        cell_indices = [
+                            a.get_parent_index("unitcell") for a in lig_atoms
+                        ]
+                        newligand.add_parent(
+                            self.get_parent("unitcell"), indices=cell_indices
+                        )
+
+                    if self.check_parent("reference"):
+                        ref_indices = [a.get_parent_index("reference") for a in lig_atoms]
+                        newligand.add_parent(self.get_parent("reference"), indices=ref_indices)
+
+
+                    newligand.set_adjacency_parameters(self.cov_factor, self.metal_factor)
+                    
+                    newligand.set_atoms(atomlist=lig_atoms, 
+                                        atom_site_labels=lig_atom_site_labels, 
+                                        geom_bond_cif=geom_bond_cif)
+
+                    newligand.inherit_adjmatrix("molecule")
+                    self.ligands.append(newligand)
+
+                ## Arranges Metals
+                for m in post_transition_metal_indices:
+                    self.metals.append(self.atoms[m])
+
+            return self.ligands, self.metals
     ############
     def split_IA_IIA(self, debug: int = 0):
         if self.atoms is None:
@@ -850,7 +1019,6 @@ class molecule(specie):
                     self.metals.append(self.atoms[m])
 
             return self.ligands, self.metals
-
     ############
     def split_complex(self, debug: int = 0):
         if self.atoms is None:
@@ -861,7 +1029,6 @@ class molecule(specie):
         else:
             refcell = self.get_parent("reference")
             geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
-
 
             self.ligands = []
             self.metals = []
@@ -1070,7 +1237,7 @@ class molecule(specie):
         specs_found = -1
 
         # Case 1: simple molecule (not complex, not IA/IIA)
-        if not self.iscomplex and not self.has_IA_IIA:
+        if not self.iscomplex and not self.has_IA_IIA and not self.has_post_transition_metal:
             found = False
             for ldx, typ in enumerate(typelist_mols):
                 issame = compare_species(self, typ[0], debug=0)
@@ -1092,19 +1259,21 @@ class molecule(specie):
 
         else:
             # Ensure ligands and metals are available
-            if not hasattr(self, "ligands"):
+            if not self.ligands is not None:
                 if self.iscomplex:
                     self.split_complex(debug=debug)
                 elif self.has_IA_IIA:
                     self.split_IA_IIA(debug=debug)
+                elif self.has_post_transition_metal:
+                    self.split_post_transition_metal(debug=debug)
 
             # Case 2: ligands
             for jdx, lig in enumerate(self.ligands):
                 found = False
                 for ldx, typ in enumerate(typelist_ligs):
-                    if not hasattr(lig, "is_nitrosyl"):
+                    if not lig.is_nitrosyl is not None:
                         lig.evaluate_as_nitrosyl()
-                    if not hasattr(typ[0], "is_nitrosyl"):
+                    if not typ[0].is_nitrosyl is not None:
                         typ[0].evaluate_as_nitrosyl()
 
                     if lig.is_nitrosyl and typ[0].is_nitrosyl:
@@ -1156,13 +1325,13 @@ class molecule(specie):
         return self.unique_species
     #######################################################
     def get_selected_cs(self, debug: int=0):
-        if not hasattr(self, "unique_species"): self.get_unique_species(debug=debug)  
+        if not self.unique_species is not None: self.get_unique_species(debug=debug)  
 
         self.selected_cs = []
         for unique_specie in self.unique_species:
             if debug >= 0 : print("Get possible charge states for unique specie", unique_specie.formula)
             tmp = unique_specie.get_possible_cs(debug=debug)
-            if tmp is None: 
+            if len(tmp) == 0: 
                 self.selected_cs.append(None)
             elif unique_specie.subtype != "metal":
                 self.selected_cs.append(list([cs.corr_total_charge for cs in unique_specie.possible_cs]))
@@ -1172,7 +1341,7 @@ class molecule(specie):
         for specie in self.species_list:
             print("Get possible charge states for species list", specie.formula)
             tmp = specie.get_possible_cs(debug=debug)
-            if tmp is None: 
+            if len(tmp) == 0: 
                 self.selected_cs.append(None)
             elif specie.subtype != "metal":
                 self.selected_cs.append(list([cs.corr_total_charge for cs in specie.possible_cs]))
@@ -1185,8 +1354,8 @@ class molecule(specie):
             self.error_get_poscharges = False
     #######################################################
     def balance_charges_for_molecules(self, input_charge: int=None, debug: int=0):
-        if not hasattr(self, "unique_species"): self.get_unique_species()
-        if not hasattr(self, "selected_cs"): self.get_selected_cs()
+        if not self.unique_species is not None: self.get_unique_species()
+        if not self.selected_cs is not None: self.get_selected_cs()
         
         if None in self.selected_cs:
             self.error_get_poscharges = True
@@ -1252,7 +1421,7 @@ class molecule(specie):
         print(f"ASSIGN_CHARGES_FOR_MOLECULE {self.formula}") 
         
         for specie in self.unique_species:
-            if self.iscomplex or self.has_IA_IIA:
+            if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
                 for jdx, lig in enumerate(self.ligands):
                     print(lig.unique_index)
                     print(specie.unique_index)
@@ -1264,7 +1433,7 @@ class molecule(specie):
             else:
                 if self.unique_index == specie.unique_index:
                     set_charge_state (specie, self, mode=1, debug=debug)
-        if self.iscomplex or self.has_IA_IIA: 
+        if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal: 
             prepare_mol(self)         
             print("Complex", self.formula, self.totcharge)
             for jdx, lig in enumerate(self.ligands):
@@ -1276,7 +1445,7 @@ class molecule(specie):
     #################   
     def create_bonds (self, debug: int=0):
 
-        if not self.iscomplex and not self.has_IA_IIA: 
+        if not self.iscomplex and not self.has_IA_IIA and not self.has_post_transition_metal: 
             result = create_bonds_specie(self, debug=debug)          ### Creates bonds between molecule.atoms using the molecule.rdkit_object
             if result == False:
                 if debug >= 1: print(f"MOLECULE.CREATE_BONDS: error creating bonds for molecule {self.formula}")
@@ -1286,7 +1455,7 @@ class molecule(specie):
                 if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Bonds created for molecule {self.formula}")
 
         # Second part
-        if self.iscomplex or self.has_IA_IIA:
+        if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
             for lig in self.ligands:
                 result = create_bonds_specie(lig, debug=debug)      ### Creates bonds between ligand.atoms, which also belong to molecule.atoms, using the ligand.rdkit_object
                 if result == False:
@@ -1297,7 +1466,7 @@ class molecule(specie):
                 else :
                     if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Bonds created for molecule {lig.formula}")
         
-        if self.iscomplex or self.has_IA_IIA:    
+        if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:    
             self.smiles_with_H = [lig.smiles for lig in self.ligands]
             self.smiles = []
             fix_zwitterions_ligands = []
@@ -1331,7 +1500,7 @@ class molecule(specie):
                     self.smiles.append(lig.smiles)
 
         # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
-        if self.iscomplex or self.has_IA_IIA:
+        if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
             create_metal_ligand_bonds(self, debug=debug)
             create_metal_metal_bonds(self, debug=debug)
 
@@ -1368,7 +1537,7 @@ class ligand(specie):
         to_print = ""
         to_print += f"------------- Cell2mol LIGAND Object --------------\n"
         to_print += specie.__repr__(self, indirect=True)
-        if hasattr(self, "groups"):
+        if self.groups is not None:
             to_print += f" Number of Groups             = {len(self.groups)}\n"
         to_print += "---------------------------------------------------\n"
         return to_print
@@ -1379,7 +1548,6 @@ class ligand(specie):
         refcell = self.get_parent("reference")
         geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
         mol = self.get_parent("molecule")
-
 
         if refcell.exist_cif_bond_moiety:
             for met in mol.metals:
@@ -1699,13 +1867,17 @@ class group(specie):
         cls, labels: list, coord: list, frac_coord: list = None, radii: list = None
     ) -> None:
         return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
-
+    
+    #######################################################
+    def __str__(self):
+        # This will make print(object) behave like before
+        return self.__repr__()
     #######################################################
     def __repr__(self):
         to_print = ""
         to_print += f"------------- Cell2mol GROUP Object --------------\n"
         to_print += specie.__repr__(self, indirect=True)
-        if hasattr(self, "metals"):
+        if self.metals is not None:
             to_print += f" Number of Metals             = {len(self.metals)}\n"
         to_print += "---------------------------------------------------\n"
         return to_print
@@ -1739,17 +1911,17 @@ class group(specie):
         if debug > 0:
             print(self)
         if self.natoms > 0:
-            if hasattr(self, "closest_metal"):
+            if self.closest_metal is not None:
                 self.get_closest_metal()
-            if hasattr(self, "is_haptic"):
+            if self.is_haptic is not None:
                 self.get_hapticity()
-            if hasattr(self, "centroid"):
+            if self.centroid is not None:
                 self.get_centroid()
-            if hasattr(self, "frac_coord"):
+            if self.frac_coord is not None:
                 self.frac_coord.pop(index)
-            if hasattr(self, "adjmat"):
+            if self.adjmat is not None:
                 self.get_adjmatrix()
-            if hasattr(self, "madjmat"):
+            if self.madjmat is not None:
                 self.get_metal_adjmatrix()
 
     #######################################################
@@ -1903,6 +2075,7 @@ class bond(BaseModel):
     atom1: object
     atom2: object
     # TOFIX @choglass: Is it int? It seems that we assign floats in new_charge_assignment.py#409
+    # THIS IS A FLOAT, NOT AN INT
     order: float = Field(default=1, alias="bond_order")  # Using alias to match original parameter name
     
     # Computed attribute with proper default
@@ -1918,6 +2091,10 @@ class bond(BaseModel):
             np.linalg.norm(np.array(self.atom1.coord) - np.array(self.atom2.coord)), 3
         )
 
+    def __str__(self):
+        # This will make print(object) behave like before
+        return self.__repr__()
+    
     def __repr__(self):
         to_print = ""
         to_print += f"------------- Cell2mol BOND Object --------------\n"
@@ -1968,6 +2145,8 @@ class atom(BaseModel):
 
     version: str = Field(default="2.0", frozen=True)
     type: str = Field(default="atom", frozen=True)
+    # Originally atom does not have a subtype, but we add it for consistency with other classes
+    subtype: str = Field(default="atom")
 
     @computed_field
     @property
@@ -2153,13 +2332,17 @@ class atom(BaseModel):
         self.atom_site_label = atom_site_label
 
     #######################################################
+    def __str__(self):
+        # This will make print(object) behave like before
+        return self.__repr__()
+    #######################################################
     def __repr__(self, indirect: bool = False):
         to_print = ""
         if not indirect:
             to_print += f"------------- Cell2mol ATOM Object ----------------\n"
         to_print += f" Version                      = {self.version}\n"
         to_print += f" Type                         = {self.type}\n"
-        if hasattr(self, "subtype"):
+        if self.subtype is not None:
             to_print += f" Sub-Type                     = {self.subtype}\n"
         to_print += f" Label                        = {self.label}\n"
         to_print += f" Atomic Number                = {self.atnum}\n"
@@ -2169,13 +2352,13 @@ class atom(BaseModel):
         idx = self.get_parent_index("ligand")
         if idx is not None:
             to_print += f" Index in Ligand              = {idx}\n"
-        if hasattr(self, "occurrence"):
-            to_print += f" Occurrence in Parent         = {self.occurrence}\n"
-        if hasattr(self, "mconnec"):
+        # if self.occurrence is not None:
+        #     to_print += f" Occurrence in Parent         = {self.occurrence}\n"
+        if self.mconnec is not None:
             to_print += f" Metal Adjacency (mconnec)    = {self.mconnec}\n"
-        if hasattr(self, "connec"):
+        if self.connec is not None:
             to_print += f" Regular Adjacencies (connec) = {self.connec}\n"
-        if hasattr(self, "charge"):
+        if self.charge is not None:
             to_print += f" Atom Charge                  = {self.charge}\n"
         if not indirect:
             to_print += "----------------------------------------------------\n"
@@ -2660,16 +2843,20 @@ class metal(atom):
         atom.reset_charge(
             self
         )  ## First uses the generic atom class function for itself
-        if hasattr(self, "poscharges"):
+        if self.poscharges is not None:
             delattr(self, "poscharge")
-
+    
+    def __str__(self):
+        # This will make print(object) behave like before
+        return self.__repr__()
+    
     def __repr__(self):
         to_print = ""
         to_print += f"------------- Cell2mol METAL Object --------------\n"
         to_print += atom.__repr__(self, indirect=True)
-        if hasattr(self, "coord_sphere_formula"):
+        if self.coord_sphere_formula is not None:
             to_print += f" Coordination Sphere Formula  = {self.coord_sphere_formula}\n"
-        if hasattr(self, "possible_cs"):
+        if self.possible_cs is not None:
             to_print += f" Possible Charges             = {self.possible_cs}\n"
         to_print += "----------------------------------------------------\n"
         return to_print
@@ -2746,6 +2933,7 @@ class cell(BaseModel):
     error_case: str | None = None
 
     # TOFIX @choglass: See if we keep here, it's assigned in refcell.py#146
+    # KEEP IT FOR NOW
     chemical_name: str | None = None
     reported_metal_os: str | None = None
     moiety_dicts: list[object] | None = None
@@ -2806,7 +2994,7 @@ class cell(BaseModel):
         for idx, mol in enumerate(moleclist):
             if debug >= 2:
                 print(f"Molecule {idx} formula={mol.formula}")
-            if not mol.iscomplex and not mol.has_IA_IIA:
+            if not mol.iscomplex and not mol.has_IA_IIA and not mol.has_post_transition_metal:
                 # if not mol.iscomplex:
                 found = False
                 for ldx, typ in enumerate(typelist_mols):  # Molecules
@@ -2834,6 +3022,8 @@ class cell(BaseModel):
                         mol.split_complex(debug=debug)
                     elif mol.has_IA_IIA:
                         mol.split_IA_IIA(debug=debug)
+                    elif mol.has_post_transition_metal:
+                        mol.split_post_transition_metal(debug=debug)
                 for jdx, lig in enumerate(mol.ligands):  # ligands
                     found = False
                     for ldx, typ in enumerate(typelist_ligs):
@@ -3064,7 +3254,8 @@ class cell(BaseModel):
 
         atom_site_labels = self.atom_site_labels
         geom_bond_cif = self.geom_bond_cif
-        if debug >= 2: print(f"GETREFS: geom_bond_cif={geom_bond_cif}")
+        
+        if debug > 2: print(f"GETREFS: geom_bond_cif={geom_bond_cif}")
         if debug >= 2: print(f"GETREFS: Generate Adjacency matrix based on interatomic distances")
         blocklist = split_species(ref_labels, ref_pos, cov_factor=cov_factor)
         if debug >= 2: print(f"GETREFS: blocklist={blocklist}")
@@ -3094,12 +3285,15 @@ class cell(BaseModel):
             for atom, idx in zip(newmolec.atoms, b):
                 # atom.add_parent(refcell, index=idx)
                 atom.add_parent(self, index=idx)
-            print(newmolec.formula, newmolec.madjnum)
+
             # This must be below the frac_coord, so they are carried on to the ligands
             if newmolec.iscomplex:
                 newmolec.split_complex()
             elif newmolec.has_IA_IIA:
                 newmolec.split_IA_IIA()
+            elif newmolec.has_post_transition_metal:
+                print(f"GETREFS: {newmolec.formula} has post-transition metal")
+                newmolec.split_post_transition_metal()
             else:
                 newmolec.add_parent(newmolec, indices=[*range(0, newmolec.natoms, 1)])
             self.refmoleclist.append(newmolec)
@@ -3142,6 +3336,19 @@ class cell(BaseModel):
                         met.get_coord_sphere_formula(debug=debug)
                 elif ref.has_IA_IIA:
                     if debug >= 0: print(f"GETREFS: working with {ref.formula} with alkali or alkali earth metals")
+                    if len(ref.ligands) == 0 :
+                        pass
+                    else:
+                        for lig in ref.ligands:
+                            lig.get_denticity(debug=debug)
+                    for met in ref.metals:
+                        met.get_connected_metals(debug=debug)
+                        met.get_coordination_geometry(debug=debug)
+                        met.get_coord_sphere_formula(debug=debug)
+                elif ref.has_post_transition_metal:
+                    if debug >= 0: print(f"GETREFS: working with {ref.formula} with post-transition metals")
+                    if debug >= 0: print(f"GETREFS: {[met.label for met in ref.metals]}")
+                    if debug >= 0: print(f"GETREFS: {[lig.formula for lig in ref.ligands]}")
                     if len(ref.ligands) == 0 :
                         pass
                     else:
@@ -3264,7 +3471,7 @@ class cell(BaseModel):
     def get_occurrence(self, substructure: object) -> int:
         occurrence = 0
         ## Molecules in Cell
-        if hasattr(substructure, "subtype") and hasattr(self, "moleclist"):
+        if substructure.subtype is not None and self.moleclist is not None:
             if substructure.subtype == "molecule":
                 for m in self.moleclist:
                     issame = compare_species(substructure, m)
@@ -3389,7 +3596,7 @@ class cell(BaseModel):
                     unique_specie.formula,
                 )
             tmp = unique_specie.get_possible_cs(debug=debug)
-            if tmp is None:
+            if len(tmp) == 0:
                 self.selected_cs.append(None)
             elif unique_specie.subtype != "metal":
                 self.selected_cs.append(
@@ -3401,7 +3608,7 @@ class cell(BaseModel):
         for specie in self.species_list:
             print("Get possible charge states for species list", specie.formula)
             tmp = specie.get_possible_cs(debug=debug)
-            if tmp is None:
+            if len(tmp) == 0:
                 self.selected_cs.append(None)
             elif specie.subtype != "metal":
                 self.selected_cs.append(
@@ -3429,7 +3636,7 @@ class cell(BaseModel):
     def assign_charges_for_refcell(self, debug: int = 0):
         for specie in self.unique_species:
             for idx, ref in enumerate(self.refmoleclist):
-                if ref.iscomplex or ref.has_IA_IIA:
+                if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
                     for jdx, lig in enumerate(ref.ligands):
                         print(lig.unique_index)
                         print(specie.unique_index)
@@ -3443,12 +3650,12 @@ class cell(BaseModel):
                         set_charge_state(specie, ref, mode=1, debug=debug)
 
         for idx, ref in enumerate(self.refmoleclist):
-            if ref.iscomplex or ref.has_IA_IIA:
+            if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
                 prepare_mol(ref)
 
         for idx, ref in enumerate(self.refmoleclist):
             print(f"ASSIGN_CHARGES: Refenrence Molecule {idx}: {ref.formula}")
-            if ref.iscomplex or ref.has_IA_IIA:
+            if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
                 print("ASSIGN_CHARGES: Complex", idx, ref.formula, ref.totcharge)
                 for jdx, lig in enumerate(ref.ligands):
                     print(
@@ -3474,9 +3681,9 @@ class cell(BaseModel):
     def assign_charges_for_unitcell(self, debug: int = 0):
         for idx, mol in enumerate(self.moleclist):
             print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")
-            if not mol.iscomplex and not mol.has_IA_IIA:
+            if not mol.iscomplex and not mol.has_IA_IIA and not mol.has_post_transition_metal:
                 for ref in self.refmoleclist:
-                    if (not ref.iscomplex and not ref.has_IA_IIA) and (
+                    if (not ref.iscomplex and not ref.has_IA_IIA and not ref.has_post_transition_metal) and (
                         mol.unique_index == ref.unique_index
                     ):
                         issame = compare_reference_indices(ref, mol, debug=debug)
@@ -3484,7 +3691,7 @@ class cell(BaseModel):
                             set_charge_state(ref, mol, mode=2, debug=debug)
             else:
                 for ref in self.refmoleclist:
-                    if (ref.iscomplex or ref.has_IA_IIA) and (
+                    if (ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal) and (
                         mol.formula == ref.formula
                     ):
                         for jdx, lig in enumerate(mol.ligands):
@@ -3508,12 +3715,12 @@ class cell(BaseModel):
                                         met.set_charge(ref_met.charge)
 
         for idx, mol in enumerate(self.moleclist):
-            if mol.iscomplex or mol.has_IA_IIA:
+            if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
                 prepare_mol(mol)
 
         for idx, mol in enumerate(self.moleclist):
             print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")
-            if mol.iscomplex or mol.has_IA_IIA:
+            if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
                 print("ASSIGN_CHARGES: Complex", idx, mol.formula, mol.totcharge)
                 for jdx, lig in enumerate(mol.ligands):
                     print(
@@ -3544,6 +3751,7 @@ class cell(BaseModel):
         
         if moleclist is None:
             # TOFIX @choglass: if no molecule list, then the cell is not neutral?
+            # IF THERE IS NO MOLECULE LIST, THE PROCESS WOULD BE STOPPED PREVIOUSLY
             raise ValueError("TO CHECK:Molecule list is None")
             # self.is_neutral = None
             # return
@@ -3669,6 +3877,7 @@ class cell(BaseModel):
 
         if moleclist is None:
             # TOFIX @choglass: if no molecule list, then the cell is not neutral?
+            # IF THERE IS NO MOLECULE LIST, THE PROCESS WOULD BE STOPPED PREVIOUSLY
             raise ValueError("TO CHECK: Molecule list is None")
             # Proposition ↓
             # self.error_create_bonds = True
@@ -3702,6 +3911,7 @@ class cell(BaseModel):
 
         if moleclist is None:
             # TOFIX @choglass: if no molecule list, just return?
+            # IF THERE IS NO MOLECULE LIST, THE PROCESS WOULD BE STOPPED PREVIOUSLY
             raise ValueError("TO CHECK:Molecule list is None")
             # Proposition ↓
             # return
@@ -3857,6 +4067,10 @@ class cell(BaseModel):
             pickle.dump(self, fil)
 
     #######################################################
+    def __str__(self):
+        # This will make print(object) behave like before
+        return self.__repr__()
+    
     def __repr__(self):
         to_print = f"------------- Cell2mol CELL Object ----------------\n"
         to_print += f" Version               = {self.version}\n"

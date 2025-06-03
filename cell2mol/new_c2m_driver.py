@@ -181,7 +181,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
 
     print("***Unit cell molecules ***")
     print(newcell)
-    if hasattr(newcell, "moleclist"):
+    if newcell.moleclist is not None:
         print_output(newcell.moleclist)
 
     surmmary.close()
@@ -197,7 +197,7 @@ if __name__ == "__main__" or __name__ == "cell2mol.new_c2m_driver":
     sys.stdout = stdout
 
     # Error handling
-    if hasattr(newcell, "error_case"):
+    if newcell.error_case is not None:
         case = newcell.error_case
         error_fname = os.path.join(current_dir, f"unitcell_error_{case}.out")
         error = open(error_fname, "w")

@@ -928,6 +928,8 @@ def get_moleclist (newcell, refcell, all_molecules, debug: int=0):
             newmolec.split_complex()
         elif newmolec.has_IA_IIA:
             newmolec.split_IA_IIA()
+        elif newmolec.has_post_transition_metal:
+            newmolec.split_post_transition_metal()
         else:
             newmolec.add_parent(newmolec, indices=[*range(0,newmolec.natoms,1)])
         newcell.moleclist.append(newmolec)  
@@ -956,6 +958,17 @@ def get_moleclist (newcell, refcell, all_molecules, debug: int=0):
                 met.get_connected_metals(debug=debug)                         
                 met.get_coordination_geometry(debug=debug)
                 met.get_coord_sphere_formula(debug=debug)
+        elif mol.has_post_transition_metal:
+            if debug >=1 : print(f"GET_MOLECLIST: working with {mol.formula} with post transition metals")
+            if len(mol.ligands) == 0 :
+                pass
+            else:
+                for lig in mol.ligands:
+                    lig.get_denticity(debug=debug)
+            for met in mol.metals: 
+                met.get_connected_metals(debug=debug)                         
+                met.get_coordination_geometry(debug=debug)
+                met.get_coord_sphere_formula(debug=debug)
 
     return newcell
 
@@ -965,9 +978,9 @@ def get_unique_indices(newcell, reference_species_list, debug: int=0):
     newcell.unique_indices = []
     newcell.species_list = []
     for mol in newcell.moleclist:
-        if not mol.iscomplex and not mol.has_IA_IIA:
+        if not mol.iscomplex and not mol.has_IA_IIA and not mol.has_post_transition_metal:
             for ref in reference_species_list:
-                if (ref.subtype == "molecule") and not ref.iscomplex and not ref.has_IA_IIA:
+                if (ref.subtype == "molecule") and not ref.iscomplex and not ref.has_IA_IIA and not ref.has_post_transition_metal:
                     issame = compare_reference_indices(ref, mol, debug=debug)
                     if issame:
                         mol.unique_index = ref.unique_index 

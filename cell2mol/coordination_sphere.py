@@ -427,7 +427,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
             tmpcoord = [atom.coord, met.coord]            
             
             refcell = atom.get_parent("reference")
-            if hasattr(atom, "atom_site_label") and hasattr(met, "atom_site_label"):
+            if atom.atom_site_label is not None and met.atom_site_label is not None:
                 atom_site_labels = [atom.atom_site_label, met.atom_site_label]
             else :
                 atom_site_labels = None
