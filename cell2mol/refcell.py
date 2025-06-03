@@ -44,21 +44,21 @@ def process_refcell(input_path, name, current_dir, cif_bond_info, debug=0):
             # Create the reference cell
             refcell = create_reference(input_path, name, cell_vector, cell_param, cif_bond_info, debug)
         
-            # for i, ref in enumerate(refcell.refmoleclist):
-            #     if hasattr(ref, "totcharge_cif"):   
-            #         N = 0
-            #         for atom in ref.labels:
-            #             N += elemdatabase.elementnr[atom]
-            #         N -= ref.totcharge_cif
-            #         if N % 2 == 0:
-            #             spin = 1
-            #         else:
-            #             spin = 2
-            #         writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz", ref.labels, ref.coord, charge=ref.totcharge_cif, spin=spin)
-            #         print(f"Ref molecule {i} {ref.formula} total charge {ref.totcharge_cif} lowest spin multiplicity {spin}")
-            #     else:
-            #         writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}.xyz", ref.labels, ref.coord, charge="", spin="")
-            #         print(f"Ref molecule {i} {ref.formula} without charge and spin information")
+            for i, ref in enumerate(refcell.refmoleclist):
+                if ref.totcharge_cif is not None and ref.iscomplex:   
+                    N = 0
+                    for atom in ref.labels:
+                        N += elemdatabase.elementnr[atom]
+                    N -= ref.totcharge_cif
+                    if N % 2 == 0:
+                        spin = 1
+                    else:
+                        spin = 2
+                    writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz", ref.labels, ref.coord, charge=ref.totcharge_cif, spin=spin)
+                    print(f"Ref molecule {i} {ref.formula} total charge {ref.totcharge_cif} lowest spin multiplicity {spin}")
+                else:
+                    writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}.xyz", ref.labels, ref.coord, charge="", spin="")
+                    print(f"Ref molecule {i} {ref.formula} without charge and spin information")
 
             if refcell.error_case == 0:
                 get_unique_species_in_reference(refcell, debug) 
