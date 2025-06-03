@@ -51,21 +51,27 @@ def get_atomic_valences(k):
     if k == 5:  # B
         return [3, 4]
     if k == 6:  # C
-        return [2, 4]
+        return [4, 2]
     if k == 7:  # N
         return [3, 4]
     if k == 8:  # O
         return [2, 1, 3]
     if k == 13:  # Al
         return [3, 4, 5]
+    if k == 14:  # Si
+        return [4, 6]
     if k == 15:  # P
-        return [6, 5, 3]  # [5,4,3]
+        return [5, 3]  # [5,4,3]
     if k == 16 : # S
         return [2, 4, 6]
+    if k ==32 :  # Ge
+        return [4, 6]
     if k == 33:  # As
         return [6, 5, 3]  # [5,4,3]
     if k == 51:  # Sb
         return [6, 5, 3]  # [5,4,3]
+    if k == 52: # Te
+        return [2, 4, 6]
     if group == 17: # F, Cl, Br, I
         return [1, 2]   # Cl [1, 7]
     if block == "s" and period == 1:
@@ -163,8 +169,8 @@ def get_BO(AC, UA, DU, valences, UA_pairs, use_graph=True):
         BO_valence = list(BO.sum(axis=1))
         DU_save = copy.copy(DU)
         UA, DU = get_UA(valences, BO_valence)
-        UA_pairs = get_UA_pairs(UA, AC, use_graph=use_graph)[0]
-        #UA_pairs = get_UA_pairs_new(UA, AC, DU, use_graph=use_graph)[0]
+        #UA_pairs = get_UA_pairs(UA, AC, use_graph=use_graph)[0]
+        UA_pairs = get_UA_pairs_new(UA, AC, DU, use_graph=use_graph)[0]
 
     return BO
 
@@ -442,13 +448,13 @@ def set_atomic_charges(
         q += charge
         if atom == 6:
             number_of_single_bonds_to_C = list(BO_matrix[i, :]).count(1)
-            # if number_of_single_bonds_to_C == 2 and BO_valences[i] == 2:
-            #     q += 1
-            #     charge = 0
-            if BO_valences[i] == 2:
-                print("set_atomic_charges", "carbon atom SetNumRadicalElectrons 2")
-                a.SetNumRadicalElectrons(2)
+            if number_of_single_bonds_to_C == 2 and BO_valences[i] == 2:
+                q += 1
                 charge = 0
+            # if BO_valences[i] == 2:
+            #     print("set_atomic_charges", "carbon atom SetNumRadicalElectrons 2")
+            #     a.SetNumRadicalElectrons(2)
+            #     charge = 0
             if number_of_single_bonds_to_C == 3 and q + 1 < mol_charge:
                 q += 2
                 charge = 1
@@ -506,71 +512,71 @@ def get_bonds(UA, AC):
 
     return bonds
 
-# def get_UA_pairs_new(UA, AC, DU, use_graph=True):
-#     """"""
-#     N_UA = 10000
-#     matching_ids = dict()
-#     matching_ids2 = dict()
-#     for i, du in zip(UA, DU):
-#         if du > 1:
-#             matching_ids[i] = N_UA
-#             matching_ids2[N_UA] = i
-#             N_UA += 1
+def get_UA_pairs_new(UA, AC, DU, use_graph=True):
+    """"""
+    N_UA = 10000
+    matching_ids = dict()
+    matching_ids2 = dict()
+    for i, du in zip(UA, DU):
+        if du > 1:
+            matching_ids[i] = N_UA
+            matching_ids2[N_UA] = i
+            N_UA += 1
 
-#     bonds = get_bonds(UA, AC)
-#     for i, j in bonds:
-#         if i in matching_ids:
-#             bonds.append(tuple(sorted([matching_ids[i], j])))
+    bonds = get_bonds(UA, AC)
+    for i, j in bonds:
+        if i in matching_ids:
+            bonds.append(tuple(sorted([matching_ids[i], j])))
 
-#         elif j in matching_ids:
-#             bonds.append(tuple(sorted([i, matching_ids[j]])))
+        elif j in matching_ids:
+            bonds.append(tuple(sorted([i, matching_ids[j]])))
 
-#     if len(bonds) == 0:
-#         return [()]
+    if len(bonds) == 0:
+        return [()]
 
-#     if use_graph:
-#         G = nx.Graph()
-#         G.add_edges_from(bonds)
-#         UA_pairs = [list(nx.max_weight_matching(G))]
-#         UA_pair = UA_pairs[0]
+    if use_graph:
+        G = nx.Graph()
+        G.add_edges_from(bonds)
+        UA_pairs = [list(nx.max_weight_matching(G))]
+        UA_pair = UA_pairs[0]
 
-#         remove_pairs = []
-#         add_pairs = []
-#         for i, j in UA_pair:
-#             if i in matching_ids2 and j in matching_ids2:
-#                 remove_pairs.append(tuple([i, j]))
-#                 add_pairs.append(tuple([matching_ids2[i], matching_ids2[j]]))
-#                 # UA_pair.remove(tuple([i,j]))
-#                 # UA_pair.append(tuple([matching_ids2[i], matching_ids2[j]]))
-#             elif i in matching_ids2:
-#                 # UA_pair.remove(tuple([i,j]))
-#                 remove_pairs.append(tuple([i, j]))
-#                 add_pairs.append(tuple([matching_ids2[i], j]))
-#                 # UA_pair.append(tuple([matching_ids2[i],j]))
-#             elif j in matching_ids2:
-#                 remove_pairs.append(tuple([i, j]))
-#                 add_pairs.append(tuple([i, matching_ids2[j]]))
+        remove_pairs = []
+        add_pairs = []
+        for i, j in UA_pair:
+            if i in matching_ids2 and j in matching_ids2:
+                remove_pairs.append(tuple([i, j]))
+                add_pairs.append(tuple([matching_ids2[i], matching_ids2[j]]))
+                # UA_pair.remove(tuple([i,j]))
+                # UA_pair.append(tuple([matching_ids2[i], matching_ids2[j]]))
+            elif i in matching_ids2:
+                # UA_pair.remove(tuple([i,j]))
+                remove_pairs.append(tuple([i, j]))
+                add_pairs.append(tuple([matching_ids2[i], j]))
+                # UA_pair.append(tuple([matching_ids2[i],j]))
+            elif j in matching_ids2:
+                remove_pairs.append(tuple([i, j]))
+                add_pairs.append(tuple([i, matching_ids2[j]]))
 
-#                 # UA_pair.remove(tuple([i,j]))
-#                 # UA_pair.append(tuple([i,matching_ids2[j]]))
-#         for p1, p2 in zip(remove_pairs, add_pairs):
-#             UA_pair.remove(p1)
-#             UA_pair.append(p2)
-#         return [UA_pair]
+                # UA_pair.remove(tuple([i,j]))
+                # UA_pair.append(tuple([i,matching_ids2[j]]))
+        for p1, p2 in zip(remove_pairs, add_pairs):
+            UA_pair.remove(p1)
+            UA_pair.append(p2)
+        return [UA_pair]
 
-#     max_atoms_in_combo = 0
-#     UA_pairs = [()]
-#     for combo in list(itertools.combinations(bonds, int(len(UA) / 2))):
-#         flat_list = [item for sublist in combo for item in sublist]
-#         atoms_in_combo = len(set(flat_list))
-#         if atoms_in_combo > max_atoms_in_combo:
-#             max_atoms_in_combo = atoms_in_combo
-#             UA_pairs = [combo]
+    max_atoms_in_combo = 0
+    UA_pairs = [()]
+    for combo in list(itertools.combinations(bonds, int(len(UA) / 2))):
+        flat_list = [item for sublist in combo for item in sublist]
+        atoms_in_combo = len(set(flat_list))
+        if atoms_in_combo > max_atoms_in_combo:
+            max_atoms_in_combo = atoms_in_combo
+            UA_pairs = [combo]
 
-#         elif atoms_in_combo == max_atoms_in_combo:
-#             UA_pairs.append(combo)
+        elif atoms_in_combo == max_atoms_in_combo:
+            UA_pairs.append(combo)
 
-#     return UA_pairs
+    return UA_pairs
 
 def get_UA_pairs(UA, AC, use_graph=True):
     """ """
@@ -600,201 +606,296 @@ def get_UA_pairs(UA, AC, use_graph=True):
 
     return UA_pairs
 
-# def AC2BO_new(
-#     AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allow_carbenes=True
-# ):
-#     """Implemenation of algorithm shown in Figure 2.
 
-#     UA: unsaturated atoms
+def get_sorted_valences_list(valences_list_of_lists, atoms):
+    
+    valences_list = itertools.product(*valences_list_of_lists)
+    O_valences = [
+        v_list
+        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
+        if atomicNum == 8
+    ]
+    N_valences = [
+        v_list
+        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
+        if atomicNum == 7
+    ]
+    C_valences = [
+        v_list
+        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
+        if atomicNum == 6
+    ]
+    P_valences = [
+        v_list
+        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
+        if atomicNum == 15
+    ]
+    S_valences = [
+        v_list
+        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
+        if atomicNum == 16
+    ]
 
-#     DU: degree of unsaturation (u matrix in Figure)
+    O_sums = []
+    for v_list in itertools.product(*O_valences):
+        O_sums.append(v_list)
+        # if sum(v_list) not in O_sums:
+        #    O_sums.append(v_list))
 
-#     best_BO: Bcurr in Figure
-#     """
+    N_sums = []
+    for v_list in itertools.product(*N_valences):
+        N_sums.append(v_list)
+        # if sum(v_list) not in N_sums:
+        #    N_sums.append(sum(v_list))
 
-#     global atomic_valence
-#     global atomic_valence_electrons
+    C_sums = []
+    for v_list in itertools.product(*C_valences):
+        C_sums.append(v_list)
+        # if sum(v_list) not in C_sums:
+        #    C_sums.append(sum(v_list))
 
-#     # make a list of valences, e.g. for CO: [[4],[2,1]]
-#     valences_list_of_lists = []
-#     AC_valence = list(AC.sum(axis=1))
+    P_sums = []
+    for v_list in itertools.product(*P_valences):
+        P_sums.append(v_list)
 
-#     for i, (atomicNum, valence) in enumerate(zip(atoms, AC_valence)):
-#         # valence can't be smaller than number of neighbourgs
-#         possible_valence = [x for x in atomic_valence[atomicNum] if x >= valence]
-#         if atomicNum == 6 and valence == 1:
-#             possible_valence.remove(2)
-#         if atomicNum == 6 and not allow_carbenes and valence == 2:
-#             possible_valence.remove(2)
-#         if atomicNum == 6 and valence == 2:
-#             possible_valence.append(3)
-#         if atomicNum == 16 and valence == 1:
-#             possible_valence = [1, 2]
+    S_sums = []
+    for v_list in itertools.product(*S_valences):
+        S_sums.append(v_list)
 
-#         if not possible_valence:
-#             print(
-#                 "Valence of atom",
-#                 i,
-#                 "is",
-#                 valence,
-#                 "which bigger than allowed max",
-#                 max(atomic_valence[atomicNum]),
-#                 ". Stopping",
-#             )
-#             sys.exit()
-#         valences_list_of_lists.append(possible_valence)
+    order_dict = dict()
+    for i, v_list in enumerate(
+        itertools.product(*[O_sums, N_sums, C_sums, P_sums, S_sums])
+    ):
+        order_dict[v_list] = i
 
-#     # convert [[4],[2,1]] to [[4,2],[4,1]]
-#     valences_list = itertools.product(*valences_list_of_lists)
+    valence_order_list = []
+    for valence_list in valences_list:
+        C_sum = []
+        N_sum = []
+        O_sum = []
+        P_sum = []
+        S_sum = []
+        for v, atomicNum in zip(valence_list, atoms):
+            if atomicNum == 6:
+                C_sum.append(v)
+            if atomicNum == 7:
+                N_sum.append(v)
+            if atomicNum == 8:
+                O_sum.append(v)
+            if atomicNum == 15:
+                P_sum.append(v)
+            if atomicNum == 16:
+                S_sum.append(v)
 
-#     best_BO = AC.copy()
+        order_idx = order_dict[
+            (tuple(O_sum), tuple(N_sum), tuple(C_sum), tuple(P_sum), tuple(S_sum))
+        ]
+        valence_order_list.append(order_idx)
 
-#     O_valences = [
-#         v_list
-#         for v_list, atomicNum in zip(valences_list_of_lists, atoms)
-#         if atomicNum == 8
-#     ]
-#     N_valences = [
-#         v_list
-#         for v_list, atomicNum in zip(valences_list_of_lists, atoms)
-#         if atomicNum == 7
-#     ]
-#     C_valences = [
-#         v_list
-#         for v_list, atomicNum in zip(valences_list_of_lists, atoms)
-#         if atomicNum == 6
-#     ]
-#     P_valences = [
-#         v_list
-#         for v_list, atomicNum in zip(valences_list_of_lists, atoms)
-#         if atomicNum == 15
-#     ]
-#     S_valences = [
-#         v_list
-#         for v_list, atomicNum in zip(valences_list_of_lists, atoms)
-#         if atomicNum == 16
-#     ]
+    sorted_valences_list = [
+        y
+        for x, y in sorted(
+            zip(valence_order_list, list(itertools.product(*valences_list_of_lists)))
+        )
+    ]
 
-#     O_sums = []
-#     for v_list in itertools.product(*O_valences):
-#         O_sums.append(v_list)
-#         # if sum(v_list) not in O_sums:
-#         #    O_sums.append(v_list))
+    return sorted_valences_list
 
-#     N_sums = []
-#     for v_list in itertools.product(*N_valences):
-#         N_sums.append(v_list)
-#         # if sum(v_list) not in N_sums:
-#         #    N_sums.append(sum(v_list))
+def AC2BO_new(
+    AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allow_carbenes=True
+):
+    """Implemenation of algorithm shown in Figure 2.
 
-#     C_sums = []
-#     for v_list in itertools.product(*C_valences):
-#         C_sums.append(v_list)
-#         # if sum(v_list) not in C_sums:
-#         #    C_sums.append(sum(v_list))
+    UA: unsaturated atoms
 
-#     P_sums = []
-#     for v_list in itertools.product(*P_valences):
-#         P_sums.append(v_list)
+    DU: degree of unsaturation (u matrix in Figure)
 
-#     S_sums = []
-#     for v_list in itertools.product(*S_valences):
-#         S_sums.append(v_list)
+    best_BO: Bcurr in Figure
+    """
 
-#     order_dict = dict()
-#     for i, v_list in enumerate(
-#         itertools.product(*[O_sums, N_sums, C_sums, P_sums, S_sums])
-#     ):
-#         order_dict[v_list] = i
+    global atomic_valence
+    global atomic_valence_electrons
 
-#     valence_order_list = []
-#     for valence_list in valences_list:
-#         C_sum = []
-#         N_sum = []
-#         O_sum = []
-#         P_sum = []
-#         S_sum = []
-#         for v, atomicNum in zip(valence_list, atoms):
-#             if atomicNum == 6:
-#                 C_sum.append(v)
-#             if atomicNum == 7:
-#                 N_sum.append(v)
-#             if atomicNum == 8:
-#                 O_sum.append(v)
-#             if atomicNum == 15:
-#                 P_sum.append(v)
-#             if atomicNum == 16:
-#                 S_sum.append(v)
+    # make a list of valences, e.g. for CO: [[4],[2,1]]
+    valences_list_of_lists = []
+    AC_valence = list(AC.sum(axis=1))
 
-#         order_idx = order_dict[
-#             (tuple(O_sum), tuple(N_sum), tuple(C_sum), tuple(P_sum), tuple(S_sum))
-#         ]
-#         valence_order_list.append(order_idx)
+    for i, (atomicNum, valence) in enumerate(zip(atoms, AC_valence)):
+        # valence can't be smaller than number of neighbourgs
+        possible_valence = [x for x in atomic_valence[atomicNum] if x >= valence]
+        if atomicNum == 6 and valence == 1:
+            possible_valence.remove(2)
+        if atomicNum == 6 and not allow_carbenes and valence == 2:
+            possible_valence.remove(2)
+        if atomicNum == 6 and valence == 2:
+            possible_valence.append(3)
+        if atomicNum == 16 and valence == 1:
+            possible_valence = [1, 2]
 
-#     sorted_valences_list = [
-#         y
-#         for x, y in sorted(
-#             zip(valence_order_list, list(itertools.product(*valences_list_of_lists)))
-#         )
-#     ]
+        if not possible_valence:
+            print(
+                "Valence of atom",
+                i,
+                "is",
+                valence,
+                "which bigger than allowed max",
+                max(atomic_valence[atomicNum]),
+                ". Stopping",
+            )
+            #possible_valence.append(valence) # this is the added line
+        valences_list_of_lists.append(possible_valence)
 
-#     for valences in sorted_valences_list:  # valences_list:
-#         UA, DU_from_AC = get_UA(valences, AC_valence)
-#         check_len = len(UA) == 0
-#         if check_len:
-#             check_bo = BO_is_OK(
-#                 AC,
-#                 AC,
-#                 charge,
-#                 DU_from_AC,
-#                 atomic_valence_electrons,
-#                 atoms,
-#                 valences,
-#                 allow_charged_fragments=allow_charged_fragments,
-#                 allow_carbenes=allow_carbenes,
-#             )
-#         else:
-#             check_bo = None
+    # convert [[4],[2,1]] to [[4,2],[4,1]]
+    valences_list = itertools.product(*valences_list_of_lists)
 
-#         if check_len and check_bo:
-#             return AC, atomic_valence_electrons
+    best_BO = AC.copy()
 
-#         UA_pairs_list = get_UA_pairs(UA, AC, DU_from_AC, use_graph=use_graph)
-#         for UA_pairs in UA_pairs_list:
-#             BO = get_BO(AC, UA, DU_from_AC, valences, UA_pairs, use_graph=use_graph)
-#             status = BO_is_OK(
-#                 BO,
-#                 AC,
-#                 charge,
-#                 DU_from_AC,
-#                 atomic_valence_electrons,
-#                 atoms,
-#                 valences,
-#                 allow_charged_fragments=allow_charged_fragments,
-#                 allow_carbenes=allow_carbenes,
-#             )
-#             charge_OK = charge_is_OK(
-#                 BO,
-#                 AC,
-#                 charge,
-#                 DU_from_AC,
-#                 atomic_valence_electrons,
-#                 atoms,
-#                 valences,
-#                 allow_charged_fragments=allow_charged_fragments,
-#                 allow_carbenes=allow_carbenes,
-#             )
+    O_valences = [
+        v_list
+        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
+        if atomicNum == 8
+    ]
+    N_valences = [
+        v_list
+        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
+        if atomicNum == 7
+    ]
+    C_valences = [
+        v_list
+        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
+        if atomicNum == 6
+    ]
+    P_valences = [
+        v_list
+        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
+        if atomicNum == 15
+    ]
+    S_valences = [
+        v_list
+        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
+        if atomicNum == 16
+    ]
 
-#             if status:
-#                 return BO, atomic_valence_electrons
-#             elif (
-#                 BO.sum() >= best_BO.sum()
-#                 and valences_not_too_large(BO, valences)
-#                 and charge_OK
-#             ):
-#                 best_BO = BO.copy()
+    O_sums = []
+    for v_list in itertools.product(*O_valences):
+        O_sums.append(v_list)
+        # if sum(v_list) not in O_sums:
+        #    O_sums.append(v_list))
 
-#     return best_BO, atomic_valence_electrons
+    N_sums = []
+    for v_list in itertools.product(*N_valences):
+        N_sums.append(v_list)
+        # if sum(v_list) not in N_sums:
+        #    N_sums.append(sum(v_list))
+
+    C_sums = []
+    for v_list in itertools.product(*C_valences):
+        C_sums.append(v_list)
+        # if sum(v_list) not in C_sums:
+        #    C_sums.append(sum(v_list))
+
+    P_sums = []
+    for v_list in itertools.product(*P_valences):
+        P_sums.append(v_list)
+
+    S_sums = []
+    for v_list in itertools.product(*S_valences):
+        S_sums.append(v_list)
+
+    order_dict = dict()
+    for i, v_list in enumerate(
+        itertools.product(*[O_sums, N_sums, C_sums, P_sums, S_sums])
+    ):
+        order_dict[v_list] = i
+
+    valence_order_list = []
+    for valence_list in valences_list:
+        C_sum = []
+        N_sum = []
+        O_sum = []
+        P_sum = []
+        S_sum = []
+        for v, atomicNum in zip(valence_list, atoms):
+            if atomicNum == 6:
+                C_sum.append(v)
+            if atomicNum == 7:
+                N_sum.append(v)
+            if atomicNum == 8:
+                O_sum.append(v)
+            if atomicNum == 15:
+                P_sum.append(v)
+            if atomicNum == 16:
+                S_sum.append(v)
+
+        order_idx = order_dict[
+            (tuple(O_sum), tuple(N_sum), tuple(C_sum), tuple(P_sum), tuple(S_sum))
+        ]
+        valence_order_list.append(order_idx)
+
+    sorted_valences_list = [
+        y
+        for x, y in sorted(
+            zip(valence_order_list, list(itertools.product(*valences_list_of_lists)))
+        )
+    ]
+
+    for valences in sorted_valences_list:  # valences_list:
+        UA, DU_from_AC = get_UA(valences, AC_valence)
+        check_len = len(UA) == 0
+        if check_len:
+            check_bo = BO_is_OK(
+                AC,
+                AC,
+                charge,
+                DU_from_AC,
+                atomic_valence_electrons,
+                atoms,
+                valences,
+                allow_charged_fragments=allow_charged_fragments,
+                allow_carbenes=allow_carbenes,
+            )
+        else:
+            check_bo = None
+
+        if check_len and check_bo:
+            return AC, atomic_valence_electrons
+
+        UA_pairs_list = get_UA_pairs_new(UA, AC, DU_from_AC, use_graph=use_graph)
+        for UA_pairs in UA_pairs_list:
+            BO = get_BO(AC, UA, DU_from_AC, valences, UA_pairs, use_graph=use_graph)
+            status = BO_is_OK(
+                BO,
+                AC,
+                charge,
+                DU_from_AC,
+                atomic_valence_electrons,
+                atoms,
+                valences,
+                allow_charged_fragments=allow_charged_fragments,
+                allow_carbenes=allow_carbenes,
+            )
+            charge_OK = charge_is_OK(
+                BO,
+                AC,
+                charge,
+                DU_from_AC,
+                atomic_valence_electrons,
+                atoms,
+                valences,
+                allow_charged_fragments=allow_charged_fragments,
+                allow_carbenes=allow_carbenes,
+            )
+
+            if status:
+                return BO, atomic_valence_electrons
+            elif (
+                BO.sum() >= best_BO.sum()
+                and valences_not_too_large(BO, valences)
+                and charge_OK
+            ):
+                best_BO = BO.copy()
+
+    return best_BO, atomic_valence_electrons
 
 def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allow_carbenes=True):
     """
@@ -859,21 +960,28 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
     #print(f"\tAC2BO: {valences_list_of_lists=}")
     
     # convert [[4],[2,1]] to [[4,2],[4,1]]
-    valences_list = []
-    for i in itertools.product(*valences_list_of_lists):
-        tmp = []
-        for j in i:
-            tmp.append(j)
-        valences_list.append(tmp)
+    # valences_list = []
+    # for i in itertools.product(*valences_list_of_lists):
+    #     tmp = []
+    #     for j in i:
+    #         tmp.append(j)
+    #     valences_list.append(tmp)
 
     best_BO = AC.copy()
     BO_is_OK_list = []
-    max_count = max(1000, int(len(valences_list)*0.3))
-    #print(f"AC2BO: {formula=} {len(valences_list)=} {max_count=}")
+    sorted_valences_list = get_sorted_valences_list(valences_list_of_lists, atoms)
+
+    # max_count = max(1000, int(len(valences_list)*0.3))
+    # #print(f"AC2BO: {formula=} {len(valences_list)=} {max_count=}")
+
+    # count = 0
+    # for valences in valences_list:
 
     count = 0
-    for valences in valences_list:
-
+    max_count = max(1000, int(len(sorted_valences_list)*0.3))
+    print(f"AC2BO: {formula=} {len(sorted_valences_list)=} {max_count=}")
+    
+    for valences in sorted_valences_list:  # valences_list:
         #print(f"\tSending", valences, AC_valence, "to get_UA")
         UA, DU_from_AC = get_UA(valences, AC_valence)
 
@@ -947,7 +1055,7 @@ def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True,
     """ """
 
     # convert AC matrix to bond order (BO) matrix
-    BO, atomic_valence_electrons = AC2BO(
+    BO, atomic_valence_electrons = AC2BO_new(
         AC,
         atoms,
         charge,
@@ -1159,6 +1267,7 @@ def chiral_stereo_check(mol):
 
     """
     try:
+        #Chem.SanitizeMol(mol)
         Chem.SanitizeMol(mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES, 
                          catchErrors=True)
         Chem.DetectBondStereochemistry(mol, -1)
