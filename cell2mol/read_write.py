@@ -43,7 +43,10 @@ def screening_cif(cif_file_path):
                     disorder = True
     
     moiety_dicts = extract_moiety(cif_file_path)
-    polymeric = any("n(" in moiety['formula'] for moiety in moiety_dicts)
+    if len(moiety_dicts) == 0:
+        polymeric = False
+    else:
+        polymeric = any("n(" in moiety['formula'] for moiety in moiety_dicts)
 
     return radical, disorder, notfound_atom, polymeric
 
@@ -391,7 +394,7 @@ def extract_moiety(file_path: str) -> list:
     uploaded_file_path = Path(file_path)
     with uploaded_file_path.open("r", encoding="utf-8") as file:
         cif_data_uploaded = file.read()
-    try:
+    if "_chemical_formula_moiety" in cif_data_uploaded:
         # Extract the moiety block
         moiety_match_uploaded = re.search(r"_chemical_formula_moiety\s*;\s*(.*?)\s*;", cif_data_uploaded, re.DOTALL)
         moiety_string_uploaded = moiety_match_uploaded.group(1) if moiety_match_uploaded else ""
@@ -404,7 +407,7 @@ def extract_moiety(file_path: str) -> list:
         moiety_dicts = [ {'formula': f, 'ratio': s, 'charge': c, 'type': t} for f, s, c, t in moiety_tuples ]
 
         # print("moiety_dicts=",moiety_dicts)
-    except:
+    else:
         print("Error parsing moiety information from CIF file.")
         moiety_dicts = []
     return moiety_dicts
