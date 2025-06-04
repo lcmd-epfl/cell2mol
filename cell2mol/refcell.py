@@ -45,41 +45,72 @@ def process_refcell(input_path, name, current_dir, cif_bond_info, debug=0):
             refcell = create_reference(input_path, name, cell_vector, cell_param, cif_bond_info, debug)
         
             for i, ref in enumerate(refcell.refmoleclist):
-                if ref.totcharge_cif is not None and ref.iscomplex:   
-                    N = 0
-                    for atom in ref.labels:
-                        N += elemdatabase.elementnr[atom]
-                    N -= ref.totcharge_cif
-                    if N % 2 == 0:
-                        spin = 1
+                if ref.iscomplex:   
+                    if ref.totcharge_cif is not None:
+                        N = 0
+                        for atom in ref.labels:
+                            N += elemdatabase.elementnr[atom]
+                        N -= ref.totcharge_cif
+                        if N % 2 == 0:
+                            spin = 1
+                        else:
+                            spin = 2
+                        writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz", ref.labels, ref.coord, charge=ref.totcharge_cif, spin=spin)
+                        print(f"Ref molecule {i} {ref.formula} total charge {ref.totcharge_cif} lowest spin multiplicity {spin}")
                     else:
-                        spin = 2
-                    writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz", ref.labels, ref.coord, charge=ref.totcharge_cif, spin=spin)
-                    print(f"Ref molecule {i} {ref.formula} total charge {ref.totcharge_cif} lowest spin multiplicity {spin}")
-                else:
-                    writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}.xyz", ref.labels, ref.coord, charge="", spin="")
-                    print(f"Ref molecule {i} {ref.formula} without charge and spin information")
+                        writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}.xyz", ref.labels, ref.coord, charge="", spin="")
+                        print(f"Ref molecule {i} {ref.formula} without charge and spin information")
 
-            if refcell.error_case == 0:
-                get_unique_species_in_reference(refcell, debug) 
-            else:
-                print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
+            # if refcell.error_case == 0:
+            #     get_unique_species_in_reference(refcell, debug) 
+            # else:
+            #     print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
             refcell.save(ref_cell_fname)
     
         # Print summary information
-        summary_fname = os.path.join(current_dir, "reference_summary.out")
-        with open(summary_fname, "w") as summary:
-            with redirect_stdout(summary):
-                print(name)
-                print_refmoleclist(refcell)
-                print_unique_species(refcell)
-                print_possible_charges(refcell)
+    #     summary_fname = os.path.join(current_dir, "reference_summary.out")
+    #     with open(summary_fname, "w") as summary:
+    #         with redirect_stdout(summary):
+    #             print(name)
+    #             print_refmoleclist(refcell)
+    #             print_unique_species(refcell)
+    #             print_possible_charges(refcell)
 
-    # Print error case information
-    error_fname = os.path.join(current_dir, f"reference_error_{refcell.error_case}.out")
-    print_error_case(refcell, error_fname)
-
+    # # Print error case information
+    if refcell.refmoleclist == []:
+        empty_ref_fname = os.path.join(current_dir, f"empty_refmoleclist.out")
+        print_error_case("X", empty_ref_fname)
+    else:
+        error_fname = os.path.join(current_dir, f"reference_error_{refcell.error_case}.out")
+        print_error_case(refcell.error_case, error_fname)
+        if refcell.disagree_with_cif_formula is not None and refcell.disagree_with_cif_formula == True:
+            disagree_fname = os.path.join(current_dir, f"disagree_with_cif_formula.out")
+            print_error_case(9, disagree_fname)
     return refcell
+
+def remove_disorder_atoms(atom_site_labels, ref_labels, ref_fracs, debug=0):
+    substring_to_remove = "?"
+
+    # Build new filtered lists
+    new_atom_site_labels = []
+    new_ref_labels = []
+    new_ref_fracs = []
+
+    for atom_site_label, ref_label, ref_frac in zip(atom_site_labels, ref_labels, ref_fracs):
+        if substring_to_remove not in atom_site_label:
+            new_atom_site_labels.append(atom_site_label)
+            new_ref_labels.append(ref_label)
+            new_ref_fracs.append(ref_frac)
+        else:
+            if debug >= 1:
+                print(f"Removing disorder atom: {atom_site_label}")
+
+    # Optionally overwrite originals
+    atom_site_labels = new_atom_site_labels
+    ref_labels = new_ref_labels
+    ref_fracs = new_ref_fracs
+    
+    return atom_site_labels, ref_labels, ref_fracs
 
 def create_reference (input_path, name, cell_vector, cell_param, cif_bond_info, debug):
     """Create the reference cell object."""
@@ -88,6 +119,7 @@ def create_reference (input_path, name, cell_vector, cell_param, cif_bond_info, 
     
     # Read the CIF file and extract the Wyckoff positions
     atom_site_labels, ref_labels, ref_fracs = get_wyckoff_positions (input_path)
+    atom_site_labels, ref_labels, ref_fracs = remove_disorder_atoms(atom_site_labels, ref_labels, ref_fracs, debug=debug)
     ref_pos = frac2cart_fromparam(ref_fracs, cell_param)
 
     # Generate the reference cell object
@@ -96,45 +128,28 @@ def create_reference (input_path, name, cell_vector, cell_param, cif_bond_info, 
     refcell.set_subtype("reference")
 
     # Read the CIF file and extract bond information if exists
-    # if cif_bond_info:
     geom_bond_cif, moiety_list_cif  = get_geom_bond (input_path)
     refcell.get_cif_bond_moiety(cif_bond_info, geom_bond_cif, moiety_list_cif)
-    # else:
-    #     refcell.get_cif_bond_moiety()
     print(f"refcell.exist_cif_bond_moiety: {refcell.exist_cif_bond_moiety}")
 
     if cif_bond_info:
         refcell.get_reference_molecules_from_moiety (ref_labels, ref_fracs, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR, debug=debug)
-        if refcell.refmoleclist == []:
-            print("No reference molecules found in the CIF file.")
-            refcell.error_case = 1
-        else:
-            compare_with_CIF(input_path, refcell, debug=debug)
-            if refcell.disagree_with_cif_formula:
-                refcell.error_case = 9
-            else:
-                refcell.error_case = 0
     else:
         refcell.get_reference_molecules(ref_labels, ref_fracs, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR, debug=debug)
-        if refcell.refmoleclist == []:
-            print("No reference molecules found in the CIF file.")
-            refcell.error_case = 1
-        else:        
-            compare_with_CIF(input_path, refcell, debug=debug)
-            if refcell.has_isolated_H:
-                refcell.error_case = 1
-            else : 
-                refcell.error_case = 0
 
-    if refcell.error_case == 0:
-        refcell.check_missing_H(debug=debug)  
-        refcell.assess_errors(mode="hydrogens") 
+    if refcell.refmoleclist == []:
+        print("No reference molecules found in the CIF file.")
+        return
+    
+    compare_with_CIF(input_path, refcell, debug=debug)
+    refcell.check_missing_H(debug=debug)  
+    refcell.assess_errors(mode="hydrogens") 
     
     tend = time.time()    
 
     if debug >= 1: print(f"\nReference molecules are generated. Total execution time: {tend - tini:.2f} seconds")
     
-    return refcell
+    return 
 
 def compare_with_CIF (input_path, refcell: cell, debug=0):
     """Extract chemical name, metal oxidation state, and moiety information from the CIF file."""
@@ -152,6 +167,11 @@ def compare_with_CIF (input_path, refcell: cell, debug=0):
     print(f"Moiety dictionaries: {refcell.moiety_dicts}")
 
     formulas_from_refcell = [ref.formula for ref in refcell.refmoleclist]
+
+    if len(moiety_dicts) == 0:
+        print("No _chemical_formula_moiety information found in the CIF file.")
+        return
+    
     formulas_from_cif = [labels2formula(cifformula_to_list(moiety['formula'])) for moiety in moiety_dicts]
     ratios_from_cif = [moiety['ratio'] for moiety in moiety_dicts]
     charges_from_cif = [moiety['charge'] for moiety in moiety_dicts]
@@ -192,11 +212,10 @@ def compare_with_CIF (input_path, refcell: cell, debug=0):
 
 def get_unique_species_in_reference (refcell, debug):
     """Processes the reference cell to obtain unique species and handle any errors."""
-    
     tini = time.time()
-    
+
     refcell.get_unique_species(debug=debug)
-    
+
     if debug >= 1:
         print(f"Unique species: {[specie.formula for specie in refcell.unique_species]}")
         print(f"Species list: {[specie.formula for specie in refcell.species_list]}\n")
@@ -210,32 +229,37 @@ def get_unique_species_in_reference (refcell, debug):
     
     return
 
-def print_error_case(refcell, error_fname):
+def print_error_case(error_case, error_fname):
     """Prints the error case to a file."""
 
     with open(error_fname, "w") as error_output:
         with redirect_stdout(error_output):
-            if refcell.error_case == 2 or refcell.error_case == 3 or refcell.error_case == 4 :
+            if error_case == 2 or error_case == 3 or error_case == 4 :
                 handle_error(2)
-                if refcell.error_case == 2:
+                if error_case == 2:
                     print("    - Missing Hydrogens in Water Molecules")
-                elif refcell.error_case == 3:
+                elif error_case == 3:
                     print("    - Missing Hydrogens in Coordinated Water Molecules")
-                elif refcell.error_case == 4:
+                elif error_case == 4:
                     print("    - Missing Hydrogens in Carbon Atoms")
-            elif refcell.error_case == 9:
+            elif error_case == 9:
                 handle_error(9) 
                 print("    - Missing elements in Reference Molecules compared to moieties reported in CIF")
+            elif error_case == "X":
+                print("    - Empty Reference Molecules list")
             else :
-                handle_error(refcell.error_case)
+                handle_error(error_case)
     return
 
 if __name__ == "__main__":
 
     input = sys.argv[1]
+    cif_bond_info = sys.argv[2].strip().lower() == 'true' if len(sys.argv) > 2 else False
+
     current_dir = os.getcwd()
     input_path = os.path.normpath(input)
     dir, file = os.path.split(input_path)
     name, extension = os.path.splitext(file)
-
-    process_refcell(input_path, name, current_dir, debug=1)
+    print(f"Input file: {input_path}")
+    print("CIF bond information:", cif_bond_info)
+    process_refcell(input_path, name, current_dir, cif_bond_info, debug=1)
