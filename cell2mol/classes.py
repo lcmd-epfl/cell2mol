@@ -67,7 +67,7 @@ from cell2mol.coordination_sphere import (
     define_coordination_geometry,
 )
 from cell2mol.utils import BaseModel
-from cell2mol.types import Spin, HapticType, Type, SubType, NOType, NDArray, ChargeState
+from cell2mol.my_types import Spin, HapticType, Type, SubType, NOType, NDArray, ChargeState
 
 elemdatabase = ElementData()
 import pickle

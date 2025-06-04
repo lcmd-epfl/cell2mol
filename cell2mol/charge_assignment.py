@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os
 import numpy as np  
-from cell2mol.types import Type
+from cell2mol.my_types import Type
 from cell2mol.elementdata import ElementData
 from cell2mol.connectivity import *
 from collections import defaultdict
