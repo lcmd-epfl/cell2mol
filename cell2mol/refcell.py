@@ -139,7 +139,7 @@ def create_reference (input_path, name, cell_vector, cell_param, cif_bond_info, 
 
     if refcell.refmoleclist == []:
         print("No reference molecules found in the CIF file.")
-        return
+        return refcell
     
     compare_with_CIF(input_path, refcell, debug=debug)
     refcell.check_missing_H(debug=debug)  
@@ -149,7 +149,7 @@ def create_reference (input_path, name, cell_vector, cell_param, cif_bond_info, 
 
     if debug >= 1: print(f"\nReference molecules are generated. Total execution time: {tend - tini:.2f} seconds")
     
-    return 
+    return refcell
 
 def compare_with_CIF (input_path, refcell: cell, debug=0):
     """Extract chemical name, metal oxidation state, and moiety information from the CIF file."""
