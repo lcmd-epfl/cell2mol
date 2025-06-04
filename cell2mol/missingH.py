@@ -147,9 +147,9 @@ def check_missingH(refmoleclist: list, debug: int=0):
                             bonded_atom_labels.append(ref.atoms[adj].label)
                         if debug >= 2: print("Adjacency", a.adjacency, bonded_atom_labels)
                         ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord, bonded_atom_labels)
-                        if ismissingH:
-                            for label, coord in zip(bonded_atom_labels, bonded_atom_coord):
-                                print("Dist", f"{a.label}-{label}", get_dist(a.coord, coord))
+                        # if ismissingH:
+                            # for label, coord in zip(bonded_atom_labels, bonded_atom_coord):
+                            #     print("Dist", f"{a.label}-{label}", get_dist(a.coord, coord))
                         if ismissingH:
                             if debug >= 1: print("")
                             if debug >= 1: print(f"WARNING in Missing H function for: {ref.type}, molecule index {idx}, {ref.formula}")

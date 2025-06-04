@@ -2500,6 +2500,9 @@ class metal(atom):
     coord_geometry: object | Literal["Undefined"] | None = None
     geom_deviation: float | Literal["Undefined"] | None = None
     rel_metal_radius: float | None = None
+    coord_nr_with_metal_bonds: int | None = None
+    coord_geometry_with_metal_bonds: object | Literal["Undefined"] | None = None
+    geom_deviation_with_metal_bonds: float | Literal["Undefined"] | None = None
     metal_factor: float | None = None
     cov_factor: float | None = None
     bond_order: int | None = None
