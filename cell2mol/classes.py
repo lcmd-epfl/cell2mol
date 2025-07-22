@@ -665,6 +665,17 @@ class molecule(specie):
 
     subtype: SubType = Field(default="molecule")
 
+    # Needed in get_molecule in xyz_molecule.py
+    input_charge : int | None = None
+    unique_species: list[object] | None = None
+    unique_indices: list[int] | None = None
+    species_list: list[object] | None = None
+    selected_cs : list[object] | None = None
+    error_get_poscharges : bool = False
+    error_multiple_distrib : bool = False
+    error_empty_distrib : bool = False
+    error_create_bonds : bool = False
+
     @classmethod
     @deprecated("Use molecule() with the keyword arguments instead.")
     def from_positional(
@@ -690,7 +701,10 @@ class molecule(specie):
         if self.iscomplex:
             self.spin = assign_spin_complexes(self)
         else:
-            self.spin = 1
+            if (self.eleccount - self.totcharge) % 2 == 0:
+                self.spin = 1
+            else:
+                self.spin = 2
         if debug >= 1:
             print(
                 f"GET_SPIN: Spin multiplicity of the complex {self.formula} is assigned as {self.spin}\n"
@@ -784,7 +798,7 @@ class molecule(specie):
                 for m in post_transition_metal_indices:
                     self.metals.append(self.atoms[m])
             else:
-                if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
+                if refcell is not None and refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
                     blocklist = split_species(
                         rest_labels,
                         rest_coord,
@@ -941,7 +955,7 @@ class molecule(specie):
                 for m in IA_IIA_metal_indices:
                     self.metals.append(self.atoms[m])
             else:
-                if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
+                if refcell is not None and refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
                     blocklist = split_species(
                         rest_labels,
                         rest_coord,
@@ -1105,7 +1119,7 @@ class molecule(specie):
                 for m in metal_idx:
                     self.metals.append(self.atoms[m])
             else:
-                if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
+                if refcell is not None and refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
                     blocklist = split_species(
                         rest_labels,
                         rest_coord,
@@ -1139,7 +1153,8 @@ class molecule(specie):
                         lig_atom_site_labels = extract_from_list(
                             b, rest_atom_site_labels, dimension=1
                         )
-
+                    else:
+                        lig_atom_site_labels = None
                     if debug > 0:
                         print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
                     # Create Ligand Object
@@ -1364,7 +1379,7 @@ class molecule(specie):
 
         unique_indices = [specie.unique_index for specie in self.species_list]
 
-        final_charge_distribution, final_charges = balance_charge(unique_indices, self.unique_species, charges_sum=input_charge, debug=debug,)
+        final_charge_distribution, final_charges = balance_charge(unique_indices, self.unique_species, input_charge=input_charge, debug=debug,)
         print(f"{len(final_charge_distribution)=} {final_charge_distribution=}")
         # Handle multiple or no charge distributions
         dist_count = len(final_charge_distribution)
@@ -1549,7 +1564,7 @@ class ligand(specie):
         geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
         mol = self.get_parent("molecule")
 
-        if refcell.exist_cif_bond_moiety:
+        if refcell is not None and refcell.exist_cif_bond_moiety:
             for met in mol.metals:
                 tmplabels = self.labels.copy()
                 tmpcoord = self.coord.copy()
@@ -1730,11 +1745,13 @@ class ligand(specie):
             conn_atom_site_labels = extract_from_list(
                 connected_idx, self.atom_site_labels, dimension=1
             )
+        else:
+            conn_atom_site_labels = None
         if debug >= 2:
             print(f"\tLIGAND.SPLIT_LIGAND: {conn_labels=}")
         if debug >= 2:
             print(f"\tLIGAND.SPLIT_LIGAND: {conn_atom_site_labels=}")
-        if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
+        if refcell is not None and refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
             blocklist = split_species(
                 conn_labels,
                 conn_coord,
@@ -1768,6 +1785,8 @@ class ligand(specie):
                 gr_atom_site_labels = extract_from_list(
                     b, conn_atom_site_labels, dimension=1
                 )
+            else:
+                gr_atom_site_labels = None
             # Create Group Object
             if self.frac_coord is not None:
                 newgroup = group.from_positional(
@@ -1950,7 +1969,7 @@ class group(specie):
         if lig.metals is None:
             lig.get_connected_metals()
 
-        if refcell.exist_cif_bond_moiety:
+        if refcell is not None and refcell.exist_cif_bond_moiety:
 
             for met in lig.metals:
                 tmplabels = self.labels.copy()
@@ -2074,8 +2093,6 @@ class bond(BaseModel):
     # Required constructor parameters
     atom1: object
     atom2: object
-    # TOFIX @choglass: Is it int? It seems that we assign floats in new_charge_assignment.py#409
-    # THIS IS A FLOAT, NOT AN INT
     order: float = Field(default=1, alias="bond_order")  # Using alias to match original parameter name
     
     # Computed attribute with proper default
@@ -2088,7 +2105,7 @@ class bond(BaseModel):
     def model_post_init(self, __context: Any) -> None:
         # Compute distance between atoms
         self.distance = round(
-            np.linalg.norm(np.array(self.atom1.coord) - np.array(self.atom2.coord)), 3
+            float(np.linalg.norm(np.array(self.atom1.coord) - np.array(self.atom2.coord))), 3
         )
 
     def __str__(self):
@@ -2234,7 +2251,7 @@ class atom(BaseModel):
         labels = list([self.label, other.label])
         coords = list([self.coord, other.coord])
         refcell = self.get_parent("reference")
-        if refcell.exist_cif_bond_moiety:
+        if refcell is not None and refcell.exist_cif_bond_moiety:
             atom_site_labels = [self.atom_site_label, other.atom_site_label]
             isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds(
                 labels, coords, atom_site_labels, refcell.geom_bond_cif
@@ -2513,6 +2530,8 @@ class metal(atom):
     unique_index: int | None = None
     charge: int | None = None
     possible_cs: list[int] | None = None
+    spin: Spin | None = None
+    valence_elec: int | None = None
 
     subtype: SubType = Field(default="metal")
 
@@ -2576,7 +2595,7 @@ class metal(atom):
         geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
 
         mol = self.get_parent("molecule")
-        if refcell.exist_cif_bond_moiety:
+        if refcell is not None and refcell.exist_cif_bond_moiety:
 
             for lig in mol.ligands:
                 for group in lig.groups:
@@ -2703,8 +2722,8 @@ class metal(atom):
             if group.is_haptic == False:
                 for atom in group.atoms:
                     diff = round(
-                        get_dist(self.coord, atom.coord)
-                        - elemdatabase.CovalentRadius3[atom.label],
+                        float(get_dist(self.coord, atom.coord)
+                        - elemdatabase.CovalentRadius3[atom.label]),
                         3,
                     )
                     diff_list.append(diff)
@@ -2714,12 +2733,12 @@ class metal(atom):
                     np.array([atom.coord for atom in group.atoms])
                 )
                 diff = round(
-                    get_dist(self.coord, haptic_center_coord)
-                    - elemdatabase.CovalentRadius3[haptic_center_label],
+                    float(get_dist(self.coord, haptic_center_coord)
+                    - elemdatabase.CovalentRadius3[haptic_center_label]),
                     3,
                 )
                 diff_list.append(diff)
-        average = round(np.average(diff_list), 3)
+        average = round(float(np.average(diff_list)), 3)    
 
         if debug > 1:
             print(f"METAL.Get_relative_metal_radius: {diff_list=}")
@@ -2736,7 +2755,7 @@ class metal(atom):
         self.metals = []
         mol = self.get_parent("molecule")
         refcell = self.get_parent("reference")
-        if refcell.exist_cif_bond_moiety:
+        if refcell is not None and refcell.exist_cif_bond_moiety:
 
             pidx = self.get_parent_index("molecule")
             # print(f"METAL.Get_connected_metals: {self.label} {pidx=} {mol.metals=}")

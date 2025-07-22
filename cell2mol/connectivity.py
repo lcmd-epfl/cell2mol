@@ -52,7 +52,7 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
             # if debug >= 2: print(f"ADD_ATOM: received {newlab=}")
             # if debug >= 2: print(f"ADD_ATOM: received {tmpconmat=}")
             # if debug >= 2: print(f"ADD_ATOM: received {tmpconnec=}")
-            if debug >= 2: print(f"ADD_ATOM: received {tmpconnec[posadded]=}")
+            if debug >= 2: print(f"ADD_ATOM: received tmpconnec[posadded]={int(tmpconnec[posadded])}")
             newlab_with_metal = newlab.copy()
             newcoord_with_metal = newcoord.copy()
             newlab_with_metal.append(tgt.label)
