@@ -23,14 +23,14 @@ def assign_spin_metal (metal:object, debug: int=0) -> None:
     """
     valence_elec = metal.get_valence_elec(metal.charge)
     period = elemdatabase.elementperiod[metal.label]
-
-    if period == 4:  # 3d transition metals
+    block = elemdatabase.elementblock[metal.label]
+    if period == 4 and block == "d":  # 3d transition metals
         if valence_elec in [0, 10]:                                        return 1
         elif valence_elec in [1, 9]:                                       return 2
         elif valence_elec in [2, 3] and metal.get_parent("molecule").is_haptic == False :         return (valence_elec + 1)
         elif valence_elec in [4, 5, 6, 7, 8] or (valence_elec in [2, 3] and metal.get_parent("molecule").is_haptic == True) :
-            if metal.coord_geometry is not None and metal.coord_geometry != "Undefined":  
-                # Predict spin multiplicity of metal based on Random forest model
+            if metal.coord_geometry is not None and metal.coord_geometry != "Undefined":
+                # Predict spin multiplicity of metal based on Random Forest model
                 feature = generate_feature_vector (metal, target_prop="spin", debug=debug)
                 path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), "total_spin_3131.pkl")
                 ramdom_forest = pickle.load(open(path_rf, 'rb'))
@@ -41,24 +41,27 @@ def assign_spin_metal (metal:object, debug: int=0) -> None:
             else:
                 print("ASSIGN_SPIN_METAL: Error! Coordination geometry of the metal is not defined.")
                 return None
-        else :
+        else:
             print("ASSIGN_SPIN_METAL: Error! Spin multiplicity could not be assigned to the metal with valence electrons: ", valence_elec)
             return None
-    else :      # 4d and 5d transition metals
+    elif period > 4 and block == "d":      # 4d and 5d transition metals
         if valence_elec % 2 == 0:   return 1
         else:                       return 2
+    else: # other metals
+        return None
 
 #######################################################
 def assign_spin_complexes (mol:object, debug: int=0) -> None:
     """ Assigns spin multiplicity of the transition metal complexes.
     """
     for metal in mol.metals:
-        if metal.spin is None: metal.get_spin(debug=debug)
+        if metal.spin is None and (elemdatabase.elementblock[metal.label] == 'd'): 
+            metal.get_spin(debug=debug)
     for ligand in mol.ligands:
         if ligand.is_nitrosyl is None: ligand.evaluate_as_nitrosyl()
     
-    metals_spin = [metal.spin for metal in mol.metals]
-    if debug >=2: print(f"ASSIGN_SPIN_COMPLEXES: {metals_spin=}")
+    metals_spin = [metal.spin for metal in mol.metals if metal.spin is not None]
+    if debug >= 2: print(f"ASSIGN_SPIN_COMPLEXES: {metals_spin=}")
 
     if any([ligand.is_nitrosyl for ligand in mol.ligands]):       return None
     else :

@@ -393,7 +393,7 @@ def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
                 
                 if specie.atoms[idx].bonds is not None:
                     if debug >=1 : 
-                        print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, np.round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
+                        print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
                 else:
                     if specie.natoms == 1:
                         if debug >=1: print(f"\tNO BONDS CREATED for {specie.atoms[idx].label} because it is the only atom in {specie.subtype} object")
@@ -436,7 +436,7 @@ def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
                 if idx not in non_bonded_atoms:
                     if specie.atoms[idx].bonds is not None:
                         if debug >=2: 
-                            print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, np.round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
+                            print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
                     else:
                         if specie.natoms == 1:
                             if debug >=1: print(f"\tNO BONDS CREATED for {specie.atoms[idx].label} because it is the only atom in {specie.subtype} object")
