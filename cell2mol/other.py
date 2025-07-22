@@ -72,7 +72,8 @@ def compute_centroid(arr: np.array) -> list:
 #######################################################
 def get_dist (atom1_pos: list, atom2_pos: list) -> float :
     dist = np.linalg.norm(np.array(atom1_pos) - np.array(atom2_pos))
-    return round(dist, 3)
+    dist = round(float(dist), 3)
+    return dist
 
 ##############################
 def get_angle(vec1, vec2) -> float : 

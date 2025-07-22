@@ -1014,12 +1014,12 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
     return lchar
 
 #######################################################
-def eval_chargelist(atom_charges: list, debug: int=0) -> Tuple[np.ndarray, np.ndarray, bool]:
-    abstotal = np.abs(np.sum(atom_charges))
+def eval_chargelist(atom_charges: list, debug: int=0) -> Tuple[int, int, bool]:
+    abstotal = int(np.abs(np.sum(atom_charges)))
     abs_atlist = []
     for a in atom_charges:
         abs_atlist.append(abs(a))
-    abs_atcharge = np.sum(abs_atlist)
+    abs_atcharge = int(np.sum(abs_atlist))
     if any(b > 0 for b in atom_charges) and any(b < 0 for b in atom_charges):
         zwitt = True
     else:
@@ -1854,8 +1854,8 @@ class charge_state(BaseModel):
     protonation: object  # protonation object
     
     # Computed attributes with proper defaults
-    uncorr_abstotal: float | None = None
-    uncorr_abs_atcharge: float | None = None
+    uncorr_abstotal: int | None = None
+    uncorr_abs_atcharge: int | None = None
     uncorr_zwitt: bool | None = None
     coincide: bool | None = None
     
@@ -1869,8 +1869,8 @@ class charge_state(BaseModel):
     corr_atom_charges: list[int] = Field(default_factory=list)
     
     # Final computed attributes with proper defaults
-    corr_abstotal: float | None = None
-    corr_abs_atcharge: float | None = None
+    corr_abstotal: int | None = None
+    corr_abs_atcharge: int | None = None
     corr_zwitt: bool | None = None
     
     # Frozen fields

@@ -44,6 +44,9 @@ def get_molecule (input_path, name, input_charge, current_dir, debug=2):
                 newmolec.split_complex()
             elif newmolec.has_IA_IIA:
                 newmolec.split_IA_IIA()
+            elif newmolec.has_post_transition_metal:
+                print(f"GETREFS: {newmolec.formula} has post-transition metal")
+                newmolec.split_post_transition_metal()
             else:
                 newmolec.add_parent(newmolec, indices=[*range(0,newmolec.natoms,1)])
             
@@ -70,6 +73,20 @@ def get_molecule (input_path, name, input_charge, current_dir, debug=2):
                     met.get_connected_metals(debug=debug)                         
                     met.get_coordination_geometry(debug=debug)
                     met.get_coord_sphere_formula(debug=debug)
+            elif newmolec.has_post_transition_metal:
+                if debug >= 0: print(f"GET_MOLECULE: working with {newmolec.formula} with post-transition metals")
+                if debug >= 0: print(f"GET_MOLECULE: {[met.label for met in newmolec.metals]}")
+                if debug >= 0: print(f"GET_MOLECULE: {[lig.formula for lig in newmolec.ligands]}")
+                if len(newmolec.ligands) == 0 :
+                    pass
+                else:
+                    for lig in newmolec.ligands:
+                        lig.get_denticity(debug=debug)
+                for met in newmolec.metals:
+                    met.get_connected_metals(debug=debug)
+                    met.get_coordination_geometry(debug=debug)
+                    met.get_coord_sphere_formula(debug=debug)
+
             newmolec.input_charge = input_charge
             if input_charge is not None:
                 newmolec.get_unique_species()
@@ -97,10 +114,11 @@ def get_molecule (input_path, name, input_charge, current_dir, debug=2):
 if __name__ == "__main__":
 
     input = sys.argv[1]
+    input_charge = sys.argv[2] 
     current_dir = os.getcwd()
     input_path = os.path.normpath(input)
     dir, file = os.path.split(input_path)
     name, extension = os.path.splitext(file)
 
     # Example usage, replace with actual arguments
-    get_molecule(input_path, name, current_dir, debug=1)
+    get_molecule(input_path, name, input_charge, current_dir, debug=1)

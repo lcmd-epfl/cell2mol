@@ -1,17 +1,21 @@
 import numpy as np
 import os
+from cell2mol import __file__
 import yaml
-from cosymlib import Geometry
 from cell2mol.other import *
 from cell2mol.connectivity import add_atom, get_adjmatrix, get_adjmatrix_from_cif_bonds
 from cell2mol.elementdata import ElementData
+from scipy.optimize import linear_sum_assignment      # Hungarian algorithm
+from scipy.stats import special_ortho_group           # more evenly distributed 
+from scipy.linalg import svd
 elemdatabase = ElementData()
 
 #######################################################
-# global ideal_structures
-# file_path = os.path.dirname(os.path.abspath(__file__)) + '/ideal_structures_center.yaml'
-# with open(file_path, 'r') as stream:c
-#     ideal_structures = yaml.safe_load(stream)
+# Load YAML file
+path = os.path.join( os.path.abspath(os.path.dirname(__file__)), "ideal_structures_center.yaml")
+with open(path, "r") as file:
+    data = yaml.safe_load(file)
+ideal_shapes_from_cosymlib = {key: np.array(value) for key, value in data.items()}
 #######################################################
 ###     Define coordination geometry from groups    ### 
 #######################################################
@@ -70,9 +74,39 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
 
     # return coordination_geometry
     return coord_nr, coordination_geometry, geom_deviation
-
 #######################################################
 def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:
+    # Get shape measure of a set of coordinates
+
+    if debug >= 2:print(f"SHAPE_MEASURE: {symbols=}")
+    if debug >= 2:print(f"SHAPE_MEASURE: {positions=}")
+
+    cn = len(symbols)-1 # coordination number of metal center
+    if debug >= 2: print(f"SHAPE_MEASURE: coordination number of metal center {cn}")
+    
+    if cn == 0 : 
+        posgeom_dev = {}
+    elif cn == 1 :
+        posgeom_dev = {'Linear' : 0.0}
+    else :
+        posgeom_dev={}
+        try :
+            ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)], dtype=object)
+            ideal_shapes = {}
+            for idx, rg in enumerate(ref_geom[:,0]):
+                geom = ref_geom[:,3][idx]
+                ideal_shapes[geom]=ideal_shapes_from_cosymlib[rg]
+            print(f"SHAPE_MEASURE: Ideal_shapes: {ideal_shapes.keys()}")
+            for geom, ideal_shape in ideal_shapes.items():
+                chsm = calc_cshm_fast(positions, ideal_shape)
+                posgeom_dev[geom]=round(float(chsm), 3)
+        except:
+            print(f"SHAPE_MEASURE: {cn} Vertices not found in shape_structure_references")
+
+    return posgeom_dev
+#######################################################
+def shape_measure_old (symbols: list, positions: list, debug: int=0) -> dict:
+    from cosymlib import Geometry
     # Get shape measure of a set of coordinates
 
     if debug >= 2:print(f"SHAPE_MEASURE: {symbols=}")
@@ -94,10 +128,10 @@ def shape_measure (symbols: list, positions: list, debug: int=0) -> dict:
     else :
         posgeom_dev={}
         try :
-            ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)])
+            ref_geom = np.array(shape_structure_references_simplified['{} Vertices'.format(cn)], dtype=object)
             for idx, rg in enumerate(ref_geom[:,0]):
                 shp_measure = geometry.get_shape_measure(rg, central_atom=1)
-                geom = ref_geom[:,3][idx]
+                geom = str(ref_geom[:,3][idx])
                 posgeom_dev[geom]=round(shp_measure, 3)      
         except:
             print(f"SHAPE_MEASURE: {cn} Vertices not found in shape_structure_references")
@@ -191,202 +225,64 @@ shape_structure_references_simplified = {'2 Vertices': [['L-2', 1, 'Dinfh', 'Lin
                         '48 Vertices': [['TCOC-48', 1, 'Oh', 'Truncated cuboctahedron']],
                         '60 Vertices': [['TRIC-60', 1, 'Ih', 'Truncated icosahedron (fullerene)']]}
 
+########################################################
+# From https://github.com/radi0sus/cshm-cc/blob/main/cshm-cc.py
+def normalize_structure(coordinates):
+    # center and normalize the structure for CShM calculations
+    centered_coords = coordinates - np.mean(coordinates, axis=0)
+    norm = np.sqrt(np.mean(np.sum(centered_coords**2, axis=1)))
+    return centered_coords / norm
 
-#######################################################
-###    Make corrcetion for coordination sphere      ###
-#######################################################
-covalent_factor_for_metal_v2 = {
-    'H': 1.19,
-    'D': 1.19,
-    'He': 1.68,
-    'Li': 0.99,
-    'Be': 0.95,
-    'B': 1.1,
-    'C': 1.22,
-    'N': 1.19,
-    'O': 1.21,
-    'F': 1.14,
-    'Ne': 1.56,
-    'Na': 0.88,
-    'Mg': 1.04,
-    'Al': 1.32,
-    'Si': 1.06,
-    'P': 1.14,
-    'S': 1.19,
-    'Cl': 1.19,
-    'Ar': 1.5,
-    'K': 0.79,
-    'Ca': 0.97,
-    'Sc': 1.3,
-    'Ti': 1.3,
-    'V': 1.3,
-    'Cr': 1.3,
-    'Mn': 1.3,
-    'Fe': 1.3,
-    'Co': 1.3,
-    'Ni': 1.3,
-    'Cu': 1.3,
-    'Zn': 1.3,
-    'Ga': 1.26,
-    'Ge': 1.24,
-    'As': 1.12,
-    'Se': 1.12,
-    'Br': 1.21,
-    'Kr': 1.6,
-    'Rb': 1.02,
-    'Sr': 0.97,
-    'Y': 1.3,
-    'Zr': 1.3,
-    'Nb': 1.3,
-    'Mo': 1.3,
-    'Tc': 1.3,
-    'Ru': 1.3,
-    'Rh': 1.3,
-    'Pd': 1.3,
-    'Ag': 1.3,
-    'Cd': 1.3,
-    'In': 1.35,
-    'Sn': 1.29,
-    'Sb': 1.04,
-    'Te': 1.06,
-    'I': 1.21,
-    'Xe': 1.51,
-    'Cs': 1.03,
-    'Ba': 0.99,
-    'La': 1.3,
-    'Ce': 1.3,
-    'Pr': 1.3,
-    'Nd': 1.3,
-    'Pm': 1.3,
-    'Sm': 1.3,
-    'Eu': 1.3,
-    'Gd': 1.3,
-    'Tb': 1.3,
-    'Dy': 1.3,
-    'Ho': 1.3,
-    'Er': 1.3,
-    'Tm': 1.3,
-    'Yb': 1.3,
-    'Lu': 1.3,
-    'Hf': 1.3,
-    'Ta': 1.3,
-    'W': 1.3,
-    'Re': 1.3,
-    'Os': 1.3,
-    'Ir': 1.3,
-    'Pt': 1.3,
-    'Au': 1.3,
-    'Hg': 1.3,
-    'Tl': 1.3,
-    'Pb': 1.29,
-    'Bi': 1.28,
-    'Po': 1.38,
-    'At': 1.34,
-    'Rn': 1.63,
-    'Fr': 1.09,
-    'Ra': 1.16,
-    'Ac': 1.3,
-    'Th': 1.3,
-    'Pa': 1.3,
-    'U': 1.3,
-    'Np': 1.3,
-    'Pu': 1.3,
-    'Am': 1.3,
-    'Cm': 1.3,
-    'Bk': 1.3,
-    'Cf': 1.3,
-    'Es': 1.3,
-    'Fm': 1.3,
-    'Md': 1.3,
-    'No': 1.3,
-    'Lr': 1.3,
-    'Rf': 1.3,
-    'Db': 1.3,
-    'Sg': 1.3,
-    'Bh': 1.3,
-    'Hs': 1.3,
-    'Mt': 1.3  
-}
-#######################################################
-def get_thres_from_two_atoms(label_i, label_j, factor=1.3, debug=0): 
-   
-    radii_i = elemdatabase.CovalentRadius3[label_i]
-    radii_j = elemdatabase.CovalentRadius3[label_j]
-
-    if (
-            elemdatabase.elementblock[label_i] == "d"
-            or elemdatabase.elementblock[label_i] == "f"
-            or elemdatabase.elementblock[label_j] == "d"
-            or elemdatabase.elementblock[label_j] == "f"
-        ):
-            factor_i = covalent_factor_for_metal_v2 [label_i]
-            factor_j = covalent_factor_for_metal_v2 [label_j]
-
-            if factor_i < factor_j  :   new_factor = factor_i
-            elif factor_i == factor_j : new_factor = factor_i
-            else :                      new_factor = factor_j
-
-            thres = round( (radii_i + radii_j) * new_factor, 3)
-            # if debug >=2 :  print(f"{label_i} : {radii_i} ({factor_i}), {label_j} : {radii_j} ({factor_j}), {new_factor=}, {thres=}")
-    else :
-        thres = round( (radii_i + radii_j) * factor , 3)
-        # if debug >=2 :  print(f"{label_i} : {radii_i}, {label_j} : {radii_j}, {factor}, {thres=}")   
+########################################################
+# From https://github.com/radi0sus/cshm-cc/blob/main/cshm-cc.py
+def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
+    # faster Hungarian algorithm optimization
+    # check number of trials, if it is to low, it calculates the
+    # local and not the global minimum
+    input_structure = normalize_structure(coordinates)
+    ideal_sq_norms = np.sum(ideal_shape**2)
+    # try different rotations first, then optimize assignment
+    min_cshm = float('inf')
     
-    return thres
+    # generate some initial rotations to avoid local minima
+    for trial in range(num_trials):
+        if trial == 0:
+            # first trial with identity rotation
+            R_init = np.eye(3)
+        else:
+            # random rotation matrix for subsequent trials
+            # generate a random rotation matrix 
+            
+            R_init = special_ortho_group.rvs(3)  
+            
+            # Ensure it's a proper rotation (det=1)
+            if np.linalg.det(R_init) < 0:
+                R_init[:, 0] *= -1
+                
+        # apply initial rotation to ideal shape
+        rotated_ideal_init = np.dot(ideal_shape, R_init)
+        
+        # compute cost matrix based on squared Euclidean distances
+        cost_matrix = np.linalg.norm(input_structure[:, None, :] - rotated_ideal_init[None, :, :], axis=2)
+        
+        # solve assignment problem (Hungarian algorithm)
+        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+        
+        # rearrange ideal_shape based on optimal assignment
+        permuted_ideal = ideal_shape[col_ind]
 
-#######################################################
-def check_neighboring_atoms_mconnec (idx, group, metal, debug):
-    
-    atom = group.atoms[idx]
-    print(atom.label, atom.adjacency)
-    neighbors = [ group.get_parent("molecule").atoms[j] for j in atom.adjacency ]
-    nb_dist_from_metal = [ get_dist(nb.coord, metal.coord) for nb in neighbors]
+        # compute optimal rotation using SVD
+        H = np.dot(input_structure.T, permuted_ideal)
+        U, _, Vt = svd(H)
+        R = np.dot(Vt.T, U.T)
 
-    neighbors_mconnec =[]
-    for nb, dist in zip(neighbors, nb_dist_from_metal) :
-        thres = get_thres_from_two_atoms(metal.label, nb.label, debug=debug)
-        if dist > thres :   pass
-        else :              neighbors_mconnec.append(nb) 
+        rotated_ideal = np.dot(permuted_ideal, R)
+        scale = np.sum(input_structure * rotated_ideal) / ideal_sq_norms
+        cshm = np.mean(np.sum((input_structure - scale * rotated_ideal) ** 2, axis=1))
+        
+        min_cshm = min(min_cshm, cshm)
 
-    if debug >= 2 : 
-        print(f"CHECK NEIGHBORS: {atom.label} connected to {[nb.label for nb in neighbors]}")
-        print(f"CHECK NEIGHBORS: Among these neighbors, {[nb_m.label for nb_m in neighbors_mconnec]}") 
-
-    if len(neighbors_mconnec) >= 2 :
-        if debug >=1 : 
-            print(f"CHECK NEIGHBORS:[Check] This coordinating atom {atom.label} connected to more than one coordinating atoms to the metal {metal.label}")
-        if set([nb_m.label for nb_m in neighbors_mconnec]) == set(["H"]) :  
-            isremoved = False
-        else :  
-            isremoved = True 
-            if debug >=1 : print("CHECK NEIGHBORS: !!! Wrong metal-coordination assignment for Atom", idx, atom.label, get_dist(atom.coord, metal.coord), "due to neighboring atoms")
-    
-    elif len(neighbors_mconnec) == 1 :
-        nb_m = neighbors_mconnec[0]
-        if debug >=1 : print(f"CHECK NEIGHBORS: [Check] This coordinating atom {atom.label} connected to another coordinating atom {nb_m.label} to the metal {metal.label}")
-
-        if (atom.label == "H" and nb_m.label in ["B", "O", "N", "C"]) :
-            isremoved = True
-            if debug >=1 : print("CHECK NEIGHBORS: !!! Wrong metal-coordination assignment for Atom", idx, atom.label, get_dist(atom.coord, metal.coord), "due to H")
-
-        elif (atom.label in ["B", "O", "N", "C"] and nb_m.label == "H") :
-            isremoved = False # H will be removed later
-            if debug >=1 : print("CHECK NEIGHBORS: metal-coordination assignment for Atom", idx, atom.label, get_dist(atom.coord, metal.coord), "connected to H which will be removed later")
-
-        else : # Check angle between metal-coordinating atoms               
-            vector1 = np.subtract(np.array(atom.coord), np.array(nb_m.coord))
-            vector2 = np.subtract(np.array(atom.coord), np.array(metal.coord))                        
-            angle = np.degrees(get_angle(vector1, vector2))
-            if angle < 55 :
-                if debug >= 1 : print("CHECK NEIGHBORS: !!! Wrong metal-coordination assignment for Atom", idx, atom.label, get_dist(atom.coord, metal.coord), "due to the angle", round(angle,2))
-                isremoved = True
-            else :
-                isremoved = False
-    else :
-        isremoved = False
-        if debug >=1 : print(f"CHECK NEIGHBORS: There is no neighbor atom connected to the metal {metal.label}")
-    
-    return isremoved
+    return min_cshm * 100
 
 #######################################################    
 def coordination_correction_for_nonhaptic(group: object, debug: int=0):
@@ -478,13 +374,10 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
     print(f"split_groups: {split_groups=}")
     final_group_indices = extract_final_indices(original_indices, split_groups)
     print(f"final_group_indices: {final_group_indices=}")
+    
     return group, final_group_indices, final_ligand_indices
-    
-    
-    #return group, split_groups, final_ligand_indices
-    #return group, split_groups[0], final_ligand_indices
-    # return group, conn_idx, final_ligand_indices
 
+#######################################################
 def extract_final_indices(initial_list, intermediate_list):
     result = []
     seen = set()
@@ -506,14 +399,13 @@ def extract_final_indices(initial_list, intermediate_list):
 
 #######################################################    
 def coordination_correction_for_haptic (group: object, debug: int=0):
-    thres_std = 0.05
-    thres_ratio = 0.95
+    add_factor = 0.45
     if debug > 0: print("Entering COORD_CORR_HAPTIC:")
     ratio_list = []
     for idx, atom in enumerate(group.atoms):
         metal = atom.get_closest_metal()
         dist = get_dist(atom.coord, metal.coord)
-        thres = get_thres_from_two_atoms(metal.label, atom.label, debug=debug)
+        thres = (metal.label + atom.label) + add_factor
         ratio_list.append(round(dist/thres,3))
         if debug >= 2 : 
             print(f"\tAtom {idx} :", atom.label, f"\tMetal :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
@@ -528,10 +420,6 @@ def coordination_correction_for_haptic (group: object, debug: int=0):
             if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
             if debug >=1 : print(atom.label)
             atom.reset_mconnec(metal, debug=debug)  
-        # elif std_dev > thres_std and ratio > thres_ratio :
-        #     if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to the long distance")
-        #     if debug >=1 : print(atom.label)
-        #     atom.reset_mconnec(metal, debug=debug) 
         else :
             conn_idx.append(idx)
             final_ligand_indices.append(atom.get_parent_index("ligand"))

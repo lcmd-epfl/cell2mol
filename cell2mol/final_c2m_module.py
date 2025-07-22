@@ -151,6 +151,13 @@ def charge_assignment(newcell, refcell, debug):
         refcell.error_case = 8
         print_elapsed("Creating bonds Failed for reference cell.", start_time)
         return newcell, refcell
+    
+    # Assign spin multiplicity to reference molecules with TMs
+    # for ref in refcell.refmoleclist:
+    #     if ref.iscomplex:
+    #         for metal in ref.metals:
+    #             metal.get_spin(debug=debug)
+    #         ref.get_spin(debug=debug)
 
     newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
     newcell.unique_species = copy.deepcopy(refcell.unique_species)
@@ -165,8 +172,18 @@ def charge_assignment(newcell, refcell, debug):
         return newcell, refcell
 
     print_elapsed("Charge Assignment Finished Normally.", start_time)
-
+    
+    # for mol in newcell.moleclist:
+    #     if mol.iscomplex:
+    #         for metal in mol.metals:
+    #             metal.get_spin(debug=debug)
+    #         mol.get_spin(debug=debug)
+            
     return newcell, refcell
+
+
+
+
 
 def print_elapsed(message: str, start_time: float):
     """Print the elapsed time since start_time."""

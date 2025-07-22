@@ -61,20 +61,20 @@ def process_refcell(input_path, name, current_dir, cif_bond_info, debug=0):
                         writexyz(current_dir, f"{name}_Ref_{i}_{ref.formula}.xyz", ref.labels, ref.coord, charge="", spin="")
                         print(f"Ref molecule {i} {ref.formula} without charge and spin information")
 
-            # if refcell.error_case == 0:
-            #     get_unique_species_in_reference(refcell, debug) 
-            # else:
-            #     print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
+            if refcell.error_case == 0:
+                get_unique_species_in_reference(refcell, debug) 
+            else:
+                print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
             refcell.save(ref_cell_fname)
     
-        # Print summary information
-    #     summary_fname = os.path.join(current_dir, "reference_summary.out")
-    #     with open(summary_fname, "w") as summary:
-    #         with redirect_stdout(summary):
-    #             print(name)
-    #             print_refmoleclist(refcell)
-    #             print_unique_species(refcell)
-    #             print_possible_charges(refcell)
+        #Print summary information
+        summary_fname = os.path.join(current_dir, "reference_summary.out")
+        with open(summary_fname, "w") as summary:
+            with redirect_stdout(summary):
+                print(name)
+                print_refmoleclist(refcell)
+                print_unique_species(refcell)
+                print_possible_charges(refcell)
 
     # # Print error case information
     if refcell.refmoleclist == []:
