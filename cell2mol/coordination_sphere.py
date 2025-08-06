@@ -401,30 +401,43 @@ def extract_final_indices(initial_list, intermediate_list):
 def coordination_correction_for_haptic (group: object, debug: int=0):
     add_factor = 0.45
     if debug > 0: print("Entering COORD_CORR_HAPTIC:")
-    ratio_list = []
+
+    distances = []
     for idx, atom in enumerate(group.atoms):
         metal = atom.get_closest_metal()
         dist = get_dist(atom.coord, metal.coord)
         thres = (metal.radii + atom.radii) + add_factor
-        ratio_list.append(round(dist/thres,3))
+        #ratio_list.append(round(dist/thres,3))
+        distances.append(round(dist, 3))
         if debug >= 2 : 
             print(f"\tAtom {idx} :", atom.label, f"\tMetal :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
-
-    std_dev = round(float(np.std(ratio_list)), 3)
-    if debug >= 2 : print(f"\t{ratio_list=} {std_dev=}")
+    mean = np.mean(distances)
+    std_dev = round(float(np.std(distances)), 3)
+    if debug >= 2 : print(f"\t{distances=} {mean=} {std_dev=}")
 
     conn_idx = []
     final_ligand_indices = []
-    for idx, (atom, ratio) in enumerate(zip(group.atoms, ratio_list)) :
+    for idx, (atom, dist) in enumerate(zip(group.atoms, distances)) :
         if atom.label == "H" : 
             if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
             if debug >=1 : print(atom.label)
             atom.reset_mconnec(metal, debug=debug)  
-        else :
+        elif std_dev > 0.1 :
+            if dist < mean - std_dev:
+                conn_idx.append(idx)
+                final_ligand_indices.append(atom.get_parent_index("ligand"))
+            else:
+                atom.reset_mconnec(metal, debug=debug)  
+        else:
             conn_idx.append(idx)
             final_ligand_indices.append(atom.get_parent_index("ligand"))
 
     conn_idx = sorted(list(set(conn_idx)))
     conn_idx = [conn_idx]
+    print(f"conn_idx: {conn_idx=}")
     return group, conn_idx, final_ligand_indices
+    # final_group_indices = extract_final_indices(range(len(group.atoms)), conn_idx)
+    # print(f"final_group_indices: {final_group_indices=}")
+    # return group, final_group_indices, final_ligand_indices
+
 #######################################################
