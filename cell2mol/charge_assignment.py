@@ -196,7 +196,7 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
         if (idx in listofminabs) and (idx in listofmintot) and coincide[idx]:
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it is in both minima")
             tmplist.append(idx)
-        elif (idx in listofminabs) and uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
+        elif uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same coordinating_atoms_uncorr_abs_atcharge")
             tmplist.append(idx)
 
@@ -393,10 +393,13 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
     aromatic_atoms = []
     aromatic_rings = []
     added_into_aromatic = []
+    coordinating_atoms_uncorr_abs_atcharge = []
     charge_states =[ch for ch in charge_states if ch is not None]
 
     if len(charge_states) == 0: return []
-
+    coordinating_atoms = [
+        idx for idx, atom in enumerate(charge_states[0].protonation.parent.atoms) if atom.mconnec > 0
+    ]
     for chs in charge_states:
         uncorr_total.append(chs.uncorr_total_charge)
         uncorr_abs_total.append(chs.uncorr_abstotal)
@@ -409,6 +412,7 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
         aromatic_atoms.append(aromatic_dict["Aromatic atoms"])
         aromatic_rings.append(aromatic_dict["Number of aromatic rings"])
         added_into_aromatic.append(aromatic_dict["Added to aromatic atoms"])
+        coordinating_atoms_uncorr_abs_atcharge.append(sum([abs(chs.uncorr_atom_charges[idx]) for idx in coordinating_atoms]))
 
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_total: {uncorr_total}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_abs_total: {uncorr_abs_total}")
@@ -418,6 +422,7 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
     if debug >= 2: print(f"    NEW SELECT FUNCTION: aromatic_atoms: {aromatic_atoms}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: aromatic_rings: {aromatic_rings}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: added_into_aromatic: {added_into_aromatic}")
+    if debug >= 2: print(f"    NEW SELECT FUNCTION: coordinating_atoms_uncorr_abs_atcharge: {coordinating_atoms_uncorr_abs_atcharge}")
 
     minoftot = np.min(uncorr_abs_total)
     minofabs = np.min(uncorr_abs_atcharge)
@@ -433,6 +438,10 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
     tmplist = []
     for idx in range(0, nlists):
         if (idx in listofminabs) and (idx in listofmintot) and coincide[idx]:
+            if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it is in both minima")
+            tmplist.append(idx)
+        elif uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
+            if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same coordinating_atoms_uncorr_abs_atcharge")
             tmplist.append(idx)
 
     # IF listofminabs and listofmintot do not have any value in common. Then we select from minima, coincide, and zwitt
@@ -468,16 +477,30 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
                 else : 
                     if debug >= 2: print("    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {tmplist=}")   
     elif len(listofmaxaromatic) > 1:
-        for idx in range(0, nlists):
-            if (idx in listofmaxaromatic) and coincide[idx] :
-                if (idx in tmplist):
-                    if added_into_aromatic[idx] == True:
-                        if debug >= 2: print("    NEW SELECT FUNCTION: Hydrogen added into aromatic atoms, so should be excluded", f"{idx=} from {tmplist=}")
-                        tmplist.remove(idx)
+        if len(tmplist) <= 1:
+            if debug >= 2:
+                print("    NEW SELECT FUNCTION: tmplist has only one or fewer entries. Skipping checking aromaticity.")
+        else:
+            new_tmplist = tmplist.copy()  
+            for idx in range(nlists):
+                if idx in listofmaxaromatic and coincide[idx]:
+                    if idx in new_tmplist:
+                        if added_into_aromatic[idx]:
+                            if debug >= 2:
+                                print(f"    NEW SELECT FUNCTION: Hydrogen added into aromatic atoms, so {idx} should be excluded from tmplist")
+                            new_tmplist.remove(idx)
+                        else:
+                            if debug >= 2:
+                                print(f"    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {new_tmplist=}")
                     else:
-                        if debug >= 2: print("    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {tmplist=}")
-                else:
-                    if debug >= 2: print("    NEW SELECT FUNCTION: Check to tmplist", f"{idx=} {tmplist=}")
+                        if debug >= 2:
+                            print(f"    NEW SELECT FUNCTION: {idx=} not yet in tmplist. Considered for addition")
+
+            if len(new_tmplist) > 0:
+                tmplist = new_tmplist
+            else:
+                if debug >= 2:
+                    print("    NEW SELECT FUNCTION: Aromaticity filtering would have emptied tmplist. Skipping removal.")
     return tmplist
 
 ########################################################
@@ -1260,7 +1283,9 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
     spec = prot.parent
     
     #### Educated Guess on the Maximum Charge one can expect from the spec[1]
-    if   spec.subtype == "molecule" and (not spec.iscomplex and not spec.has_IA_IIA and not spec.has_post_transition_metal): 
+    if spec.formula in ['C-O', "H2-O", "C-N"]:
+        maxcharge = 0
+    elif   spec.subtype == "molecule" and (not spec.iscomplex and not spec.has_IA_IIA and not spec.has_post_transition_metal): 
         maxcharge = 3
     elif spec.subtype == "ligand":  
         count_non_connected_O = 0
@@ -1782,11 +1807,24 @@ def fix_zwitterions_in_adjacent_atoms(mol, debug=0):
                 len(neighbors) == 3 and
                 neighbor_labels.count('O') == 2
             )
-            if is_nitro:
+            is_nitrate = (
+                atom_label == 'N' and
+                len(neighbors) == 3 and
+                neighbor_labels.count('O') == 3
+            )
+            if is_nitro or is_nitrate:
                 if debug:
-                    print(f"\tSkipping nitro group.")
+                    print(f"\tSkipping nitro or nitrate group.")
                 continue
-
+            is_carbonyl = (
+                atom_label == 'O' and
+                len(neighbors) == 1 and
+                neighbor_labels.count('C') == 1
+            )
+            if is_carbonyl:
+                if debug:
+                    print(f"\tSkipping carbonyl group.")
+                continue
             for neighbor in neighbors:
                 n_fcharge = neighbor.GetFormalCharge()
                 n_label = neighbor.GetSymbol()
@@ -1796,6 +1834,10 @@ def fix_zwitterions_in_adjacent_atoms(mol, debug=0):
                         print(f"\tSkipping neighbor with same label: {n_label} (idx={neighbor_idx}, charge={n_fcharge})")
                     continue
                 if n_fcharge < 0:
+                    if atom_label == 'N' and n_label == 'O':
+                        if debug:
+                            print(f"\tSkipping N+ with O- neighbor: {n_label} (idx={neighbor_idx}, charge={n_fcharge})")
+                        continue
                     fix_zwitterions = True
                     if debug:
                         print(f"\tFound neighbor with negative charge {n_label} (idx={neighbor_idx}, charge={n_fcharge})")

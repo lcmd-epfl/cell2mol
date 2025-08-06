@@ -1,6 +1,8 @@
 import numpy as np
 import copy
-from cell2mol.charge_assignment import protonation, get_charge, get_charge_manual, charge_state, check_rdkit_obj_connectivity, aromatic_info
+
+from sklearn import metrics
+from cell2mol.charge_assignment import protonation, get_charge, get_charge_manual, aromatic_info_v2
 import itertools
 import os
 from cell2mol import __file__
@@ -45,9 +47,10 @@ def balance_charge(unique_indices: list, unique_species: list, input_charge: int
                     aromatic_ring = []
 
                     for cs in spec.possible_cs:
-                        aromatic_dict = aromatic_info(cs.rdkit_obj)
+                        added_indices = [idx for idx, val in enumerate(cs.protonation.addedlist) if val != 0]
+                        aromatic_dict = aromatic_info_v2(cs.rdkit_obj, added_indices)
                         aromatic_counts.append(aromatic_dict["Aromatic atoms"])
-                        aromatic_ring.append(aromatic_dict["Number of rings"])
+                        aromatic_ring.append(aromatic_dict["Number of aromatic rings"])
 
                     print(f"aromatic_counts: {spec.formula} {aromatic_counts}")
                     print(f"aromatic_ring: {spec.formula} {aromatic_ring}")
