@@ -136,10 +136,15 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
     aromatic_atoms = []
     aromatic_rings = []
     added_into_aromatic = []
+    coordinating_atoms_uncorr_abs_atcharge = []
     charge_states =[ch for ch in charge_states if ch is not None]
-
     if len(charge_states) == 0: return []
 
+
+    coordinating_atoms = [
+        idx for idx, atom in enumerate(charge_states[0].protonation.parent.atoms) if atom.mconnec > 0
+    ]
+    print(f"    NEW SELECT FUNCTION: coordinating_atoms_indices={coordinating_atoms}")
     for chs in charge_states:
         uncorr_total.append(chs.uncorr_total_charge)
         uncorr_abs_total.append(chs.uncorr_abstotal)
@@ -152,6 +157,8 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
         aromatic_atoms.append(aromatic_dict["Aromatic atoms"])
         aromatic_rings.append(aromatic_dict["Number of aromatic rings"])
         added_into_aromatic.append(aromatic_dict["Added to aromatic atoms"])
+        sum([abs(chs.uncorr_atom_charges[idx]) for idx in coordinating_atoms])
+        coordinating_atoms_uncorr_abs_atcharge.append(sum([abs(chs.uncorr_atom_charges[idx]) for idx in coordinating_atoms]))
 
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_total: {uncorr_total}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_abs_total: {uncorr_abs_total}")
@@ -161,7 +168,8 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
     if debug >= 2: print(f"    NEW SELECT FUNCTION: aromatic_atoms: {aromatic_atoms}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: aromatic_rings: {aromatic_rings}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: added_into_aromatic: {added_into_aromatic}")
-
+    if debug >= 2: print(f"    NEW SELECT FUNCTION: coordinating_atoms_uncorr_abs_atcharge: {coordinating_atoms_uncorr_abs_atcharge}")
+    
     minoftot = np.min(uncorr_abs_total)
     minofabs = np.min(uncorr_abs_atcharge)
     maxofaromatic = np.max(aromatic_atoms)
@@ -186,8 +194,13 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
     tmplist = []
     for idx in range(0, nlists):
         if (idx in listofminabs) and (idx in listofmintot) and coincide[idx]:
+            if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it is in both minima")
+            tmplist.append(idx)
+        elif (idx in listofminabs) and uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
+            if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same coordinating_atoms_uncorr_abs_atcharge")
             tmplist.append(idx)
 
+        
     # IF listofminabs and listofmintot do not have any value in common. Then we select from minima, coincide, and zwitt
     if len(tmplist) == 0:
         if debug >= 2: print("    NEW SELECT FUNCTION: No entry in initial tmplist. We now select from minima, coincide and zwitt:")
@@ -296,16 +309,23 @@ def check_possible_resonance(charge_state: object, debug: int = 0) -> object:
         return charge_state
 
     rdkit_obj = charge_state.rdkit_obj
-    coordinating_atoms = [
-        idx for idx, atom in enumerate(prot.parent.atoms) if atom.mconnec > 0
-    ]
-    possible_res_mols = rdchem.ResonanceMolSupplier(rdkit_obj)
-
+    # coordinating_atoms = [
+    #     idx for idx, atom in enumerate(prot.parent.atoms) if atom.mconnec > 0
+    # ]
+    try:
+        possible_res_mols = rdchem.ResonanceMolSupplier(rdkit_obj)
+    except Exception as e:
+        if debug >= 2:
+            print(f"CHECK_POSSIBLE_RESONANCE: Error in ResonanceMolSupplier: {e}")
+        return charge_state
+    
     if len(possible_res_mols) == 0:
         return charge_state
 
     best_res_mol = possible_res_mols[0]
-
+    if best_res_mol is None:
+        return charge_state
+    
     if debug >= 0:
         print(f"CHECK_POSSIBLE_RESONANCE: {prot.parent.formula} {len(possible_res_mols)=}")
         print(f"Best candidate: {Chem.MolToSmiles(best_res_mol)}")
@@ -923,6 +943,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 if debug >= 2:  print(f"        GET_PROTONATION_STATES: Protonation SAVED with {added_atoms} atoms added to ligand. status={new_prot.status}")
             else:
                 if debug >= 2:  print(f"        GET_PROTONATION_STATES: Protonation DISCARDED. Steric Clashes found when adding atoms. status={new_prot.status}")
+                empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
+                return empty_protonation_states
     if debug > 2: print(f"        GET_PROTONATION_STATES:{protonation_states=}")            
     return protonation_states 
 #######################################################
@@ -1730,22 +1752,25 @@ def fix_zwitterions_in_adjacent_atoms(mol, debug=0):
                 print(f"\nPositive atom: {atom_label} (idx={atom_idx}, charge={fcharge})")
                 print(f"\tNeighbors: {list(zip(neighbor_labels, neighbor_indices))}")
 
-            # Skip nitrosyl groups: N+ with two O neighbors
-            is_nitrosyl = (
+            # Skip nitro groups: N+ with two O neighbors
+            is_nitro = (
                 atom_label == 'N' and
                 len(neighbors) == 3 and
                 neighbor_labels.count('O') == 2
             )
-            if is_nitrosyl:
+            if is_nitro:
                 if debug:
-                    print(f"\tSkipping nitrosyl group.")
+                    print(f"\tSkipping nitro group.")
                 continue
 
             for neighbor in neighbors:
                 n_fcharge = neighbor.GetFormalCharge()
                 n_label = neighbor.GetSymbol()
                 neighbor_idx = neighbor.GetIdx()
-
+                if n_label == atom_label:
+                    if debug:
+                        print(f"\tSkipping neighbor with same label: {n_label} (idx={neighbor_idx}, charge={n_fcharge})")
+                    continue
                 if n_fcharge < 0:
                     fix_zwitterions = True
                     if debug:

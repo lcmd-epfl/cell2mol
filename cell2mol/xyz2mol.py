@@ -59,7 +59,7 @@ def get_atomic_valences(k):
     if k == 13:  # Al
         return [3, 4, 5]
     if k == 14:  # Si
-        return [4, 6]
+        return [4]
     if k == 15:  # P
         return [5, 3]  # [5,4,3]
     if k == 16 : # S
@@ -842,7 +842,7 @@ def AC2BO_new(
         )
     ]
     print("\tAC2BO_new: sorted_valences_list", len(sorted_valences_list))
-    max_count = min(100, int(len(sorted_valences_list)*0.3))
+    max_count = min(200, int(len(sorted_valences_list)*0.3))
     #print(f"AC2BO_new: {len(sorted_valences_list)=} {max_count=}")
 
     for valences in sorted_valences_list[:max_count]:  # valences_list:
