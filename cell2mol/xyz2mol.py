@@ -220,7 +220,7 @@ def charge_is_OK(
 
             if q != 0:
                 q_list.append(q)
-
+    #print("charge_is_OK: Q", Q, "charge", charge)
     return charge == Q
 
 
@@ -718,7 +718,10 @@ def AC2BO_new(
 
     # make a list of valences, e.g. for CO: [[4],[2,1]]
     valences_list_of_lists = []
-    AC_valence = list(AC.sum(axis=1))
+    # AC_valence = list(AC.sum(axis=1))
+    AC_valence = [int(x) for x in AC.sum(axis=1)]
+    #print("Atom labels:", [elemdatabase.elementsym[atom] for atom in atoms])
+    #print(f"{AC_valence=}")
 
     for i, (atomicNum, valence) in enumerate(zip(atoms, AC_valence)):
         # valence can't be smaller than number of neighbourgs
@@ -826,7 +829,7 @@ def AC2BO_new(
                 P_sum.append(v)
             if atomicNum == 16:
                 S_sum.append(v)
-
+        # print("AC2BO_new: O_sum", O_sum, "N_sum", N_sum, "C_sum", C_sum, "P_sum", P_sum, "S_sum", S_sum)
         order_idx = order_dict[
             (tuple(O_sum), tuple(N_sum), tuple(C_sum), tuple(P_sum), tuple(S_sum))
         ]
@@ -838,27 +841,32 @@ def AC2BO_new(
             zip(valence_order_list, list(itertools.product(*valences_list_of_lists)))
         )
     ]
+    print("\tAC2BO_new: sorted_valences_list", len(sorted_valences_list))
+    max_count = min(100, int(len(sorted_valences_list)*0.3))
+    #print(f"AC2BO_new: {len(sorted_valences_list)=} {max_count=}")
 
-    for valences in sorted_valences_list:  # valences_list:
+    for valences in sorted_valences_list[:max_count]:  # valences_list:
+        # print(f"\tSending", valences, AC_valence, "to get_UA")
         UA, DU_from_AC = get_UA(valences, AC_valence)
-        check_len = len(UA) == 0
-        if check_len:
-            check_bo = BO_is_OK(
-                AC,
-                AC,
-                charge,
-                DU_from_AC,
-                atomic_valence_electrons,
-                atoms,
-                valences,
-                allow_charged_fragments=allow_charged_fragments,
-                allow_carbenes=allow_carbenes,
-            )
-        else:
-            check_bo = None
+        #print(f"\tAC2BO_new: {UA=}, {DU_from_AC=}")
+        # check_len = len(UA) == 0
+        # if check_len:
+        #     check_bo = BO_is_OK(
+        #         AC,
+        #         AC,
+        #         charge,
+        #         DU_from_AC,
+        #         atomic_valence_electrons,
+        #         atoms,
+        #         valences,
+        #         allow_charged_fragments=allow_charged_fragments,
+        #         allow_carbenes=allow_carbenes,
+        #     )
+        # else:
+        #     check_bo = None
 
-        if check_len and check_bo:
-            return AC, atomic_valence_electrons
+        # if check_len and check_bo:
+        #     return AC, atomic_valence_electrons
 
         UA_pairs_list = get_UA_pairs_new(UA, AC, DU_from_AC, use_graph=use_graph)
         for UA_pairs in UA_pairs_list:
@@ -897,6 +905,7 @@ def AC2BO_new(
 
     return best_BO, atomic_valence_electrons
 
+
 def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allow_carbenes=True):
     """
     implemenation of algorithm shown in Figure 2
@@ -907,7 +916,9 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
 
     # make a list of valences, e.g. for CO: [[4],[2,1]]
     valences_list_of_lists = []
-    AC_valence = list(AC.sum(axis=1))
+    # AC_valence = list(AC.sum(axis=1))
+    AC_valence = [int(x) for x in AC.sum(axis=1)]
+    #print("Atom labels:", [elemdatabase.elementsym[atom] for atom in atoms])
     #print(f"{AC_valence=}")
     formula = labels2formula([elemdatabase.elementsym[atom] for atom in atoms])    
     wrong = 0
@@ -978,11 +989,11 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
     # for valences in valences_list:
 
     count = 0
-    max_count = max(1000, int(len(sorted_valences_list)*0.3))
-    print(f"AC2BO: {formula=} {len(sorted_valences_list)=} {max_count=}")
+    max_count = min(len(sorted_valences_list), 500)
+
+    print(f"\tAC2BO: {formula=} {len(sorted_valences_list)=} {max_count=}")
     
     for valences in sorted_valences_list:  # valences_list:
-        #print(f"\tSending", valences, AC_valence, "to get_UA")
         UA, DU_from_AC = get_UA(valences, AC_valence)
 
         check_len = len(UA) == 0
@@ -1055,7 +1066,8 @@ def AC2mol(mol, AC, atoms, charge, allow_charged_fragments=True, use_graph=True,
     """ """
 
     # convert AC matrix to bond order (BO) matrix
-    BO, atomic_valence_electrons = AC2BO_new(
+    # BO, atomic_valence_electrons = AC2BO_new(
+    BO, atomic_valence_electrons = AC2BO(
         AC,
         atoms,
         charge,
@@ -1337,7 +1349,6 @@ def xyz2mol(
         return new_mols, BO
     else:
         return new_mols
-
 
 ########################
 #### END OF XYZ2MOL ####

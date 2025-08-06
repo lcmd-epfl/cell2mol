@@ -2124,7 +2124,7 @@ class bond(BaseModel):
         to_print += f" Molecule Atom 1 index    = {idx1}\n"
         to_print += f" Molecule Atom 2 index    = {idx2}\n"
         to_print += f" Bond Order               = {self.order}\n"
-        to_print += f" Distance                 = {self.distance, 3}\n"
+        to_print += f" Distance                 = {self.distance}\n"
         to_print += "----------------------------------------------------\n"
         return to_print
 
