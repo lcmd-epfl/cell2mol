@@ -169,7 +169,7 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
     if debug >= 2: print(f"    NEW SELECT FUNCTION: aromatic_rings: {aromatic_rings}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: added_into_aromatic: {added_into_aromatic}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: coordinating_atoms_uncorr_abs_atcharge: {coordinating_atoms_uncorr_abs_atcharge}")
-    
+
     minoftot = np.min(uncorr_abs_total)
     minofabs = np.min(uncorr_abs_atcharge)
     maxofaromatic = np.max(aromatic_atoms)
@@ -234,16 +234,40 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
                 else : 
                     if debug >= 2: print("    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {tmplist=}")   
     elif len(listofmaxaromatic) > 1:
-        for idx in range(0, nlists):
-            if (idx in listofmaxaromatic) and coincide[idx] :
-                if (idx in tmplist):
-                    if added_into_aromatic[idx] == True:
-                        if debug >= 2: print("    NEW SELECT FUNCTION: Hydrogen added into aromatic atoms, so should be excluded", f"{idx=} from {tmplist=}")
-                        tmplist.remove(idx)
+        if len(tmplist) <= 1:
+            if debug >= 2:
+                print("    NEW SELECT FUNCTION: tmplist has only one or fewer entries. Skipping checking aromaticity.")
+        else:
+            new_tmplist = tmplist.copy()  
+            for idx in range(nlists):
+                if idx in listofmaxaromatic and coincide[idx]:
+                    if idx in new_tmplist:
+                        if added_into_aromatic[idx]:
+                            if debug >= 2:
+                                print(f"    NEW SELECT FUNCTION: Hydrogen added into aromatic atoms, so {idx} should be excluded from tmplist")
+                            new_tmplist.remove(idx)
+                        else:
+                            if debug >= 2:
+                                print(f"    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {new_tmplist=}")
                     else:
-                        if debug >= 2: print("    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {tmplist=}")
-                else:
-                    if debug >= 2: print("    NEW SELECT FUNCTION: Check to tmplist", f"{idx=} {tmplist=}")
+                        if debug >= 2:
+                            print(f"    NEW SELECT FUNCTION: {idx=} not yet in tmplist. Considered for addition")
+
+            if len(new_tmplist) > 0:
+                tmplist = new_tmplist
+            else:
+                if debug >= 2:
+                    print("    NEW SELECT FUNCTION: Aromaticity filtering would have emptied tmplist. Skipping removal.")
+        # for idx in range(0, nlists):
+        #     if (idx in listofmaxaromatic) and coincide[idx] :
+        #         if (idx in tmplist):
+        #             if added_into_aromatic[idx] == True:
+        #                 if debug >= 2: print("    NEW SELECT FUNCTION: Hydrogen added into aromatic atoms, so should be excluded", f"{idx=} from {tmplist=}")
+        #                 tmplist.remove(idx)
+        #             else:
+        #                 if debug >= 2: print("    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {tmplist=}")
+        #         else:
+        #             if debug >= 2: print("    NEW SELECT FUNCTION: Check to tmplist", f"{idx=} {tmplist=}")
 
     ####################
     # tmplist is built #
