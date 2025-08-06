@@ -49,7 +49,7 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
             #if debug >= 2 : print(f"METAL.DEFINE_coordination_geometry: {[atom.coord for atom in group.atoms]}")
             haptic_center_coord = compute_centroid(np.array([atom.coord for atom in group.atoms]))
             symbols.append(str(group.haptic_type))
-            positions.append(list(haptic_center_coord))
+            positions.append(haptic_center_coord.tolist())
             count += 1      
             if debug >= 2 : print(f"mid point of {group.haptic_type=}", haptic_center_coord)      
             coord_haptic_type.append(group.haptic_type)             
@@ -405,12 +405,12 @@ def coordination_correction_for_haptic (group: object, debug: int=0):
     for idx, atom in enumerate(group.atoms):
         metal = atom.get_closest_metal()
         dist = get_dist(atom.coord, metal.coord)
-        thres = (metal.label + atom.label) + add_factor
+        thres = (metal.radii + atom.radii) + add_factor
         ratio_list.append(round(dist/thres,3))
         if debug >= 2 : 
             print(f"\tAtom {idx} :", atom.label, f"\tMetal :", metal.label, "\tdistance :", round(dist, 3), "\tthres :", thres)
 
-    std_dev = round(np.std(ratio_list), 3)
+    std_dev = round(float(np.std(ratio_list)), 3)
     if debug >= 2 : print(f"\t{ratio_list=} {std_dev=}")
 
     conn_idx = []
