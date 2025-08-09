@@ -38,7 +38,7 @@ if "ipykernel" in sys.modules:
 rdBase.DisableLog("rdApp.*")
 
 fullerene = ["C60", "C72", "C80"]
-manual_assign = ["O4-Cl", "N3", "I3", "N2", "N-O"]
+manual_assign = ["O4-Cl", "N3", "N2", "N-O", "I3", "I4", "I5", "I6"]
 #######################################################
 def get_possible_charge_state(spec: object, debug: int=0): 
     if spec.protonation_states is None: spec.get_protonation_states(debug=debug)
@@ -46,6 +46,11 @@ def get_possible_charge_state(spec: object, debug: int=0):
         return None
     if spec.formula in manual_assign:
         ch_state = get_charge_manual(spec, debug=debug)
+        possible_cs = [ch_state]
+        return possible_cs
+    if spec.formula in fullerene:
+        print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} is a fullerene")
+        ch_state = get_charge(0, spec.protonation_states[0])
         possible_cs = [ch_state]
         return possible_cs
     if spec.subtype == "group" :  
@@ -109,15 +114,6 @@ def extract_charge_state_metrics(charge_states, debug):
         metrics["aromatic_rings"].append(aromatic_dict["Number of aromatic rings"])
         metrics["added_into_aromatic"].append(aromatic_dict["Added to aromatic atoms"])
 
-    if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_total: {metrics["uncorr_total"]}")
-    if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_abs_total: {metrics["uncorr_abs_total"]}")
-    if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_abs_atcharge: {metrics["uncorr_abs_atcharge"]}")
-    if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_zwitt: {metrics["uncorr_zwitt"]}")
-    if debug >= 2: print(f"    NEW SELECT FUNCTION: coincide: {metrics["coincide"]}")
-    if debug >= 2: print(f"    NEW SELECT FUNCTION: aromatic_atoms: {metrics["aromatic_atoms"]}")
-    if debug >= 2: print(f"    NEW SELECT FUNCTION: aromatic_rings: {metrics["aromatic_rings"]}")
-    if debug >= 2: print(f"    NEW SELECT FUNCTION: added_into_aromatic: {metrics["added_into_aromatic"]}")
-
     return metrics
 
 #######################################################
@@ -137,6 +133,7 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
     aromatic_rings = []
     added_into_aromatic = []
     coordinating_atoms_uncorr_abs_atcharge = []
+    coordinating_atoms_uncorr_atcharge = []
     charge_states =[ch for ch in charge_states if ch is not None]
     if len(charge_states) == 0: return []
 
@@ -159,6 +156,7 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
         added_into_aromatic.append(aromatic_dict["Added to aromatic atoms"])
         sum([abs(chs.uncorr_atom_charges[idx]) for idx in coordinating_atoms])
         coordinating_atoms_uncorr_abs_atcharge.append(sum([abs(chs.uncorr_atom_charges[idx]) for idx in coordinating_atoms]))
+        coordinating_atoms_uncorr_atcharge.append([chs.uncorr_atom_charges[idx] for idx in coordinating_atoms])
 
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_total: {uncorr_total}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_abs_total: {uncorr_abs_total}")
@@ -169,6 +167,7 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
     if debug >= 2: print(f"    NEW SELECT FUNCTION: aromatic_rings: {aromatic_rings}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: added_into_aromatic: {added_into_aromatic}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: coordinating_atoms_uncorr_abs_atcharge: {coordinating_atoms_uncorr_abs_atcharge}")
+    if debug >= 2: print(f"    NEW SELECT FUNCTION: coordinating_atoms_uncorr_atcharge: {coordinating_atoms_uncorr_atcharge}")
 
     minoftot = np.min(uncorr_abs_total)
     minofabs = np.min(uncorr_abs_atcharge)
@@ -197,10 +196,12 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it is in both minima")
             tmplist.append(idx)
         elif uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
-            if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same coordinating_atoms_uncorr_abs_atcharge")
-            tmplist.append(idx)
+            if all(atcharge < 0 for atcharge in coordinating_atoms_uncorr_atcharge[idx]):
+                if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same absolute atom charge as coordinating atoms and all are negative")
+                tmplist.append(idx)
+            else:
+                if debug >= 2: print(f"    NEW SELECT FUNCTION: Skipping idx={idx} because it has the same absolute atom charge as coordinating atoms but not all are negative")
 
-        
     # IF listofminabs and listofmintot do not have any value in common. Then we select from minima, coincide, and zwitt
     if len(tmplist) == 0:
         if debug >= 2: print("    NEW SELECT FUNCTION: No entry in initial tmplist. We now select from minima, coincide and zwitt:")
@@ -395,7 +396,7 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
     added_into_aromatic = []
     coordinating_atoms_uncorr_abs_atcharge = []
     charge_states =[ch for ch in charge_states if ch is not None]
-
+    coordinating_atoms_uncorr_atcharge = []
     if len(charge_states) == 0: return []
     coordinating_atoms = [
         idx for idx, atom in enumerate(charge_states[0].protonation.parent.atoms) if atom.mconnec > 0
@@ -413,7 +414,7 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
         aromatic_rings.append(aromatic_dict["Number of aromatic rings"])
         added_into_aromatic.append(aromatic_dict["Added to aromatic atoms"])
         coordinating_atoms_uncorr_abs_atcharge.append(sum([abs(chs.uncorr_atom_charges[idx]) for idx in coordinating_atoms]))
-
+        coordinating_atoms_uncorr_atcharge.append([chs.uncorr_atom_charges[idx] for idx in coordinating_atoms])
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_total: {uncorr_total}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_abs_total: {uncorr_abs_total}")
     if debug >= 2: print(f"    NEW SELECT FUNCTION: uncorr_abs_atcharge: {uncorr_abs_atcharge}")
@@ -441,8 +442,11 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it is in both minima")
             tmplist.append(idx)
         elif uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
-            if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same coordinating_atoms_uncorr_abs_atcharge")
-            tmplist.append(idx)
+            if all(atcharge < 0 for atcharge in coordinating_atoms_uncorr_atcharge[idx]):
+                if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same absolute atom charge as coordinating atoms and all are negative")
+                tmplist.append(idx)
+            else:
+                if debug >= 2: print(f"    NEW SELECT FUNCTION: Skipping idx={idx} because it has the same absolute atom charge as coordinating atoms but not all are negative")
 
     # IF listofminabs and listofmintot do not have any value in common. Then we select from minima, coincide, and zwitt
     if len(tmplist) == 0:
@@ -559,6 +563,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     
     if len(get_non_transition_metal_idxs(newlab)) == natoms:  # metal cluster (e.g. Sb12 in AKEVIX)
         if debug >= 2: print(f"    POSCHARGE: CANNOT Generate PROTONATION for this specie {specie.formula} ({specie.subtype})")
+        # empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
+        # return empty_protonation_states
         return None
 
     # Variables that control how many atoms have been added.
@@ -942,21 +948,23 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
             o_s = np.sum(com)
             toallocate = int(0)
-            # print(f"{non_local_groups=} {non_local_groups_indices=}")
-            # for jdx, a in enumerate(ligand.atoms):
-            #     if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
-            #         print(jdx, a.label, a.mconnec)
-            # print("====")
+            print(f"{non_local_groups=} {non_local_groups_indices=}")
+            for jdx, a in enumerate(ligand.atoms):
+                if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
+                    print(jdx, a.label, a.mconnec)
+            print("====")
             for jdx, a in enumerate(ligand.atoms):
                 if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0 and jdx in non_local_groups_indices:
-                    # print(a.label)
+                    print(a.label)
                     if non_local_groups > 1:
-                        #print(f"{com=} {toallocate=}")
+                        print(f"{com=} {toallocate=}")
                         if com[toallocate] == 1:
                             elemlist[jdx] = "H"
                             addedlist[jdx] = 1
                             mol = ligand.get_parent("molecule")
-                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], unconditional=True, debug=debug)
+                            print(len(newlab), len(newcoord))
+                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], unconditional=True, debug=3)
+                            print(isadded, len(newlab), len(newcoord))
                             if isadded:
                                 added_atoms += addedlist[jdx]
                                 if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
@@ -968,7 +976,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             elemlist[jdx] = "H"
                             addedlist[jdx] = 1
                             mol = ligand.get_parent("molecule")
-                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], unconditional=True, debug=debug)
+                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], unconditional=True, debug=3)
                             if isadded:
                                 added_atoms += addedlist[jdx]
                                 if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
@@ -1036,7 +1044,7 @@ def get_charge_manual(spec, debug: int=0):
             if adjacent_labels.count("N") == 2:
                 new_order = move_element(order, 1, idx)
                 break  # Found the target atom, no need to check further
-        
+
     if spec.formula == "I3":
         smiles = "I[I-]I"
         charge = -1
@@ -1053,7 +1061,14 @@ def get_charge_manual(spec, debug: int=0):
             if adjacent_labels.count("I") == 2:
                 new_order = move_element(order, 1, idx)
                 break  # Found the target atom, no need to check further
-        
+    
+    if spec.formula in polyiodide.keys():
+        smiles = polyiodide[spec.formula]["smiles"]
+        charge = polyiodide[spec.formula]["charge"]
+        order = range(spec.natoms)
+        new_order = order  # Default to initial order if no modification is needed
+    
+
     if spec.formula == "N2":
         smiles = "N#N"
         charge = 0
@@ -1086,6 +1101,7 @@ def get_charge_manual(spec, debug: int=0):
 
     temp_mol = Chem.MolFromSmiles(smiles, sanitize=False)
     mol = Chem.RenumberAtoms(temp_mol, new_order)
+    mol = Chem.RemoveHs(mol)
     atom_charge = []
     total_charge = 0
     for i in range(spec.natoms):
@@ -1101,6 +1117,7 @@ def get_charge_manual(spec, debug: int=0):
     
     return ch_state
 ########################################################
+############################################################
 # def aromatic_info(smiles):
 #     mol = Chem.MolFromSmiles(smiles)
 #     if mol is None:
@@ -1114,6 +1131,27 @@ def aromatic_info(mol: object):
         "Number of rings": len(Chem.GetSymmSSSR(mol)),
         "Aromatic rings": Chem.GetSSSR(mol),
     }
+########################################################
+polyiodide = {
+    # "I3":  {"charge": -1, "smiles": "I[I-]I", "negative_atoms": [1]},
+    "I4":  {"charge": -2, "smiles": "I[I-][I-]I", "negative_atoms": [1, 2]},
+    "I5":  {"charge": -1, "smiles": "II[I-]II", "negative_atoms": [2]},
+    "I6":  {"charge": -2, "smiles": "I[I-]II[I-]I", "negative_atoms": [1, 4]},
+    # "I7":  {"charge": -1},
+    # "I8":  {"charge": -2},
+    # "I9":  {"charge": -1},
+    # "I10": {"charge": -2},  # Could also be -4 
+    # "I11": {"charge": -3},
+    # "I12": {"charge": -2},
+    # "I13": {"charge": -3},
+    # "I14": {"charge": -4},
+    # "I16": {"charge": -2},
+    # "I22": {"charge": -4},
+    # "I26": {"charge": -3},  # Could also be -4 
+    # "I28": {"charge": -4},
+    # "I29": {"charge": -3},
+}
+
 ########################################################
 def aromatic_info_v2(mol: object, added_indices=None):
     if added_indices is None:
@@ -1311,7 +1349,7 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
     
         if (not spec.is_nitrosyl) and prot.added_atoms > 0 :
             maxcharge = 0
-    
+    # maxcharge = 0
     if debug >= 2: print(f"MAXCHARGE: maxcharge set at {maxcharge}")
     
     # Defines list of charges that will try

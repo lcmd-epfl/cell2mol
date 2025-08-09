@@ -9,7 +9,7 @@ from cell2mol import __file__
 from cell2mol.spin import generate_feature_vector
 import pickle
 from rdkit import Chem
-manual_assign = ["O4-Cl", "N3", "I3", "N2", "N-O"]
+manual_assign = ["O4-Cl", "N3", "N2", "N-O", "I3", "I4", "I5", "I6"]
 #######################################################
 def balance_charge(unique_indices: list, unique_species: list, input_charge: int=0, rare: bool=False, predict: bool=False, aromatic: bool=False, debug: int=0) -> list:
     """Function to Select the Best Charge Distribution for the unique species.
@@ -60,15 +60,15 @@ def balance_charge(unique_indices: list, unique_species: list, input_charge: int
                             toadd.append(tch.corr_total_charge)
                         pass  # all values are 0 — skip
                     else:
-                        # max_aromatic = max(aromatic_counts)
-                        # max_indices = [i for i, val in enumerate(aromatic_counts) if val == max_aromatic]
                         # First select by max aromatic atoms
                         max_aromatic = max(aromatic_counts)
                         primary_indices = [i for i, val in enumerate(aromatic_counts) if val == max_aromatic]
-
+                        print(f"   Primary indices with max aromatic atoms ({max_aromatic}): {primary_indices}")
+                        
                         # Among those, select by max aromatic rings
                         max_ring = max([aromatic_ring[i] for i in primary_indices])
                         max_indices = [i for i in primary_indices if aromatic_ring[i] == max_ring]
+                        print(f"   Max aromatic rings ({max_ring}) at indices: {max_indices}")
                         if len(max_indices) == 1:
                             idx = max_indices[0]
                             cs = spec.possible_cs[idx]
@@ -242,9 +242,14 @@ def set_charge_state(reference, target, mode, debug: int=0):
     
     elif mode == 2 : # For "unit" cell. Their charge state are not calculated
         if (target.subtype == "ligand") or (target.subtype == "molecule" and not target.iscomplex and not target.has_IA_IIA and not target.has_post_transition_metal):
-
+            print(f"SET_CHARGE_STATE: {mode=} {reference.smiles=} {Chem.MolToSmiles(reference.rdkit_obj)}")
+            if reference.smiles != Chem.MolToSmiles(reference.rdkit_obj):
+                print(f"SET_CHARGE_STATE: WARNING!!! Check the smiles of reference {reference.formula}")
             rdkit_obj = reorder_rdkit_atoms(reference.rdkit_obj, reference.atom_site_labels, target.atom_site_labels)
-            smiles = Chem.MolToSmiles(rdkit_obj)
+            if target.formula in manual_assign:
+                smiles = reference.smiles
+            else:
+                smiles = Chem.MolToSmiles(rdkit_obj)
             atom_charges = []
             total_charge = 0
             

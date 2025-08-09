@@ -1346,7 +1346,9 @@ class molecule(specie):
         for unique_specie in self.unique_species:
             if debug >= 0 : print("Get possible charge states for unique specie", unique_specie.formula)
             tmp = unique_specie.get_possible_cs(debug=debug)
-            if len(tmp) == 0: 
+            if tmp is None:
+                self.selected_cs.append(None)
+            elif len(tmp) == 0:
                 self.selected_cs.append(None)
             elif unique_specie.subtype != "metal":
                 self.selected_cs.append(list([cs.corr_total_charge for cs in unique_specie.possible_cs]))
@@ -1356,7 +1358,9 @@ class molecule(specie):
         for specie in self.species_list:
             print("Get possible charge states for species list", specie.formula)
             tmp = specie.get_possible_cs(debug=debug)
-            if len(tmp) == 0: 
+            if tmp is None:
+                self.selected_cs.append(None)
+            elif len(tmp) == 0:
                 self.selected_cs.append(None)
             elif specie.subtype != "metal":
                 self.selected_cs.append(list([cs.corr_total_charge for cs in specie.possible_cs]))
@@ -1368,7 +1372,7 @@ class molecule(specie):
         else :
             self.error_get_poscharges = False
     #######################################################
-    def balance_charges_for_molecules(self, input_charge: int=None, debug: int=0):
+    def balance_charges_for_molecules(self, input_charge: int=None, second_try: bool=False, debug: int=0):
         if not self.unique_species is not None: self.get_unique_species()
         if not self.selected_cs is not None: self.get_selected_cs()
         
@@ -1386,8 +1390,8 @@ class molecule(specie):
         self.error_multiple_distrib = dist_count > 1
         self.error_empty_distrib = dist_count == 0
         
-        if dist_count != 1:
-            # Attempt to balance charges again with more specific conditions
+        if dist_count != 1 and second_try:
+            #Attempt to balance charges again with more specific conditions
             if self.error_multiple_distrib :
                 print("More than one possible distribution found.")
                 second_final_charge_distribution, second_final_charges = balance_charge(
@@ -1397,7 +1401,7 @@ class molecule(specie):
                     aromatic=True, 
                     debug=debug,
                 )    
-            elif self.error_empty_distrib :
+            if self.error_empty_distrib :
                 print("No valid distribution found.")
                 second_final_charge_distribution, second_final_charges = balance_charge(
                     unique_indices, 
@@ -3618,7 +3622,9 @@ class cell(BaseModel):
                     unique_specie.formula,
                 )
             tmp = unique_specie.get_possible_cs(debug=debug)
-            if len(tmp) == 0:
+            if tmp is None:
+                self.selected_cs.append(None)
+            elif len(tmp) == 0:
                 self.selected_cs.append(None)
             elif unique_specie.subtype != "metal":
                 self.selected_cs.append(
@@ -3630,7 +3636,9 @@ class cell(BaseModel):
         for specie in self.species_list:
             print("Get possible charge states for species list", specie.formula)
             tmp = specie.get_possible_cs(debug=debug)
-            if len(tmp) == 0:
+            if tmp is None:
+                self.selected_cs.append(None)
+            elif len(tmp) == 0:
                 self.selected_cs.append(None)
             elif specie.subtype != "metal":
                 self.selected_cs.append(
