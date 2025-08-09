@@ -73,7 +73,8 @@ def get_atomic_valences(k):
     if k == 52: # Te
         return [2, 4, 6]
     if group == 17: # F, Cl, Br, I
-        return [1, 2]   # Cl [1, 7]
+        return [1]
+        # return [1, 2]   # Cl [1, 7]
     if block == "s" and period == 1:
         av = 2 - ave
     elif group == 1 and period != 1:
@@ -312,6 +313,12 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
         found = True
     elif atom == 16 and BO_valence == 6 and not found:  # SX6
         charge = 0
+        found = True
+    elif atom == 16 and BO_valence == 4 and not found:  
+        charge = 0
+        found = True
+    elif atom == 16 and BO_valence == 5 and not found:  
+        charge = 1
         found = True
     elif atom == 33 and BO_valence == 6 and not found:  # AsX6
         charge = -1
@@ -964,6 +971,7 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
             # sys.exit()
         valences_list_of_lists.append(possible_valence)
     #print(f"{wrong=}")
+    #print(f"\tAC2BO: {formula=} {len(valences_list_of_lists)=} {[vl for vl in valences_list_of_lists]=}")
     if wrong > 0:
         # print(f"AC2BO: {wrong=}")
         return None, atomic_valence_electrons
@@ -989,10 +997,11 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
     # for valences in valences_list:
 
     count = 0
-    max_count = min(len(sorted_valences_list), 500)
-
+    max_count = min(len(sorted_valences_list), 100)
+    #print(f"\tAC2BO: {sorted_valences_list=}")
     print(f"\tAC2BO: {formula=} {len(sorted_valences_list)=} {max_count=}")
-    
+    # if len(sorted_valences_list) > 1000:
+    #     return None, atomic_valence_electrons
     for valences in sorted_valences_list:  # valences_list:
         UA, DU_from_AC = get_UA(valences, AC_valence)
 

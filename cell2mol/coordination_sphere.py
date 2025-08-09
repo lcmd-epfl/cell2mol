@@ -295,7 +295,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
     # Sort the indexed list of atoms, prioritizing hydrogen atoms
     sorted_indexed_atoms = sorted(indexed_atoms, key=lambda x: (x[1].label != "H", x[1].label))
-
+    print("sorted_indexed_atoms:", sorted_indexed_atoms)
     # Extract the sorted atoms and their original indices into separate lists
     sorted_atoms = [atom[1] for atom in sorted_indexed_atoms]
     original_indices = [atom[0] for atom in sorted_indexed_atoms]
@@ -373,6 +373,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
     print(f"conn_idx: {conn_idx=}")
     print(f"split_groups: {split_groups=}")
     final_group_indices = extract_final_indices(original_indices, split_groups)
+    print("original_indices:", original_indices)
     print(f"final_group_indices: {final_group_indices=}")
     
     return group, final_group_indices, final_ligand_indices
@@ -390,7 +391,8 @@ def extract_final_indices(initial_list, intermediate_list):
         group = []
         for idx in sublist:
             if idx not in seen:
-                group.append(initial_list[idx])
+                group.append(idx)
+                # group.append(initial_list[idx])
                 seen.add(idx)
         if group:
             result.append(group)

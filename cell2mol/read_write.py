@@ -1039,9 +1039,9 @@ def print_moleclist(cell):
                     print(f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex with Post-Transition metals)")
                 else:
                     if mol.smiles is not None:
-                        print(f"Reference Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex) {mol.smiles=}")
+                        print(f"Unitcell Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex) {mol.smiles=}")
                     else:
-                        print(f"Reference Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex)")
+                        print(f"Unitcell Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex)")
             else:
                 if mol.iscomplex:
                     print(f"Unitcell Molecule {i}: {mol.formula} (TM complex)")

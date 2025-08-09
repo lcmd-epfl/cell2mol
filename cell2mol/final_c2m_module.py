@@ -102,7 +102,9 @@ def charge_assignment(newcell, refcell, debug):
     newcell.error_multiple_distrib = dist_count > 1
     newcell.error_empty_distrib = dist_count == 0
     
-    if dist_count != 1:
+    # second_try = True
+    second_try = False
+    if dist_count != 1 and second_try:
         # Attempt to balance charges again with more specific conditions
         if newcell.error_multiple_distrib :
             print("More than one possible distribution found.")
