@@ -937,7 +937,7 @@ def print_refmoleclist (cell):
 
         if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
             for met in ref.metals:
-                met_info = f"\t{met.formula} ({met.subtype} atom_site_label={met.atom_site_label})"
+                met_info = f"\t{met.formula} ({met.subtype}) atom_site_label={met.atom_site_label}"
                 if met.charge is not None:
                     met_info += f" metal_OS={met.charge}"
                 elif met.possible_cs is not None:
