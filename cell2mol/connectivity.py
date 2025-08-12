@@ -123,7 +123,7 @@ def find_closest_metal(atom: object, metalist: list, debug: int=0):
     return np.argmin(dist)
 
 ################################
-def is_haptic_ring(labels, coord):
+def is_single_ring(labels, coord):
     """ Check if the group is a ring """
     isgood, adjmat, adjnum = get_adjmatrix(labels, coord)
 
@@ -1158,7 +1158,7 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
     else :
         blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=cov_factor, debug=debug)      
     if debug > 0: print(f"\t\tGROUP.SPLIT_GROUP: {blocklist=}")
-
+    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: final_ligand_indices={final_ligand_indices}")
     ## Arranges Groups 
     for b in blocklist:
         if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: block={b}")

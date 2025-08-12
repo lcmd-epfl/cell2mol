@@ -937,7 +937,7 @@ def print_refmoleclist (cell):
 
         if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
             for met in ref.metals:
-                met_info = f"\t{met.formula} ({met.subtype})"
+                met_info = f"\t{met.formula} ({met.subtype} atom_site_label={met.atom_site_label})"
                 if met.charge is not None:
                     met_info += f" metal_OS={met.charge}"
                 elif met.possible_cs is not None:
@@ -978,7 +978,7 @@ def print_refmoleclist (cell):
                                 if group.is_haptic:
                                     group_info += f" {attr}={getattr(group, attr)}"
                         if group.metals is not None:
-                            group_info += f" connected_metals={[m.label for m in group.metals]}"
+                            group_info += f" connected_metals={[m.atom_site_label for m in group.metals]} "
                         # if group.closest_metal is not None:
                         #     group_info += f" closest_metal.label={group.closest_metal.label}"
                         print(group_info)
@@ -1084,7 +1084,7 @@ def print_moleclist(cell):
 
             if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
                 for met in mol.metals:
-                    met_info = f"\t{met.formula} ({met.subtype})"
+                    met_info = f"\t{met.formula} ({met.subtype}) atom_site_label={met.atom_site_label}"
 
                     if met.charge is not None:
                         met_info += f" metal_OS={met.charge}"
@@ -1121,7 +1121,7 @@ def print_moleclist(cell):
                                     if group.is_haptic:
                                         group_info += f" {attr}={getattr(group, attr)}"
                             if group.metals is not None:
-                                group_info += f" connected_metals={[m.label for m in group.metals]}"
+                                group_info += f" connected_metals={[m.atom_site_label for m in group.metals]}"
                             # if group.closest_metal is not None:
                             #     group_info += f" closest_metal.label={group.closest_metal.label}"
                             print(group_info)
