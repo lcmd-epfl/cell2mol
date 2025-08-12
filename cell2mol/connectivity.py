@@ -10,7 +10,7 @@ from cell2mol.read_write import writexyz
 import os
 import networkx as nx
 import re
-
+from cell2mol.missingH import get_missingH_from_adjacency
 elemdatabase = ElementData()
 
 #######################################################
@@ -145,7 +145,208 @@ def is_haptic_ring(labels, coord):
     return False  # Otherwise, not a ring compound
 
 ################################
+def add_hydrogen_to_carbon (labels: list, coords: list, site: int, ligand: object, element: str="H", debug: int=0) -> Tuple[bool, list, list]:
+    # Original labels and coordinates are copied
+    isadded = True
+    newlab = labels.copy()
+    newcoord = coords.copy()   
+    for idx, a in enumerate(ligand.atoms):
+        if idx == site:
+            apos = np.array(a.coord.copy())
+            bonded_atom_coord = []
+            bonded_atom_labels = []
+            
+            for adj in a.adjacency:
+                n_label = ligand.get_parent("molecule").labels[adj]
+                n_coord = ligand.get_parent("molecule").coord[adj]
+                if elemdatabase.elementblock[n_label] == 'd' or elemdatabase.elementblock[n_label] == 'f':
+                    pass
+                else:
+                    bonded_atom_coord.append(n_coord)
+                    bonded_atom_labels.append(n_label)
+            if debug >= 2: print("Adjacency", a.adjacency, bonded_atom_labels)
+            ismissingH, report, num_missingH = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord, bonded_atom_labels)
+            print("ADD_H_to_CARBON: ismissingH", ismissingH, report, num_missingH)
+            if len(bonded_atom_labels) == 2:
+                Hs = place_hydrogens(apos, bonded_atom_coord[0], bonded_atom_coord[1])
+                if Hs.shape[0] == 2:
+                    newcoord.append(Hs[0])
+                    newcoord.append(Hs[1])
+                    newlab.extend([str(element), str(element)])
+                    if debug >= 2: print(f"ADD_H_to_CARBON: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
+                elif Hs.shape[0] == 1:
+                    newcoord.append(Hs[0])
+                    newlab.extend([str(element)])
+                    if debug >= 2: print(f"ADD_H_to_CARBON: Added one {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
 
+            # print(a.adjacency)
+            # neighbors_in_ligand = []
+            # for adj in a.adjacency:
+            #     n_label = ligand.get_parent("molecule").labels[adj]
+            #     if elemdatabase.elementblock[n_label] == 'd' or elemdatabase.elementblock[n_label] == 'f':
+            #         pass
+            #     else :
+            #         if debug >= 2: print(f"ADD_TWO_ATOMS: {n_label} is not a transition metal, adding to neighbors_in_ligand")
+            #         neighbors_in_ligand.append(adj)
+            # if len(neighbors_in_ligand) == 2:
+            #     N1 = ligand.get_parent("molecule").coord[neighbors_in_ligand[0]]
+            #     N2 = ligand.get_parent("molecule").coord[neighbors_in_ligand[1]]
+            #     H1, H2 = add_two_hydrogens_sp3(apos, N1, N2)
+            #     newcoord.append(H1)
+            #     newcoord.append(H2)
+            #     if debug >= 2:
+            #         print(f"ADD_TWO_ATOMS: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
+    return isadded, newlab, newcoord
+
+def normalize(v):
+    n = np.linalg.norm(v)
+    return v / n if n != 0 else v
+
+def kabsch_rotation(P, Q):
+    """
+    Find rotation R that best aligns P to Q (both 3xN).
+    Returns 3x3 rotation matrix.
+    """
+    H = P @ Q.T
+    U, S, Vt = np.linalg.svd(H)
+    R = Vt.T @ U.T
+    # Right-handed fix
+    if np.linalg.det(R) < 0:
+        Vt[-1, :] *= -1
+        R = Vt.T @ U.T
+    return R
+
+def add_two_hydrogens_sp3(C, N1, N2, r_CH=1.09):
+    """
+    Place two hydrogens on carbon C given two neighbor atoms N1, N2.
+    Assumes sp3 tetrahedral around C. Returns positions H1, H2.
+    """
+    # Unit vectors from C toward existing neighbors
+    a = normalize(N1 - C)
+    b = normalize(N2 - C)
+
+    # Tetrahedral template (four directions)
+    u1 = normalize(np.array([ 1,  1,  1], dtype=float))
+    u2 = normalize(np.array([ 1, -1, -1], dtype=float))
+    u3 = normalize(np.array([-1,  1, -1], dtype=float))
+    u4 = normalize(np.array([-1, -1,  1], dtype=float))
+
+    # Align template u1,u2 to the actual directions a,b via Kabsch
+    P = np.stack([u1, u2], axis=1)  # 3x2
+    Q = np.stack([a,  b ], axis=1)  # 3x2
+    R = kabsch_rotation(P, Q)
+
+    # Rotate the remaining template directions to get H directions
+    dH1 = normalize(R @ u3)
+    dH2 = normalize(R @ u4)
+
+    # Place hydrogens at tetrahedral distance
+    H1 = C + r_CH * dH1
+    H2 = C + r_CH * dH2
+    return H1, H2
+
+
+def place_hydrogens(C, N1, N2, r_CH=1.09, hybridization="auto",
+                    sp2_angle_window=(95, 145), sp3_angle_window=(95, 125)):
+    """
+    Place hydrogens on a carbon with two existing neighbors.
+
+    Parameters
+    ----------
+    C, N1, N2 : (3,) arrays
+        3D coordinates of carbon and its two neighbors.
+    r_CH : float
+        C–H bond length (Å). ~1.09 Å is fine for sp2/sp3.
+    hybridization : {'auto','sp2','sp3'}
+        - 'auto': detect from angle between N1–C and N2–C
+        - 'sp2' : force one H in trigonal planar geometry
+        - 'sp3' : force two H in tetrahedral geometry
+    sp2_angle_window : (lo, hi) degrees
+        Angle window to consider geometry as sp2 in 'auto' mode (default ~120° ±).
+    sp3_angle_window : (lo, hi) degrees
+        Angle window to consider geometry as sp3 in 'auto' mode (default ~109.5° ±).
+
+    Returns
+    -------
+    Hs : (k,3) array
+        Coordinates of placed hydrogens (k=1 for sp2, k=2 for sp3).
+
+    Raises
+    ------
+    ValueError
+        If geometry is degenerate or 'auto' cannot classify reliably.
+    """
+    C = np.asarray(C, float)
+    N1 = np.asarray(N1, float)
+    N2 = np.asarray(N2, float)
+
+    a = normalize(N1 - C)
+    b = normalize(N2 - C)
+
+    # Angle between neighbors
+    cosang = np.clip(a @ b, -1.0, 1.0)
+    angle = np.degrees(np.arccos(cosang))
+
+    def add_sp2():
+        # In-plane bisector opposite to existing bonds
+        dH = -(a + b)
+        if np.linalg.norm(dH) < 1e-8:
+            raise ValueError("Neighbors nearly opposite (sp-like). Cannot place sp2 hydrogen reliably.")
+        dH = normalize(dH)
+        return np.array([C + r_CH * dH])
+
+    def add_sp3():
+        # Tetrahedral template (four directions)
+        u1 = normalize(np.array([ 1,  1,  1], float))
+        u2 = normalize(np.array([ 1, -1, -1], float))
+        u3 = normalize(np.array([-1,  1, -1], float))
+        u4 = normalize(np.array([-1, -1,  1], float))
+
+        # Align template u1,u2 to actual directions a,b (order doesn't matter much)
+        P = np.stack([u1, u2], axis=1)  # 3x2
+        Q = np.stack([a,  b ], axis=1)  # 3x2
+        R = kabsch_rotation(P, Q)
+
+        dH1 = normalize(R @ u3)
+        dH2 = normalize(R @ u4)
+        H1 = C + r_CH * dH1
+        H2 = C + r_CH * dH2
+        return np.vstack([H1, H2])
+
+    # Decide hybridization
+    mode = hybridization.lower()
+    if mode == "auto":
+        # Prefer sp3 if close to tetrahedral, else sp2 if closer to trigonal
+        in_sp3 = (sp3_angle_window[0] <= angle <= sp3_angle_window[1])
+        in_sp2 = (sp2_angle_window[0] <= angle <= sp2_angle_window[1])
+
+        if in_sp3 and not in_sp2:
+            return add_sp3()
+        if in_sp2 and not in_sp3:
+            return add_sp2()
+        # If ambiguous, pick the closer target angle
+        target_sp3 = 109.47
+        target_sp2 = 120.0
+        if abs(angle - target_sp3) < abs(angle - target_sp2):
+            return add_sp3()
+        else:
+            return add_sp2()
+
+    elif mode == "sp3":
+        return add_sp3()
+    elif mode == "sp2":
+        return add_sp2()
+    else:
+        raise ValueError("hybridization must be 'auto', 'sp2', or 'sp3'.")
+
+# -----------------------
+# Example usage:
+# C  = np.array([0.0, 0.0, 0.0])
+# N1 = np.array([1.54, 0.0, 0.0])        # e.g., a C–C bond
+# N2 = np.array([-0.5, 1.4, 0.0])        # another neighbor
+# H1, H2 = add_two_hydrogens_sp3(C, N1, N2)
+# print(H1, H2)
+################################
 def labels2formula(labels: list):
     elems = elemdatabase.elementnr.keys()
     formula=[]
@@ -934,10 +1135,9 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
     # Split the "group" to obtain the groups connected to a specific metal
     splitted_groups = []
     
-    if debug > 1: print(f"GROUP.SPLIT_GROUP: {conn_idx=}")
-    if debug > 1: print(f"GROUP.SPLIT_GROUP: {original_group.labels=}")
-    if debug > 1: print(f"GROUP.SPLIT_GROUP: {original_group.coord=}")
-    if debug > 1: print(f"GROUP.SPLIT_GROUP: {[atom.label for atom in original_group.atoms]=}")
+    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {conn_idx=}")
+    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {original_group.labels=}")
+    if debug > 2: print(f"\t\tGROUP.SPLIT_GROUP: {original_group.coord=}")
     conn_labels  = extract_from_list(conn_idx, original_group.labels, dimension=1)
     conn_coord   = extract_from_list(conn_idx, original_group.coord, dimension=1)
     frac_coord = getattr(original_group, "frac_coord", None)
@@ -945,9 +1145,10 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
     conn_radii   = extract_from_list(conn_idx, original_group.radii, dimension=1)
     conn_atoms   = extract_from_list(conn_idx, original_group.atoms, dimension=1)
     atom_site_labels = getattr(original_group, "atom_site_labels", None)
+    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: original_group.atom_site_labels={atom_site_labels}")
     conn_atom_site_labels = extract_from_list(conn_idx, atom_site_labels, dimension=1) if atom_site_labels is not None else None
 
-    if debug > 1: print(f"GROUP.SPLIT_GROUP: {conn_labels=}")
+    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {conn_labels=}")
 
     cov_factor=original_group.get_parent("ligand").cov_factor
     refcell = original_group.get_parent("reference")
@@ -956,11 +1157,11 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
         blocklist = split_species(conn_labels, conn_coord, atom_site_labels=conn_atom_site_labels, geom_bond_cif=geom_bond_cif, debug=debug)
     else :
         blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=cov_factor, debug=debug)      
-    if debug > 0: print(f"GROUP.SPLIT_GROUP: {blocklist=}")
+    if debug > 0: print(f"\t\tGROUP.SPLIT_GROUP: {blocklist=}")
 
     ## Arranges Groups 
     for b in blocklist:
-        if debug > 1: print(f"GROUP.SPLIT_GROUP: block={b}")
+        if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: block={b}")
         gr_indices      = extract_from_list(b, conn_idx, dimension=1)
         ligand_idx      = extract_from_list(b, final_ligand_indices, dimension=1)
         gr_labels       = extract_from_list(b, conn_labels, dimension=1)
@@ -970,11 +1171,11 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
         gr_atoms        = extract_from_list(b, conn_atoms, dimension=1)
         gr_atom_site_labels = extract_from_list(b, conn_atom_site_labels, dimension=1) if atom_site_labels is not None else None
 
-        if debug > 1: print(f"GROUP.SPLIT_GROUP: {gr_labels=}")
-        if debug > 1: print(f"GROUP.SPLIT_GROUP: {gr_atom_site_labels=}")
+        if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {gr_labels=}")
+        if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {gr_atom_site_labels=}")
         # Create Group Object
         newgroup = group.from_positional(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
-        if debug > 1: print(f"GROUP.SPLIT_GROUP: {newgroup.labels=}")
+        if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {newgroup.labels=}")
         # For debugging
         newgroup.origin = "split_group"
         # Define the GROUP as parent of the group. Bottom-Up hierarchy
@@ -987,6 +1188,7 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
         newgroup.get_connected_metals(debug=debug)
         newgroup.get_closest_metal(debug=debug)
         newgroup.get_hapticity(debug=debug)
+        newgroup.checked_coordination = True
         newgroup.get_denticity(debug=debug)
         # Top-down hierarchy
         splitted_groups.append(newgroup)

@@ -490,7 +490,7 @@ def set_atomic_charges(
 #     return mol
 
 def set_atomic_radicals(
-    mol, atoms, atomic_valence_electrons, BO_valences, use_atom_maps=True
+    mol, atoms, atomic_valence_electrons, BO_valences, use_atom_maps=False
 ):
     """The number of radical electrons = absolute atomic charge."""
     atomic_valence[8] = [2, 1]
@@ -1288,9 +1288,9 @@ def chiral_stereo_check(mol):
 
     """
     try:
-        #Chem.SanitizeMol(mol)
-        Chem.SanitizeMol(mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES, 
-                         catchErrors=True)
+        Chem.SanitizeMol(mol)
+        # Chem.SanitizeMol(mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES, 
+        #                  catchErrors=True)
         Chem.DetectBondStereochemistry(mol, -1)
         Chem.AssignStereochemistry(mol, flagPossibleStereoCenters=True, force=True)
         Chem.AssignAtomChiralTagsFromStructure(mol, -1)

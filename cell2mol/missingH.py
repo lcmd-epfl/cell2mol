@@ -72,8 +72,9 @@ def get_missingH_from_adjacency(Z, center, points, bonded_atom_labels):
     report += report_shape
 
     #missingH = False
+    num_missingH = shapeval - val_e
 
-    return missingH, report
+    return missingH, report, num_missingH
 
 
 ######################
@@ -146,7 +147,7 @@ def check_missingH(refmoleclist: list, debug: int=0):
                             bonded_atom_coord.append(ref.coord[adj])
                             bonded_atom_labels.append(ref.atoms[adj].label)
                         if debug >= 2: print("Adjacency", a.adjacency, bonded_atom_labels)
-                        ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord, bonded_atom_labels)
+                        ismissingH, report, num_missingH = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord, bonded_atom_labels)
                         # if ismissingH:
                             # for label, coord in zip(bonded_atom_labels, bonded_atom_coord):
                             #     print("Dist", f"{a.label}-{label}", get_dist(a.coord, coord))
@@ -179,7 +180,7 @@ def check_missingH(refmoleclist: list, debug: int=0):
                                 bonded_atom_coord.append(lig.get_parent("molecule").coord[adj])
                                 bonded_atom_labels.append(lig.get_parent("molecule").atoms[adj].label)
                             if debug >= 2: print("Adjacency", a.adjacency, bonded_atom_labels)
-                            ismissingH, report = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord, bonded_atom_labels)
+                            ismissingH, report, num_missingH = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord, bonded_atom_labels)
                             if ismissingH:
                                 print(a.label, a.mconnec, a.coord)
                                 if debug >= 1: print("")

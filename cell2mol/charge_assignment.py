@@ -53,6 +53,14 @@ def get_possible_charge_state(spec: object, debug: int=0):
         ch_state = get_charge(0, spec.protonation_states[0])
         possible_cs = [ch_state]
         return possible_cs
+    
+    if spec.subtype == "ligand" and len(spec.groups) == 1 and spec.groups[0].is_haptic and "h8-Cyclooctatetraenyl" in spec.groups[0].haptic_type:
+        print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} is a h8-Cyclooctatetraenyl with a protonation state {spec.protonation_states[0].formula} with {spec.protonation_states[0].added_atoms} added atoms")
+        ch_state = get_charge(-1, spec.protonation_states[0])
+        print(ch_state)
+        possible_cs = [ch_state]
+        return possible_cs
+    
     if spec.subtype == "group" :  
         return None
     if spec.subtype == 'molecule' and (spec.iscomplex or spec.has_IA_IIA or spec.has_post_transition_metal):
@@ -566,6 +574,9 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         # empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
         # return empty_protonation_states
         return None
+    # if len(ligand.groups) == 1 and ligand.groups[0].is_haptic and "h8-Cyclooctatetraenyl" in ligand.groups[0].haptic_type:
+    #     empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
+    #     return empty_protonation_states        
 
     # Variables that control how many atoms have been added.
     tmp_added_atoms = 0
@@ -629,6 +640,45 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             addedlist[idx] = 1
                             tmp_added_atoms += 1
                         else: block[idx] = 1
+
+            elif "h8-Cyclooctatetraenyl" in g.haptic_type and not Selected_Hapticity:
+                Selected_Hapticity = True
+                tobeadded = 1
+                tmp_added_atoms = 0
+                for idx, a in enumerate(ligand.atoms):
+                    if idx in parent_indices and a.mconnec == 1:
+                        if tmp_added_atoms < tobeadded:
+                            elemlist[idx] = "H"
+                            addedlist[idx] = 1
+                            tmp_added_atoms += 1
+                        else: block[idx] = 1
+                # count = 0
+                # for idx, a in enumerate(ligand.atoms):
+                #     if idx in parent_indices and a.mconnec == 1:
+                #         count += 1
+                #         if tmp_added_atoms < tobeadded and count == 4:
+                #             elemlist[idx] = "H"
+                #             addedlist[idx] = 1
+                #             tmp_added_atoms += 1
+                #         else: block[idx] = 1
+
+                # tobeadded = 0
+                # for idx, a in enumerate(ligand.atoms):
+                #     if idx in parent_indices and a.mconnec == 1:
+                #         block[idx] = 1
+
+                # tobeadded = 2
+                # tmp_added_atoms = 0
+                # count = 0
+                # for idx, a in enumerate(ligand.atoms):
+                #     if idx in parent_indices and a.mconnec == 1:
+                #         count += 1
+                #         if tmp_added_atoms < tobeadded:
+                #             if count == 1 or count == 5 :
+                #                 elemlist[idx] = "H"
+                #                 addedlist[idx] = 1
+                #                 tmp_added_atoms += 1
+                #         else: block[idx] = 1
 
             elif "h5-AsCp" in g.haptic_type and not Selected_Hapticity:
                 Selected_Hapticity = True
@@ -698,6 +748,18 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 for idx, a in enumerate(ligand.atoms):
                     if idx in parent_indices and a.mconnec == 1:
                         block[idx] = 1
+                # for idx, a in enumerate(ligand.atoms):
+                #     if idx in parent_indices and a.mconnec == 1:
+                #         ismissingH, report, num_missingH = check_missing_hydrogens_from_adjacency(a, ligand, debug)
+                #         if num_missingH == 0:
+                #             block[idx] = 1
+                #         else:
+                #             if debug >= 2: print(f"        GET_PROTONATION_STATES: Adding {num_missingH} H to {idx} with label {a.label}")
+                #             elemlist[idx] = "H"
+                #             addedlist[idx] = num_missingH
+                #             tmp_added_atoms += num_missingH
+                #             if debug >= 2: print(f"{addedlist=} {block=} {added_atoms=} {elemlist=}")
+
 
             elif ("h2-Benzene" in g.haptic_type or "h2-Butadiene" or "h2-ethylene" in g.haptic_type) and not Selected_Hapticity:
                 if debug >= 2: print("        GET_PROTONATION_STATES: No action is required")
@@ -875,8 +937,15 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         for idx, a in enumerate(ligand.atoms):
             if addedlist[idx] != 0 and block[idx] == 0:
                 mol = ligand.get_parent("molecule")
-                for i in range(addedlist[idx]):
+                print(f"{range(addedlist[idx])=} {idx=} {addedlist[idx]=} {a.label=} {a.mconnec=}")
+                # if a.label == "C":
+                #     isadded, newlab, newcoord = add_hydrogen_to_carbon(newlab, newcoord, idx, ligand, debug=debug)
+                if addedlist[idx] == 1: 
                     isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, mol.metals, elemlist[idx], unconditional=True, debug=debug)
+                elif addedlist[idx] == 2:
+                    isadded, newlab, newcoord = add_hydrogen_to_carbon(newlab, newcoord, idx, ligand, debug=debug)
+                else :
+                    print(f"        GET_PROTONATION_STATES: Impossible to add {addedlist[idx]} atoms to atom {idx} ")
                 if isadded:
                     if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
                     added_atoms += addedlist[idx]
@@ -1375,6 +1444,25 @@ def eval_chargelist(atom_charges: list, debug: int=0) -> Tuple[int, int, bool]:
     return abstotal, abs_atcharge, zwitt
 
 #######################################################
+def check_missing_hydrogens_from_adjacency(atom: object, ligand: object, debug: int=0) -> Tuple[bool, str, int]:
+    bonded_atom_labels = []
+    bonded_atom_coord = []
+    adj_indices = [adj for adj in atom.adjacency]  # Get the adjacency of the atom
+    metal_adj_indices = [m_adj for m_adj in atom.metal_adjacency]  # Get the adjacency of the atom with respect to the metal
+
+    for adj in adj_indices:
+        if adj in metal_adj_indices:
+            # If the atom is connected to the metal, we do not consider it
+            continue
+        bonded_atom_labels.append(ligand.get_parent("molecule").labels[adj])
+        bonded_atom_coord.append(ligand.get_parent("molecule").coord[adj])
+
+    ismissingH, report, num_missingH = get_missingH_from_adjacency(atom.atnum, atom.coord, bonded_atom_coord, bonded_atom_labels)
+    print(f"CHECK_MISSING_HYDROGENS_IN_CARBON: {atom.label} has {bonded_atom_labels}) \
+           ismissingH={ismissingH}, num_missingH={num_missingH}, report={report}")
+    return ismissingH, report, num_missingH
+
+#######################################################
 def check_carbenes(atom: object, ligand: object, debug: int=0) -> Tuple[bool, str, int, int]:
     # Function that determines whether a given connected "atom" of a "ligand" of a "molecule" is a carbene
     # This function is in progress. Ideally, should be able to identify Fischer, Schrock and N-Heterocyclic Carbenes
@@ -1394,7 +1482,8 @@ def check_carbenes(atom: object, ligand: object, debug: int=0) -> Tuple[bool, st
 
     # Initial attempt with Carbenes, but they are much more complex
     # Looks for Neighbouring N atoms
-    list_of_coord_atoms = []
+    bonded_atom_labels = []
+    bonded_atom_coord = []
     adj_indices = [adj for adj in atom.adjacency]  # Get the adjacency of the atom
     metal_adj_indices = [m_adj for m_adj in atom.metal_adjacency]  # Get the adjacency of the atom with respect to the metal
 
@@ -1402,19 +1491,25 @@ def check_carbenes(atom: object, ligand: object, debug: int=0) -> Tuple[bool, st
         if adj in metal_adj_indices:
             # If the atom is connected to the metal, we do not consider it
             continue
-        list_of_coord_atoms.append(ligand.get_parent("molecule").labels[adj])
-    #numN = list_of_coord_atoms.count("N")
-    print(f"CHECK_CARBENES: {atom.label} has {list_of_coord_atoms}. Checking for carbenes")
-    # if numN == 2:  # it is an N-Heterocyclic carbenes
-    #     iscarbene = True
-    #     element = "H" 
-    #     addedlist = 1
-    # el
-    if len(list_of_coord_atoms) == 2 :
-        iscarbene = True
-        element = "H"
-        addedlist = 2
-        metal_electrons = 2
+        bonded_atom_labels.append(ligand.get_parent("molecule").labels[adj])
+        bonded_atom_coord.append(ligand.get_parent("molecule").coord[adj])
+    print(f"CHECK_CARBENES: {atom.label} has {bonded_atom_labels}. Checking for carbenes")
+
+    ismissingH, report, num_missingH = get_missingH_from_adjacency(atom.atnum, atom.coord, bonded_atom_coord, bonded_atom_labels)
+    print(f"CHECK_CARBENES: {atom.label} has {bonded_atom_labels}. ismissingH={ismissingH}, num_missingH={num_missingH}, report={report}")
+    if len(bonded_atom_labels) == 2:
+        if num_missingH == 2 :
+            iscarbene = True
+            element = "H"
+            addedlist = 2
+            metal_electrons = 2            
+
+        elif num_missingH == 1:
+            iscarbene = False
+            element = "H"
+            addedlist = 1
+            metal_electrons = 0
+
     return iscarbene, element, addedlist, metal_electrons
 
 #######################################################
