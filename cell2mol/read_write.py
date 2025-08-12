@@ -984,24 +984,54 @@ def print_refmoleclist (cell):
                         print(group_info)
                     
 ######################################################
-def print_unique_species (cell):
-    if cell.unique_species is not None:
-        print(f"\nUnique Species in {cell.subtype}:")
-        for specie in cell.unique_species:
-            if specie.subtype == "metal":
-                if specie.charge is not None:
-                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.charge=}")
-                else:
-                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=}")
-            else:
-                if specie.totcharge is not None and specie.smiles is not None:
-                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.smiles=} {specie.totcharge=}")
-                elif specie.totcharge is not None:
-                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.totcharge=}")
-                else:
-                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})")
-    else:
+def print_unique_species(cell):
+    unique_species = getattr(cell, "unique_species", None)
+    if not unique_species:
         print("\nNo unique species found in the cell object.")
+        return
+
+    print(f"\nUnique Species in {cell.subtype}:")
+    for specie in unique_species:
+        parts = [f"{specie.unique_index=}", f"{specie.formula}", f"({specie.subtype})"]
+
+        if specie.subtype == "metal":
+            parts.append(f"{specie.coord_sphere_formula=}")
+            if getattr(specie, "charge", None) is not None:
+                parts.append(f"{specie.charge=}")
+        elif specie.subtype == "ligand":
+            parts.append(f"{specie.denticity=}")
+            if specie.is_haptic:
+                parts.append(f"{specie.haptic_type=}")
+            if getattr(specie, "smiles", None) is not None:
+                parts.append(f"{specie.smiles=}")
+            if getattr(specie, "totcharge", None) is not None:
+                parts.append(f"{specie.totcharge=}")
+        else:
+            if getattr(specie, "smiles", None) is not None:
+                parts.append(f"{specie.smiles=}")
+            if getattr(specie, "totcharge", None) is not None:
+                parts.append(f"{specie.totcharge=}")
+
+        print("\t" + " ".join(parts))
+######################################################
+# def print_unique_species (cell):
+#     if cell.unique_species is not None:
+#         print(f"\nUnique Species in {cell.subtype}:")
+#         for specie in cell.unique_species:
+#             if specie.subtype == "metal":
+#                 if specie.charge is not None:
+#                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.charge=}")
+#                 else:
+#                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=}")
+#             else:
+#                 if specie.totcharge is not None and specie.smiles is not None:
+#                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.smiles=} {specie.totcharge=}")
+#                 elif specie.totcharge is not None:
+#                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.totcharge=}")
+#                 else:
+#                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})")
+#     else:
+#         print("\nNo unique species found in the cell object.")
 
 ######################################################
 def print_possible_charges (cell, debug=0):
