@@ -56,7 +56,7 @@ def get_missingH_from_adjacency(Z, center, points, bonded_atom_labels):
         if bonded_atom_labels[0] == "O" or bonded_atom_labels[0] == "N": # CO or CN
             missingH = False
         else:
-            shapeval = "more than 1 (possibly missing H in methyl)"
+            # shapeval = "more than 1 (possibly missing H in methyl)"
             missingH = True
     elif val_e == shapeval :  
         missingH = False
@@ -64,11 +64,16 @@ def get_missingH_from_adjacency(Z, center, points, bonded_atom_labels):
         missingH = False
     else : # val_e < shapeval
         missingH = True
+        num_missingH = shapeval - val_e
 
     # Saves report
     # print(f"Summary of facts:\n -Atom has {num_adj_atoms} adjacent atoms \n -with total bond order {sum_bond_order} \n -arranged in a shape {shape} that suggests coordination {shapeval} \n -with formal charge {charge} \n -valence {valence} and {lonepairs} lone pairs.")
     # report += str(f"Summary of facts:\n -Atom has {num_adj_atoms} adjacent atoms \n -with total bond order {sum_bond_order} \n -arranged in a shape {shape} that suggests coordination {shapeval} \n -with formal charge {charge} \n -valence {valence} and {lonepairs} lone pairs. \n")
-    report += str(f"Summary of facts:\n -Atom has {num_adj_atoms} adjacent atoms \n -arranged in a shape {shape} that suggests coordination {shapeval} \n")
+    report += str(f"Summary of facts:\n -Atom has {num_adj_atoms} adjacent atoms \n")
+    if val_e == 1 and missingH:
+        report += str(f" -with a single adjacent atom {bonded_atom_labels[0]} that is not O or N, possibly a methyl group with missing H atoms.\n")
+    else:
+        report += str(f" -arranged in a shape {shape} that suggests coordination {shapeval} \n")
     report += report_shape
 
     #missingH = False

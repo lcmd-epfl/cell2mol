@@ -3,7 +3,7 @@ import os
 from cell2mol import __file__
 import yaml
 from cell2mol.other import *
-from cell2mol.connectivity import add_atom, get_adjmatrix, get_adjmatrix_from_cif_bonds, is_haptic_ring
+from cell2mol.connectivity import add_atom, get_adjmatrix, get_adjmatrix_from_cif_bonds, is_single_ring
 from cell2mol.elementdata import ElementData
 from scipy.optimize import linear_sum_assignment      # Hungarian algorithm
 from scipy.stats import special_ortho_group           # more evenly distributed 
@@ -403,10 +403,10 @@ def extract_final_indices(initial_list, intermediate_list):
 def coordination_correction_for_haptic(group: object, debug: int=0):
     add_factor = 0.45
     if debug > 0: print("Entering COORD_CORR_HAPTIC:")
+    single_ring = is_single_ring(group.labels, group.coord)
+    if debug > 0: print(f"Is single ring: {single_ring}")
     conn_idx = []
     conn_idx_by_metal = {jdx : [] for jdx, met in enumerate(group.metals)}
-    final_ligand_indices_by_metal = {jdx: [] for jdx in range(len(group.metals))}
-    good_atoms = []
     for idx, atom in enumerate(group.atoms):
         for jdx, met in enumerate(group.metals):
             lig     = group.get_parent("ligand")
@@ -431,20 +431,46 @@ def coordination_correction_for_haptic(group: object, debug: int=0):
                 if debug > 0 : 
                     print(f"\tAtom {atom.label} ({ligand_idx=}) is connected to metal {met.label} ({met.atom_site_label}, group.metals index {jdx=})")
                 conn_idx.append(idx)
-                final_ligand_indices_by_metal[jdx].append(atom.get_parent_index("ligand"))
-                good_atoms.append(atom)
                 conn_idx_by_metal[jdx].append(idx)
             else:
                 if debug > 0 : print(f"\tAtom {atom.label} ({ligand_idx=}) is not connected to metal {met.label} ({met.atom_site_label}, group.metals index {jdx=})")
     print(f"conn_idx before set: {conn_idx=}")
     conn_idx = sorted(list(set(conn_idx)))
     split_groups = []
+    final_ligand_indices_by_metal = {jdx : [] for jdx, met in enumerate(group.metals)}
     for jdx, indices in conn_idx_by_metal.items():
         metal = group.metals[jdx]
         if indices:
             print(f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}")
-            new_group = [i for i in indices]
+            if single_ring:
+                # For single ring, we need to check distances
+                print(f"Checking distances for a single ring")
+                distances = [get_dist(metal.coord, group.atoms[i].coord) for i in indices]
+                mean = np.mean(distances)
+                std_dev = round(float(np.std(distances)), 3)
+                if std_dev > 0.1 :
+                    new_group = []
+                    for idx, dist in zip(indices, distances):
+                        if dist < mean - std_dev:
+                            print(f"Distance {dist} is below mean - std_dev ({mean} - {std_dev}), adding to conn_idx")
+                            new_group.append(idx)
+                        else:
+                            print(f"Distance {dist} is above mean - std_dev ({mean} - {std_dev}), resetting mconnec for atom {group.atoms[idx].label}")
+                            group.atoms[idx].reset_mconnec(metal, debug=debug)
+                    print(f"New group after distance check: {new_group}")
+                else:
+                    print(f"std_dev is too low ({std_dev}), adding all indices to conn_idx")
+                    new_group = [i for i in indices]
+            else :
+                new_group = [i for i in indices]
             split_groups.append(new_group)
+    
+    for jdx, indices in enumerate(split_groups):
+        for idx in indices:
+            atom = group.atoms[idx]
+            if atom.get_parent_index("ligand") is not None:
+                final_ligand_indices_by_metal[jdx].append(atom.get_parent_index("ligand"))
+
     print(f"conn_idx: {conn_idx=}")
     print(f"split_groups: {split_groups=}")
     final_group_indices = split_groups
@@ -469,7 +495,7 @@ def coordination_correction_for_haptic_old (group: object, debug: int=0):
     std_dev = round(float(np.std(distances)), 3)
     if debug >= 2 : print(f"\t{distances=} {mean=} {std_dev=}")
 
-    is_ring = is_haptic_ring(group.labels, group.coord)
+    is_ring = is_single_ring(group.labels, group.coord)
     conn_idx = []
     final_ligand_indices = []
     for idx, (atom, dist) in enumerate(zip(group.atoms, distances)) :
