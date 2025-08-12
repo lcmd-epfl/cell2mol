@@ -3,7 +3,7 @@ import os
 from cell2mol import __file__
 import yaml
 from cell2mol.other import *
-from cell2mol.connectivity import add_atom, get_adjmatrix, get_adjmatrix_from_cif_bonds
+from cell2mol.connectivity import add_atom, get_adjmatrix, get_adjmatrix_from_cif_bonds, is_haptic_ring
 from cell2mol.elementdata import ElementData
 from scipy.optimize import linear_sum_assignment      # Hungarian algorithm
 from scipy.stats import special_ortho_group           # more evenly distributed 
@@ -367,7 +367,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
     for jdx, indices in conn_idx_by_metal.items():
         metal = group.metals[jdx]
         if indices:
-            print(f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].label for i in indices]}")
+            print(f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}")
             new_group = [i for i in indices]
             split_groups.append(new_group)
     print(f"conn_idx: {conn_idx=}")
@@ -399,8 +399,60 @@ def extract_final_indices(initial_list, intermediate_list):
 
     return result
 
-#######################################################    
-def coordination_correction_for_haptic (group: object, debug: int=0):
+#######################################################
+def coordination_correction_for_haptic(group: object, debug: int=0):
+    add_factor = 0.45
+    if debug > 0: print("Entering COORD_CORR_HAPTIC:")
+    conn_idx = []
+    conn_idx_by_metal = {jdx : [] for jdx, met in enumerate(group.metals)}
+    final_ligand_indices_by_metal = {jdx: [] for jdx in range(len(group.metals))}
+    good_atoms = []
+    for idx, atom in enumerate(group.atoms):
+        for jdx, met in enumerate(group.metals):
+            lig     = group.get_parent("ligand")
+            ligand_idx = atom.get_parent_index("ligand")
+            if debug > 2: print(f"\tevaluating coordination with metal {met.label} ({met.atom_site_label})")
+            if debug > 2: print(f"\n{met}")
+
+            tmplabels = [atom.label, met.label]
+            tmpcoord = [atom.coord, met.coord]            
+            
+            refcell = atom.get_parent("reference")
+            if atom.atom_site_label is not None and met.atom_site_label is not None:
+                atom_site_labels = [atom.atom_site_label, met.atom_site_label]
+            else :
+                atom_site_labels = None
+            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
+                isconnected, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, refcell.geom_bond_cif, metal_only=True)
+            else:
+                isconnected, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+
+            if isconnected and any(tmpadjnum) > 0: 
+                if debug > 0 : 
+                    print(f"\tAtom {atom.label} ({ligand_idx=}) is connected to metal {met.label} ({met.atom_site_label}, group.metals index {jdx=})")
+                conn_idx.append(idx)
+                final_ligand_indices_by_metal[jdx].append(atom.get_parent_index("ligand"))
+                good_atoms.append(atom)
+                conn_idx_by_metal[jdx].append(idx)
+            else:
+                if debug > 0 : print(f"\tAtom {atom.label} ({ligand_idx=}) is not connected to metal {met.label} ({met.atom_site_label}, group.metals index {jdx=})")
+    print(f"conn_idx before set: {conn_idx=}")
+    conn_idx = sorted(list(set(conn_idx)))
+    split_groups = []
+    for jdx, indices in conn_idx_by_metal.items():
+        metal = group.metals[jdx]
+        if indices:
+            print(f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}")
+            new_group = [i for i in indices]
+            split_groups.append(new_group)
+    print(f"conn_idx: {conn_idx=}")
+    print(f"split_groups: {split_groups=}")
+    final_group_indices = split_groups
+    print(f"final_group_indices: {final_group_indices=}")
+    return group, final_group_indices, final_ligand_indices_by_metal
+
+#######################################################
+def coordination_correction_for_haptic_old (group: object, debug: int=0):
     add_factor = 0.45
     if debug > 0: print("Entering COORD_CORR_HAPTIC:")
 
@@ -417,6 +469,7 @@ def coordination_correction_for_haptic (group: object, debug: int=0):
     std_dev = round(float(np.std(distances)), 3)
     if debug >= 2 : print(f"\t{distances=} {mean=} {std_dev=}")
 
+    is_ring = is_haptic_ring(group.labels, group.coord)
     conn_idx = []
     final_ligand_indices = []
     for idx, (atom, dist) in enumerate(zip(group.atoms, distances)) :
@@ -424,12 +477,16 @@ def coordination_correction_for_haptic (group: object, debug: int=0):
             if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
             if debug >=1 : print(atom.label)
             atom.reset_mconnec(metal, debug=debug)  
-        elif std_dev > 0.1 :
-            if dist < mean - std_dev:
-                conn_idx.append(idx)
-                final_ligand_indices.append(atom.get_parent_index("ligand"))
+        elif is_ring:
+            if std_dev > 0.1 :
+                if dist < mean - std_dev:
+                    conn_idx.append(idx)
+                    final_ligand_indices.append(atom.get_parent_index("ligand"))
+                else:
+                    atom.reset_mconnec(metal, debug=debug) 
             else:
-                atom.reset_mconnec(metal, debug=debug)  
+                conn_idx.append(idx)
+                final_ligand_indices.append(atom.get_parent_index("ligand")) 
         else:
             conn_idx.append(idx)
             final_ligand_indices.append(atom.get_parent_index("ligand"))
