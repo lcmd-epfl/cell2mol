@@ -254,7 +254,7 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
                         if added_into_aromatic[idx]:
                             if debug >= 2:
                                 print(f"    NEW SELECT FUNCTION: Hydrogen added into aromatic atoms, so {idx} should be excluded from tmplist")
-                            new_tmplist.remove(idx)
+                            # new_tmplist.remove(idx)
                         else:
                             if debug >= 2:
                                 print(f"    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {new_tmplist=}")
@@ -267,16 +267,6 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
             else:
                 if debug >= 2:
                     print("    NEW SELECT FUNCTION: Aromaticity filtering would have emptied tmplist. Skipping removal.")
-        # for idx in range(0, nlists):
-        #     if (idx in listofmaxaromatic) and coincide[idx] :
-        #         if (idx in tmplist):
-        #             if added_into_aromatic[idx] == True:
-        #                 if debug >= 2: print("    NEW SELECT FUNCTION: Hydrogen added into aromatic atoms, so should be excluded", f"{idx=} from {tmplist=}")
-        #                 tmplist.remove(idx)
-        #             else:
-        #                 if debug >= 2: print("    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {tmplist=}")
-        #         else:
-        #             if debug >= 2: print("    NEW SELECT FUNCTION: Check to tmplist", f"{idx=} {tmplist=}")
 
     ####################
     # tmplist is built #
@@ -500,7 +490,7 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
                         if added_into_aromatic[idx]:
                             if debug >= 2:
                                 print(f"    NEW SELECT FUNCTION: Hydrogen added into aromatic atoms, so {idx} should be excluded from tmplist")
-                            new_tmplist.remove(idx)
+                            # new_tmplist.remove(idx)
                         else:
                             if debug >= 2:
                                 print(f"    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {new_tmplist=}")
@@ -877,10 +867,26 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                                 elemlist[idx] = "H"
                                 addedlist[idx] = 1
                             else:
-                                needs_nonlocal = True
-                                non_local_groups += 1
-                                non_local_groups_indices.append(idx)
-                                if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
+                                G = nx.from_numpy_array(ligand.adjmat.astype(float))
+                                cycle_basis = nx.cycle_basis(G)
+                                print(f"        GET_PROTONATION_STATES: cycle_basis={cycle_basis}")
+                                index = [i for i, cycle in enumerate(cycle_basis) if idx in cycle]
+                                if len(index) == 1 :
+                                    ring_size = len(cycle_basis[index[0]])
+                                    if ring_size == 6:
+                                        block[idx] = 1
+                                        print(f"        GET_PROTONATION_STATES: block pyridine-like {a.label} atom with {a.connec} in the ring {ring_size=}")
+                                    else:
+                                        needs_nonlocal = True
+                                        non_local_groups += 1
+                                        non_local_groups_indices.append(idx)
+                                        if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
+                                else:        
+                                    needs_nonlocal = True
+                                    non_local_groups += 1
+                                    non_local_groups_indices.append(idx)
+                                    if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
+                
                 # Phosphorous
                 elif (a.connec >= 3) and a.label == "P": 
                     block[idx] = 1
@@ -981,13 +987,14 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         # Initiate variables
         avoid = ["Si", "P"]
 
+        non_local_groups_labels = [ligand.labels[idx] for idx in non_local_groups_indices]
         if debug >= 2: print(" ")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: Enters non-local with:")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: local_labels: {local_labels}")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: block: {block}")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: addedlist: {addedlist}")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: {len(non_local_groups_indices)} non_local_groups groups found") 
-        if debug >= 2: print(f"        GET_PROTONATION_STATES: non_local_groups={[ligand.labels[idx] for idx in non_local_groups_indices]}")
+        if debug >= 2: print(f"        GET_PROTONATION_STATES: non_local_groups_labels={non_local_groups_labels}")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: {non_local_groups_indices=}")
         # CREATES ALL COMBINATIONS OF PROTONATION STATES# 
         # Creates [0,1] tuples for each non_local protonation site
@@ -1384,7 +1391,32 @@ def check_rdkit_obj_connectivity(mol: object, natoms: int, ich: int, debug: int=
     return iscorrect
 
 #######################################################
-def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
+def get_list_of_charges_to_try (prot: object, debug: int=0) -> list:
+    ### Determines which charges are worth trying for a given specie and a protonation state
+    lchar = []
+    spec = prot.parent
+    
+    #### Educated Guess on the Maximum Charge one can expect from the spec[1]
+    if spec.formula in ['C-O', "H2-O", "C-N"]:
+        maxcharge = 0
+    elif   spec.subtype == "molecule" and (not spec.iscomplex and not spec.has_IA_IIA and not spec.has_post_transition_metal): 
+        maxcharge = 3
+    elif spec.subtype == "ligand":  # Since other charges will be handled by protonation states
+        maxcharge = 0
+    else:
+        maxcharge = 2
+    if debug >= 2: print(f"MAXCHARGE: maxcharge set at {maxcharge}")
+    
+    # Defines list of charges that will try
+    for magn in range(0, int(maxcharge + 1)):
+        if magn == 0:    signlist = [1]
+        elif magn != 0:  signlist = [-1, 1]
+        for sign in signlist:
+            ich = int(magn * sign)
+            lchar.append(ich)
+    return lchar
+#######################################################  
+def get_list_of_charges_to_try_old(prot: object, debug: int=0) -> list:
     ### Determines which charges are worth trying for a given specie and a protonation state
     lchar = []
     spec = prot.parent
@@ -1418,7 +1450,7 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
     
         if (not spec.is_nitrosyl) and prot.added_atoms > 0 :
             maxcharge = 0
-    # maxcharge = 0
+
     if debug >= 2: print(f"MAXCHARGE: maxcharge set at {maxcharge}")
     
     # Defines list of charges that will try
@@ -1498,7 +1530,7 @@ def check_carbenes(atom: object, ligand: object, debug: int=0) -> Tuple[bool, st
     ismissingH, report, num_missingH = get_missingH_from_adjacency(atom.atnum, atom.coord, bonded_atom_coord, bonded_atom_labels)
     print(f"CHECK_CARBENES: {atom.label} has {bonded_atom_labels}. ismissingH={ismissingH}, num_missingH={num_missingH}, report={report}")
     if len(bonded_atom_labels) == 2:
-        if num_missingH == 2 :
+        if (num_missingH == 2) & bonded_atom_labels.count("H") == 0:
             iscarbene = True
             element = "H"
             addedlist = 2

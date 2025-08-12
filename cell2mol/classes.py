@@ -11,7 +11,7 @@ from cell2mol.connectivity import (
     labels2electrons,
     labels2formula,
     get_adjmatrix,
-    is_haptic_ring,
+    is_single_ring,
 )
 from cell2mol.connectivity import (
     get_metal_idxs,
@@ -1853,7 +1853,10 @@ class ligand(specie):
                     continue
                 else:
                     if debug > 1 : print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.formula} with {conn_idx=}")
-                    splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices, debug=debug)
+                    if type(final_ligand_indices) is dict:
+                        splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices[0], debug=debug)
+                    elif type(final_ligand_indices) is list:
+                        splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices, debug=debug)
                     for g in splitted_groups:
                         self.groups.append(g)
         if debug > 0 : print(f"\tLIGAND.SPLIT_LIGAND: found groups {[ group.formula for group in self.groups]}")
@@ -2068,7 +2071,7 @@ class group(specie):
         # elif numC == 1 and numP == 1 and totnum == 2:
         #     self.haptic_type = ["h2-P=C"]
         #     self.is_haptic = True
-        elif is_haptic_ring(self.labels, self.coord):
+        elif is_single_ring(self.labels, self.coord):
             self.haptic_type = [f"{len(self.labels)}-ring {self.formula}"]
             self.is_haptic = True
 
