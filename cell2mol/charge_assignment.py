@@ -1391,7 +1391,7 @@ def check_rdkit_obj_connectivity(mol: object, natoms: int, ich: int, debug: int=
     return iscorrect
 
 #######################################################
-def get_list_of_charges_to_try (prot: object, debug: int=0) -> list:
+def get_list_of_charges_to_try_new (prot: object, debug: int=0) -> list:
     ### Determines which charges are worth trying for a given specie and a protonation state
     lchar = []
     spec = prot.parent
@@ -1416,7 +1416,7 @@ def get_list_of_charges_to_try (prot: object, debug: int=0) -> list:
             lchar.append(ich)
     return lchar
 #######################################################  
-def get_list_of_charges_to_try_old(prot: object, debug: int=0) -> list:
+def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
     ### Determines which charges are worth trying for a given specie and a protonation state
     lchar = []
     spec = prot.parent
@@ -1446,8 +1446,8 @@ def get_list_of_charges_to_try_old(prot: object, debug: int=0) -> list:
         if maxcharge > 4: 
             maxcharge = 4  ## At most, we try range(-4,5,1)
         if maxcharge < 2: 
-            maxcharge = 2  ## At leaest, we try range(-2,3,1)
-    
+            maxcharge = 2  ## At least, we try range(-2,3,1)
+
         if (not spec.is_nitrosyl) and prot.added_atoms > 0 :
             maxcharge = 0
 
@@ -2003,6 +2003,12 @@ def fix_zwitterions_in_adjacent_atoms(mol, debug=0):
                         if debug:
                             print(f"\tSkipping N+ with O- neighbor: {n_label} (idx={neighbor_idx}, charge={n_fcharge})")
                         continue
+                    if n_label == "B":
+                        n_neighbors = rw_mol.GetAtomWithIdx(neighbor_idx).GetNeighbors()
+                        if len(n_neighbors) == 4:
+                            if debug:
+                                print(f"\tSkipping B- with 4 neighbors: {n_label} (idx={neighbor_idx}, charge={n_fcharge})")
+                            continue
                     fix_zwitterions = True
                     if debug:
                         print(f"\tFound neighbor with negative charge {n_label} (idx={neighbor_idx}, charge={n_fcharge})")

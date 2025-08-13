@@ -278,7 +278,9 @@ def get_fragments_new (newcell, updated, indices_in_ref, refcell, cov_factor: fl
             for sublist in tmp_blocklist
         ]
     if debug >= 2 : print("get_fragments: blocklist", blocklist)
-    
+    if blocklist is None:
+        return []
+
     fragments = []  
     for b in blocklist:
         if debug > 2 : print(f"get_fragments: doing block={b}")
