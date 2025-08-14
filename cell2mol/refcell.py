@@ -5,8 +5,8 @@ from contextlib import redirect_stdout
 from cell2mol.classes import cell
 from cell2mol.read_write import *
 from cell2mol.cell_operations import frac2cart_fromparam
-from cell2mol.other import handle_error
-from cell2mol.connectivity import labels2formula, get_alkali_alkaline_earth_metal_idxs
+from cell2mol.other import handle_error, extract_from_list
+from cell2mol.connectivity import labels2formula, get_alkali_alkaline_earth_metal_idxs, split_species
 import time
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
@@ -132,6 +132,22 @@ def create_reference (input_path, name, cell_vector, cell_param, cif_bond_info, 
     refcell.get_cif_bond_moiety(cif_bond_info, geom_bond_cif, moiety_list_cif)
     print(f"refcell.exist_cif_bond_moiety: {refcell.exist_cif_bond_moiety}")
 
+    # if cif_bond_info:
+    #     moiety_indices = get_moiety_indices_from_labels(atom_site_labels, moiety_list_cif)
+    #     blocklist = moiety_indices
+    # else:
+    #     blocklist = split_species(ref_labels, ref_pos)
+
+    # if debug >= 2: print(f"PRECHECK_reference: blocklist={blocklist}")
+    # if blocklist is None:
+    #     print(f"PRECHECK_reference: No blocklist found")
+    #     return refcell
+    # else:
+    #     formulas_from_refcell = []
+    #     for b in blocklist:
+    #         mol_labels = extract_from_list(b, ref_labels, dimension=1)
+    #         formulas_from_refcell.append(labels2formula(mol_labels))
+
     if cif_bond_info:
         refcell.get_reference_molecules_from_moiety (ref_labels, ref_fracs, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR, debug=debug)
     else:
@@ -182,10 +198,6 @@ def compare_with_CIF (input_path, refcell: cell, debug=0):
     print(f"Charges from CIF: {charges_from_cif}")
     print(f"Formulas from refcell: {formulas_from_refcell}")
 
-    cif_totals = sum_formulas(formulas_from_cif, ratios_from_cif)
-    ref_totals = sum_formulas(formulas_from_refcell)
-    df_compare, all_match = compare_totals(cif_totals, ref_totals, atol=1e-9)
-
     disagree_with_cif = []
     for ref_idx, info in matches.items():
         ref = refcell.refmoleclist[ref_idx]
@@ -211,15 +223,30 @@ def compare_with_CIF (input_path, refcell: cell, debug=0):
     
     if len(disagree_with_cif) > 0:
         print("Discrepancies found between refcell and CIF") 
-        if not all_match:
-            print(f"Element totals differ between refcell and CIF:\n{df_compare}")
-            print("Possible causes:")
-            print("- Missing atoms in the crystal structure (mismatch with CIF moiety).")
-            print("- Different adjacency cutoffs in refcell changed connectivity.")
-            refcell.disagree_with_cif_formula = True
-        else:
-            print("Element totals in refcell and CIF match.")
-            refcell.disagree_with_cif_formula = False
+        refcell.disagree_with_cif_formula = True
+        try:
+            cif_totals = sum_formulas(formulas_from_cif, ratios_from_cif)
+            if cif_totals is not None:
+                print(f"Element totals from CIF: {cif_totals}")
+                ref_totals = sum_formulas(formulas_from_refcell)
+                df_compare, all_match = compare_totals(cif_totals, ref_totals, atol=1e-9)
+                if not all_match:
+                    print(f"Element totals differ between refcell and CIF:\n{df_compare}")
+                    print("Possible causes:")
+                    print("- Missing atoms in the crystal structure (mismatch with CIF moiety).")
+                    print("- Different adjacency matrix in refcell changed connectivity.")
+        except:
+            print("Can not calculate element totals from CIF. This may be due to non-float ratios in moieties in CIF.")
+
+        # if not all_match:
+        #     print(f"Element totals differ between refcell and CIF:\n{df_compare}")
+        #     print("Possible causes:")
+        #     print("- Missing atoms in the crystal structure (mismatch with CIF moiety).")
+        #     print("- Different adjacency matrix in refcell changed connectivity.")
+        #     refcell.disagree_with_cif_formula = True
+        # else:
+        #     print("Element totals in refcell and CIF match.")
+        #     refcell.disagree_with_cif_formula = False
     else:
         print("No discrepancies found between formulas from refcell and CIF.")
         refcell.disagree_with_cif_formula = False
