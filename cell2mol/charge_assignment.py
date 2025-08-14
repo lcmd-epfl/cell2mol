@@ -887,6 +887,9 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             if numN == 1 and numO == 1: # amide
                                 elemlist[idx] = "H"
                                 addedlist[idx] = 1
+                            elif numH == 2 and ligand.formula == "H2-C":
+                                elemlist[idx] = "H"
+                                addedlist[idx] = 2
                             elif numN == 2 or (numN == 1 and numC == 1): # NHCs or CAACs
                                 iscarbene, tmp_element, tmp_added, tmp_metal = check_carbenes(a, ligand)
                                 if debug >= 2: print(f"        GET_PROTONATION_STATES: Evaluating as carbene and {iscarbene}")
@@ -895,9 +898,10 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                                     elemlist[idx] = tmp_element
                                     addedlist[idx] = tmp_added
                                     metal_electrons[idx] = tmp_metal
-                            elif numH == 2 and ligand.formula == "H2-C":
-                                elemlist[idx] = "H"
-                                addedlist[idx] = 2
+                                else:
+                                    needs_nonlocal = True
+                                    non_local_groups += 1
+                                    non_local_groups_indices.append(idx)
                             else:
                                 needs_nonlocal = True
                                 non_local_groups += 1
@@ -1526,25 +1530,20 @@ def check_carbenes(atom: object, ligand: object, debug: int=0) -> Tuple[bool, st
         bonded_atom_coord.append(ligand.get_parent("molecule").coord[adj])
     print(f"CHECK_CARBENES: {atom.label} has {bonded_atom_labels}. Checking for carbenes")
     
-    if len(bonded_atom_labels) == 2:
-        iscarbene = True
-        element = "H"
-        addedlist = 2
-        metal_electrons = 2
-    # ismissingH, report, num_missingH = get_missingH_from_adjacency(atom.atnum, atom.coord, bonded_atom_coord, bonded_atom_labels)
-    # print(f"CHECK_CARBENES: {atom.label} has {bonded_atom_labels}. ismissingH={ismissingH}, num_missingH={num_missingH}, report={report}")
+    ismissingH, report, num_missingH = get_missingH_from_adjacency(atom.atnum, atom.coord, bonded_atom_coord, bonded_atom_labels)
+    print(f"CHECK_CARBENES: {atom.label} has {bonded_atom_labels}. ismissingH={ismissingH}, num_missingH={num_missingH}, report={report}")
     
-    # if len(bonded_atom_labels) == 2:
-    #     if (num_missingH == 2) and bonded_atom_labels.count("H") == 0:
-    #         iscarbene = True
-    #         element = "H"
-    #         addedlist = 2
-    #         metal_electrons = 2            
-    #     elif num_missingH == 1:
-    #         iscarbene = False
-    #         element = "H"
-    #         addedlist = 1
-    #         metal_electrons = 0
+    if len(bonded_atom_labels) == 2:
+        if (num_missingH == 2) and bonded_atom_labels.count("H") == 0:
+            iscarbene = True
+            element = "H"
+            addedlist = 2
+            metal_electrons = 2            
+        elif num_missingH == 1:
+            iscarbene = False
+            element = "H"
+            addedlist = 1
+            metal_electrons = 0
     print(f"CHECK_CARBENES: {atom.label} ({atom.atom_site_label}) iscarbene={iscarbene}, element={element}, addedlist={addedlist}, metal_electrons={metal_electrons}")
     return iscarbene, element, addedlist, metal_electrons
 
