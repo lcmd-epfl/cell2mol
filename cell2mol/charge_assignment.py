@@ -559,11 +559,13 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     newlab   = ligand.labels.copy()
     newcoord = ligand.coord.copy()
     
-    if len(get_non_transition_metal_idxs(newlab)) == natoms:  # metal cluster (e.g. Sb12 in AKEVIX)
-        if debug >= 2: print(f"    POSCHARGE: CANNOT Generate PROTONATION for this specie {specie.formula} ({specie.subtype})")
-        # empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
-        # return empty_protonation_states
-        return None
+    if len(get_non_transition_metal_idxs(newlab)) == natoms :
+        if natoms <= 2:  # metal cluster (e.g. Sb12 in AKEVIX)
+            empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
+            return empty_protonation_states
+        else:
+            if debug >= 2: print(f"    POSCHARGE: CANNOT Generate PROTONATION for this specie {specie.formula} ({specie.subtype})")
+            return None
     # if len(ligand.groups) == 1 and ligand.groups[0].is_haptic and "h8-Cyclooctatetraenyl" in ligand.groups[0].haptic_type:
     #     empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
     #     return empty_protonation_states        
@@ -610,13 +612,11 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 tmp_added_atoms = 0
                 for idx, a in enumerate(ligand.atoms):
                     if idx in parent_indices and a.mconnec == 1:
-                        print (idx, tmp_added_atoms, tobeadded)
                         if tmp_added_atoms < tobeadded:
                             print(f"        GET_PROTONATION_STATES: Adding H to {idx} with label {a.label}")
                             elemlist[idx] = "H"
                             addedlist[idx] = 1
                             tmp_added_atoms += 1
-                            print(f"{addedlist=} {block=} {added_atoms=} {elemlist=}")
                         else: block[idx] = 1
 
             elif "h7-Cycloheptatrienyl" in g.haptic_type and not Selected_Hapticity:
@@ -642,33 +642,6 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             addedlist[idx] = 1
                             tmp_added_atoms += 1
                         else: block[idx] = 1
-                # count = 0
-                # for idx, a in enumerate(ligand.atoms):
-                #     if idx in parent_indices and a.mconnec == 1:
-                #         count += 1
-                #         if tmp_added_atoms < tobeadded and count == 4:
-                #             elemlist[idx] = "H"
-                #             addedlist[idx] = 1
-                #             tmp_added_atoms += 1
-                #         else: block[idx] = 1
-
-                # tobeadded = 0
-                # for idx, a in enumerate(ligand.atoms):
-                #     if idx in parent_indices and a.mconnec == 1:
-                #         block[idx] = 1
-
-                # tobeadded = 2
-                # tmp_added_atoms = 0
-                # count = 0
-                # for idx, a in enumerate(ligand.atoms):
-                #     if idx in parent_indices and a.mconnec == 1:
-                #         count += 1
-                #         if tmp_added_atoms < tobeadded:
-                #             if count == 1 or count == 5 :
-                #                 elemlist[idx] = "H"
-                #                 addedlist[idx] = 1
-                #                 tmp_added_atoms += 1
-                #         else: block[idx] = 1
 
             elif "h5-AsCp" in g.haptic_type and not Selected_Hapticity:
                 Selected_Hapticity = True
@@ -718,7 +691,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         else:
                             block[idx] = 1
 
-            elif ("h3-Allyl" in g.haptic_type or "h3-Cp" in g.haptic_type) and not Selected_Hapticity:
+            elif any(sub in g.haptic_type for sub in ["h3-Allyl", "h3-Cp"]) and not Selected_Hapticity:
                 Selected_Hapticity = True
                 tobeadded = 1
                 tmp_added_atoms = 0
@@ -731,7 +704,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         else:
                             block[idx] = 1
 
-            elif ("h4-Benzene" in g.haptic_type or "h4-Butadiene" in g.haptic_type) and not Selected_Hapticity:
+            elif any(sub in g.haptic_type for sub in ["h4-Butadiene", "h4-Benzene"]) and not Selected_Hapticity:
                 if debug >= 2: print("        GET_PROTONATION_STATES: No action is required")
                 Selected_Hapticity = True
                 tobeadded = 0
@@ -750,8 +723,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 #             tmp_added_atoms += num_missingH
                 #             if debug >= 2: print(f"{addedlist=} {block=} {added_atoms=} {elemlist=}")
 
-
-            elif ("h2-Benzene" in g.haptic_type or "h2-Butadiene" or "h2-ethylene" in g.haptic_type) and not Selected_Hapticity:
+            elif any(sub in g.haptic_type for sub in ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]) and not Selected_Hapticity:
                 if debug >= 2: print("        GET_PROTONATION_STATES: No action is required")
                 Selected_Hapticity = True
                 tobeadded = 0
@@ -767,16 +739,20 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                     if idx in parent_indices and a.mconnec == 1:
                         block[idx] = 1
 
-            elif "h2-P=C" in g.haptic_type and not Selected_Hapticity:
-                if debug >= 2: print("        GET_PROTONATION_STATES: No action is required")
-                Selected_Hapticity = True
-                tobeadded = 0
-                for idx, a in enumerate(ligand.atoms):
-                    if idx in parent_indices and a.mconnec == 1:
-                        block[idx] = 1
-
             # If the group hapticity type is not recognized -or instructions are not defined-, nothing is done
-            if not Selected_Hapticity:
+            elif not Selected_Hapticity:
+                if len(g.haptic_type) == 1:
+                    if g.haptic_type[0] in ['5-ring C4-N']:
+                        tobeadded = 1
+                        tmp_added_atoms = 0
+                        for idx, a in enumerate(ligand.atoms):
+                            if idx in parent_indices and a.mconnec == 1:
+                                if tmp_added_atoms < tobeadded:
+                                    elemlist[idx] = "H"
+                                    addedlist[idx] = 1
+                                    tmp_added_atoms += 1
+                                else:
+                                    block[idx] = 1                       
                 if debug >= 2: print(f"        GET_PROTONATION_STATES: {g.haptic_type} not recognized or new rules are necessary")
 
         else:  # cases without hapticity
@@ -788,39 +764,43 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
             for idx in parent_indices:
                 a = ligand.atoms[idx]
                 if debug >= 2: print(f"        GET_PROTONATION_STATES: evaluating non-haptic group with index {idx} and label {a.label}")
+                list_of_adj_atoms = []
+                adj_indices = [adj for adj in a.adjacency]  
+                metal_adj_indices = [m_adj for m_adj in a.metal_adjacency]
+                for adj in adj_indices:
+                    if adj in metal_adj_indices:
+                        # If the atom is connected to the metal, we do not consider it
+                        continue
+                    list_of_adj_atoms.append(ligand.get_parent("molecule").labels[adj])
+                
                 # Simple Ionic Case
                 if a.label in ions:
                     if a.connec == 0:
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
-                    elif a.connec >= 1:
+                    elif len(list_of_adj_atoms) >= 1:
                         block[idx] = 1
                 # Oxygen
                 elif a.label == "O" :
-                    if a.connec == 2 and (a.connec - a.mconnec) == 1:
+                    if a.connec == 2 and len(list_of_adj_atoms) == 1:
                         needs_nonlocal = True
                         non_local_groups += 1
                         non_local_groups_indices.append(idx)
                         if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
-                    elif a.connec > 1:
+                    elif len(list_of_adj_atoms) >= 2:
                         block[idx] = 1
-                        # elemlist[idx] = "H"
-                        # addedlist[idx] = 1
 
                 # Sulfur and Selenium
                 elif a.label == "S" or a.label == "Se":
                     if a.connec == 1 :
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
-                    elif a.connec == 2 and (a.connec - a.mconnec) == 1:
+                    elif a.connec == 2 and len(list_of_adj_atoms) == 1:
                         needs_nonlocal = True
                         non_local_groups += 1
                         non_local_groups_indices.append(idx)
                         if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")                        
-                        # block[idx] = 1
-                        # elemlist[idx] = "H"
-                        # addedlist[idx] = 1
-                    else:
+                    elif len(list_of_adj_atoms) >= 2:
                         block[idx] = 1
                 # Hydrides
                 elif a.label == "H":
@@ -828,10 +808,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                     if a.connec <= 1:
                         elemlist[idx] = "Cl"
                         addedlist[idx] = 1
-                    # elif a.connec == 1:
-                    #     elemlist[idx] = "Cl"
-                    #     addedlist[idx] = 1
-                    elif (a.connec - a.mconnec) > 1:
+                    elif len(list_of_adj_atoms) >= 1:
                         block[idx] = 1
                 # Nitrogen
                 elif a.label == "N":
@@ -847,21 +824,10 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             elemlist[idx] = "H"
                             addedlist[idx] = 1
                     else:
-                        # nitrogen with at least 3 adjacencies doesnt need H
-                        # if a.connec >= 3:
-                        if (a.connec - a.mconnec) >= 3 :
+                        # nitrogen with at least 3 adjacencies with non-metal atoms doesnt need H
+                        if len(list_of_adj_atoms) >= 3 :
                             block[idx] = 1
-                            # needs_nonlocal = True
-                            # non_local_groups += 1
-                            # non_local_groups_indices.append(idx) 
-                            # elemlist[idx] = "H"
-                            # addedlist[idx] = 1
                         else:
-                            # Checks for adjacent Atoms
-                            list_of_adj_atoms = []
-                            for adj in a.adjacency:
-                                if debug >= 2: print(f"        GET_PROTONATION_STATES: {adj=}", ligand.get_parent("molecule").labels[adj])
-                                list_of_adj_atoms.append(ligand.get_parent("molecule").labels[adj])
                             numN = list_of_adj_atoms.count("N")
                             if numN == 2:  # triazole or tetrazole
                                 elemlist[idx] = "H"
@@ -888,44 +854,79 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                                     if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
                 
                 # Phosphorous
-                elif (a.connec >= 3) and a.label == "P": 
-                    block[idx] = 1
+                elif a.label == "P":
+                    if len(list_of_adj_atoms) >= 3:
+                        block[idx] = 1
+                    elif len(list_of_adj_atoms) == 1:
+                        if list_of_adj_atoms[0] == "N" or list_of_adj_atoms[0] == "C":
+                            block[idx] = 1
+                        elif list_of_adj_atoms[0] == "P":
+                            elemlist[idx] = "H"
+                            addedlist[idx] = 2
+                        else:
+                            needs_nonlocal = True
+                            non_local_groups += 1
+                            non_local_groups_indices.append(idx)        
+                    else:
+                        needs_nonlocal = True
+                        non_local_groups += 1
+                        non_local_groups_indices.append(idx)                                                
                 # Case of Carbon (Simple CX vs. Carbenes)
                 elif a.label == "C":
-                    if ligand.natoms == 2:
-                        # CN
-                        if "N" in ligand.labels:
-                            elemlist[idx] = "H"
-                            addedlist[idx] = 1
-                        # CO
-                        if "O" in ligand.labels: block[idx] = 1
-                    # Added for amides
-                    elif (any(ligand.get_parent("molecule").labels[adj] == "O" for adj in a.adjacency) and any(ligand.get_parent("molecule").labels[adj] == "N" for adj in a.adjacency) and a.connec == 2 ):
-                        elemlist[idx] = "H"
+                    if ligand.formula == "C-N": # CN
+                        elemlist[idx] = "H" 
                         addedlist[idx] = 1
+                    elif ligand.formula == "C-O": # CO
+                        block[idx] = 1
                     else:
-                        mol = ligand.get_parent("molecule")
-                        iscarbene, tmp_element, tmp_added, tmp_metal = check_carbenes(a, ligand)
-                        if debug >= 2: print(f"        GET_PROTONATION_STATES: Evaluating as carbene and {iscarbene}")
-                        if iscarbene:
-                            # Carbene identified
-                            elemlist[idx] = tmp_element
-                            addedlist[idx] = tmp_added
-                            metal_electrons[idx] = tmp_metal
+                        numN = list_of_adj_atoms.count("N")
+                        numO = list_of_adj_atoms.count("O")
+                        numH = list_of_adj_atoms.count("H")
+                        numC = list_of_adj_atoms.count("C")
+                        if len(list_of_adj_atoms) == 2:
+                            if numN == 1 and numO == 1: # amide
+                                elemlist[idx] = "H"
+                                addedlist[idx] = 1
+                            elif numN == 2 or (numN == 1 and numC == 1): # NHCs or CAACs
+                                iscarbene, tmp_element, tmp_added, tmp_metal = check_carbenes(a, ligand)
+                                if debug >= 2: print(f"        GET_PROTONATION_STATES: Evaluating as carbene and {iscarbene}")
+                                if iscarbene:
+                                    # Carbene identified
+                                    elemlist[idx] = tmp_element
+                                    addedlist[idx] = tmp_added
+                                    metal_electrons[idx] = tmp_metal
+                            elif numH == 2 and ligand.formula == "H2-C":
+                                elemlist[idx] = "H"
+                                addedlist[idx] = 2
+                            else:
+                                needs_nonlocal = True
+                                non_local_groups += 1
+                                non_local_groups_indices.append(idx)
+                                if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
+                        elif len(list_of_adj_atoms) == 3:
+                            if numH == 3 and ligand.formula == "H3-C":
+                                elemlist[idx] = "H"
+                                addedlist[idx] = 1  
+                            else:
+                                needs_nonlocal = True
+                                non_local_groups += 1
+                                non_local_groups_indices.append(idx)
+                                if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")     
                         else:
                             needs_nonlocal = True
                             non_local_groups += 1
                             non_local_groups_indices.append(idx)
                             if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
+
                 # Silicon
                 elif a.label == "Si":
-                    if (a.connec - a.mconnec) < 4:
+                    if len(list_of_adj_atoms) < 4:
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
                     else: block[idx]
                 # Boron
                 elif a.label == "B":
-                    if (a.connec - a.mconnec) < 4:
+                    if len(list_of_adj_atoms) < 4:
                         elemlist[idx] = "H"
                         addedlist[idx] = 1
                     else: block[idx]
@@ -943,13 +944,11 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         for idx, a in enumerate(ligand.atoms):
             if addedlist[idx] != 0 and block[idx] == 0:
                 mol = ligand.get_parent("molecule")
-                print(f"{range(addedlist[idx])=} {idx=} {addedlist[idx]=} {a.label=} {a.mconnec=}")
-                # if a.label == "C":
-                #     isadded, newlab, newcoord = add_hydrogen_to_carbon(newlab, newcoord, idx, ligand, debug=debug)
+                if debug >= 2: print(f"{range(addedlist[idx])=} {idx=} {addedlist[idx]=} {a.label=} {a.atom_site_label=} {a.connec=} {a.mconnec=}")
                 if addedlist[idx] == 1: 
                     isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, mol.metals, elemlist[idx], unconditional=True, debug=debug)
                 elif addedlist[idx] == 2:
-                    isadded, newlab, newcoord = add_hydrogen_to_carbon(newlab, newcoord, idx, ligand, debug=debug)
+                    isadded, newlab, newcoord = add_two_hydrogens(newlab, newcoord, idx, ligand, debug=debug)
                 else :
                     print(f"        GET_PROTONATION_STATES: Impossible to add {addedlist[idx]} atoms to atom {idx} ")
                 if isadded:
@@ -985,14 +984,14 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         local_added_atoms = added_atoms
 
         # Initiate variables
-        avoid = ["Si", "P"]
-
+        #avoid = ["Si", "P"]
+        avoid = ["Si"]
         non_local_groups_labels = [ligand.labels[idx] for idx in non_local_groups_indices]
         if debug >= 2: print(" ")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: Enters non-local with:")
-        if debug >= 2: print(f"        GET_PROTONATION_STATES: local_labels: {local_labels}")
-        if debug >= 2: print(f"        GET_PROTONATION_STATES: block: {block}")
-        if debug >= 2: print(f"        GET_PROTONATION_STATES: addedlist: {addedlist}")
+        if debug > 2: print(f"        GET_PROTONATION_STATES: local_labels: {local_labels}")
+        if debug > 2: print(f"        GET_PROTONATION_STATES: block: {block}")
+        if debug > 2: print(f"        GET_PROTONATION_STATES: addedlist: {addedlist}")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: {len(non_local_groups_indices)} non_local_groups groups found") 
         if debug >= 2: print(f"        GET_PROTONATION_STATES: non_local_groups_labels={non_local_groups_labels}")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: {non_local_groups_indices=}")
@@ -1025,13 +1024,13 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
             o_s = np.sum(com)
             toallocate = int(0)
             print(f"{non_local_groups=} {non_local_groups_indices=}")
-            for jdx, a in enumerate(ligand.atoms):
-                if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
-                    print(jdx, a.label, a.mconnec)
-            print("====")
+            # for jdx, a in enumerate(ligand.atoms):
+            #     if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0:
+            #         print(jdx, a.label, a.mconnec)
+            # print("====")
             for jdx, a in enumerate(ligand.atoms):
                 if a.mconnec >= 1 and a.label not in avoid and block[jdx] == 0 and jdx in non_local_groups_indices:
-                    print(a.label)
+                    #print(a.label)
                     if non_local_groups > 1:
                         print(f"{com=} {toallocate=}")
                         if com[toallocate] == 1:
@@ -1904,10 +1903,11 @@ def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
             
     # Creates Molecule
     temp_obj = rwlig.GetMol()
-    print("CORRECT_SMILES: after removing additional elements", Chem.MolToSmiles(temp_obj))
+    #print("CORRECT_SMILES: after removing additional elements", Chem.MolToSmiles(temp_obj))
     
     obj, fix_zwitterions = fix_zwitterions_in_adjacent_atoms(temp_obj, debug=debug)
-    print("CORRECT_SMILES: fixing the zwitterions", fix_zwitterions, Chem.MolToSmiles(obj))
+    if fix_zwitterions:
+        print("CORRECT_SMILES: fixing the zwitterions", fix_zwitterions, Chem.MolToSmiles(obj))
     try:
         Chem.SanitizeMol(obj)
         Chem.DetectBondStereochemistry(obj, -1)
@@ -2214,8 +2214,8 @@ class protonation(BaseModel):
             if refcell is not None:
                 self.atom_site_labels_indices = [atom.get_parent_index("reference") for atom in self.parent.atoms]
                 self.atom_site_labels = [refcell.atom_site_labels[idx] for idx in self.atom_site_labels_indices]
-                print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
-                print("PROTONATION.atom_site_labels", self.atom_site_labels)
+                #print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
+                #print("PROTONATION.atom_site_labels", self.atom_site_labels)
             
             if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
                 self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(self.labels, self.coords, self.atom_site_labels, geom_bond_cif)

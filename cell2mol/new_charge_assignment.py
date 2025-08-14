@@ -358,7 +358,6 @@ def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
         rdkit_obj = specie.rdkit_obj
 
     n_atoms_rdkit = rdkit_obj.GetNumAtoms() # e.g.10 
-    if debug >= 1: print(f"CREATE_bonds_specie: {specie.formula=}, {specie.subtype=}")
 
     if n_atoms == n_atoms_rdkit:
         if debug >= 2: print(f"\tNumber of atoms in {specie.subtype} object and RDKit object are equal: {n_atoms} {n_atoms_rdkit}")
@@ -400,7 +399,7 @@ def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
                         specie.atoms[idx].add_bond(new_bond)
                 
                 if specie.atoms[idx].bonds is not None:
-                    if debug >=1 : 
+                    if debug > 2 : 
                         print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
                 else:
                     if specie.natoms == 1:
@@ -443,7 +442,7 @@ def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
                 
                 if idx not in non_bonded_atoms:
                     if specie.atoms[idx].bonds is not None:
-                        if debug >=2: 
+                        if debug > 2: 
                             print(f"\tBONDS", [(bd.atom1.label, bd.atom2.label, bd.order, round(bd.distance,3)) for bd in specie.atoms[idx].bonds])
                     else:
                         if specie.natoms == 1:

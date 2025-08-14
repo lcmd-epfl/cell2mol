@@ -61,7 +61,7 @@ def get_atomic_valences(k):
     if k == 14:  # Si
         return [4]
     if k == 15:  # P
-        return [5, 3]  # [5,4,3]
+        return [3, 5]  # [5,4,3]
     if k == 16 : # S
         return [2, 4, 6]
     if k ==32 :  # Ge
