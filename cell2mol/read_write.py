@@ -285,7 +285,11 @@ def sum_formulas(formulas, ratios=None):
     if ratios is None:
         ratios = [1.0]*len(formulas)
     if len(ratios) != len(formulas):
-        raise ValueError("ratios and formulas must have the same length")
+        return None
+        #raise ValueError("ratios and formulas must have the same length")
+    if any(not isinstance(r, (int, float)) for r in ratios):
+        return None
+        #raise ValueError("ratios contains non-float values")
     total = Counter()
     for f, r in zip(formulas, ratios):
         c = parse_formula_string(f)

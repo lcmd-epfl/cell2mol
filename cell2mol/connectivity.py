@@ -186,166 +186,126 @@ def add_two_hydrogens (labels: list, coords: list, site: int, ligand: object, el
                     newlab.extend([str(element)])
                     if debug >= 2: 
                         print(f"\t\tADD_TWO_HYDROGENS: Added one {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
-            elif len(bonded_atom_labels) == 1:
-                Hs = place_hydrogens(apos, bonded_atom_coord[0])
-                if Hs.shape[0] == 2:
-                    newcoord.append(Hs[0])
-                    newcoord.append(Hs[1])
-                    newlab.extend([str(element), str(element)])
-                    if debug >= 2: 
-                        print(f"\t\tADD_TWO_HYDROGENS: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
+            # elif len(bonded_atom_labels) == 1:
+            #     Hs = place_hydrogens(apos, bonded_atom_coord[0])
+            #     if Hs.shape[0] == 2:
+            #         newcoord.append(Hs[0])
+            #         newcoord.append(Hs[1])
+            #         newlab.extend([str(element), str(element)])
+            #         if debug >= 2: 
+            #             print(f"\t\tADD_TWO_HYDROGENS: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
     return isadded, newlab, newcoord
 
 def normalize(v):
     n = np.linalg.norm(v)
-    if n < 1e-12:
-        raise ValueError("Zero-length vector.")
-    return v / n
+    return v / n if n != 0 else v
 
-def rodrigues(v, k, theta_rad):
-    # Rotate vector v around unit axis k by angle theta
-    k = normalize(k)
-    v_par = (v @ k) * k
-    v_perp = v - v_par
-    return v_par + v_perp*np.cos(theta_rad) + np.cross(k, v)*np.sin(theta_rad)
+def kabsch_rotation(P, Q):
+    """
+    Find rotation R that best aligns P to Q (both 3xN).
+    Returns 3x3 rotation matrix.
+    """
+    H = P @ Q.T
+    U, S, Vt = np.linalg.svd(H)
+    R = Vt.T @ U.T
+    # Right-handed fix
+    if np.linalg.det(R) < 0:
+        Vt[-1, :] *= -1
+        R = Vt.T @ U.T
+    return R
 
-def place_hydrogens(C, N1, N2=None, r_CH=1.09, hybridization="auto",
+def place_hydrogens(C, N1, N2, r_CH=1.09, hybridization="auto",
                     sp2_angle_window=(95, 145), sp3_angle_window=(95, 125)):
     """
-    Place hydrogens on a carbon.
-
-    Cases
-    -----
-    - With two neighbors (N1, N2 not None): behaves like your original function.
-      * 'sp2' -> 1 H (planar), 'sp3' -> 2 H (tetrahedral), 'auto' decides from angle.
-    - With one neighbor (N1 set, N2 is None):
-      * If hybridization is 'sp2' or 'auto' -> 2 H in trigonal planar geometry.
-      * If hybridization is 'sp3' -> 3 H in tetrahedral geometry (optional below; here we keep to 2 in sp2).
+    Place hydrogens on a carbon with two existing neighbors.
 
     Parameters
     ----------
-    C, N1, N2 : (3,) arrays; N2 can be None for the one-neighbor case.
+    C, N1, N2 : (3,) arrays
+        3D coordinates of carbon and its two neighbors.
     r_CH : float
+        C–H bond length (Å). ~1.09 Å is fine for sp2/sp3.
     hybridization : {'auto','sp2','sp3'}
-    sp2_angle_window, sp3_angle_window : used only in the two-neighbor 'auto' case.
+        - 'auto': detect from angle between N1–C and N2–C
+        - 'sp2' : force one H in trigonal planar geometry
+        - 'sp3' : force two H in tetrahedral geometry
+    sp2_angle_window : (lo, hi) degrees
+        Angle window to consider geometry as sp2 in 'auto' mode (default ~120° ±).
+    sp3_angle_window : (lo, hi) degrees
+        Angle window to consider geometry as sp3 in 'auto' mode (default ~109.5° ±).
 
     Returns
     -------
     Hs : (k,3) array
+        Coordinates of placed hydrogens (k=1 for sp2, k=2 for sp3).
+
+    Raises
+    ------
+    ValueError
+        If geometry is degenerate or 'auto' cannot classify reliably.
     """
     C = np.asarray(C, float)
     N1 = np.asarray(N1, float)
-    a = normalize(N1 - C)
+    N2 = np.asarray(N2, float)
 
-    def add_sp2_two(a, b):
+    a = normalize(N1 - C)
+    b = normalize(N2 - C)
+
+    # Angle between neighbors
+    cosang = np.clip(a @ b, -1.0, 1.0)
+    angle = np.degrees(np.arccos(cosang))
+
+    def add_sp2():
+        # In-plane bisector opposite to existing bonds
         dH = -(a + b)
         if np.linalg.norm(dH) < 1e-8:
             raise ValueError("Neighbors nearly opposite (sp-like). Cannot place sp2 hydrogen reliably.")
         dH = normalize(dH)
         return np.array([C + r_CH * dH])
 
-    def kabsch_rotation(P, Q):
-        # Minimal 3x2 Kabsch for completeness (same as you had)
-        # P and Q are 3x2
-        H = P @ Q.T
-        U, _, Vt = np.linalg.svd(H)
-        R = U @ Vt
-        if np.linalg.det(R) < 0:
-            U[:, -1] *= -1
-            R = U @ Vt
-        return R
-
-    def add_sp3_two(a, b):
+    def add_sp3():
+        # Tetrahedral template (four directions)
         u1 = normalize(np.array([ 1,  1,  1], float))
         u2 = normalize(np.array([ 1, -1, -1], float))
         u3 = normalize(np.array([-1,  1, -1], float))
         u4 = normalize(np.array([-1, -1,  1], float))
+
+        # Align template u1,u2 to actual directions a,b (order doesn't matter much)
         P = np.stack([u1, u2], axis=1)  # 3x2
         Q = np.stack([a,  b ], axis=1)  # 3x2
         R = kabsch_rotation(P, Q)
+
         dH1 = normalize(R @ u3)
         dH2 = normalize(R @ u4)
         H1 = C + r_CH * dH1
         H2 = C + r_CH * dH2
         return np.vstack([H1, H2])
 
-    # --- One-neighbor sp2: put two H's in the trigonal plane ---
-    def add_sp2_one(a):
-        # Build a stable local frame: choose any vector not parallel to 'a'
-        trial = np.array([1.0, 0.0, 0.0])
-        if abs(a @ trial) > 0.9:
-            trial = np.array([0.0, 1.0, 0.0])
-        e_y = normalize(trial - (trial @ a) * a)  # in-plane, ⟂ to a
-        n = normalize(np.cross(a, e_y))           # plane normal
+    # Decide hybridization
+    mode = hybridization.lower()
+    if mode == "auto":
+        # Prefer sp3 if close to tetrahedral, else sp2 if closer to trigonal
+        in_sp3 = (sp3_angle_window[0] <= angle <= sp3_angle_window[1])
+        in_sp2 = (sp2_angle_window[0] <= angle <= sp2_angle_window[1])
 
-        # Rotate the neighbor direction by ±120° within the plane to get the two C–H directions
-        theta = np.radians(120.0)
-        d1 = normalize(rodrigues(a, n,  theta))
-        d2 = normalize(rodrigues(a, n, -theta))
-
-        H1 = C + r_CH * d1
-        H2 = C + r_CH * d2
-        return np.vstack([H1, H2])
-
-    def add_sp3_one(a):
-        # Place three H's at tetrahedral angles around 'a'
-        # Make a local frame
-        trial = np.array([1.0, 0.0, 0.0])
-        if abs(a @ trial) > 0.9:
-            trial = np.array([0.0, 1.0, 0.0])
-        e_y = normalize(trial - (trial @ a) * a)
-        n = normalize(np.cross(a, e_y))
-        # Directions roughly pointing away from 'a' at ~109.47°
-        # Construct three directions equally spaced (±120°) around the axis 'a'
-        theta = np.radians(109.47)
-        # Start from a direction opposite to 'a' but tilted to match tetrahedral angle
-        base = normalize(-a*np.cos(theta) + e_y*np.sin(theta))
-        d1 = base
-        d2 = normalize(rodrigues(base, a,  2*np.pi/3))
-        d3 = normalize(rodrigues(base, a, -2*np.pi/3))
-        H1 = C + r_CH * d1
-        H2 = C + r_CH * d2
-        H3 = C + r_CH * d3
-        return np.vstack([H1, H2, H3])
-
-    if N2 is None:
-        mode = hybridization.lower()
-        if mode == "sp2" or mode == "auto":
-            # For one neighbor, default 'auto' to sp2 (common CH2=)
-            return add_sp2_one(a)
-        elif mode == "sp3":
-            # If you prefer to forbid this, raise instead.
-            return add_sp3_one(a)
+        if in_sp3 and not in_sp2:
+            return add_sp3()
+        if in_sp2 and not in_sp3:
+            return add_sp2()
+        # If ambiguous, pick the closer target angle
+        target_sp3 = 109.47
+        target_sp2 = 120.0
+        if abs(angle - target_sp3) < abs(angle - target_sp2):
+            return add_sp3()
         else:
-            raise ValueError("hybridization must be 'auto', 'sp2', or 'sp3'.")
+            return add_sp2()
+
+    elif mode == "sp3":
+        return add_sp3()
+    elif mode == "sp2":
+        return add_sp2()
     else:
-        N2 = np.asarray(N2, float)
-        b = normalize(N2 - C)
-
-        cosang = np.clip(a @ b, -1.0, 1.0)
-        angle = np.degrees(np.arccos(cosang))
-
-        mode = hybridization.lower()
-        if mode == "auto":
-            in_sp3 = (sp3_angle_window[0] <= angle <= sp3_angle_window[1])
-            in_sp2 = (sp2_angle_window[0] <= angle <= sp2_angle_window[1])
-            if in_sp3 and not in_sp2:
-                return add_sp3_two(a, b)
-            if in_sp2 and not in_sp3:
-                return add_sp2_two(a, b)
-            target_sp3 = 109.47
-            target_sp2 = 120.0
-            if abs(angle - target_sp3) < abs(angle - target_sp2):
-                return add_sp3_two(a, b)
-            else:
-                return add_sp2_two(a, b)
-        elif mode == "sp3":
-            return add_sp3_two(a, b)
-        elif mode == "sp2":
-            return add_sp2_two(a, b)
-        else:
-            raise ValueError("hybridization must be 'auto', 'sp2', or 'sp3'.")
-
+        raise ValueError("hybridization must be 'auto', 'sp2', or 'sp3'.")
 ################################
 def labels2formula(labels: list):
     elems = elemdatabase.elementnr.keys()
