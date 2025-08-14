@@ -1525,21 +1525,26 @@ def check_carbenes(atom: object, ligand: object, debug: int=0) -> Tuple[bool, st
         bonded_atom_labels.append(ligand.get_parent("molecule").labels[adj])
         bonded_atom_coord.append(ligand.get_parent("molecule").coord[adj])
     print(f"CHECK_CARBENES: {atom.label} has {bonded_atom_labels}. Checking for carbenes")
-
-    ismissingH, report, num_missingH = get_missingH_from_adjacency(atom.atnum, atom.coord, bonded_atom_coord, bonded_atom_labels)
-    print(f"CHECK_CARBENES: {atom.label} has {bonded_atom_labels}. ismissingH={ismissingH}, num_missingH={num_missingH}, report={report}")
     
     if len(bonded_atom_labels) == 2:
-        if (num_missingH == 2) and bonded_atom_labels.count("H") == 0:
-            iscarbene = True
-            element = "H"
-            addedlist = 2
-            metal_electrons = 2            
-        elif num_missingH == 1:
-            iscarbene = False
-            element = "H"
-            addedlist = 1
-            metal_electrons = 0
+        iscarbene = True
+        element = "H"
+        addedlist = 2
+        metal_electrons = 2
+    # ismissingH, report, num_missingH = get_missingH_from_adjacency(atom.atnum, atom.coord, bonded_atom_coord, bonded_atom_labels)
+    # print(f"CHECK_CARBENES: {atom.label} has {bonded_atom_labels}. ismissingH={ismissingH}, num_missingH={num_missingH}, report={report}")
+    
+    # if len(bonded_atom_labels) == 2:
+    #     if (num_missingH == 2) and bonded_atom_labels.count("H") == 0:
+    #         iscarbene = True
+    #         element = "H"
+    #         addedlist = 2
+    #         metal_electrons = 2            
+    #     elif num_missingH == 1:
+    #         iscarbene = False
+    #         element = "H"
+    #         addedlist = 1
+    #         metal_electrons = 0
     print(f"CHECK_CARBENES: {atom.label} ({atom.atom_site_label}) iscarbene={iscarbene}, element={element}, addedlist={addedlist}, metal_electrons={metal_electrons}")
     return iscarbene, element, addedlist, metal_electrons
 

@@ -1295,14 +1295,23 @@ class molecule(specie):
                         lig.get_hapticity(debug=debug)
                     if typ[0].haptic_type is None:
                         typ[0].get_hapticity(debug=debug)
+                    # if lig.metals is None:
+                    #     lig.get_connected_metals(debug=debug)
+                    # if typ[0].metals is None:
+                    #     typ[0].get_connected_metals(debug=debug)
+                    # lig_m_atom_site_labels = [m.atom_site_label for m in lig.metals]
+                    # typ_m_atom_site_labels = [m.atom_site_label for m in typ[0].metals]
 
                     if lig.is_nitrosyl and typ[0].is_nitrosyl:
                         issame = lig.NO_type == typ[0].NO_type
                     else:
-                        if lig.haptic_type != typ[0].haptic_type:
-                            issame = False
-                        else:
+                        # if (len(lig_m_atom_site_labels) == len(typ_m_atom_site_labels) and
+                        #     sorted(lig_m_atom_site_labels) == sorted(typ_m_atom_site_labels) and
+                        #     lig.haptic_type == typ[0].haptic_type):
+                        if lig.haptic_type == typ[0].haptic_type:
                             issame = compare_species(lig, typ[0], debug=0)
+                        else:
+                            issame = False
 
                     if issame:
                         found = True
@@ -3101,13 +3110,22 @@ class cell(BaseModel):
                             lig.get_hapticity(debug=debug)
                         if typ[0].haptic_type is None:
                             typ[0].get_hapticity(debug=debug)
-
+                        # if lig.metals is None:
+                        #     lig.get_connected_metals(debug=debug)
+                        # if typ[0].metals is None:
+                        #     typ[0].get_connected_metals(debug=debug)
+                        # lig_m_atom_site_labels = [m.atom_site_label for m in lig.metals]
+                        # typ_m_atom_site_labels = [m.atom_site_label for m in typ[0].metals]
+                        
                         if lig.is_nitrosyl and typ[0].is_nitrosyl:
                             if lig.NO_type == typ[0].NO_type:
                                 issame = True
                             else:
                                 issame = False
                         else:
+                            # if (len(lig_m_atom_site_labels) == len(typ_m_atom_site_labels) and
+                            #     sorted(lig_m_atom_site_labels) == sorted(typ_m_atom_site_labels) and
+                            #     lig.haptic_type == typ[0].haptic_type):
                             if lig.haptic_type == typ[0].haptic_type:
                                 issame = compare_species(lig, typ[0], debug=0)
                             else:
