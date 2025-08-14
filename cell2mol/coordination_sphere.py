@@ -295,7 +295,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
     # Sort the indexed list of atoms, prioritizing hydrogen atoms
     sorted_indexed_atoms = sorted(indexed_atoms, key=lambda x: (x[1].label != "H", x[1].label))
-    print("sorted_indexed_atoms:", sorted_indexed_atoms)
+    if debug > 2: print("sorted_indexed_atoms:", sorted_indexed_atoms)
     # Extract the sorted atoms and their original indices into separate lists
     sorted_atoms = [atom[1] for atom in sorted_indexed_atoms]
     original_indices = [atom[0] for atom in sorted_indexed_atoms]
@@ -354,7 +354,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
                     isremoved = True
                     removed_idx.append(ligand_idx)
                     ### Reset Connectivity of the atom and the parents
-                    atom.reset_mconnec(met, debug=debug)
+                    atom.reset_mconnec(met, debug=1)
                     met.get_coord_sphere()
                     met.get_coord_sphere_formula()
             else:
@@ -446,17 +446,20 @@ def coordination_correction_for_haptic(group: object, debug: int=0):
                 # For single ring, we need to check distances
                 print(f"Checking distances for a single ring")
                 distances = [get_dist(metal.coord, group.atoms[i].coord) for i in indices]
-                mean = np.mean(distances)
+                mean = round(np.mean(distances), 3)
                 std_dev = round(float(np.std(distances)), 3)
+                z_scores = (distances - mean) / std_dev
+
+                print(f"Distances: {distances}, Mean: {mean}, Std Dev: {std_dev}, Z-scores: {z_scores}")
                 if std_dev > 0.1 :
                     new_group = []
-                    for idx, dist in zip(indices, distances):
-                        if dist < mean - std_dev:
-                            print(f"Distance {dist} is below mean - std_dev ({mean} - {std_dev}), adding to conn_idx")
+                    for idx, z in zip(indices, z_scores):
+                        if abs(z) < 1.0:  # Using a threshold of 1.0 for Z-score
+                            print(f"Distance {distances[idx]} has a z-score {z_scores[idx]} below 1.0, adding to conn_idx")
                             new_group.append(idx)
                         else:
-                            print(f"Distance {dist} is above mean - std_dev ({mean} - {std_dev}), resetting mconnec for atom {group.atoms[idx].label}")
-                            group.atoms[idx].reset_mconnec(metal, debug=debug)
+                            print(f"Distance {distances[idx]} has a z-score {z_scores[idx]} above 1.0, resetting mconnec for atom {group.atoms[idx].label}")
+                            group.atoms[idx].reset_mconnec(metal, debug=1)
                     print(f"New group after distance check: {new_group}")
                 else:
                     print(f"std_dev is too low ({std_dev}), adding all indices to conn_idx")
@@ -502,14 +505,14 @@ def coordination_correction_for_haptic_old (group: object, debug: int=0):
         if atom.label == "H" : 
             if debug >=1 : print(f"\t!!! Wrong metal-coordination assignment for Atom", idx, atom.label , get_dist(atom.coord, metal.coord), "due to H")
             if debug >=1 : print(atom.label)
-            atom.reset_mconnec(metal, debug=debug)  
+            atom.reset_mconnec(metal, debug=1)  
         elif is_ring:
             if std_dev > 0.1 :
                 if dist < mean - std_dev:
                     conn_idx.append(idx)
                     final_ligand_indices.append(atom.get_parent_index("ligand"))
                 else:
-                    atom.reset_mconnec(metal, debug=debug) 
+                    atom.reset_mconnec(metal, debug=1) 
             else:
                 conn_idx.append(idx)
                 final_ligand_indices.append(atom.get_parent_index("ligand")) 

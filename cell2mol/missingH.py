@@ -177,11 +177,15 @@ def check_missingH(refmoleclist: list, debug: int=0):
                     if debug >= 1: print(f"Found fullerene {ref.formula} in the cell. skipping missing H check in carbon atoms")               
                 else:
                     for kdx, a in enumerate(lig.atoms):
-                        if a.label == "C" and a.mconnec == 0:
+                        # if a.label == "C" and a.mconnec == 0: # Check carbon not connected to metals 
+                        if a.label == "C":
                             bonded_atom_coord = []
                             bonded_atom_labels = []
-                            
+                            metal_adj_indices = [m_adj for m_adj in a.metal_adjacency]
                             for adj in a.adjacency:
+                                if adj in metal_adj_indices:
+                                    # If the atom is connected to the metal, we do not consider it
+                                    continue
                                 bonded_atom_coord.append(lig.get_parent("molecule").coord[adj])
                                 bonded_atom_labels.append(lig.get_parent("molecule").atoms[adj].label)
                             if debug >= 2: print("Adjacency", a.adjacency, bonded_atom_labels)

@@ -276,19 +276,111 @@ def exit_with_error_exception(e):
     
     sys.exit(e)      
 #######################
-# Helper to convert string like "H13-C5-N2" to Counter {'H':13, 'C':5, 'N':2}
-def parse_formula_string(formula_str):
-    tokens = re.findall(r'([A-Z][a-z]*)(\d*)', formula_str)
+def sum_formulas(formulas, ratios=None):
+    """
+    Sum element counts across a list of formula strings.
+    If ratios is provided, multiply each formula's counts by the corresponding ratio.
+    Returns a dict {element: float_count}.
+    """
+    if ratios is None:
+        ratios = [1.0]*len(formulas)
+    if len(ratios) != len(formulas):
+        raise ValueError("ratios and formulas must have the same length")
+    total = Counter()
+    for f, r in zip(formulas, ratios):
+        c = parse_formula_string(f)
+        for el, n in c.items():
+            total[el] += n * float(r)
+    # Convert to plain dict of floats
+    return {el: float(n) for el, n in total.items()}
+
+def compare_totals(cif_totals: dict, ref_totals: dict, atol=1e-8):
+    """
+    Build a comparison DataFrame with CIF totals, Refcell totals, and Delta = CIF - Ref.
+    Also returns whether all elements match within the tolerance.
+    """
+    elements = sorted(set(cif_totals) | set(ref_totals))
+    rows = []
+    all_ok = True
+    for el in elements:
+        cif_val = cif_totals.get(el, 0.0)
+        ref_val = ref_totals.get(el, 0.0)
+        delta = cif_val - ref_val
+        ok = abs(delta) <= atol
+        all_ok = all_ok and ok
+        rows.append({"Element": el, "CIF_total": cif_val, "Refcell_total": ref_val, "Delta (CIF-Ref)": delta, "OK": ok})
+    df = pd.DataFrame(rows)
+    return df, all_ok
+
+def parse_formula_string(formula_str: str) -> Counter:
+    # One lowercase letter max (Cl, Ti, Fe, etc.)
+    tokens = re.findall(r'([A-Z][a-z]?)(\d*)', formula_str)
+#     tokens = re.findall(r'([A-Z][a-z]*)(\d*)', formula_str)
     return Counter({el: int(cnt) if cnt else 1 for el, cnt in tokens})
 
-def formula_diff_dict(f1, f2):
+def formula_diff_dict(f1: str, f2: str) -> dict:
     c1 = parse_formula_string(f1)
     c2 = parse_formula_string(f2)
     all_elements = set(c1) | set(c2)
-    diff = {el: abs(c1[el] - c2[el]) for el in all_elements if c1[el] != c2[el]}
-    return diff
+    return {el: abs(c1[el] - c2[el]) for el in all_elements if c1[el] != c2[el]}
+
+def _nonH_signature(counter: Counter):
+    # Canonical signature ignoring hydrogens (order-independent)
+    return tuple(sorted((el, cnt) for el, cnt in counter.items() if el != 'H'))
 
 def find_closest_matches(reference, target):
+    # Pre-parse targets once
+    parsed_targets = [(tgt, parse_formula_string(tgt)) for tgt in target]
+    matches = {}
+
+    for i, ref in enumerate(reference):
+        c_ref = parse_formula_string(ref)
+
+        # 1) Exact match on full composition
+        for tgt, c_tgt in parsed_targets:
+            if c_tgt == c_ref:
+                matches[i] = {'ref': ref, 'match': tgt, 'diff_dict': {}}
+                break
+        else:
+            # 2) H-insensitive signature match (same non-H composition)
+            sig_ref = _nonH_signature(c_ref)
+            hinsensitive = [(tgt, c_tgt) for tgt, c_tgt in parsed_targets
+                            if _nonH_signature(c_tgt) == sig_ref]
+
+            if hinsensitive:
+                # Choose the one with minimal |ΔH|
+                best_tgt, best_ct = min(
+                    hinsensitive,
+                    key=lambda x: abs(x[1].get('H', 0) - c_ref.get('H', 0))
+                )
+                matches[i] = {
+                    'ref': ref,
+                    'match': best_tgt,
+                    'diff_dict': formula_diff_dict(ref, best_tgt)
+                }
+            else:
+                # 3) Weighted fallback: penalize non-H strongly, H lightly
+                def weighted_score(c_tgt: Counter):
+                    elems = set(c_ref) | set(c_tgt)
+                    score = 0.0
+                    for el in elems:
+                        diff = abs(c_ref.get(el, 0) - c_tgt.get(el, 0))
+                        if el == 'H':
+                            score += 0.1 * diff      # hydrogens are cheap
+                        else:
+                            score += 10.0 * diff     # non-H differences matter a lot
+                    return score
+
+                best_tgt, best_ct = min(parsed_targets, key=lambda x: weighted_score(x[1]))
+                matches[i] = {
+                    'ref': ref,
+                    'match': best_tgt,
+                    'diff_dict': formula_diff_dict(ref, best_tgt)
+                }
+
+    return matches
+
+def find_closest_matches_old(reference, target):
     matches = {}
     for i, ref in enumerate(reference):
         if ref in target:
