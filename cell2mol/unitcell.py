@@ -29,12 +29,12 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
 
     if refcell.error_case != 0:
         logging.error("Error encountered while processing the reference cell")
-        return refcell
-    # elif refcell.disagree_with_cif_formula is not None and refcell.disagree_with_cif_formula == True:
-    #     logging.error("Discrepancies found between refcell and CIF. This will cause errors in the charge prediction, so STOPPING pre-emptively.")
-    #     return refcell        
+        return refcell       
     else:
         # Redirect stdout to file for logging
+        if refcell.disagree_with_cif_formula is not None and refcell.disagree_with_cif_formula == True:
+            logging.info("Discrepancies found between refcell and CIF. This will cause errors in the charge prediction!")
+        
         with open(output_fname, "a") as output, redirect_stdout(output):
             logging.info(f"cell2mol version {VERSION}")
             logging.info(f"Initializing cell object from input path: {input_path}")

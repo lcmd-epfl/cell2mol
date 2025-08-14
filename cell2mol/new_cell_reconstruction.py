@@ -830,8 +830,8 @@ def reconstruct (refcell, newcell, sym_ops, debug: int=0):
                 print("Error in reconstruction!!")
                 newcell.error_reconstruction = True
                 print("final remaining fragments", len(final_remaining_fragments), [mol.formula for mol in final_remaining_fragments]) 
-                for j, rem in enumerate(final_remaining_fragments):
-                    writexyz(os.getcwd(), f"{newcell.name}_Frag_{i}_{rem.formula}_{j}.xyz", rem.labels, rem.coord) 
+                # for j, rem in enumerate(final_remaining_fragments):
+                #     writexyz(os.getcwd(), f"{newcell.name}_Frag_{i}_{rem.formula}_{j}.xyz", rem.labels, rem.coord) 
                 # final_remaining_fragments_v2, reconstructed_molecules = final_remaining_reconstruction_v2(remaining_fragments, newcell, cell_vector, reconstructed_molecules, refcell, cov_factor=cov_factor, metal_factor=metal_factor, debug=0)
                 # if len(final_remaining_fragments_v2) == 0:
                 #     print("GOOD!! All fragments are reconstructed successfully.")

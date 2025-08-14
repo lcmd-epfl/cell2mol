@@ -1479,7 +1479,7 @@ class molecule(specie):
                 self.error_create_bonds = True
                 return # Exit the function entirely if creating bonds fails for a non-complex molecule
             else :
-                if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Bonds created for molecule {self.formula}")
+                if debug > 2: print(f"MOLECULE.CREATE_BONDS: Bonds created for molecule {self.formula}")
 
         # Second part
         if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
@@ -1491,7 +1491,7 @@ class molecule(specie):
                     return # Exit the function entirely if creating bonds fails for any ligand
                 
                 else :
-                    if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Bonds created for molecule {lig.formula}")
+                    if debug > 1: print(f"MOLECULE.CREATE_BONDS: Bonds created for molecule {lig.formula}")
         
         if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:    
             self.smiles_with_H = [lig.smiles for lig in self.ligands]
@@ -1499,20 +1499,20 @@ class molecule(specie):
             fix_zwitterions_ligands = []
             # Fourth part : correction smiles of ligands
             for lig in self.ligands:
-                print(f"MOLECULE.CREATE_BONDS: Correcting Smiles for ligand {lig.formula}")
+                if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Correcting Smiles for ligand {lig.formula}")
                 result, fix_zwitterions = correct_smiles_ligand(lig, debug=debug)
                 if result == False:
                     if debug >= 1: print(f"MOLECULE.CREATE_BONDS: error correcting smiles for ligand {lig.formula}")
                     self.error_create_bonds = True
                     return # Exit the function entirely 
                 else :
-                    if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Smiles corrected for ligand {lig.formula}")
+                    if debug > 2: print(f"MOLECULE.CREATE_BONDS: Smiles corrected for ligand {lig.formula}")
                     if fix_zwitterions :
                         fix_zwitterions_ligands.append(lig)
                     else:
                         self.smiles.append(lig.smiles)    
-            
-            if debug >= 1:print(f"MOLECULE.CREATE_BONDS: {len(fix_zwitterions_ligands)} zwitterion ligands found in the complex")
+            if len(fix_zwitterions_ligands) > 0:
+                if debug >= 1: print(f"MOLECULE.CREATE_BONDS: {len(fix_zwitterions_ligands)} zwitterion ligands found in the complex")
             for lig in fix_zwitterions_ligands:
                 for atom in lig.atoms:
                     atom.bonds = []
@@ -3716,8 +3716,6 @@ class cell(BaseModel):
             for idx, ref in enumerate(self.refmoleclist):
                 if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
                     for jdx, lig in enumerate(ref.ligands):
-                        print(lig.unique_index)
-                        print(specie.unique_index)
                         if lig.unique_index == specie.unique_index:
                             set_charge_state(specie, lig, mode=1, debug=debug)
                     for kdx, met in enumerate(ref.metals):
@@ -3963,7 +3961,7 @@ class cell(BaseModel):
 
         temp = []
         for mol in moleclist:
-            if debug >= 1: print(f"CELL.CREATE_BONDS: Creating Bonds for molecule {mol.formula}")
+            if debug >= 1: print(f"\nCELL.CREATE_BONDS: Creating Bonds for molecule {mol.formula}")
             mol.create_bonds(debug=debug)  
             temp.append(mol.error_create_bonds)
         

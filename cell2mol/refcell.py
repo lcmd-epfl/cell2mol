@@ -6,7 +6,7 @@ from cell2mol.classes import cell
 from cell2mol.read_write import *
 from cell2mol.cell_operations import frac2cart_fromparam
 from cell2mol.other import handle_error
-from cell2mol.connectivity import labels2formula
+from cell2mol.connectivity import labels2formula, get_alkali_alkaline_earth_metal_idxs
 import time
 from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
@@ -182,6 +182,10 @@ def compare_with_CIF (input_path, refcell: cell, debug=0):
     print(f"Charges from CIF: {charges_from_cif}")
     print(f"Formulas from refcell: {formulas_from_refcell}")
 
+    cif_totals = sum_formulas(formulas_from_cif, ratios_from_cif)
+    ref_totals = sum_formulas(formulas_from_refcell)
+    df_compare, all_match = compare_totals(cif_totals, ref_totals, atol=1e-9)
+
     disagree_with_cif = []
     for ref_idx, info in matches.items():
         ref = refcell.refmoleclist[ref_idx]
@@ -198,12 +202,24 @@ def compare_with_CIF (input_path, refcell: cell, debug=0):
                 print(f"\tFailed to Assign charge to refcell molecule {info['ref']} matched with CIF {info['match']}")
 
         else:
+            # If there are differences, print them
             print(f"{ref_idx=} {info['ref']}: Closest match found. {info['match']} with difference of {info['diff_dict']}")
+            if len(get_alkali_alkaline_earth_metal_idxs(list(info['diff_dict'].keys()))) > 0:
+                print(f"{ref_idx=} {info['ref']}: Discrepancy found due to covalent radius of alkali/alkaline earth metals.")
+                print("This will cause errors in unit cell reconstruction. Set --cif_bond_info as True and re-run.")
             disagree_with_cif.append(ref_idx)
     
     if len(disagree_with_cif) > 0:
         print("Discrepancies found between refcell and CIF") 
-        refcell.disagree_with_cif_formula = True
+        if not all_match:
+            print(f"Element totals differ between refcell and CIF:\n{df_compare}")
+            print("Possible causes:")
+            print("- Missing atoms in the crystal structure (mismatch with CIF moiety).")
+            print("- Different adjacency cutoffs in refcell changed connectivity.")
+            refcell.disagree_with_cif_formula = True
+        else:
+            print("Element totals in refcell and CIF match.")
+            refcell.disagree_with_cif_formula = False
     else:
         print("No discrepancies found between formulas from refcell and CIF.")
         refcell.disagree_with_cif_formula = False
