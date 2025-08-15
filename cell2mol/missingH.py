@@ -101,7 +101,10 @@ def find_shape(vecs):
         avg_angle = np.mean(angles)
         report_shape += str(f"Angles {angles} Avg: {avg_angle}\n")
         report_shape += str(f"Angles {np.degrees(angles)} Avg: {np.degrees(avg_angle)}\n")
-        diffs = list([np.abs(avg_angle - np.pi),np.abs(avg_angle - 2.094395),np.abs(avg_angle - 1.570796),np.abs(avg_angle - 1.911136)])
+        diffs = list([float(np.abs(avg_angle - np.pi)),
+                      float(np.abs(avg_angle - 2.094395)),
+                      float(np.abs(avg_angle - 1.570796)),
+                      float(np.abs(avg_angle - 1.911136))])
         minshape = np.argmin(diffs)
         minval = np.min(diffs)
         report_shape += str(f"Diffs: {diffs} Minval: {minval}\n")

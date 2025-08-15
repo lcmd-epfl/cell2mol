@@ -183,10 +183,6 @@ def charge_assignment(newcell, refcell, debug):
             
     return newcell, refcell
 
-
-
-
-
 def print_elapsed(message: str, start_time: float):
     """Print the elapsed time since start_time."""
     elapsed = time.time() - start_time
