@@ -149,6 +149,7 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
     coordinating_atoms = [
         idx for idx, atom in enumerate(charge_states[0].protonation.parent.atoms) if atom.mconnec > 0
     ]
+    blocked_indices = [idx for idx, b in enumerate(charge_states[0].protonation.block) if b == 1]
     print(f"    NEW SELECT FUNCTION: coordinating_atoms_indices={coordinating_atoms}")
     for chs in charge_states:
         uncorr_total.append(chs.uncorr_total_charge)
@@ -162,7 +163,6 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
         aromatic_atoms.append(aromatic_dict["Aromatic atoms"])
         aromatic_rings.append(aromatic_dict["Number of aromatic rings"])
         added_into_aromatic.append(aromatic_dict["Added to aromatic atoms"])
-        sum([abs(chs.uncorr_atom_charges[idx]) for idx in coordinating_atoms])
         coordinating_atoms_uncorr_abs_atcharge.append(sum([abs(chs.uncorr_atom_charges[idx]) for idx in coordinating_atoms]))
         coordinating_atoms_uncorr_atcharge.append([chs.uncorr_atom_charges[idx] for idx in coordinating_atoms])
 
@@ -203,12 +203,13 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
         if (idx in listofminabs) and (idx in listofmintot) and coincide[idx]:
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it is in both minima")
             tmplist.append(idx)
-        elif uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
-            if all(atcharge < 0 for atcharge in coordinating_atoms_uncorr_atcharge[idx]):
-                if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same absolute atom charge as coordinating atoms and all are negative")
-                tmplist.append(idx)
-            else:
-                if debug >= 2: print(f"    NEW SELECT FUNCTION: Skipping idx={idx} because it has the same absolute atom charge as coordinating atoms but not all are negative")
+        elif coordinating_atoms != blocked_indices: 
+            if uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
+                if all(atcharge < 0 for atcharge in coordinating_atoms_uncorr_atcharge[idx]):
+                    if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same absolute atom charge as coordinating atoms and all are negative")
+                    tmplist.append(idx)
+                else:
+                    if debug >= 2: print(f"    NEW SELECT FUNCTION: Skipping idx={idx} because it has the same absolute atom charge as coordinating atoms but not all are negative")
 
     # IF listofminabs and listofmintot do not have any value in common. Then we select from minima, coincide, and zwitt
     if len(tmplist) == 0:
@@ -399,6 +400,7 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
     coordinating_atoms = [
         idx for idx, atom in enumerate(charge_states[0].protonation.parent.atoms) if atom.mconnec > 0
     ]
+    blocked_indices = [idx for idx, b in enumerate(charge_states[0].protonation.block) if b == 1]
     for chs in charge_states:
         uncorr_total.append(chs.uncorr_total_charge)
         uncorr_abs_total.append(chs.uncorr_abstotal)
@@ -439,12 +441,13 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
         if (idx in listofminabs) and (idx in listofmintot) and coincide[idx]:
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it is in both minima")
             tmplist.append(idx)
-        elif uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
-            if all(atcharge < 0 for atcharge in coordinating_atoms_uncorr_atcharge[idx]):
-                if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same absolute atom charge as coordinating atoms and all are negative")
-                tmplist.append(idx)
-            else:
-                if debug >= 2: print(f"    NEW SELECT FUNCTION: Skipping idx={idx} because it has the same absolute atom charge as coordinating atoms but not all are negative")
+        elif coordinating_atoms != blocked_indices:  
+            if uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
+                if all(atcharge < 0 for atcharge in coordinating_atoms_uncorr_atcharge[idx]):
+                    if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same absolute atom charge as coordinating atoms and all are negative")
+                    tmplist.append(idx)
+                else:
+                    if debug >= 2: print(f"    NEW SELECT FUNCTION: Skipping idx={idx} because it has the same absolute atom charge as coordinating atoms but not all are negative")
 
     # IF listofminabs and listofmintot do not have any value in common. Then we select from minima, coincide, and zwitt
     if len(tmplist) == 0:
