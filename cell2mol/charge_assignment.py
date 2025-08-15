@@ -149,6 +149,9 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
     coordinating_atoms = [
         idx for idx, atom in enumerate(charge_states[0].protonation.parent.atoms) if atom.mconnec > 0
     ]
+    coordinating_atoms_labels = [
+        atom.label for idx, atom in enumerate(charge_states[0].protonation.parent.atoms) if atom.mconnec > 0
+    ]
     blocked_indices = [idx for idx, b in enumerate(charge_states[0].protonation.block) if b == 1]
     print(f"    NEW SELECT FUNCTION: coordinating_atoms_indices={coordinating_atoms}")
     for chs in charge_states:
@@ -203,7 +206,7 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
         if (idx in listofminabs) and (idx in listofmintot) and coincide[idx]:
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it is in both minima")
             tmplist.append(idx)
-        elif coordinating_atoms != blocked_indices: 
+        elif (coordinating_atoms == blocked_indices) and (coordinating_atoms_labels.count("C") > 0):
             if uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
                 if all(atcharge < 0 for atcharge in coordinating_atoms_uncorr_atcharge[idx]):
                     if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same absolute atom charge as coordinating atoms and all are negative")
@@ -400,6 +403,9 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
     coordinating_atoms = [
         idx for idx, atom in enumerate(charge_states[0].protonation.parent.atoms) if atom.mconnec > 0
     ]
+    coordinating_atoms_labels = [
+        atom.label for idx, atom in enumerate(charge_states[0].protonation.parent.atoms) if atom.mconnec > 0
+    ]
     blocked_indices = [idx for idx, b in enumerate(charge_states[0].protonation.block) if b == 1]
     for chs in charge_states:
         uncorr_total.append(chs.uncorr_total_charge)
@@ -441,7 +447,7 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
         if (idx in listofminabs) and (idx in listofmintot) and coincide[idx]:
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it is in both minima")
             tmplist.append(idx)
-        elif coordinating_atoms != blocked_indices:  
+        elif (coordinating_atoms == blocked_indices) and (coordinating_atoms_labels.count("C") > 0):  
             if uncorr_abs_atcharge[idx] == coordinating_atoms_uncorr_abs_atcharge[idx] and coincide[idx]:
                 if all(atcharge < 0 for atcharge in coordinating_atoms_uncorr_atcharge[idx]):
                     if debug >= 2: print(f"    NEW SELECT FUNCTION: Adding idx={idx} to tmplist because it has the same absolute atom charge as coordinating atoms and all are negative")
