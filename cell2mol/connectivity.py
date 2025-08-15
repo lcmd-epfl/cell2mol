@@ -553,6 +553,8 @@ def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: l
                 print("Adjacency Matrix: Atom", i, labels[i], "is a halogen with valence bigger than allowed max valence", max_valence, "and is connected to", indices, [labels[j] for j in indices])
                 # Do not correct the adjacency matrix for halogens
                 pass
+            elif labels[i] in ["B"]:  # Boron
+                pass
             elif i in alkali_alkaline_earth_metal_idxs or i in post_transition_metal_idxs:
                 for j in indices:
                     b = np.array(pos[j])

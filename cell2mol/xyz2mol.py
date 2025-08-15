@@ -67,7 +67,7 @@ def get_atomic_valences(k):
     if k ==32 :  # Ge
         return [4, 6]
     if k == 33:  # As
-        return [6, 5, 3]  # [5,4,3]
+        return [5, 3]  # [5,4,3]
     if k == 51:  # Sb
         return [6, 5, 3]  # [5,4,3]
     if k == 52: # Te
@@ -214,7 +214,7 @@ def charge_is_OK(
                 if not allow_carbenes and number_of_single_bonds_to_C == 2 and BO_valences[i] == 2:
                     Q += 1
                     q = 2
-                    print("Carbenes are not allowed in this molecule")
+                    print("\t\tCarbenes are not allowed in this molecule")
                 if number_of_single_bonds_to_C == 3 and Q + 1 < charge:
                     Q += 2
                     q = 1
@@ -997,7 +997,7 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
     # for valences in valences_list:
 
     count = 0
-    max_count = min(len(sorted_valences_list), 100)
+    max_count = min(len(sorted_valences_list), 50)
     #print(f"\tAC2BO: {sorted_valences_list=}")
     print(f"\tAC2BO: {formula=} {len(sorted_valences_list)=} {max_count=}")
     # if len(sorted_valences_list) > 1000:

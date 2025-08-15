@@ -748,6 +748,14 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                     if idx in parent_indices and a.mconnec == 1:
                         block[idx] = 1
 
+            elif "h6-Benzene" in g.haptic_type and not Selected_Hapticity:
+                if debug >= 2: print("        GET_PROTONATION_STATES: No action is required")
+                Selected_Hapticity = True
+                tobeadded = 0
+                for idx, a in enumerate(ligand.atoms):
+                    if idx in parent_indices and a.mconnec == 1:
+                        block[idx] = 1
+                        
             # If the group hapticity type is not recognized -or instructions are not defined-, nothing is done
             elif not Selected_Hapticity:
                 if len(g.haptic_type) == 1:
@@ -871,7 +879,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             block[idx] = 1
                         elif list_of_adj_atoms[0] == "P":
                             elemlist[idx] = "H"
-                            addedlist[idx] = 2
+                            addedlist[idx] = 1
                         else:
                             needs_nonlocal = True
                             non_local_groups += 1
