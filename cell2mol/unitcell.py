@@ -7,9 +7,9 @@ from ase.io import read
 from cell2mol.classes import cell
 from cell2mol.final_c2m_module import cell2mol_mode
 from cell2mol.other import handle_error
-from cell2mol.read_write import print_refmoleclist, print_unique_species, print_moleclist
+from cell2mol.read_write import print_refmoleclist, print_unique_species, print_moleclist, print_possible_charges
 import copy
-
+import time
 VERSION = "2.0"
 COV_FACTOR = 1.3
 METAL_FACTOR = 1.0
@@ -63,6 +63,8 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
             summary_fname_ref = os.path.join(current_dir, "reference_summary.out")
             with open(summary_fname_ref, "a") as summary_ref:
                 with redirect_stdout(summary_ref):
+                    print_unique_species(refcell)
+                    print_possible_charges(refcell)
                     print("************ After charge assignment of unit cell ************")
                     print_refmoleclist(refcell)   
 
@@ -100,10 +102,34 @@ def get_cell_parameters(structure):
     
     return cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops
 
+def get_unique_species_in_reference (refcell, debug):
+    """Processes the reference cell to obtain unique species and handle any errors."""
+    tini = time.time()
+
+    refcell.get_unique_species(debug=debug)
+
+    if debug >= 1:
+        print(f"Unique species: {[specie.formula for specie in refcell.unique_species]}")
+        print(f"Species list: {[specie.formula for specie in refcell.species_list]}\n")
+
+    refcell.get_selected_cs(debug=debug)
+    refcell.assess_errors(mode="possible_charges")
+    
+    tend = time.time()    
+    
+    if debug >= 1: print(f"\nAssign possible charges of Reference molecules. Total execution time: {tend - tini:.2f} seconds")
+    
+    return
+
 
 def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debug):
     """Handles the reconstruction, charge assignment, and spin assignment for molecules."""
     cov_factor = refcell.refmoleclist[0].cov_factor if refcell.refmoleclist else COV_FACTOR
+    
+    if refcell.error_case == 0:
+        get_unique_species_in_reference(refcell, debug) 
+    else:
+        print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
 
     # Copy reference molecules from refcell
     newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
