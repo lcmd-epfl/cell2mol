@@ -330,7 +330,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
             if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
                 isconnected, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, refcell.geom_bond_cif, metal_only=True)
             else:
-                isconnected, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+                isconnected, tmpadjmat, tmpadjnum, warning = get_adjmatrix(tmplabels, tmpcoord, metal_only=True, add_atoms=True)
 
             if isconnected and any(tmpadjnum) > 0: 
                 if debug > 0 : 
@@ -425,7 +425,7 @@ def coordination_correction_for_haptic(group: object, debug: int=0):
             if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
                 isconnected, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, refcell.geom_bond_cif, metal_only=True)
             else:
-                isconnected, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+                isconnected, tmpadjmat, tmpadjnum, warning = get_adjmatrix(tmplabels, tmpcoord, metal_only=True, add_atoms=True)
 
             if isconnected and any(tmpadjnum) > 0: 
                 if debug > 0 : 
