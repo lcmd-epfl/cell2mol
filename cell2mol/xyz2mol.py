@@ -55,6 +55,7 @@ def get_atomic_valences(k):
     if k == 7:  # N
         return [3, 4]
     if k == 8:  # O
+        # return [2]
         return [2, 1, 3]
     if k == 13:  # Al
         return [3, 4, 5]
@@ -928,6 +929,14 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
     #print("Atom labels:", [elemdatabase.elementsym[atom] for atom in atoms])
     #print(f"{AC_valence=}")
     formula = labels2formula([elemdatabase.elementsym[atom] for atom in atoms])    
+    # print(f"\tAC2BO: {atoms=}")
+    # count = {}
+    # for atomicNum in sorted(sorted(set(atoms))):
+    #     count[atomicNum] = atoms.count(atomicNum)
+    #     print(f"Element: {elemdatabase.elementsym[atomicNum]}, "
+    #           f"Count: {atoms.count(atomicNum)}, possible valences: {atomic_valence[atomicNum]}")
+    # print(f"Total count of elements: {count}")
+    
     wrong = 0
 
     for i, (atomicNum, valence) in enumerate(zip(atoms, AC_valence)):
@@ -950,9 +959,23 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
         if atomicNum == 6 and valence == 2:
             possible_valence.append(3)
         if atomicNum == 7:
-            #print("Possible valences for:", atomicNum,"are",possible_valence, valence)
             if valence not in possible_valence:
                 possible_valence.append(valence)
+            #print("Possible valences for:", atomicNum,"are",possible_valence, valence)
+            # if count[atomicNum] > 8 :
+                # possible_valence = [valence]
+                # possible_valence = [3, 4]
+            # elif valence not in possible_valence:
+            #     possible_valence.append(valence)
+        # if atomicNum == 8:
+            # if count[atomicNum] > 8 :
+                # possible_valence = [2]
+                # possible_valence = [valence]
+                # possible_valence = [2, 1]
+        # if atomicNum == 6:
+            # if count[atomicNum] > 8 :
+                # possible_valence = [valence]
+                # possible_valence = [4]
         # if atomicNum == 15:
         #    print("Possible valences for:", atomicNum,"are",possible_valence, valence)
         if len(possible_valence) == 0:
@@ -971,11 +994,10 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
             # sys.exit()
         valences_list_of_lists.append(possible_valence)
     #print(f"{wrong=}")
-    #print(f"\tAC2BO: {formula=} {len(valences_list_of_lists)=} {[vl for vl in valences_list_of_lists]=}")
+    # print(f"\tAC2BO: {formula=} {len(valences_list_of_lists)=} {[vl for vl in valences_list_of_lists]=}")
     if wrong > 0:
         # print(f"AC2BO: {wrong=}")
         return None, atomic_valence_electrons
-    
     #print(f"\tAC2BO: {valences_list_of_lists=}")
     
     # convert [[4],[2,1]] to [[4,2],[4,1]]
@@ -1028,6 +1050,7 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
             return AC, atomic_valence_electrons
         
         UA_pairs_list = get_UA_pairs(UA, AC, use_graph=use_graph)
+        # good_BO_list = []
         for UA_pairs in UA_pairs_list:
             BO = get_BO(AC, UA, DU_from_AC, valences, UA_pairs, use_graph=use_graph)
             status = BO_is_OK(
@@ -1054,6 +1077,7 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
             )
             if status:
                 print(f"\tAC2BO: {formula=} status", status, f"{charge=} {count=}")
+                # good_BO_list.append((BO, atomic_valence_electrons))
                 return BO, atomic_valence_electrons
             elif (
                 BO.sum() >= best_BO.sum()
@@ -1067,7 +1091,13 @@ def AC2BO (AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allo
             if count > max_count :
                 print(f"\tOver maximum counts AC2BO: {formula=} {charge=} {count=}")
                 return best_BO, atomic_valence_electrons
-            
+                # if len(good_BO_list) > 0 :
+                #     print(good_BO_list)
+                #     return good_BO_list[2][0], good_BO_list[2][1]
+                # else:
+                    # print(f"\tOver maximum counts AC2BO: {formula=} {charge=} {count=}")
+                    # return best_BO, atomic_valence_electrons
+
     return best_BO, atomic_valence_electrons
 
 
