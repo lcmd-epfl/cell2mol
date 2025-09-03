@@ -48,7 +48,7 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
             newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])
 
             # Evaluates the new adjacency matrix.
-            dummy, tmpconmat, tmpconnec = get_adjmatrix(newlab, newcoord, ligand.cov_factor)
+            dummy, tmpconmat, tmpconnec, warning = get_adjmatrix(newlab, newcoord, ligand.cov_factor, add_atoms=True)
             # if debug >= 2: print(f"ADD_ATOM: received {newlab=}")
             # if debug >= 2: print(f"ADD_ATOM: received {tmpconmat=}")
             # if debug >= 2: print(f"ADD_ATOM: received {tmpconnec=}")
@@ -124,7 +124,7 @@ def find_closest_metal(atom: object, metalist: list, debug: int=0):
 ################################
 def is_single_ring(labels, coord):
     """ Check if the group is a ring """
-    isgood, adjmat, adjnum = get_adjmatrix(labels, coord)
+    isgood, adjmat, adjnum, warning = get_adjmatrix(labels, coord)
 
     # Convert adjacency matrix to a NetworkX graph
     G = nx.from_numpy_array(np.array(adjmat))
@@ -139,9 +139,51 @@ def is_single_ring(labels, coord):
     # Check if there's exactly one cycle that includes all nodes (simple ring)
     if len(cycle_basis) == 1 and len(cycle_basis[0]) == len(G.nodes):
         print("Ring group", len(labels), labels)
-        return True  # The graph represents a ring compound
+        return True
+    #     return True, None  # The graph represents a ring compound
+    # elif len(cycle_basis) == 1 and len(cycle_basis[0]) != len(G.nodes):
+    #     return False, cycle_basis[0]  # The graph has a cycle but not all nodes are included
 
     return False  # Otherwise, not a ring compound
+################################
+def check_blocklist (conn_labels, conn_coord, blocklist, debug: int=2):
+    """ Split a list of atoms into blocks of connected atoms """
+    new_blocklist = []
+    for b in blocklist:
+        if debug >= 2:
+            print(f"\t\tCHECK_blocklist: block={b}")
+        gr_labels = extract_from_list(b, conn_labels, dimension=1, debug=debug)
+        gr_coord = extract_from_list(b, conn_coord, dimension=1)
+        isgood, adjmat, adjnum, warning = get_adjmatrix(gr_labels, gr_coord)
+        G = nx.from_numpy_array(np.array(adjmat))
+        if nx.is_connected(G):
+            cycle_basis = nx.cycle_basis(G)
+            if len(cycle_basis) == 1:
+                print(f"\t\tCHECK_blocklist: Found single cycle in block {b}: {cycle_basis[0]}")
+                if len(cycle_basis[0]) == len(G.nodes):
+                    new_blocklist.append(b)
+                elif len(cycle_basis[0]) != len(G.nodes):
+                    new_blocklist.append(cycle_basis[0])
+                    remaining = [n for n in G.nodes if n not in cycle_basis[0]]
+                    print(f"\t\tCHECK_blocklist: Remaining nodes in block: {remaining}")
+                    
+                    rem_labels = extract_from_list(remaining, conn_labels, dimension=1, debug=debug)
+                    rem_coord = extract_from_list(remaining, conn_coord, dimension=1)
+                    isgood, adjmat_rem, adjnum, warning = get_adjmatrix(rem_labels, rem_coord)
+                    G_rem = nx.from_numpy_array(np.array(adjmat_rem))
+                    for comp in nx.connected_components(G_rem):
+                        remaining_block = [remaining[idx] for idx in comp]
+                        new_blocklist.append(remaining_block)
+                        print(f"\t\tCHECK_blocklist: {remaining_block=}")
+                else:
+                    pass
+            else:
+                new_blocklist.append(b)
+        else:
+            new_blocklist.append(b)
+    print(f"\t\tCHECK_blocklist: Final new_blocklist: {new_blocklist}")
+    return new_blocklist
+
 
 ################################
 def add_two_hydrogens (labels: list, coords: list, site: int, ligand: object, element: str="H", debug: int=0) -> Tuple[bool, list, list]:
@@ -174,18 +216,18 @@ def add_two_hydrogens (labels: list, coords: list, site: int, ligand: object, el
                 ismissingH, report, num_missingH = True, "", 2
             
             if len(bonded_atom_labels) == 2:
-                Hs = place_hydrogens(apos, bonded_atom_coord[0], bonded_atom_coord[1])
+                Hs = place_hydrogens(apos, bonded_atom_coord[0], bonded_atom_coord[1], hybridization="sp3")
                 if Hs.shape[0] == 2:
                     newcoord.append(Hs[0])
                     newcoord.append(Hs[1])
                     newlab.extend([str(element), str(element)])
                     if debug >= 2: 
                         print(f"\t\tADD_TWO_HYDROGENS: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
-                elif Hs.shape[0] == 1:
-                    newcoord.append(Hs[0])
-                    newlab.extend([str(element)])
-                    if debug >= 2: 
-                        print(f"\t\tADD_TWO_HYDROGENS: Added one {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
+                # elif Hs.shape[0] == 1:
+                #     newcoord.append(Hs[0])
+                #     newlab.extend([str(element)])
+                #     if debug >= 2: 
+                #         print(f"\t\tADD_TWO_HYDROGENS: Added one {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
             # elif len(bonded_atom_labels) == 1:
             #     Hs = place_hydrogens(apos, bonded_atom_coord[0])
             #     if Hs.shape[0] == 2:
@@ -441,7 +483,7 @@ def get_radii(labels: list) -> np.ndarray:
     return np.array(radii)
 
 ####################################
-def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default", metal_only: bool=False) -> Tuple[int, list, list]:
+def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default", metal_only: bool=False, add_atoms: bool=False) -> Tuple[int, list, list]:
     
     isgood = True 
     clash_threshold = 0.3
@@ -503,8 +545,11 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
                             madjmat[j, i] = 1
 
     # Corrects valence violations
-    isgood_valence, adjmat, madjmat = correct_valence_violation(adjmat, madjmat, labels, pos, radii)
-    isgood = isgood and isgood_valence
+    if add_atoms:
+        warning = False
+    else:
+        isgood_valence, adjmat, madjmat, warning = correct_valence_violation(adjmat, madjmat, labels, pos, radii)
+        isgood = isgood and isgood_valence
 
     for i in range(0, natoms):
         adjnum[i] = np.sum(adjmat[i, :])
@@ -516,9 +561,9 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
     madjnum = madjnum.astype(int)
 
     if not metal_only: 
-        return isgood, adjmat, adjnum
+        return isgood, adjmat, adjnum, warning
     else:
-        return isgood, madjmat, madjnum
+        return isgood, madjmat, madjnum, warning
 
 ####################################
 def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: list):
@@ -531,7 +576,7 @@ def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: l
     post_transition_metal_idxs = get_post_transition_metal_idxs(labels)
     alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
     allowed = set(metal_idxs) | set(post_transition_metal_idxs) | set(alkali_alkaline_earth_metal_idxs)  
-
+    warning = False
     for i in range(0, natoms):
         indices = np.where(adjmat[i, :] != 0)[0]
         num_in_allowed = len(set(indices) & allowed)
@@ -552,10 +597,13 @@ def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: l
             if labels[i] in ["F", "Cl", "Br", "I"]: # Halogens
                 print("Adjacency Matrix: Atom", i, labels[i], "is a halogen with valence bigger than allowed max valence", max_valence, "and is connected to", indices, [labels[j] for j in indices])
                 # Do not correct the adjacency matrix for halogens
+                warning = True
                 pass
             elif labels[i] in ["B"]:  # Boron
+                warning = True
                 pass
             elif i in alkali_alkaline_earth_metal_idxs or i in post_transition_metal_idxs:
+                warning = True
                 for j in indices:
                     b = np.array(pos[j])
                     dist = np.linalg.norm(a - b)
@@ -573,15 +621,20 @@ def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: l
                 num_to_remove = len(connections) - max_valence - num_in_allowed
                 for idx in range(num_to_remove):
                     j, rem = sorted_connections[idx]
-                    if rem > 0.2: # Only remove bonds with a significant margin
-                        adjmat[i, j] = 0
-                        adjmat[j, i] = 0
-                        madjmat[i, j] = 0
-                        madjmat[j, i] = 0
-                        print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
-                    else:
-                        print(f"Adjacency Matrix: Not removing bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
-    return isgood, adjmat, madjmat
+                    adjmat[i, j] = 0
+                    adjmat[j, i] = 0
+                    madjmat[i, j] = 0
+                    madjmat[j, i] = 0
+                    print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+                    # if rem > 0.2: # Only remove bonds with a significant margin
+                    #     adjmat[i, j] = 0
+                    #     adjmat[j, i] = 0
+                    #     madjmat[i, j] = 0
+                    #     madjmat[j, i] = 0
+                    #     print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+                    # else:
+                    #     print(f"Adjacency Matrix: Not removing bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+    return isgood, adjmat, madjmat, warning
 
 ####################################
 def correct_valence_violation_v1(adjmat, madjmat, labels: list, pos: list, radii: list):
@@ -849,7 +902,7 @@ def count_species(labels: list, pos: list, radii: list=None, indices: list=None,
     if atom_site_labels is not None and geom_bond_cif is not None:
         isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds (labels, pos, atom_site_labels, geom_bond_cif)
     else:
-        isgood, adjmat, adjnum = get_adjmatrix(labels, pos, cov_factor, radii)
+        isgood, adjmat, adjnum, warning = get_adjmatrix(labels, pos, cov_factor, radii)
 
     if not isgood: return int(0)
 
@@ -886,7 +939,7 @@ def split_species(labels: list, pos: list, radii: list=None, indices: list=None,
     if atom_site_labels is not None and geom_bond_cif is not None:
         isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds (labels, pos, atom_site_labels, geom_bond_cif)
     else:
-        isgood, adjmat, adjnum = get_adjmatrix(labels, pos, cov_factor, radii)
+        isgood, adjmat, adjnum, warning = get_adjmatrix(labels, pos, cov_factor, radii)
     if not isgood: return None
 
     degree = np.diag(adjnum)  # creates a matrix with adjnum as diagonal values. Needed for the laplacian

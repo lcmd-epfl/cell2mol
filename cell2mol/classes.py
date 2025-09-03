@@ -28,6 +28,7 @@ from cell2mol.connectivity import (
     compare_metals,
     compare_reference_indices,
     get_adjmatrix_from_cif_bonds,
+    check_blocklist,
 )
 from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
 from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
@@ -476,7 +477,7 @@ class specie(BaseModel):
             )
         else:
             print("SPECIE.GET_ADJMATRIX: Based on interatomic distances")
-            isgood, adjmat, adjnum = get_adjmatrix(
+            isgood, adjmat, adjnum, warning = get_adjmatrix(
                 self.labels, self.coord, self.cov_factor, self.radii
             )
 
@@ -502,7 +503,7 @@ class specie(BaseModel):
             )
         else:
             print("SPECIE.GET_METAL_ADJMATRIX: Based on interatomic distances")
-            isgood, madjmat, madjnum = get_adjmatrix(
+            isgood, madjmat, madjnum, warning = get_adjmatrix(
                 self.labels, self.coord, self.cov_factor, self.radii, metal_only=True
             )
 
@@ -1299,16 +1300,16 @@ class molecule(specie):
                     #     lig.get_connected_metals(debug=debug)
                     # if typ[0].metals is None:
                     #     typ[0].get_connected_metals(debug=debug)
-                    # lig_m_atom_site_labels = [m.atom_site_label for m in lig.metals]
-                    # typ_m_atom_site_labels = [m.atom_site_label for m in typ[0].metals]
+                    lig_groups_labels = [g.labels for g in lig.groups]
+                    typ_groups_labels = [g.labels for g in typ[0].groups]
 
                     if lig.is_nitrosyl and typ[0].is_nitrosyl:
                         issame = lig.NO_type == typ[0].NO_type
                     else:
-                        # if (len(lig_m_atom_site_labels) == len(typ_m_atom_site_labels) and
-                        #     sorted(lig_m_atom_site_labels) == sorted(typ_m_atom_site_labels) and
-                        #     lig.haptic_type == typ[0].haptic_type):
-                        if lig.haptic_type == typ[0].haptic_type:
+                        if (len(lig_groups_labels) == len(typ_groups_labels) and
+                            sorted(lig_groups_labels) == sorted(typ_groups_labels) and
+                            lig.haptic_type == typ[0].haptic_type):
+                        # if lig.haptic_type == typ[0].haptic_type:
                             issame = compare_species(lig, typ[0], debug=0)
                         else:
                             issame = False
@@ -1607,7 +1608,7 @@ class ligand(specie):
                 tmpcoord = self.coord.copy()
                 tmplabels.append(met.label)
                 tmpcoord.append(met.coord)
-                isgood, tmpadjmat, tmpadjnum = get_adjmatrix(
+                isgood, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
                     tmplabels, tmpcoord, metal_only=True
                 )
                 if isgood and any(tmpadjnum) > 0:
@@ -1784,9 +1785,12 @@ class ligand(specie):
             blocklist = split_species(
                 conn_labels, conn_coord, radii=conn_radii, debug=debug
             )
-
         if debug >= 2:
             print(f"\tLIGAND.SPLIT_LIGAND: {blocklist=}")
+
+        blocklist = check_blocklist(conn_labels, conn_coord, blocklist)
+        if debug >= 2:
+            print(f"\tLIGAND.SPLIT_LIGAND: After Checking {blocklist=}")
         ## Arranges Groups
         for b in blocklist:
             if debug >= 2:
@@ -2021,7 +2025,7 @@ class group(specie):
                 tmpcoord = self.coord.copy()
                 tmplabels.append(met.label)
                 tmpcoord.append(met.coord)
-                isgood, tmpadjmat, tmpadjnum = get_adjmatrix(
+                isgood, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
                     tmplabels, tmpcoord, metal_only=True
                 )
                 if isgood and any(tmpadjnum) > 0:
@@ -2287,7 +2291,7 @@ class atom(BaseModel):
             )
         else:
 
-            isgood, adjmat, adjnum = get_adjmatrix(labels, coords)
+            isgood, adjmat, adjnum, warning = get_adjmatrix(labels, coords)
         if isgood and adjnum[0] > 0:
             return True
         else:
@@ -2353,7 +2357,7 @@ class atom(BaseModel):
     #         tmpcoord  = self.coord.copy()
     #         tmplabels.append(met.label)
     #         tmpcoord.append(met.coord)
-    #         isgood, tmpadjmat, tmpadjnum = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
+    #         isgood, tmpadjmat, tmpadjnum, warning = get_adjmatrix(tmplabels, tmpcoord, metal_only=True)
     #         if isgood and any(tmpadjnum) > 0: self.metals.append(met)
     #     return self.metals
 
@@ -2699,7 +2703,7 @@ class metal(atom):
                     tmpcoord.extend(group.coord)
                     if debug > 2:
                         print(tmplabels, tmpcoord)
-                    isgood, tmpadjmat, tmpadjnum = get_adjmatrix(
+                    isgood, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
                         tmplabels, tmpcoord, metal_only=True
                     )
                     if isgood:
@@ -2833,7 +2837,7 @@ class metal(atom):
                 if debug > 2:
                     print(tmplabels, tmpcoord)
 
-                isgood, tmpadjmat, tmpadjnum = get_adjmatrix(
+                isgood, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
                     tmplabels, tmpcoord, metal_only=True
                 )
                 if isgood:
@@ -3114,19 +3118,19 @@ class cell(BaseModel):
                         #     lig.get_connected_metals(debug=debug)
                         # if typ[0].metals is None:
                         #     typ[0].get_connected_metals(debug=debug)
-                        # lig_m_atom_site_labels = [m.atom_site_label for m in lig.metals]
-                        # typ_m_atom_site_labels = [m.atom_site_label for m in typ[0].metals]
-                        
+                        lig_groups_labels = [g.labels for g in lig.groups]
+                        typ_groups_labels = [g.labels for g in typ[0].groups]
+
                         if lig.is_nitrosyl and typ[0].is_nitrosyl:
                             if lig.NO_type == typ[0].NO_type:
                                 issame = True
                             else:
                                 issame = False
                         else:
-                            # if (len(lig_m_atom_site_labels) == len(typ_m_atom_site_labels) and
-                            #     sorted(lig_m_atom_site_labels) == sorted(typ_m_atom_site_labels) and
-                            #     lig.haptic_type == typ[0].haptic_type):
-                            if lig.haptic_type == typ[0].haptic_type:
+                            if (len(lig_groups_labels) == len(typ_groups_labels) and
+                                sorted(lig_groups_labels) == sorted(typ_groups_labels) and
+                                lig.haptic_type == typ[0].haptic_type):
+                            # if lig.haptic_type == typ[0].haptic_type:
                                 issame = compare_species(lig, typ[0], debug=0)
                             else:
                                 issame = False

@@ -52,24 +52,24 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
             newcell.save(cell_fname)
 
             # Print summary information for the unit cell
-            summary_fname = os.path.join(current_dir, "unitcell_summary.out")
-            with open(summary_fname, "w") as summary:
-                with redirect_stdout(summary):
-                    print(name)
-                    print_refmoleclist(newcell)
-                    print_unique_species(newcell)
-                    print_moleclist(newcell)
+            # summary_fname = os.path.join(current_dir, "unitcell_summary.out")
+            # with open(summary_fname, "w") as summary:
+            #     with redirect_stdout(summary):
+            #         print(name)
+            #         print_refmoleclist(newcell)
+            #         print_unique_species(newcell)
+            #         print_moleclist(newcell)
 
             summary_fname_ref = os.path.join(current_dir, "reference_summary.out")
             with open(summary_fname_ref, "a") as summary_ref:
                 with redirect_stdout(summary_ref):
-                    print_unique_species(refcell)
-                    print_possible_charges(refcell)
-                    print("************ After charge assignment of unit cell ************")
+                    # print_unique_species(refcell)
+                    # print_possible_charges(refcell)
+                    print("\n************ After charge assignment of unit cell ************")
                     print_refmoleclist(refcell)   
 
             # Handle error cases for the unit cell
-            if hasattr(newcell, 'error_case'):
+            if hasattr(newcell, 'error_case') and newcell.error_case is not None :
                 error_fname = os.path.join(current_dir, f"unitcell_error_{newcell.error_case}.out")
                 with open(error_fname, "w") as error_output:
                     with redirect_stdout(error_output):
@@ -126,10 +126,10 @@ def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debu
     """Handles the reconstruction, charge assignment, and spin assignment for molecules."""
     cov_factor = refcell.refmoleclist[0].cov_factor if refcell.refmoleclist else COV_FACTOR
     
-    if refcell.error_case == 0:
-        get_unique_species_in_reference(refcell, debug) 
-    else:
-        print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
+    # if refcell.error_case == 0:
+    #     get_unique_species_in_reference(refcell, debug) 
+    # else:
+    #     print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
 
     # Copy reference molecules from refcell
     newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
@@ -138,17 +138,20 @@ def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debu
     newcell.has_missing_H = refcell.has_missing_H
     newcell.error_get_poscharges = refcell.error_get_poscharges
     logging.info("Starting the cell2mol process for the unit cell")
-
-    # Step-by-step molecule reconstruction and error assessment
-    mode = "reconstruction"
-    cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
-    newcell.assess_errors(mode=mode)
-
-    if newcell.error_case == 0 :
-        mode = "charge_assignment"
+    
+    if refcell.error_case == 0:
+        # Step-by-step molecule reconstruction and error assessment
+        mode = "reconstruction"
         cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
         newcell.assess_errors(mode=mode)
-        
+
+        if newcell.error_case == 0 :
+            mode = "charge_assignment"
+            cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
+            newcell.assess_errors(mode=mode)
+    else:
+        print(f"Error occurred in processing refcell: error case {refcell.error_case}")
+
 if __name__ == "__main__":
     input = sys.argv[1]
     current_dir = os.getcwd()

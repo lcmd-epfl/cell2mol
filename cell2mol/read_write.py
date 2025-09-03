@@ -396,7 +396,7 @@ def find_closest_matches_old(reference, target):
             matches[i] = {'ref': ref, 'match': best_match, 'diff_dict': best_diff}
     return matches
 #######################
-def extract_chemical_name(file_path):
+def extract_chemical_name_v1(file_path):
     try:
         with open(file_path, 'r') as file:
             start_reading = False
@@ -422,7 +422,60 @@ def extract_chemical_name(file_path):
     except FileNotFoundError:
         print(f"File not found: {file_path}")
         return None
+#######################    
+def extract_chemical_name(file_path, tag="_chemical_name_systematic"):
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return None
 
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
+        if line.lstrip().startswith(tag):
+            # Try to get value on the same line: e.g.,
+            # _chemical_name_systematic 'Some name'
+            after = line.split(tag, 1)[1].strip()
+            if after:  # value is on same line
+                # strip matching quotes if present
+                if (after[0] in "'\"" and after[-1:] == after[0]) and len(after) >= 2:
+                    val = after[1:-1]
+                else:
+                    val = after
+                # normalize whitespace
+                return " ".join(val.split())
+
+            # Otherwise value should be on following lines
+            i += 1
+            # Expect a semicolon in column 1 starting the text block
+            if i < n and lines[i].startswith(";"):
+                i += 1
+                buf = []
+                while i < n:
+                    # End of block only if semicolon is in column 1
+                    if lines[i].startswith(";"):
+                        break
+                    # Keep exact line content except trailing newline
+                    buf.append(lines[i].rstrip("\n"))
+                    i += 1
+                # Join without forcing spaces between lines, then normalize
+                text = "".join(buf)
+                # Collapse any excessive whitespace to single spaces
+                text = " ".join(text.split())
+                return text or None
+            else:
+                # Fallback: next non-empty line is the value (rare but possible)
+                while i < n and not lines[i].strip():
+                    i += 1
+                if i < n:
+                    val = lines[i].strip()
+                    return " ".join(val.split()) if val else None
+                return None
+        i += 1
+    return None
 #######################
 def extract_metal_oxidation_state(chemical_name):
 
@@ -1102,6 +1155,8 @@ def print_unique_species(cell):
                 parts.append(f"{specie.smiles=}")
             if getattr(specie, "totcharge", None) is not None:
                 parts.append(f"{specie.totcharge=}")
+            if getattr(specie, "groups", None) is not None:
+                parts.append(f"groups={[group.formula for group in specie.groups]}")
         else:
             if getattr(specie, "smiles", None) is not None:
                 parts.append(f"{specie.smiles=}")
