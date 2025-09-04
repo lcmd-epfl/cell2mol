@@ -5,6 +5,7 @@ from contextlib import redirect_stdout
 from ase.io import read
 from cell2mol.classes import molecule
 from cell2mol.connectivity import split_species
+from cell2mol.read_write import print_molecule
 
 # Constants
 VERSION = "2.0"
@@ -89,9 +90,9 @@ def get_molecule (input_path, name, input_charge, current_dir, debug=2):
 
             newmolec.input_charge = input_charge
             if input_charge is not None:
-                newmolec.get_unique_species()
-                newmolec.get_selected_cs()
-                newmolec.balance_charges_for_molecules(input_charge=input_charge)
+                newmolec.get_unique_species(debug=debug)
+                newmolec.get_selected_cs(debug=debug)
+                newmolec.balance_charges_for_molecules(input_charge=input_charge, debug=debug)
                 if any([
                     newmolec.error_get_poscharges,
                     newmolec.error_multiple_distrib,
@@ -101,12 +102,13 @@ def get_molecule (input_path, name, input_charge, current_dir, debug=2):
                     newmolec.save(molec_fname)
                     return newmolec
                 
-                newmolec.assign_charges_for_molecule()
-                newmolec.create_bonds()
+                newmolec.assign_charges_for_molecule(debug=debug)
+                newmolec.create_bonds(debug=debug)
                 if newmolec.error_create_bonds:
                     print("[ERROR] Create Bonds failed.")
                     newmolec.error_case = 8
-            
+                else:
+                    print_molecule(newmolec)
             newmolec.save(molec_fname)
             return newmolec
 
@@ -114,7 +116,8 @@ def get_molecule (input_path, name, input_charge, current_dir, debug=2):
 if __name__ == "__main__":
 
     input = sys.argv[1]
-    input_charge = sys.argv[2] 
+    input_charge = sys.argv[2]
+    input_charge = int(input_charge) 
     current_dir = os.getcwd()
     input_path = os.path.normpath(input)
     dir, file = os.path.split(input_path)

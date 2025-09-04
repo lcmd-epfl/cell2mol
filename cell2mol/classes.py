@@ -1839,23 +1839,25 @@ class ligand(specie):
             #     self.groups.append(newgroup)
             # else:
 
-            newgroup, final_group_indices, final_ligand_indices = newgroup.check_coordination(debug=debug)
+            newgroup, final_group_indices, final_ligand_indices, group_metals_indices = newgroup.check_coordination(debug=debug)
             print(f"\tLIGAND.SPLIT_LIGAND: {newgroup.formula} {newgroup.labels}")
             print(f"\tLIGAND.SPLIT_LIGAND: {final_group_indices=}")
             print(f"\tLIGAND.SPLIT_LIGAND: {final_ligand_indices=}")
+            print(f"\tLIGAND.SPLIT_LIGAND: {group_metals_indices=}")
+            # print(f"\tLIGAND.SPLIT_LIGAND: connected to {[newgroup.metals[kdx].atom_site_label for kdx in group_metals_indices]}")
             if not is_single_sublist(final_group_indices): # atoms in new group are connected to different metals
                 if debug > 1 : print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.formula} with {final_group_indices=} {[met.label for met in newgroup.metals]}")
-                for kdx, conn_idx in enumerate(final_group_indices):
-                    if debug > 1 : print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.labels} with {conn_idx=}")
-                    if type(final_ligand_indices) is dict:
-                        splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices[kdx], debug=debug)
-                    elif type(final_ligand_indices) is list:
-                        splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices, debug=debug)
+                for kdx, (conn_idx, metal_idx) in enumerate(zip(final_group_indices, group_metals_indices)):
+                    group_metals = [newgroup.metals[midx] for midx in metal_idx]
+                    if debug > 1 : 
+                        print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.labels} with {conn_idx=} {[met.atom_site_label for met in group_metals]=}")
+                    splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices[kdx], group_metals, debug=debug)
                     for g in splitted_groups:
                         self.groups.append(g)
             else:
                 if debug > 1 : print(f"\tGROUP {newgroup.formula} with {final_group_indices=} connected to {[met.label for met in newgroup.metals]}")
                 conn_idx = final_group_indices[0]
+                group_metals = [newgroup.metals[kdx] for kdx in group_metals_indices[0]]
                 if len(conn_idx) == len(newgroup.atoms):
                     if debug > 1 : print(f"\tLIGAND.SPLIT_LIGAND: new group is found")
                     newgroup.get_denticity(debug=debug)
@@ -1866,10 +1868,7 @@ class ligand(specie):
                     continue
                 else:
                     if debug > 1 : print(f"\tenterting SPLIT_GROUP for the GROUP {newgroup.formula} with {conn_idx=}")
-                    if type(final_ligand_indices) is dict:
-                        splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices[0], debug=debug)
-                    elif type(final_ligand_indices) is list:
-                        splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices, debug=debug)
+                    splitted_groups = split_group(newgroup, conn_idx, final_ligand_indices[0], group_metals, debug=debug)
                     for g in splitted_groups:
                         self.groups.append(g)
         if debug > 0 : print(f"\tLIGAND.SPLIT_LIGAND: found groups {[ group.formula for group in self.groups]}")
@@ -2097,15 +2096,15 @@ class group(specie):
         if self.atoms is None:
             self.set_atoms()
         if self.is_haptic:
-            self, conn_idx, final_ligand_indices = coordination_correction_for_haptic(
+            self, conn_idx, final_ligand_indices, group_metals_indices = coordination_correction_for_haptic(
                 self, debug=debug
             )
         if self.is_haptic == False:
-            self, conn_idx, final_ligand_indices = (
+            self, conn_idx, final_ligand_indices, group_metals_indices = (
                 coordination_correction_for_nonhaptic(self, debug=debug)
             )
         self.checked_coordination = True
-        return self, conn_idx, final_ligand_indices
+        return self, conn_idx, final_ligand_indices, group_metals_indices
 
     #######################################################
     def get_denticity(self, debug: int = 0):
@@ -2617,8 +2616,6 @@ class metal(atom):
 
     #######################################################
     def get_connected_groups(self, debug: int = 0):
-        from cell2mol.connectivity import split_group
-
         # metal.groups will be used for the calculation of the relative metal radius
         # and define the coordination geometry of the metal /hapicitiy/ hapttype
         if not self.check_parent("molecule"):
@@ -2627,126 +2624,18 @@ class metal(atom):
         refcell = self.get_parent("reference")
         geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
         mol = self.get_parent("molecule")
-
         connected_groups = []
-        if refcell is not None and refcell.exist_cif_bond_moiety:
-            for lig in mol.ligands:
-                for group in lig.groups:
-                    if debug > 2:
-                        print(group.formula)
-                    ligand_indices = [a.get_parent_index("ligand") for a in group.atoms]
-                    tmplabels = []
-                    tmpcoord = []
-                    atom_site_labels = []
-
-                    tmplabels.append(self.label)
-                    tmpcoord.append(self.coord)
-                    atom_site_labels.append(self.atom_site_label)
-
-                    tmplabels.extend(group.labels)
-                    tmpcoord.extend(group.coord)
-
-                    atom_site_labels.extend([atom.atom_site_label for atom in group.atoms])
-                    if debug >= 2: print(f"METAL.Get_connected_groups: {tmplabels=} {atom_site_labels=}")
-                    isgood, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, geom_bond_cif, metal_only=True)
-                    if isgood :
-                        if debug > 2: print(group.formula, tmpadjmat, tmpadjnum)
-                        if all(tmpadjnum[1:]): 
-                            self.groups.append(group)
-                            if debug >= 0:
-                                print(
-                                    f"METAL.Get_connected_groups: Metal {self.label} is connected to all atoms in {group.formula}"
-                                )
-
-                        elif any(tmpadjnum[1:]):
-                            if debug > 1:
-                                print(
-                                    f"METAL.Get_connected_groups: {self.label} is connected to {group.formula} but not all atoms are connected"
-                                )
-                            conn_idx = [
-                                idx for idx, num in enumerate(tmpadjnum[1:]) if num == 1
-                            ]
-                            conn_ligand_indices = [
-                                ligand_indices[idx]
-                                for idx, num in enumerate(tmpadjnum[1:])
-                                if num == 1
-                            ]
-                            if debug > 1:
-                                print(
-                                    f"METAL.Get_connected_groups: {tmpadjnum[1:]=} {conn_idx=} {conn_ligand_indices=} {ligand_indices=}"
-                                )
-                            splitted_groups = split_group(
-                                group, conn_idx, conn_ligand_indices, debug=debug
+        for lig in mol.ligands:
+            for group in lig.groups:
+                if debug > 1:
+                    print(group.formula, [m.atom_site_label for m in group.metals])
+                for met in group.metals:
+                    if self == met:
+                        connected_groups.append(group)
+                        if debug >= 0:
+                            print(
+                                f"METAL.Get_connected_groups: Metal {self.label} ({self.atom_site_label}) is connected to group {group.formula}"
                             )
-                            for g in splitted_groups:
-                                self.groups.append(g)
-                                if debug > 1:
-                                    print(
-                                        f"METAL.Get_connected_groups: {self.label} is connected to {g.formula} after split_group"
-                                    )
-                        else:
-                            if debug > 1:
-                                print(
-                                    f"METAL.Get_connected_groups: {self.label} is not connected to {group.formula}"
-                                )
-        else:
-            for lig in mol.ligands:
-                for group in lig.groups:
-                    if debug > 2:
-                        print(group.formula)
-                    ligand_indices = [a.get_parent_index("ligand") for a in group.atoms]
-                    tmplabels = []
-                    tmpcoord = []
-                    tmplabels.append(self.label)
-                    tmpcoord.append(self.coord)
-                    tmplabels.extend(group.labels)
-                    tmpcoord.extend(group.coord)
-                    if debug > 2:
-                        print(tmplabels, tmpcoord)
-                    isgood, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
-                        tmplabels, tmpcoord, metal_only=True
-                    )
-                    if isgood:
-                        if debug > 2:
-                            print(group.formula, tmpadjmat, tmpadjnum)
-                        if all(tmpadjnum[1:]):
-                            if debug > 1:
-                                print(
-                                    f"METAL.Get_connected_groups: {self.label} is connected to {group.formula} with all atoms"
-                                )
-                            connected_groups.append(group)
-                        elif any(tmpadjnum[1:]):
-                            if debug > 1:
-                                print(
-                                    f"METAL.Get_connected_groups: {self.label} is connected to {group.formula} but not all atoms are connected"
-                                )
-                            conn_idx = [
-                                idx for idx, num in enumerate(tmpadjnum[1:]) if num == 1
-                            ]
-                            conn_ligand_indices = [
-                                ligand_indices[idx]
-                                for idx, num in enumerate(tmpadjnum[1:])
-                                if num == 1
-                            ]
-                            if debug > 1:
-                                print(
-                                    f"METAL.Get_connected_groups: {tmpadjnum[1:]=} {conn_idx=} {conn_ligand_indices=} {ligand_indices=}"
-                                )
-                            splitted_groups = split_group(
-                                group, conn_idx, conn_ligand_indices, debug=debug
-                            )
-                            for g in splitted_groups:
-                                connected_groups.append(g)
-                                if debug > 1:
-                                    print(
-                                        f"METAL.Get_connected_groups: {self.label} is connected to {g.formula} after split_group"
-                                    )
-                        else:
-                            if debug > 1:
-                                print(
-                                    f"METAL.Get_connected_groups: {self.label} is not connected to {group.formula}"
-                                )
-
         final_connected_groups = []
         groups_atom_site_labels = [
             [a.atom_site_label for a in g.atoms] for g in connected_groups
@@ -2762,6 +2651,152 @@ class metal(atom):
                 f"METAL.Get_connected_groups: {self.label} ({self.atom_site_label}) connected groups: {[g.formula for g in self.groups]}"
             )
         return self.groups
+    # def get_connected_groups(self, debug: int = 0):
+    #     from cell2mol.connectivity import split_group
+
+    #     # metal.groups will be used for the calculation of the relative metal radius
+    #     # and define the coordination geometry of the metal /hapicitiy/ hapttype
+    #     if not self.check_parent("molecule"):
+    #         return None
+
+    #     refcell = self.get_parent("reference")
+    #     geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+    #     mol = self.get_parent("molecule")
+
+    #     connected_groups = []
+    #     if refcell is not None and refcell.exist_cif_bond_moiety:
+    #         for lig in mol.ligands:
+    #             for group in lig.groups:
+    #                 if debug > 2:
+    #                     print(group.formula)
+    #                 ligand_indices = [a.get_parent_index("ligand") for a in group.atoms]
+    #                 tmplabels = []
+    #                 tmpcoord = []
+    #                 atom_site_labels = []
+
+    #                 tmplabels.append(self.label)
+    #                 tmpcoord.append(self.coord)
+    #                 atom_site_labels.append(self.atom_site_label)
+
+    #                 tmplabels.extend(group.labels)
+    #                 tmpcoord.extend(group.coord)
+
+    #                 atom_site_labels.extend([atom.atom_site_label for atom in group.atoms])
+    #                 if debug >= 2: print(f"METAL.Get_connected_groups: {tmplabels=} {atom_site_labels=}")
+    #                 isgood, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(tmplabels, tmpcoord, atom_site_labels, geom_bond_cif, metal_only=True)
+    #                 if isgood :
+    #                     if debug > 2: print(group.formula, tmpadjmat, tmpadjnum)
+    #                     if all(tmpadjnum[1:]): 
+    #                         self.groups.append(group)
+    #                         if debug >= 0:
+    #                             print(
+    #                                 f"METAL.Get_connected_groups: Metal {self.label} is connected to all atoms in {group.formula}"
+    #                             )
+
+    #                     elif any(tmpadjnum[1:]):
+    #                         if debug > 1:
+    #                             print(
+    #                                 f"METAL.Get_connected_groups: {self.label} is connected to {group.formula} but not all atoms are connected"
+    #                             )
+    #                         conn_idx = [
+    #                             idx for idx, num in enumerate(tmpadjnum[1:]) if num == 1
+    #                         ]
+    #                         conn_ligand_indices = [
+    #                             ligand_indices[idx]
+    #                             for idx, num in enumerate(tmpadjnum[1:])
+    #                             if num == 1
+    #                         ]
+    #                         if debug > 1:
+    #                             print(
+    #                                 f"METAL.Get_connected_groups: {tmpadjnum[1:]=} {conn_idx=} {conn_ligand_indices=} {ligand_indices=}"
+    #                             )
+    #                         splitted_groups = split_group(
+    #                             group, conn_idx, conn_ligand_indices, debug=debug
+    #                         )
+    #                         for g in splitted_groups:
+    #                             self.groups.append(g)
+    #                             if debug > 1:
+    #                                 print(
+    #                                     f"METAL.Get_connected_groups: {self.label} is connected to {g.formula} after split_group"
+    #                                 )
+    #                     else:
+    #                         if debug > 1:
+    #                             print(
+    #                                 f"METAL.Get_connected_groups: {self.label} is not connected to {group.formula}"
+    #                             )
+    #     else:
+    #         for lig in mol.ligands:
+    #             for group in lig.groups:
+    #                 if debug > 2:
+    #                     print(group.formula)
+    #                 ligand_indices = [a.get_parent_index("ligand") for a in group.atoms]
+    #                 tmplabels = []
+    #                 tmpcoord = []
+    #                 tmplabels.append(self.label)
+    #                 tmpcoord.append(self.coord)
+    #                 tmplabels.extend(group.labels)
+    #                 tmpcoord.extend(group.coord)
+    #                 if debug > 2:
+    #                     print(tmplabels, tmpcoord)
+    #                 isgood, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
+    #                     tmplabels, tmpcoord, metal_only=True
+    #                 )
+    #                 if isgood:
+    #                     if debug > 2:
+    #                         print(group.formula, tmpadjmat, tmpadjnum)
+    #                     if all(tmpadjnum[1:]):
+    #                         if debug > 1:
+    #                             print(
+    #                                 f"METAL.Get_connected_groups: {self.label} is connected to {group.formula} with all atoms"
+    #                             )
+    #                         connected_groups.append(group)
+    #                     elif any(tmpadjnum[1:]):
+    #                         if debug > 1:
+    #                             print(
+    #                                 f"METAL.Get_connected_groups: {self.label} is connected to {group.formula} but not all atoms are connected"
+    #                             )
+    #                         conn_idx = [
+    #                             idx for idx, num in enumerate(tmpadjnum[1:]) if num == 1
+    #                         ]
+    #                         conn_ligand_indices = [
+    #                             ligand_indices[idx]
+    #                             for idx, num in enumerate(tmpadjnum[1:])
+    #                             if num == 1
+    #                         ]
+    #                         if debug > 1:
+    #                             print(
+    #                                 f"METAL.Get_connected_groups: {tmpadjnum[1:]=} {conn_idx=} {conn_ligand_indices=} {ligand_indices=}"
+    #                             )
+    #                         splitted_groups = split_group(
+    #                             group, conn_idx, conn_ligand_indices, debug=debug
+    #                         )
+    #                         for g in splitted_groups:
+    #                             connected_groups.append(g)
+    #                             if debug > 1:
+    #                                 print(
+    #                                     f"METAL.Get_connected_groups: {self.label} is connected to {g.formula} after split_group"
+    #                                 )
+    #                     else:
+    #                         if debug > 1:
+    #                             print(
+    #                                 f"METAL.Get_connected_groups: {self.label} is not connected to {group.formula}"
+    #                             )
+
+    #     final_connected_groups = []
+    #     groups_atom_site_labels = [
+    #         [a.atom_site_label for a in g.atoms] for g in connected_groups
+    #     ]
+    #     # Remove duplicate groups based on atom_site_labels
+
+    #     for g_labels, group in zip(groups_atom_site_labels, connected_groups):
+    #         if not any(set(g_labels).issubset(set(other)) and set(g_labels) != set(other) for other in groups_atom_site_labels):
+    #             final_connected_groups.append(group)
+    #     self.groups = final_connected_groups
+    #     if debug >= 1:
+    #         print(
+    #             f"METAL.Get_connected_groups: {self.label} ({self.atom_site_label}) connected groups: {[g.formula for g in self.groups]}"
+    #         )
+    #     return self.groups
 
     #######################################################
     def get_relative_metal_radius(self, debug: int = 0):

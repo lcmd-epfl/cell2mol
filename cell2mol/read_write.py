@@ -1283,3 +1283,73 @@ def print_moleclist(cell):
     else:
         print("\nNo molecules found in the cell object.")
 
+######################################################
+def print_molecule(mol):
+    if mol is not None:
+        print(f"\nMolecule:")                 
+        if mol.totcharge is not None:
+            if mol.iscomplex:
+                print(f"{mol.formula} {mol.totcharge=} (TM complex)")
+            elif mol.has_IA_IIA:
+                print(f"{mol.formula} {mol.totcharge=} (Complex with Alkali or Alkaline metals)")
+            elif mol.has_post_transition_metal:
+                print(f"{mol.formula} {mol.totcharge=} (Complex with Post-Transition metals)")
+            else:
+                if mol.smiles is not None:
+                    print(f"{mol.formula} {mol.totcharge=} (Non-complex) {mol.smiles=}")
+                else:
+                    print(f"{mol.formula} {mol.totcharge=} (Non-complex)")
+        else:
+            if mol.iscomplex:
+                print(f"{mol.formula} (TM complex)")
+            elif mol.has_IA_IIA:
+                print(f"{mol.formula} (Complex with Alkali or Alkaline metals)")
+            elif mol.has_post_transition_metal:
+                print(f"{mol.formula} (Complex with Post-Transition metals)")
+            else:
+                print(f"{mol.formula} (Non-complex)")
+
+        if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
+            for met in mol.metals:
+                met_info = f"\t{met.formula} ({met.subtype}) atom_site_label={met.atom_site_label}"
+
+                if met.charge is not None:
+                    met_info += f" metal_OS={met.charge}"
+                elif met.possible_cs is not None:
+                    met_info += f" metal_possible_OS={met.possible_cs}"
+                print(met_info)
+
+                for attr in ["coord_sphere_formula"]:
+                    if hasattr(met, attr):
+                        print(f"\t|--Coordination information {attr}={getattr(met, attr)}")
+
+                if all(hasattr(met, attr) for attr in ["coord_nr", "coord_geometry", "geom_deviation"]):
+                    print(f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}")
+
+                if all(hasattr(met, attr) for attr in ["coord_nr_with_metal_bonds", "coord_geometry_with_metal_bonds", "geom_deviation_with_metal_bonds", "metals"]):
+                    bonded_metals = [m.label for m in met.metals]
+                    print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
+            print("")
+
+            for lig in mol.ligands:
+                lig_info = f"\t{lig.formula} ({lig.subtype})"
+                for attr in ["smiles", "denticity", "totcharge"]:
+                    if hasattr(lig, attr):
+                        lig_info += f" {attr}={getattr(lig, attr)}"
+                print(lig_info)
+                if lig.groups is not None:
+                    for group in lig.groups:
+                        group_info = f"\t|--(group){group.labels}"
+                        for attr in ["denticity"]:
+                            if hasattr(group, attr):
+                                group_info += f" {attr}={getattr(group, attr)}"
+                        for attr in ["is_haptic", "haptic_type"]:
+                            if hasattr(group, attr):
+                                if group.is_haptic:
+                                    group_info += f" {attr}={getattr(group, attr)}"
+                        if group.metals is not None:
+                            group_info += f" connected_metals={[m.atom_site_label for m in group.metals]}"
+
+                        print(group_info)
+    else:
+        print("\nNo molecule object.")
