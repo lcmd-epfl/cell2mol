@@ -8,6 +8,7 @@ from cell2mol.elementdata import ElementData
 from scipy.optimize import linear_sum_assignment      # Hungarian algorithm
 from scipy.stats import special_ortho_group           # more evenly distributed 
 from scipy.linalg import svd
+from collections import defaultdict
 elemdatabase = ElementData()
 
 #######################################################
@@ -362,21 +363,57 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
     
     print(f"conn_idx before set: {conn_idx=}")
+    print(f"conn_idx_by_metal: {conn_idx_by_metal=}")
     conn_idx = sorted(list(set(conn_idx)))
     split_groups = []
+    final_ligand_indices_by_metal = {jdx : [] for jdx, met in enumerate(group.metals)}
     for jdx, indices in conn_idx_by_metal.items():
         metal = group.metals[jdx]
         if indices:
             print(f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}")
             new_group = [i for i in indices]
             split_groups.append(new_group)
+
+    for jdx, indices in enumerate(split_groups):
+        for idx in indices:
+            atom = group.atoms[idx]
+            if atom.get_parent_index("ligand") is not None:
+                final_ligand_indices_by_metal[jdx].append(atom.get_parent_index("ligand"))
+    
     print(f"conn_idx: {conn_idx=}")
     print(f"split_groups: {split_groups=}")
-    final_group_indices = extract_final_indices(original_indices, split_groups)
-    print("original_indices:", original_indices)
+    final_group_indices = split_groups
     print(f"final_group_indices: {final_group_indices=}")
+    print(f"final_ligand_indices_by_metal: {final_ligand_indices_by_metal=}")
+    grouped = defaultdict(list)
+    for k, v in final_ligand_indices_by_metal.items():
+        grouped[tuple(v)].append(k)
+    print(grouped)
+    # turn values into a list of lists
+    group_metals_indices = [v for v in grouped.values()]
+    print(f"group_metals_indices: {group_metals_indices=}")
+    return group, final_group_indices, final_ligand_indices_by_metal, group_metals_indices
+
+    # grouped_metals = defaultdict(list)
+    # for m_idx, idx in conn_idx_by_metal.items():
+    #     grouped_metals[m_idx].append(group.metals[m_idx])
+    # atoms_grouped = [grouped_metals[i] for i in sorted(grouped_metals)]
+    # print(atoms_grouped)   
+    # conn_idx = sorted(list(set(conn_idx)))
+    # split_groups = []
+    # for jdx, indices in conn_idx_by_metal.items():
+    #     metal = group.metals[jdx]
+    #     if indices:
+    #         print(f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}")
+    #         new_group = [i for i in indices]
+    #         split_groups.append(new_group)
+    # print(f"conn_idx: {conn_idx=}")
+    # print(f"split_groups: {split_groups=}")
+    # final_group_indices = extract_final_indices(original_indices, split_groups)
+    # print("original_indices:", original_indices)
+    # print(f"final_group_indices: {final_group_indices=}")
     
-    return group, final_group_indices, final_ligand_indices
+    # return group, final_group_indices, final_ligand_indices
 
 #######################################################
 def extract_final_indices(initial_list, intermediate_list):
@@ -387,13 +424,14 @@ def extract_final_indices(initial_list, intermediate_list):
     if intermediate_list and isinstance(intermediate_list[0], int):
         intermediate_list = [[i] for i in intermediate_list]
 
-    for sublist in intermediate_list:
+    for jdx, sublist in enumerate(intermediate_list):
         group = []
         for idx in sublist:
             if idx not in seen:
-                group.append(idx)
+                group.append(idx)    
                 # group.append(initial_list[idx])
                 seen.add(idx)
+                
         if group:
             result.append(group)
 
@@ -476,9 +514,13 @@ def coordination_correction_for_haptic(group: object, debug: int=0):
                                 print(f"Distance {distances[idx]} has a z-score {z_scores[idx]} > {-z_lo}, resetting mconnec for atom {group.atoms[idx].label}")
                                 group.atoms[idx].reset_mconnec(metal, debug=1)
                     else:
-                        print("Figure out why std_dev is high")
+                        print("Figure out why std_dev is high") # e.g. EBUFOW
                         for idx, z in zip(indices, z_scores):
-                            new_group.append(idx)
+                            if z < 0:
+                                new_group.append(idx)
+                            else:
+                                group.atoms[idx].reset_mconnec(metal, debug=1)
+                                print(f"Distance {distances[idx]} has a z-score {z_scores[idx]}, resetting mconnec for atom {group.atoms[idx].label}")
                     print(f"New group after distance check: {new_group}")
                 else:
                     print(f"std_dev is too low ({std_dev}), adding all indices to conn_idx")
@@ -497,7 +539,15 @@ def coordination_correction_for_haptic(group: object, debug: int=0):
     print(f"split_groups: {split_groups=}")
     final_group_indices = split_groups
     print(f"final_group_indices: {final_group_indices=}")
-    return group, final_group_indices, final_ligand_indices_by_metal
+    print(f"final_ligand_indices_by_metal: {final_ligand_indices_by_metal=}")
+    grouped = defaultdict(list)
+    for k, v in final_ligand_indices_by_metal.items():
+        grouped[tuple(v)].append(k)
+    print(grouped)
+    # turn values into a list of lists
+    group_metals_indices = [v for v in grouped.values()]
+    print(f"group_metals_indices: {group_metals_indices=}")
+    return group, final_group_indices, final_ligand_indices_by_metal, group_metals_indices
 
 #######################################################
 def coordination_correction_for_haptic_old (group: object, debug: int=0):
