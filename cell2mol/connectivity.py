@@ -161,9 +161,11 @@ def check_blocklist (conn_labels, conn_coord, blocklist, debug: int=2):
             if len(cycle_basis) == 1:
                 print(f"\t\tCHECK_blocklist: Found single cycle in block {b}: {cycle_basis[0]}")
                 if len(cycle_basis[0]) == len(G.nodes):
+                    print([b[idx] for idx in cycle_basis[0]])
                     new_blocklist.append(b)
                 elif len(cycle_basis[0]) != len(G.nodes):
-                    new_blocklist.append(cycle_basis[0])
+                    print([b[idx] for idx in cycle_basis[0]], sorted([b[idx] for idx in cycle_basis[0]]))
+                    new_blocklist.append(sorted([b[idx] for idx in cycle_basis[0]]))
                     remaining = [n for n in G.nodes if n not in cycle_basis[0]]
                     print(f"\t\tCHECK_blocklist: Remaining nodes in block: {remaining}")
                     
@@ -475,9 +477,9 @@ def get_radii(labels: list) -> np.ndarray:
         else: label = l
         radii.append(elemdatabase.CovalentRadius3[label])
         # if elemdatabase.elementgroup[label] == 1 and label != "H":
-        #     radii.append(elemdatabase.CovalentRadius2[label])
+        #     radii.append(elemdatabase.IonicRadius[f"{label}1+"])
         # elif elemdatabase.elementgroup[label] == 2:
-        #     radii.append(elemdatabase.CovalentRadius2[label])
+        #     radii.append(elemdatabase.IonicRadius[f"{label}2+"])
         # else:
         #     radii.append(elemdatabase.CovalentRadius3[label])
     return np.array(radii)
@@ -511,7 +513,11 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
             a = np.array(pos[i])
             b = np.array(pos[j])
             dist = np.linalg.norm(a - b)
-            thres = (radii[i] + radii[j]) + add_factor
+            alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])
+            if len(alkali_alkaline_earth_metal_idxs) > 0:
+                thres = (radii[i] + radii[j]) + 0.3
+            else:
+                thres = (radii[i] + radii[j]) + add_factor
             #thres = min((radii[i] + radii[j]) * cov_factor, (radii[i] + radii[j]) + add_factor)
             # if thres - (radii[i] + radii[j]) > 0.8:
             #     thres = (radii[i] + radii[j]) + add_factor
@@ -621,19 +627,19 @@ def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: l
                 num_to_remove = len(connections) - max_valence - num_in_allowed
                 for idx in range(num_to_remove):
                     j, rem = sorted_connections[idx]
-                    adjmat[i, j] = 0
-                    adjmat[j, i] = 0
-                    madjmat[i, j] = 0
-                    madjmat[j, i] = 0
-                    print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
-                    # if rem > 0.2: # Only remove bonds with a significant margin
-                    #     adjmat[i, j] = 0
-                    #     adjmat[j, i] = 0
-                    #     madjmat[i, j] = 0
-                    #     madjmat[j, i] = 0
-                    #     print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
-                    # else:
-                    #     print(f"Adjacency Matrix: Not removing bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+                    # adjmat[i, j] = 0
+                    # adjmat[j, i] = 0
+                    # madjmat[i, j] = 0
+                    # madjmat[j, i] = 0
+                    # print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+                    if rem > 0.2: # Only remove bonds with a significant margin
+                        adjmat[i, j] = 0
+                        adjmat[j, i] = 0
+                        madjmat[i, j] = 0
+                        madjmat[j, i] = 0
+                        print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+                    else:
+                        print(f"Adjacency Matrix: Not removing bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
     return isgood, adjmat, madjmat, warning
 
 ####################################
@@ -1149,7 +1155,7 @@ def mol_with_atom_index(mol):
     return mol
 
 #################################
-def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
+def split_group(original_group, conn_idx, final_ligand_indices, connected_metal, debug: int=0):
     from cell2mol.classes import group
     # Split the "group" to obtain the groups connected to a specific metal
     splitted_groups = []
@@ -1167,6 +1173,8 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
     if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: original_group.atom_site_labels={atom_site_labels}")
     conn_atom_site_labels = extract_from_list(conn_idx, atom_site_labels, dimension=1) if atom_site_labels is not None else None
 
+    # if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: connected_metal={connected_metal.atom_site_label}")
+    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {connected_metal=}")
     if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {conn_labels=}")
 
     cov_factor=original_group.get_parent("ligand").cov_factor
@@ -1204,8 +1212,11 @@ def split_group(original_group, conn_idx, final_ligand_indices, debug: int=0):
         # Inherit the adjacencies from molecule
         newgroup.inherit_adjmatrix("ligand")
         # Associate the Groups with the Metals
-        newgroup.get_connected_metals(debug=debug)
-        newgroup.get_closest_metal(debug=debug)
+        #newgroup.get_connected_metals(debug=debug)
+        #newgroup.get_closest_metal(debug=debug)
+        
+        newgroup.metals = []
+        newgroup.metals.extend(connected_metal)
         newgroup.get_hapticity(debug=debug)
         newgroup.checked_coordination = True
         newgroup.get_denticity(debug=debug)

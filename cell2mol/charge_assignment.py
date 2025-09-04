@@ -515,7 +515,53 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
                 if debug >= 2:
                     print("    NEW SELECT FUNCTION: Aromaticity filtering would have emptied tmplist. Skipping removal.")
     return tmplist
+#########   
+def get_valences_list_of_lists(ligand: object, allow_carbenes: bool = False) -> list:
+    from cell2mol.xyz2mol import atomic_valence, get_sorted_valences_list
+    valences_list_of_lists = []
+    atoms = [elemdatabase.elementnr[l] for l in ligand.labels]
+    AC = ligand.adjmat
+    AC_valence = [int(x) for x in AC.sum(axis=1)]
 
+    for i, (atomicNum, valence) in enumerate(zip(atoms, AC_valence)):
+        # valence can't be smaller than number of neighbours
+        if len(atomic_valence[atomicNum]) == 0:
+            print(
+                "In AC2BO",
+                i,
+                "Atomic number",
+                atomicNum,
+                "Has no possible valences assigned in database",
+            )
+        possible_valence = [x for x in atomic_valence[atomicNum] if x >= valence]
+        if atomicNum == 6 and valence == 1:
+            if 2 in possible_valence:
+                possible_valence.remove(2)
+        if atomicNum == 6 and not allow_carbenes and valence == 2:
+            if 2 in possible_valence:
+                possible_valence.remove(2)
+        if atomicNum == 6 and valence == 2:
+            possible_valence.append(3)
+        if atomicNum == 7:
+            if valence not in possible_valence:
+                possible_valence.append(valence)
+        if len(possible_valence) == 0:
+            element = elemdatabase.elementsym[atomicNum]
+            if elemdatabase.elementgroup[element] == 1 or elemdatabase.elementgroup[element] == 2 : # Alkali and Alkaline earth metals
+                print('WARNING!! Valence of atom', element, i,\
+                    'is', valence,'which is bigger than allowed max',max(atomic_valence[atomicNum]),'. Stopping')
+                possible_valence.append(valence)
+            elif elemdatabase.elementperiod[element] < 3 : # e.g. HOLMOK
+                print('WARNING!! Valence of atom', element, i,\
+                    'is', valence,'which bigger than allowed max',max(atomic_valence[atomicNum]),'. Stopping')
+                possible_valence.append(valence)
+                # wrong += 1
+            else:
+                possible_valence.append(valence)
+            # sys.exit()
+        valences_list_of_lists.append(possible_valence)
+    sorted_valences_list = get_sorted_valences_list(valences_list_of_lists, atoms)
+    return valences_list_of_lists, sorted_valences_list
 ########################################################
 def get_empty_protonation_state (specie: object, debug: int=2) -> list:
     if debug >= 2: print(f"\nPOSCHARGE: doing empty PROTONATION for this specie {specie.formula} ({specie.subtype})")
@@ -552,12 +598,14 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
               f"Combinations {combinations_in_xyz2mol}")
         total_combinations_in_xyz2mol += combinations_in_xyz2mol
     print(f"\tTotal count of elements: {count}, Total combinations in xyz2mol {total_combinations_in_xyz2mol}")
-    threshold_xyz2mol = 1500
-
+    threshold_xyz2mol = 1000
+    valences_list_of_lists, sorted_valences_list = get_valences_list_of_lists(specie)
+    print(f"    POSCHARGE: Found {len(valences_list_of_lists)=} for this specie {specie.formula} ({specie.subtype})")
+    print(f"    POSCHARGE: Found {len(sorted_valences_list)=} for this specie {specie.formula} ({specie.subtype})")
     if   specie.type != "specie":                                   return None
     if   specie.subtype == "group":                                 return None
     if total_combinations_in_xyz2mol > threshold_xyz2mol:
-        if debug >= 2: print(f"    POSCHARGE: Return None for this specie {specie.formula} ({specie.subtype}) due to to many combinations of atomic valences")
+        if debug >= 2: print(f"    POSCHARGE: Return PROTONATION with False status for this specie {specie.formula} ({specie.subtype}) due to to many combinations of atomic valences")
         empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
         temp_prot = empty_protonation_states[0]
         temp_prot.status = False
@@ -597,8 +645,15 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
             empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
             return empty_protonation_states
         else:
-            if debug >= 2: print(f"    POSCHARGE: CANNOT Generate PROTONATION for this specie {specie.formula} ({specie.subtype})")
-            return None
+            empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
+            return empty_protonation_states
+            # if debug >= 2: print(f"    POSCHARGE: Return PROTONATION with False status for this specie {specie.formula} ({specie.subtype}) due to all non-transition metals")
+            # empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
+            # temp_prot = empty_protonation_states[0]
+            # temp_prot.status = False
+            # return list([temp_prot])
+            # if debug >= 2: print(f"    POSCHARGE: CANNOT Generate PROTONATION for this specie {specie.formula} ({specie.subtype})")
+            # return None
     # if len(ligand.groups) == 1 and ligand.groups[0].is_haptic and "h8-Cyclooctatetraenyl" in ligand.groups[0].haptic_type:
     #     empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
     #     return empty_protonation_states        
