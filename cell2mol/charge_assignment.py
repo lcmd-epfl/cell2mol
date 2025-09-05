@@ -1080,6 +1080,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
         # If, at this stage, we have found that any atom must be added, this is done before entering the non_local part.
         # The block variable makes that more atoms cannot be added to these connected atoms
+        reset_H_indices = []
         for idx, a in enumerate(ligand.atoms):
             if addedlist[idx] != 0 and block[idx] == 0:
                 mol = ligand.get_parent("molecule")
@@ -1087,6 +1088,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 if addedlist[idx] == 1: 
                     isadded, newlab, newcoord = add_atom(newlab, newcoord, idx, ligand, mol.metals, elemlist[idx], unconditional=True, debug=debug)
                 elif addedlist[idx] == 2:
+                    if pos_carbenes[idx] == 1:
+                        reset_H_indices.extend([len(newlab), len(newlab)+1])
                     isadded, newlab, newcoord = add_two_hydrogens(newlab, newcoord, idx, ligand, debug=debug)
                 else :
                     print(f"        GET_PROTONATION_STATES: Impossible to add {addedlist[idx]} atoms to atom {idx} ")
@@ -1106,18 +1109,20 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     if not needs_nonlocal:
         if debug >= 2: print(f"\nPOSCHARGE: doing Local PROTONATION for this specie {specie.formula} ({specie.subtype})")
         if debug > 2: print(f"{addedlist=} {block=} {added_atoms=} {elemlist=}")
+        if debug >= 2: print(f"{len(newlab)=} {len(newcoord)=} {added_atoms=}")
         new_prot = protonation.from_positional(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, parent=specie) 
         protonation_states.append(new_prot)
     elif pos_carbenes.sum() > 0:
         print(f"    POSCHARGE: Found {pos_carbenes.sum()} pos_carbenes. They will be treated as local")
         if debug >= 2: print(f"\nPOSCHARGE: doing Local PROTONATION for this specie {specie.formula} ({specie.subtype})")
-        if debug >= 2: print(f"{addedlist=} {block=} {added_atoms=} {elemlist=} {pos_carbenes=} {metal_electrons=}")
-        if debug >= 2: print(f"{len(addedlist)=} {len(block)=} {added_atoms=} {len(elemlist)=} {len(pos_carbenes)=} {len(metal_electrons)=}")
+        if debug > 2: print(f"{addedlist=} {block=} {added_atoms=} {elemlist=} {pos_carbenes=} {metal_electrons=}")
+        if debug > 2: print(f"{len(addedlist)=} {len(block)=} {added_atoms=} {len(elemlist)=} {len(pos_carbenes)=} {len(metal_electrons)=}")
         new_prot = protonation.from_positional(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, parent=specie) 
         protonation_states.append(new_prot)
-        newlab   = ligand.labels.copy()
-        newcoord = ligand.coord.copy()
-        print(len(newlab), len(newcoord))
+        if debug >= 2: print(f"{len(newlab)=} {len(newcoord)=}")
+        newlab   = [val for idx, val in enumerate(newlab) if idx not in reset_H_indices]
+        newcoord = [val for idx, val in enumerate(newcoord) if idx not in reset_H_indices]
+        if debug >= 2: print(f"{len(newlab)=} {len(newcoord)=}")
         print(f"        GET_PROTONATION_STATES: Resetting to original ligand to process non-local")
         for idx, i in enumerate(pos_carbenes):
             if i > 0 :

@@ -99,7 +99,11 @@ def get_cell_parameters(structure):
     cell_param = structure.cell.cellpar()
     space_group = structure.info.get('spacegroup')
     sym_ops = space_group.get_op() if space_group else None
-    
+    print(f"Cell parameters: {cell_param}")
+    print(f"Cell vectors: {cell_vector}")
+    print(f"Space group: {space_group if space_group else 'N/A'}")
+    print("Symmetry operations:", sym_ops if sym_ops else "No symmetry operations found")
+
     return cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops
 
 def get_unique_species_in_reference (refcell, debug):
