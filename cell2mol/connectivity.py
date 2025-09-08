@@ -161,10 +161,10 @@ def check_blocklist (conn_labels, conn_coord, blocklist, debug: int=2):
             if len(cycle_basis) == 1:
                 print(f"\t\tCHECK_blocklist: Found single cycle in block {b}: {cycle_basis[0]}")
                 if len(cycle_basis[0]) == len(G.nodes):
-                    print([b[idx] for idx in cycle_basis[0]])
+                    #print([b[idx] for idx in cycle_basis[0]])
                     new_blocklist.append(b)
                 elif len(cycle_basis[0]) != len(G.nodes):
-                    print([b[idx] for idx in cycle_basis[0]], sorted([b[idx] for idx in cycle_basis[0]]))
+                    print(f"\t\t{[b[idx] for idx in cycle_basis[0]], sorted([b[idx] for idx in cycle_basis[0]])}")
                     new_blocklist.append(sorted([b[idx] for idx in cycle_basis[0]]))
                     remaining = [n for n in G.nodes if n not in cycle_basis[0]]
                     print(f"\t\tCHECK_blocklist: Remaining nodes in block: {remaining}")
@@ -188,7 +188,7 @@ def check_blocklist (conn_labels, conn_coord, blocklist, debug: int=2):
 
 
 ################################
-def add_two_hydrogens (labels: list, coords: list, site: int, ligand: object, element: str="H", debug: int=0) -> Tuple[bool, list, list]:
+def add_hydrogens (labels: list, coords: list, site: int, ligand: object, num_hydrogens: int, element: str="H", debug: int=0) -> Tuple[bool, list, list]:
     # Original labels and coordinates are copied
     isadded = True
     newlab = labels.copy()
@@ -209,35 +209,48 @@ def add_two_hydrogens (labels: list, coords: list, site: int, ligand: object, el
                     bonded_atom_labels.append(n_label)
 
             if debug >= 2: 
-                print("\t\tADD_TWO_HYDROGENS:", a.label, a.atom_site_label, a.adjacency, bonded_atom_labels)
+                print("\t\tADD_HYDROGENS:", a.label, a.atom_site_label, a.adjacency, bonded_atom_labels, f"will add {num_hydrogens=}")
 
             if a.label == "C":
                 ismissingH, report, num_missingH = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord, bonded_atom_labels)
-                if debug >= 2: print("\t\tADD_TWO_HYDROGENS: ismissingH", ismissingH, report, num_missingH)
+                if debug >= 2: print("\t\tADD_HYDROGENS: ismissingH", ismissingH, report, num_missingH)
             else:
                 ismissingH, report, num_missingH = True, "", 2
             
-            if len(bonded_atom_labels) == 2:
-                Hs = place_hydrogens(apos, bonded_atom_coord[0], bonded_atom_coord[1], hybridization="sp3")
+            if num_hydrogens == 2:
+                if len(bonded_atom_labels) == 1:
+                    Hs = place_hydrogens(apos, bonded_atom_coord[0], hybridization="sp2")
+                elif len(bonded_atom_labels) == 2:
+                    Hs = place_hydrogens(apos, bonded_atom_coord[0], bonded_atom_coord[1], hybridization="sp3")            
                 if Hs.shape[0] == 2:
                     newcoord.append(Hs[0])
                     newcoord.append(Hs[1])
                     newlab.extend([str(element), str(element)])
                     if debug >= 2: 
-                        print(f"\t\tADD_TWO_HYDROGENS: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
+                        print(f"\t\tADD_HYDROGENS: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec} and label={a.label} ({a.atom_site_label})")
+            elif num_hydrogens == 3:
+                if len(bonded_atom_labels) == 1:
+                    Hs = place_hydrogens(apos, bonded_atom_coord[0], hybridization="sp3")
+           
+                if Hs.shape[0] == 3:
+                    newcoord.append(Hs[0])
+                    newcoord.append(Hs[1])
+                    newcoord.append(Hs[2])
+                    newlab.extend([str(element), str(element), str(element)])
+                    if debug >= 2:
+                        print(f"\t\tADD_HYDROGENS: Added three {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec} and label={a.label} ({a.atom_site_label})")
+                # if Hs.shape[0] == 2:
+                #     newcoord.append(Hs[0])
+                #     newcoord.append(Hs[1])
+                #     newlab.extend([str(element), str(element)])
+                #     if debug >= 2: 
+                #         print(f"\t\tADD_TWO_HYDROGENS: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec} and label={a.label}")
                 # elif Hs.shape[0] == 1:
                 #     newcoord.append(Hs[0])
                 #     newlab.extend([str(element)])
                 #     if debug >= 2: 
                 #         print(f"\t\tADD_TWO_HYDROGENS: Added one {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
-            # elif len(bonded_atom_labels) == 1:
-            #     Hs = place_hydrogens(apos, bonded_atom_coord[0])
-            #     if Hs.shape[0] == 2:
-            #         newcoord.append(Hs[0])
-            #         newcoord.append(Hs[1])
-            #         newlab.extend([str(element), str(element)])
-            #         if debug >= 2: 
-            #             print(f"\t\tADD_TWO_HYDROGENS: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
+
     return isadded, newlab, newcoord
 
 def normalize(v):
@@ -258,7 +271,161 @@ def kabsch_rotation(P, Q):
         R = Vt.T @ U.T
     return R
 
-def place_hydrogens(C, N1, N2, r_CH=1.09, hybridization="auto",
+def _perp_unit(u):
+    """Deterministic unit vector perpendicular to u."""
+    u = normalize(u)
+    # choose a global axis least aligned with u
+    g = np.array([1.0, 0.0, 0.0]) if abs(u[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+    v = g - (g @ u) * u
+    nv = np.linalg.norm(v)
+    if nv < 1e-12:
+        g = np.array([0.0, 0.0, 1.0])
+        v = g - (g @ u) * u
+        nv = np.linalg.norm(v)
+        if nv < 1e-12:
+            raise ValueError("Cannot construct a perpendicular direction.")
+    return v / nv
+
+def place_hydrogens(C, N1=None, N2=None, N3=None, r_CH=1.09, hybridization="auto",
+                    sp2_angle_window=(95, 145), sp3_angle_window=(95, 125)):
+    """
+    Place hydrogens on a carbon with 1–3 existing neighbors.
+
+    Rules
+    -----
+    - 1 neighbor: add 2 H (sp2), add 3 H (sp3)
+    - 2 neighbors: add 1 H (sp2), add 2 H (sp3)
+    - 3 neighbors: add 1 H (sp3)  [sp2 invalid -> raises]
+
+    Auto behavior
+    -------------
+    - 1 neighbor: defaults to 'sp3'
+    - 2 neighbors: infer from angle windows (same as before)
+    - 3 neighbors: 'sp3'
+
+    Returns
+    -------
+    Hs : (k,3) array of hydrogen coordinates.
+    """
+    C = np.asarray(C, float)
+    neighbors = [v for v in (N1, N2, N3) if v is not None]
+    n_nb = len(neighbors)
+    if n_nb == 0 or n_nb > 3:
+        raise ValueError("This function supports 1–3 neighbors.")
+
+    # Unit vectors from C toward neighbors
+    us = []
+    for i, N in enumerate(neighbors):
+        u = np.asarray(N, float) - C
+        if np.linalg.norm(u) < 1e-12:
+            raise ValueError(f"Neighbor {i+1} coincides with C.")
+        us.append(normalize(u))
+
+    # Tetrahedral template (four directions)
+    u1 = normalize(np.array([ 1,  1,  1], float))
+    u2 = normalize(np.array([ 1, -1, -1], float))
+    u3 = normalize(np.array([-1,  1, -1], float))
+    u4 = normalize(np.array([-1, -1,  1], float))
+    Utemp = [u1, u2, u3, u4]
+
+    mode = hybridization.lower()
+    if mode not in ("auto", "sp2", "sp3"):
+        raise ValueError("hybridization must be 'auto', 'sp2', or 'sp3'.")
+
+    # ---------- CASE: 1 neighbor ----------
+    if n_nb == 1:
+        a = us[0]
+        if mode == "auto":
+            mode = "sp3"  # default to methyl (CH3)
+        if mode == "sp2":
+            # Planar CH2: two H's in plane ⟂? Actually in plane defined by a and some perp axis.
+            p1 = normalize(-a)          # opposite to neighbor
+            p2 = _perp_unit(a)          # any unit vector ⟂ a defines the plane
+            c60 = 0.5
+            s60 = np.sqrt(3)/2.0
+            d1 = normalize(c60 * p1 + s60 * p2)
+            d2 = normalize(c60 * p1 - s60 * p2)
+            H1 = C + r_CH * d1
+            H2 = C + r_CH * d2
+            return np.vstack([H1, H2])  # two hydrogens
+        else:  # sp3 → three hydrogens (methyl)
+            # Align template so one vertex aligns with neighbor; fix rotation using a ⟂ axis
+            b_perp = _perp_unit(a)
+            P = np.stack([u1, u2], axis=1)        # template pair to pin orientation
+            Q = np.stack([a,   b_perp], axis=1)   # target pair
+            R = kabsch_rotation(P, Q)
+            dH2 = normalize(R @ u2)
+            dH3 = normalize(R @ u3)
+            dH4 = normalize(R @ u4)
+            H2 = C + r_CH * dH2
+            H3 = C + r_CH * dH3
+            H4 = C + r_CH * dH4
+            return np.vstack([H2, H3, H4])        # three hydrogens
+
+    # ---------- CASE: 2 neighbors ----------
+    if n_nb == 2:
+        a, b = us
+        # Angle between neighbors
+        cosang = np.clip(a @ b, -1.0, 1.0)
+        angle = np.degrees(np.arccos(cosang))
+
+        def add_sp2_two():
+            # In-plane bisector opposite to existing bonds
+            dH = -(a + b)
+            if np.linalg.norm(dH) < 1e-8:
+                raise ValueError("Neighbors nearly opposite (sp-like). Cannot place sp2 hydrogen reliably.")
+            dH = normalize(dH)
+            return np.array([C + r_CH * dH])  # one hydrogen
+
+        def add_sp3_two():
+            # Align two template directions to a,b then use the other two for H's
+            P = np.stack([u1, u2], axis=1)   # 3x2 template
+            Q = np.stack([a,  b ], axis=1)   # 3x2 targets
+            R = kabsch_rotation(P, Q)
+            dH1 = normalize(R @ u3)
+            dH2 = normalize(R @ u4)
+            H1 = C + r_CH * dH1
+            H2 = C + r_CH * dH2
+            return np.vstack([H1, H2])       # two hydrogens
+
+        if mode == "auto":
+            in_sp3 = (sp3_angle_window[0] <= angle <= sp3_angle_window[1])
+            in_sp2 = (sp2_angle_window[0] <= angle <= sp2_angle_window[1])
+            if in_sp3 and not in_sp2:
+                return add_sp3_two()
+            if in_sp2 and not in_sp3:
+                return add_sp2_two()
+            # closest target
+            target_sp3 = 109.47
+            target_sp2 = 120.0
+            if abs(angle - target_sp3) < abs(angle - target_sp2):
+                return add_sp3_two()
+            else:
+                return add_sp2_two()
+        elif mode == "sp3":
+            return add_sp3_two()
+        else:  # sp2
+            return add_sp2_two()
+
+    # ---------- CASE: 3 neighbors ----------
+    if n_nb == 3:
+        if mode == "auto":
+            mode = "sp3"
+        if mode != "sp3":
+            raise ValueError("With 3 neighbors, only 'sp3' is supported (adds one hydrogen).")
+        a, b, c = us
+        # Align three template directions to the three neighbors; remaining vertex gives H
+        P = np.stack([u1, u2, u3], axis=1)    # 3x3 template
+        Q = np.stack([a,  b,  c ], axis=1)    # 3x3 targets
+        R = kabsch_rotation(P, Q)
+        dH = normalize(R @ u4)
+        H = C + r_CH * dH
+        return np.array([H])  # one hydrogen
+
+    # Should not reach here
+    raise RuntimeError("Unhandled neighbor count.")
+        
+def place_hydrogens_v1 (C, N1, N2, r_CH=1.09, hybridization="auto",
                     sp2_angle_window=(95, 145), sp3_angle_window=(95, 125)):
     """
     Place hydrogens on a carbon with two existing neighbors.
@@ -1102,15 +1269,15 @@ def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
 def compare_reference_indices (ref, mol, debug: int=0):
     if (ref.natoms == mol.natoms) & (ref.formula == mol.formula):
         if (sorted(ref.get_parent_indices("reference")) == sorted(mol.get_parent_indices("reference"))):
-            if debug >= 2: 
+            if debug > 2: 
                 print("Matched", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
             issame = True
         else:
-            if debug >= 2:
+            if debug > 2:
                 print("Different indices", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
             issame = False
     else : 
-        if debug >= 2:
+        if debug > 2:
             print("Different numbers", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
         issame = False
     return issame
