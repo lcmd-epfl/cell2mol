@@ -64,7 +64,7 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
             with open(summary_fname_ref, "a") as summary_ref:
                 with redirect_stdout(summary_ref):
                     # print_unique_species(refcell)
-                    # print_possible_charges(refcell)
+                    print_possible_charges(refcell)
                     print("\n************ After charge assignment of unit cell ************")
                     print_refmoleclist(refcell)   
 
@@ -99,10 +99,10 @@ def get_cell_parameters(structure):
     cell_param = structure.cell.cellpar()
     space_group = structure.info.get('spacegroup')
     sym_ops = space_group.get_op() if space_group else None
-    print(f"Cell parameters: {cell_param}")
-    print(f"Cell vectors: {cell_vector}")
-    print(f"Space group: {space_group if space_group else 'N/A'}")
-    print("Symmetry operations:", sym_ops if sym_ops else "No symmetry operations found")
+    # print(f"Cell parameters: {cell_param}")
+    # print(f"Cell vectors: {cell_vector}")
+    # print(f"Space group: {space_group if space_group else 'N/A'}")
+    # print("Symmetry operations:", sym_ops if sym_ops else "No symmetry operations found")
 
     return cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops
 

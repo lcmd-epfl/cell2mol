@@ -63,7 +63,6 @@ def unitcell_reconstruction(newcell, refcell, sym_ops, debug):
     print_elapsed("Unit Cell Reconstruction Finished Normally.", start_time)
 
     newcell = get_moleclist(newcell, refcell, all_molecules, debug=debug)
-    newcell.unique_species = copy.deepcopy(refcell.unique_species)
     newcell = get_unique_indices(newcell, refcell.species_list, debug=debug)
 
     return newcell
@@ -82,11 +81,18 @@ def charge_assignment(newcell, refcell, debug):
         return newcell, refcell
 
     # Check for missing charge states
+    refcell.get_selected_cs(debug=debug)
+    #refcell.assess_errors(mode="possible_charges")
     if None in refcell.selected_cs:
+        newcell.error_get_poscharges = True
+    elif refcell.error_get_poscharges:
         newcell.error_get_poscharges = True
     else:
         newcell.error_get_poscharges = False
-
+        
+    newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
+    newcell.unique_species = copy.deepcopy(refcell.unique_species)
+    
     # Print possible and selected charge states
     print_possible_and_selected_cs(newcell, refcell, debug=debug)
 
