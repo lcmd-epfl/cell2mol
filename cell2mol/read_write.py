@@ -1101,7 +1101,8 @@ def print_refmoleclist (cell):
 
                 if all(hasattr(met, attr) for attr in ["coord_nr_with_metal_bonds", "coord_geometry_with_metal_bonds", "geom_deviation_with_metal_bonds", "metals"]):
                     bonded_metals = [m.label for m in met.metals]
-                    print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
+                    if len(bonded_metals) > 0:
+                        print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
 
             for lig in ref.ligands:
                 lig_info = f"\t{lig.formula} ({lig.subtype})"
@@ -1252,7 +1253,8 @@ def print_moleclist(cell):
 
                     if all(hasattr(met, attr) for attr in ["coord_nr_with_metal_bonds", "coord_geometry_with_metal_bonds", "geom_deviation_with_metal_bonds", "metals"]):
                         bonded_metals = [m.label for m in met.metals]
-                        print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
+                        if len(bonded_metals) > 0:
+                            print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
                 print("")
 
                 for lig in mol.ligands:
@@ -1328,7 +1330,8 @@ def print_molecule(mol):
 
                 if all(hasattr(met, attr) for attr in ["coord_nr_with_metal_bonds", "coord_geometry_with_metal_bonds", "geom_deviation_with_metal_bonds", "metals"]):
                     bonded_metals = [m.label for m in met.metals]
-                    print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
+                    if len(bonded_metals) > 0:
+                        print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
             print("")
 
             for lig in mol.ligands:

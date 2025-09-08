@@ -74,7 +74,7 @@ def process_refcell(input_path, name, current_dir, cif_bond_info, debug=0):
                 print(name)
                 print_refmoleclist(refcell)
                 print_unique_species(refcell)
-                print_possible_charges(refcell)
+                #print_possible_charges(refcell)
 
     # # Print error case information
     if refcell.refmoleclist == []:
@@ -254,8 +254,8 @@ def compare_with_CIF (input_path, refcell: cell, debug=0):
     return
 
 def get_unique_species_in_reference (refcell, debug):
-    """Processes the reference cell to obtain unique species and handle any errors."""
-    tini = time.time()
+    """Processes the reference cell to obtain unique species and species_list"""
+    # tini = time.time()
 
     refcell.get_unique_species(debug=debug)
 
@@ -263,12 +263,12 @@ def get_unique_species_in_reference (refcell, debug):
         print(f"Unique species: {[specie.formula for specie in refcell.unique_species]}")
         print(f"Species list: {[specie.formula for specie in refcell.species_list]}\n")
 
-    refcell.get_selected_cs(debug=debug)
-    refcell.assess_errors(mode="possible_charges")
+    # refcell.get_selected_cs(debug=debug)
+    # refcell.assess_errors(mode="possible_charges")
     
-    tend = time.time()    
+    # tend = time.time()    
     
-    if debug >= 1: print(f"\nAssign possible charges of Reference molecules. Total execution time: {tend - tini:.2f} seconds")
+    # if debug >= 1: print(f"\nAssign possible charges of Reference molecules. Total execution time: {tend - tini:.2f} seconds")
     
     return
 

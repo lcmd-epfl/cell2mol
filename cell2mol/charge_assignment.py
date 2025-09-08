@@ -10,6 +10,7 @@ import sys
 from cell2mol.hungarian import reorder
 from cell2mol.xyz2mol import xyz2mol, chiral_stereo_check
 from cell2mol.utils.pydantic import BaseModel
+import time
 
 # Pydantic imports for the converted classes
 from pydantic import Field, computed_field
@@ -60,6 +61,11 @@ def get_possible_charge_state(spec: object, debug: int=0):
         print(ch_state)
         possible_cs = [ch_state]
         return possible_cs
+    if spec.subtype == "ligand" and spec.is_silylyne:
+        print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} has silylyne group with a protonation state {spec.protonation_states[0].formula} with {spec.protonation_states[0].added_atoms} added atoms")
+        ch_state = get_charge(0, spec.protonation_states[0])
+        possible_cs = [ch_state]
+        return possible_cs
     
     if spec.subtype == "group" :  
         return None
@@ -68,10 +74,16 @@ def get_possible_charge_state(spec: object, debug: int=0):
     charge_states = []  
     ### Evaluates possible charges for each protonation state ###
     print(f"GET_POSSIBLE_CHARGE_STATE: {spec.formula} ({spec.subtype}) ({len(spec.protonation_states)=})")#\n{spec.protonation_states=}")
+    valences_list_of_lists, sorted_valences_list = get_valences_list_of_lists(spec.protonation_states[0])
+    print(f"GET_POSSIBLE_CHARGE_STATE: Found {len(sorted_valences_list)=} for this specie {spec.formula} ({spec.subtype})")        
+    
     for prot in spec.protonation_states:
         charge_states_for_one_prot = []
-        final_charges = get_list_of_charges_to_try(prot)
-        if debug >= 2: print(f"    POSCHARGE will try charges {prot.formula=} {prot.added_atoms=},{final_charges}")
+        if len(sorted_valences_list) > 10000:
+            final_charges = [0]
+        else:
+            final_charges = get_list_of_charges_to_try(prot)
+        if debug >= 2: print(f"    POSCHARGE will try charges {prot.formula=} {prot.added_atoms=} {prot.status=} {final_charges}")
 
         for ich in final_charges:
             # if ich == 0:
@@ -300,13 +312,15 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
              
         # CASE 1, IF only one distribution meets the requirement. Then it is chosen
         if len(list_for_tgt_charge) == 1:
-            good_chs = check_possible_resonance(list_for_tgt_charge[0])
+            #good_chs = check_possible_resonance(list_for_tgt_charge[0])
+            good_chs = list_for_tgt_charge[0]
             good_states.append(good_chs)
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Case 1, only one entry for {tgt_charge} in tmplist")
  
         # CASE 2, IF more than one charge_state is found for a given final charge
         elif len(list_for_tgt_charge) > 1:
-            temp_list = [ check_possible_resonance(temp) for temp in list_for_tgt_charge]
+            temp_list = [temp for temp in list_for_tgt_charge]
+            #temp_list = [ check_possible_resonance(temp) for temp in list_for_tgt_charge]
             tmplist_new = select_charge_distr_v2(temp_list, debug=debug)
             print(f"{tmplist_new=}")
             if len(tmplist_new) == 0:
@@ -353,7 +367,10 @@ def check_possible_resonance(charge_state: object, debug: int = 0) -> object:
     best_res_mol = possible_res_mols[0]
     if best_res_mol is None:
         return charge_state
-    
+    if prot.parent.formula == "H32-C20-N3-O-Si-P":
+        for i, tmp in enumerate(possible_res_mols):
+            print(f"CHECK_POSSIBLE_RESONANCE: Found resonance structure {i}: {Chem.MolToSmiles(tmp)} {Chem.MolToSmiles(tmp)==Chem.MolToSmiles(rdkit_obj)}")  
+
     if debug >= 0:
         print(f"CHECK_POSSIBLE_RESONANCE: {prot.parent.formula} {len(possible_res_mols)=}")
         print(f"Best candidate: {Chem.MolToSmiles(best_res_mol)}")
@@ -517,7 +534,8 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
     return tmplist
 #########   
 def get_valences_list_of_lists(ligand: object, allow_carbenes: bool = False) -> list:
-    from cell2mol.xyz2mol import atomic_valence, get_sorted_valences_list
+    from cell2mol.xyz2mol import atomic_valence, get_sorted_valences_list, get_sorted_valences_list_v2
+
     valences_list_of_lists = []
     atoms = [elemdatabase.elementnr[l] for l in ligand.labels]
     AC = ligand.adjmat
@@ -560,7 +578,17 @@ def get_valences_list_of_lists(ligand: object, allow_carbenes: bool = False) -> 
                 possible_valence.append(valence)
             # sys.exit()
         valences_list_of_lists.append(possible_valence)
+    # tini = time.time()
     sorted_valences_list = get_sorted_valences_list(valences_list_of_lists, atoms)
+    # tend = time.time()    
+    # print(f"\n=time sorted_valences_list {tend - tini:.2f} seconds {ligand.formula}")
+
+    # tini = time.time()
+    # sorted_valences_list_v2 = get_sorted_valences_list_v2(valences_list_of_lists, atoms)
+    # tend = time.time()    
+    # print(f"\n=time sorted_valences_list_v2 {tend - tini:.2f} seconds {ligand.formula}")
+    # print(f"{(sorted_valences_list==sorted_valences_list_v2)=}")
+    # print(f"    POSCHARGE: Found {len(sorted_valences_list_v2)=} for this specie")
     return valences_list_of_lists, sorted_valences_list
 ########################################################
 def get_empty_protonation_state (specie: object, debug: int=2) -> list:
@@ -576,7 +604,7 @@ def get_empty_protonation_state (specie: object, debug: int=2) -> list:
                                                     int(0), 
                                                     empty_list, empty_list, empty_list, elemlist, 
                                                     typ="Empty", parent=specie)
-    if debug >= 2: print("    CREATED EMPTY PROTONATION", empty_protonation)
+    if debug > 2: print("    CREATED EMPTY PROTONATION", empty_protonation)
     
     return list([empty_protonation])
 #######################################################
@@ -599,18 +627,20 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         total_combinations_in_xyz2mol += combinations_in_xyz2mol
     print(f"\tTotal count of elements: {count}, Total combinations in xyz2mol {total_combinations_in_xyz2mol}")
     threshold_xyz2mol = 1000
-    valences_list_of_lists, sorted_valences_list = get_valences_list_of_lists(specie)
-    print(f"    POSCHARGE: Found {len(valences_list_of_lists)=} for this specie {specie.formula} ({specie.subtype})")
-    print(f"    POSCHARGE: Found {len(sorted_valences_list)=} for this specie {specie.formula} ({specie.subtype})")
+    threshold_sorted_valences_list = 10000
+    # valences_list_of_lists, sorted_valences_list = get_valences_list_of_lists(specie)
+    # print(f"    POSCHARGE: Found {len(valences_list_of_lists)=} for this specie {specie.formula} ({specie.subtype})")
+    # print(f"    POSCHARGE: Found {len(sorted_valences_list)=} for this specie {specie.formula} ({specie.subtype})")
     if   specie.type != "specie":                                   return None
     if   specie.subtype == "group":                                 return None
-    if total_combinations_in_xyz2mol > threshold_xyz2mol:
-        if debug >= 2: print(f"    POSCHARGE: Return PROTONATION with False status for this specie {specie.formula} ({specie.subtype}) due to to many combinations of atomic valences")
-        empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
-        temp_prot = empty_protonation_states[0]
-        temp_prot.status = False
-        return list([temp_prot])
-    elif specie.subtype == "molecule" and (specie.iscomplex or specie.has_IA_IIA or specie.has_post_transition_metal) : return None     
+    # if len(sorted_valences_list) > threshold_sorted_valences_list:        
+    #     #total_combinations_in_xyz2mol > threshold_xyz2mol:
+    #     if debug >= 2: print(f"    POSCHARGE: Return PROTONATION with False status for this specie {specie.formula} ({specie.subtype}) due to to many combinations of atomic valences")
+    #     empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
+    #     temp_prot = empty_protonation_states[0]
+    #     temp_prot.status = False
+    #     return list([temp_prot])
+    if specie.subtype == "molecule" and (specie.iscomplex or specie.has_IA_IIA or specie.has_post_transition_metal) : return None     
     elif (specie.subtype == "molecule" and not specie.iscomplex and not specie.has_IA_IIA and not specie.has_post_transition_metal):
         empty_protonation_states = get_empty_protonation_state(specie, debug=debug)
         return empty_protonation_states
@@ -666,7 +696,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
     non_local_groups = 0
     non_local_groups_indices = []
     needs_nonlocal = False
-
+    reset_H_indices = []
+    
     # Initialization of the variables
     addedlist       = np.zeros((natoms)).astype(int)
     block           = np.zeros((natoms)).astype(int)
@@ -868,7 +899,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         # If the atom is connected to the metal, we do not consider it
                         continue
                     list_of_adj_atoms.append(ligand.get_parent("molecule").labels[adj])
-                
+                if debug >= 2: print(f"        GET_PROTONATION_STATES: found adjacent atoms {[l for l in list_of_adj_atoms]} for atom {a.label} with {a.connec} connections and {a.mconnec} metal connections")
                 # Simple Ionic Case
                 if a.label in ions:
                     if a.connec == 0:
@@ -969,17 +1000,26 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         non_local_groups_indices.append(idx)                                                
                 # Case of Carbon (Simple CX vs. Carbenes)
                 elif a.label == "C":
-                    if ligand.formula == "C-N": # CN
+                    # if ligand.formula == "C-N": # CN
+                    if ligand.formula in ["C-N", "C-P", "C-As", "C-Sb"]: # CN, CP, CAs, CSb
                         elemlist[idx] = "H" 
                         addedlist[idx] = 1
-                    elif ligand.formula == "C-O": # CO
+                    #elif ligand.formula == "C-O": # CO
+                    elif ligand.formula in ["C-O", "C-S", "C-Se", "C-Te"]: # CO, CS, CSe, CTe
                         block[idx] = 1
                     else:
                         numN = list_of_adj_atoms.count("N")
                         numO = list_of_adj_atoms.count("O")
                         numH = list_of_adj_atoms.count("H")
                         numC = list_of_adj_atoms.count("C")
-                        if len(list_of_adj_atoms) == 2:
+                        if len(list_of_adj_atoms) == 0:
+                            elemlist[idx] = "H"
+                            addedlist[idx] = 2
+                            metal_electrons[idx] = 4
+                        elif len(list_of_adj_atoms) == 1:
+                            elemlist[idx] = "H"
+                            addedlist[idx] = 1                             
+                        elif len(list_of_adj_atoms) == 2:
                             if numN == 1 and numO == 1: # amide
                                 elemlist[idx] = "H"
                                 addedlist[idx] = 1
@@ -1026,22 +1066,6 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                                     non_local_groups += 1
                                     non_local_groups_indices.append(idx)  
 
-                                    # iscarbene, tmp_element, tmp_added, tmp_metal = check_carbenes(a, ligand)
-                                    # if debug >= 2: print(f"        GET_PROTONATION_STATES: Evaluating as carbene and {iscarbene}")
-                                    # if iscarbene:
-                                    #     # Carbene identified
-                                    #     elemlist[idx] = tmp_element
-                                    #     addedlist[idx] = tmp_added
-                                    #     metal_electrons[idx] = tmp_metal
-                                    # else:
-                                    #     needs_nonlocal = True
-                                    #     non_local_groups += 1
-                                    #     non_local_groups_indices.append(idx)
-                            # else:
-                            #     needs_nonlocal = True
-                            #     non_local_groups += 1
-                            #     non_local_groups_indices.append(idx)
-                            #     if debug >= 2: print(f"        GET_PROTONATION_STATES: will be sent to nonlocal due to {a.label} atom")
                         elif len(list_of_adj_atoms) == 3:
                             if numH == 3 and ligand.formula == "H3-C":
                                 elemlist[idx] = "H"
@@ -1059,9 +1083,37 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
                 # Silicon
                 elif a.label == "Si":
-                    if len(list_of_adj_atoms) < 4:
+                    if len(list_of_adj_atoms) == 1: 
                         elemlist[idx] = "H"
-                        addedlist[idx] = 1
+                        addedlist[idx] = 3
+                        metal_electrons[idx] = 2
+                        ligand.is_silylyne = True                         
+                    elif len(list_of_adj_atoms) == 3:
+                        needs_nonlocal = True
+                        non_local_groups += 1
+                        non_local_groups_indices.append(idx)
+                    elif len(list_of_adj_atoms) == 2:                       
+                        numN = list_of_adj_atoms.count("N")
+                        numC = list_of_adj_atoms.count("C")
+                        G = nx.from_numpy_array(ligand.adjmat.astype(float))
+                        cycle_basis = nx.cycle_basis(G)
+                        print(f"        GET_PROTONATION_STATES: cycle_basis={cycle_basis}")
+                        index = [i for i, cycle in enumerate(cycle_basis) if idx in cycle]
+                        if len(index) == 1 :
+                            print(f"        GET_PROTONATION_STATES: {idx=} is in a cycle")
+                            if (numN == 2) or (numC == 2) or (numN == 1 and numC == 1):
+                                #issilylene = True 
+                                elemlist[idx] = "H"
+                                addedlist[idx] = 2
+                                metal_electrons[idx] = 2 
+                            else:
+                                needs_nonlocal = True
+                                non_local_groups += 1
+                                non_local_groups_indices.append(idx)
+                        else: 
+                            needs_nonlocal = True
+                            non_local_groups += 1
+                            non_local_groups_indices.append(idx)                          
                     else: block[idx]
                 # Boron
                 elif a.label == "B":
@@ -1080,7 +1132,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
         # If, at this stage, we have found that any atom must be added, this is done before entering the non_local part.
         # The block variable makes that more atoms cannot be added to these connected atoms
-        reset_H_indices = []
+        
         for idx, a in enumerate(ligand.atoms):
             if addedlist[idx] != 0 and block[idx] == 0:
                 mol = ligand.get_parent("molecule")
@@ -1090,7 +1142,9 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 elif addedlist[idx] == 2:
                     if pos_carbenes[idx] == 1:
                         reset_H_indices.extend([len(newlab), len(newlab)+1])
-                    isadded, newlab, newcoord = add_two_hydrogens(newlab, newcoord, idx, ligand, debug=debug)
+                    isadded, newlab, newcoord = add_hydrogens(newlab, newcoord, idx, ligand, num_hydrogens=2, debug=debug)
+                elif addedlist[idx] == 3:
+                    isadded, newlab, newcoord = add_hydrogens(newlab, newcoord, idx, ligand, num_hydrogens=3, debug=debug)
                 else :
                     print(f"        GET_PROTONATION_STATES: Impossible to add {addedlist[idx]} atoms to atom {idx} ")
                 if isadded:
@@ -1101,7 +1155,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                     print(f"        GET_PROTONATION_STATES: Failed to add {elemlist[idx]} to atom {idx} with: a.mconnec={a.mconnec} and label={a.label}")
                     addedlist[idx] = 0 
                     block[idx] = 1  # No more elements will be added to those atoms
-                   
+    print(f"{reset_H_indices=}")               
     ############################
     ###### NON-LOCAL PART ######
     ############################
@@ -1119,7 +1173,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
         if debug > 2: print(f"{len(addedlist)=} {len(block)=} {added_atoms=} {len(elemlist)=} {len(pos_carbenes)=} {len(metal_electrons)=}")
         new_prot = protonation.from_positional(newlab, newcoord, ligand.cov_factor, added_atoms, addedlist, block, metal_electrons, elemlist, parent=specie) 
         protonation_states.append(new_prot)
-        if debug >= 2: print(f"{len(newlab)=} {len(newcoord)=}")
+        if debug >= 2: print(f"{len(newlab)=} {len(newcoord)=} ")
         newlab   = [val for idx, val in enumerate(newlab) if idx not in reset_H_indices]
         newcoord = [val for idx, val in enumerate(newcoord) if idx not in reset_H_indices]
         if debug >= 2: print(f"{len(newlab)=} {len(newcoord)=}")
@@ -1151,7 +1205,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
 
         # Initiate variables
         #avoid = ["Si", "P"]
-        avoid = ["Si"]
+        #avoid = ["Si"]
+        avoid = []
         non_local_groups_labels = [ligand.labels[idx] for idx in non_local_groups_indices]
         if debug >= 2: print(" ")
         if debug >= 2: print(f"        GET_PROTONATION_STATES: Enters non-local with:")
@@ -1204,7 +1259,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             addedlist[jdx] = 1
                             mol = ligand.get_parent("molecule")
                             
-                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], unconditional=True, debug=debug)
+                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], unconditional=True, debug=3)
                             print(isadded, len(newlab), len(newcoord))
                             if isadded:
                                 added_atoms += addedlist[jdx]
@@ -1217,7 +1272,7 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             elemlist[jdx] = "H"
                             addedlist[jdx] = 1
                             mol = ligand.get_parent("molecule")
-                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], unconditional=True, debug=debug)
+                            isadded, newlab, newcoord = add_atom(newlab, newcoord, jdx, ligand, mol.metals, elemlist[jdx], unconditional=True, debug=3)
                             if isadded:
                                 added_atoms += addedlist[jdx]
                                 if debug >= 2: print(f"        GET_PROTONATION_STATES: Added {elemlist[jdx]} to atom {jdx} with: a.mconnec={a.mconnec} and label={a.label}")
@@ -1426,14 +1481,16 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
         
     natoms = prot.natoms
     atnums = prot.atnums
-    if debug >= 2: print(f"\nGET_CHARGE. Starting get_charge with charge {charge} and {prot.formula} {prot.added_atoms=}")
     # prot.coords and prot.cov_factor will not be used
-    if (prot.status == False) :
-        mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=False)
-    # if (prot.status == False) or (prot.added_atoms > 0):
-        # mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=False)
-    else:
-        mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow)
+    tini = time.time()
+
+    if prot.status == False: # or prot.added_atoms > 0:
+        allow = False
+    if debug >= 0: print(f"\nGET_CHARGE. Starting get_charge with charge {charge} and {prot.formula} {prot.status=} {prot.added_atoms=} allow_charged_fragments={allow}")
+
+    mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow)
+    tend = time.time()    
+    print(f"GET_CHARGE. xyz2mol took {tend-tini:.3f} seconds {prot.formula}")
     #mols = xyz2mol(atnums, prot.coords, prot.adjmat, prot.cov_factor, charge=charge, allow_charged_fragments=allow, allow_carbenes=allow_carbenes)
     if debug >= 2: print(f"GET_CHARGE.{len(mols)=} received from xyz2mol with charge {charge}")
     
@@ -1566,7 +1623,7 @@ def get_list_of_charges_to_try_new (prot: object, debug: int=0) -> list:
     spec = prot.parent
     
     #### Educated Guess on the Maximum Charge one can expect from the spec[1]
-    if spec.formula in ['C-O', "H2-O", "C-N"]:
+    if spec.formula in ['C-O', "H2-O", "C-N",  "C-S", "C-Se", "C-Te", "C-P", "C-As", "C-Sb"]:
         maxcharge = 0
     elif   spec.subtype == "molecule" and (not spec.iscomplex and not spec.has_IA_IIA and not spec.has_post_transition_metal): 
         maxcharge = 3
@@ -1598,7 +1655,7 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
     # print(f"Total count of C, N, O, P, S: {count}")
 
     #### Educated Guess on the Maximum Charge one can expect from the spec[1]
-    if spec.formula in ['C-O', "H2-O", "C-N"]:
+    if spec.formula in ['C-O', "H2-O", "C-N",  "C-S", "C-Se", "C-Te", "C-P", "C-As", "C-Sb"]:
         maxcharge = 0
     elif   spec.subtype == "molecule" and (not spec.iscomplex and not spec.has_IA_IIA and not spec.has_post_transition_metal): 
         maxcharge = 3
@@ -2195,9 +2252,9 @@ def fix_zwitterions_in_adjacent_atoms(mol, debug=0):
 
                     bond = rw_mol.GetBondBetweenAtoms(atom_idx, neighbor_idx)
                     print(f"\tBond type between atom {atom_idx} and {neighbor.GetIdx()}: {bond.GetBondType()}")
-                    print(bond)
-                    print(bond.GetBondType(), bond.GetBondType()=="DOUBLE")
-                    print(bond.GetBondTypeAsDouble(), bond.GetBondTypeAsDouble()== 2.0)
+                    # print(bond)
+                    # print(bond.GetBondType(), bond.GetBondType()=="DOUBLE")
+                    # print(bond.GetBondTypeAsDouble(), bond.GetBondTypeAsDouble()== 2.0)
                     if bond:
                         print("BOND exists")
                     if bond and (bond.GetBondTypeAsDouble()== 2.0):

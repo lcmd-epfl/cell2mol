@@ -582,12 +582,16 @@ class specie(BaseModel):
     def get_possible_cs(self, debug: int = 0):
         ## Arranges a list of possible charge_states associated with this species,
         ## which is later managed at the cell level to determine the good one
-        if self.subtype == "ligand" or (
-            self.subtype == "molecule" and not self.iscomplex and not self.has_IA_IIA
-        ):
-            if self.protonation_states is None:
-                self.get_protonation_states(debug=debug)
-            self.possible_cs = get_possible_charge_state(self, debug=debug)
+        if self.possible_cs is None:
+            if self.subtype == "ligand" or (
+                self.subtype == "molecule" and not self.iscomplex and not self.has_IA_IIA
+            ):
+                print(f"SPECIE.GET_POSSIBLE_CS: {self.formula} {self.protonation_states=}")
+                if self.protonation_states is None:
+                    self.get_protonation_states(debug=debug)
+                    print(f"SPECIE.GET_POSSIBLE_CS: Obtained {self.formula} {self.protonation_states=}")
+                
+                self.possible_cs = get_possible_charge_state(self, debug=debug)
         return self.possible_cs
 
     ############
@@ -1556,6 +1560,7 @@ class ligand(specie):
     haptic_type: HapticType | None = None
     is_haptic: bool | None = None
     is_nitrosyl: bool | None = None
+    is_silylyne: bool | None = None
     metals: list["metal"] | None = None
     unique_index: int | None = None
 

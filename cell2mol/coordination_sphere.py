@@ -335,7 +335,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
 
             if isconnected and any(tmpadjnum) > 0: 
                 if debug > 0 : 
-                    print(f"\tAtom {atom.label} is connected to metal {met.label} (atom {ligand_idx=}) (metal group.metals index {jdx=})")
+                    print(f"\tAtom {atom.label} (atom {ligand_idx=}) is connected to metal {met.label} ({met.atom_site_label},{jdx=})")#(metal group.metals index {jdx=})")
                 
                 if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
                     isadded  = True
@@ -359,7 +359,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
                     met.get_coord_sphere()
                     met.get_coord_sphere_formula()
             else:
-                if debug > 0 : print(f"\tAtom {atom.label} is not connected to metal {met.label} (atom {ligand_idx=}) (metal group.metals index {jdx=})")
+                if debug > 0 : print(f"\tAtom {atom.label} (atom {ligand_idx=}) is not connected to metal {met.label} ({met.atom_site_label},{jdx=})")# (metal group.metals index {jdx=})")
 
     
     print(f"conn_idx before set: {conn_idx=}")
@@ -388,7 +388,6 @@ def coordination_correction_for_nonhaptic(group: object, debug: int=0):
     grouped = defaultdict(list)
     for k, v in final_ligand_indices_by_metal.items():
         grouped[tuple(v)].append(k)
-    print(grouped)
     # turn values into a list of lists
     group_metals_indices = [v for v in grouped.values()]
     print(f"group_metals_indices: {group_metals_indices=}")
@@ -467,11 +466,11 @@ def coordination_correction_for_haptic(group: object, debug: int=0):
 
             if isconnected and any(tmpadjnum) > 0: 
                 if debug > 0 : 
-                    print(f"\tAtom {atom.label} ({ligand_idx=}) is connected to metal {met.label} ({met.atom_site_label}, group.metals index {jdx=})")
+                    print(f"\tAtom {atom.label} ({ligand_idx=}) is connected to metal {met.label} ({met.atom_site_label},{jdx=})") #, group.metals index {jdx=})")
                 conn_idx.append(idx)
                 conn_idx_by_metal[jdx].append(idx)
             else:
-                if debug > 0 : print(f"\tAtom {atom.label} ({ligand_idx=}) is not connected to metal {met.label} ({met.atom_site_label}, group.metals index {jdx=})")
+                if debug > 0 : print(f"\tAtom {atom.label} ({ligand_idx=}) is not connected to metal {met.label} ({met.atom_site_label},{jdx=})") #, group.metals index {jdx=})")
     print(f"conn_idx before set: {conn_idx=}")
     conn_idx = sorted(list(set(conn_idx)))
     split_groups = []
@@ -543,8 +542,6 @@ def coordination_correction_for_haptic(group: object, debug: int=0):
     grouped = defaultdict(list)
     for k, v in final_ligand_indices_by_metal.items():
         grouped[tuple(v)].append(k)
-    print(grouped)
-    # turn values into a list of lists
     group_metals_indices = [v for v in grouped.values()]
     print(f"group_metals_indices: {group_metals_indices=}")
     return group, final_group_indices, final_ligand_indices_by_metal, group_metals_indices
