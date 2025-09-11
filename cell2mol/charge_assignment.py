@@ -1012,13 +1012,35 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         numO = list_of_adj_atoms.count("O")
                         numH = list_of_adj_atoms.count("H")
                         numC = list_of_adj_atoms.count("C")
-                        if len(list_of_adj_atoms) == 0:
+
+                        if len(list_of_adj_atoms) == 1:
+                            # Case 1 : M-C--R
                             elemlist[idx] = "H"
-                            addedlist[idx] = 2
-                            metal_electrons[idx] = 4
-                        elif len(list_of_adj_atoms) == 1:
-                            elemlist[idx] = "H"
-                            addedlist[idx] = 1                             
+                            addedlist[idx] = 1  
+
+                            # Case 2 : Fisher carbyne
+                            # iscarbyne = True 
+                            # elemlist[idx] = "H"
+                            # addedlist[idx] = 3 # Fisher carbyne
+                            # metal_electrons[idx] = 2 # Fisher carbyne
+                            
+                            # Case 3 : Schrock carbyne
+                            # addedlist[idx] = 3 # Schrock carbyne
+                            # metal_electrons[idx] = 0 # Schrock carbyne
+                            
+                            # pos_carbenes[idx] = 1 
+                            # needs_nonlocal = True
+                            # non_local_groups += 1
+                            # non_local_groups_indices.append(idx)                      
+
+                            # Case 3 : terminal carbon
+                            # elemlist[idx] = "H"
+                            # addedlist[idx] = 1                    
+                        
+                            # Case 4 : carbene M=C=R
+                            # addedlist[idx] = 2
+                            # metal_electrons[idx] = 2              
+
                         elif len(list_of_adj_atoms) == 2:
                             if numN == 1 and numO == 1: # amide
                                 elemlist[idx] = "H"
@@ -1026,7 +1048,6 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                             elif numH == 2 and ligand.formula == "H2-C":
                                 elemlist[idx] = "H"
                                 addedlist[idx] = 2
-                            # elif numN == 2 or (numN == 1 and numC == 1): # NHCs or CAACs
                             else:
                                 G = nx.from_numpy_array(ligand.adjmat.astype(float))
                                 cycle_basis = nx.cycle_basis(G)
@@ -1144,6 +1165,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         reset_H_indices.extend([len(newlab), len(newlab)+1])
                     isadded, newlab, newcoord = add_hydrogens(newlab, newcoord, idx, ligand, num_hydrogens=2, debug=debug)
                 elif addedlist[idx] == 3:
+                    if pos_carbenes[idx] == 1:
+                        reset_H_indices.extend([len(newlab), len(newlab)+1, len(newlab)+2])
                     isadded, newlab, newcoord = add_hydrogens(newlab, newcoord, idx, ligand, num_hydrogens=3, debug=debug)
                 else :
                     print(f"        GET_PROTONATION_STATES: Impossible to add {addedlist[idx]} atoms to atom {idx} ")
