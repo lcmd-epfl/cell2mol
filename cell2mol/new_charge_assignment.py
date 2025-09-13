@@ -659,3 +659,4 @@ def generate_tmc_rdkit_obj_smiles(mol:object, debug: int=0) -> object:
     
     tmc_smiles = Chem.MolToSmiles(tmc_rdkit_obj)
     return tmc_rdkit_obj, tmc_smiles
+    return new_mol, tmc_rdkit_obj
