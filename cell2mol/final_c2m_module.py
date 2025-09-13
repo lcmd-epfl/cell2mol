@@ -92,7 +92,7 @@ def charge_assignment(newcell, refcell, debug):
         
     newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
     newcell.unique_species = copy.deepcopy(refcell.unique_species)
-    
+
     # Print possible and selected charge states
     print_possible_and_selected_cs(newcell, refcell, debug=debug)
 
@@ -153,7 +153,7 @@ def charge_assignment(newcell, refcell, debug):
 
     # Assign charges to reference molecules in the reference cell
     refcell.assign_charges_for_refcell(debug=debug)
-    refcell.create_bonds(debug=debug)
+    #refcell.create_bonds(debug=debug)
 
     if refcell.error_create_bonds:
         refcell.error_case = 8
@@ -172,7 +172,6 @@ def charge_assignment(newcell, refcell, debug):
 
     # Assign charges to molecules in the unit cell
     newcell.assign_charges_for_unitcell(debug=debug)
-    newcell.create_bonds(debug=debug)
     newcell.check_charge_neutrality(debug=debug)
 
     if newcell.error_create_bonds:
