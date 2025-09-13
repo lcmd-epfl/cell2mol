@@ -642,16 +642,22 @@ def generate_tmc_rdkit_obj_smiles(mol:object, debug: int=0) -> object:
     if debug >= 1: print(f"\t\tTMC_SMILES: {smiles=}")
           
     tmc_rdkit_obj = Chem.MolFromSmiles(smiles) # Hydrogens are removed 
-
-    if debug >= 1: print(f"\t\tTMC_SMILES: {Chem.MolToSmiles(tmc_rdkit_obj)}")
         
     try:
         Chem.SanitizeMol(tmc_rdkit_obj)
-    except:
-        print("\t\tTMC_SMILES: SanitizeMol with extra keywords")
-        Chem.SanitizeMol(tmc_rdkit_obj, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES, 
-                         catchErrors=True)
-    return  new_mol.GetMol(), Chem.MolToSmiles(tmc_rdkit_obj)
+        return new_mol.GetMol(), Chem.MolToSmiles(tmc_rdkit_obj)
+    except Exception:
+        try:
+            print("\t\tTMC_SMILES: SanitizeMol with extra keywords")
+            Chem.SanitizeMol(
+                tmc_rdkit_obj,
+                sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES,
+                catchErrors=True
+            )
+            return new_mol.GetMol(), Chem.MolToSmiles(tmc_rdkit_obj)
+        except Exception:
+            return new_mol.GetMol(), smiles
+    
     if mol.is_haptic:
         print(f"\t\tTMC_SMILES: {mol.is_haptic=} {mol.haptic_type=}")
         tmc_rdkit_obj = Chem.rdmolops.DativeBondsToHaptic(tmc_rdkit_obj)
