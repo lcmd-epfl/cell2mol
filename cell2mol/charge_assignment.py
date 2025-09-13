@@ -312,15 +312,15 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
              
         # CASE 1, IF only one distribution meets the requirement. Then it is chosen
         if len(list_for_tgt_charge) == 1:
-            #good_chs = check_possible_resonance(list_for_tgt_charge[0])
-            good_chs = list_for_tgt_charge[0]
+            good_chs = check_possible_resonance(list_for_tgt_charge[0])
+            # good_chs = list_for_tgt_charge[0]
             good_states.append(good_chs)
             if debug >= 2: print(f"    NEW SELECT FUNCTION: Case 1, only one entry for {tgt_charge} in tmplist")
  
         # CASE 2, IF more than one charge_state is found for a given final charge
         elif len(list_for_tgt_charge) > 1:
-            temp_list = [temp for temp in list_for_tgt_charge]
-            #temp_list = [ check_possible_resonance(temp) for temp in list_for_tgt_charge]
+            # temp_list = [temp for temp in list_for_tgt_charge]
+            temp_list = [ check_possible_resonance(temp) for temp in list_for_tgt_charge]
             tmplist_new = select_charge_distr_v2(temp_list, debug=debug)
             print(f"{tmplist_new=}")
             if len(tmplist_new) == 0:
@@ -500,12 +500,17 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
         if debug >= 2: print("    NEW SELECT FUNCTION: All entries have the same aromaticity. pass ")
         pass
     elif len(listofmaxaromatic) == 1:
+        new_tmplist = []
         for idx in range(0, nlists):
             if (idx in listofmaxaromatic) and coincide[idx]:
                 if (idx not in tmplist): 
                     tmplist.append(idx)         
-                else : 
+                else :  # idx in tmplist
+                    new_tmplist.append(idx)
                     if debug >= 2: print("    NEW SELECT FUNCTION: Already included in tmplist", f"{idx=} {tmplist=}")   
+        if len(new_tmplist) > 0:
+            tmplist = new_tmplist
+            if debug >= 2: print("    NEW SELECT FUNCTION: Updated tmplist with new_tmplist", f"{tmplist=}")
     elif len(listofmaxaromatic) > 1:
         if len(tmplist) <= 1:
             if debug >= 2:
@@ -1016,13 +1021,13 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                         if len(list_of_adj_atoms) == 1:
                             # Case 1 : M-C--R
                             elemlist[idx] = "H"
-                            addedlist[idx] = 1  
-
-                            # Case 2 : Fisher carbyne
+                            addedlist[idx] = 1
+                            # TODO: consider carbynes or carbenes when the charge assignment is failed
+                            # Case 2 : Fischer carbyne
                             # iscarbyne = True 
                             # elemlist[idx] = "H"
-                            # addedlist[idx] = 3 # Fisher carbyne
-                            # metal_electrons[idx] = 2 # Fisher carbyne
+                            # addedlist[idx] = 3 # Fischer carbyne
+                            # metal_electrons[idx] = 2 # Fischer carbyne
                             
                             # Case 3 : Schrock carbyne
                             # addedlist[idx] = 3 # Schrock carbyne
@@ -1208,8 +1213,8 @@ def get_protonation_states_specie(specie: object, debug: int=0) -> list:
                 addedlist[idx] = 0
                 metal_electrons[idx] = 0   
                 block[idx] = 0 
-        if debug >= 2: print(f"{addedlist=} {block=} {added_atoms=} {elemlist=} {pos_carbenes=} {metal_electrons=}")                                
-        if debug >= 2: print(f"{len(addedlist)=} {len(block)=} {added_atoms=} {len(elemlist)=} {len(pos_carbenes)=} {len(metal_electrons)=}")
+        if debug > 2: print(f"{addedlist=} {block=} {added_atoms=} {elemlist=} {pos_carbenes=} {metal_electrons=}")                                
+        if debug > 2: print(f"{len(addedlist)=} {len(block)=} {added_atoms=} {len(elemlist)=} {len(pos_carbenes)=} {len(metal_electrons)=}")
 
     # else:
     if needs_nonlocal:
@@ -2104,8 +2109,7 @@ def prepare_mols (moleclist: list, unique_indices: list, unique_species: list, f
 #######################################################
 def correct_smiles_ligand(ligand: object, debug: int=0) -> Tuple[str, object]:
     ## Receives a ligand class object and constructs the smiles and the rdkit_obj object from scratch, using atoms and bond information
-
-     
+  
     Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
     #### Creates an empty editable molecule
     rwlig = Chem.RWMol()    

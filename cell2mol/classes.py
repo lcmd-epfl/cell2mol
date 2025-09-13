@@ -664,8 +664,8 @@ class molecule(specie):
     unique_index: int | None = None
     totcharge_cif : int | None = None
 
-    smiles: str | list[str] | None = None
-    smiles_with_H: list[str] | None = None
+    ligand_smiles: str | list[str] | None = None
+    ligand_smiles_with_H: list[str] | None = None
     error_create_bonds : bool = False
 
     subtype: SubType = Field(default="molecule")
@@ -694,6 +694,7 @@ class molecule(specie):
         to_print += specie.__repr__(self, indirect=True)
         if self.ligands is not None:
             if self.ligands is not None:
+                #to_print += f" Ligands Smiles               = {self.ligand_smiles}\n"
                 to_print += f" Number of Ligands            = {len(self.ligands)}\n"
         if self.metals is not None:
             if self.metals is not None:
@@ -1475,7 +1476,7 @@ class molecule(specie):
                 if self.unique_index == specie.unique_index:
                     set_charge_state (specie, self, mode=1, debug=debug)
         if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal: 
-            prepare_mol(self)         
+            prepare_mol(self, debug=debug)         
             print("Complex", self.formula, self.totcharge)
             for jdx, lig in enumerate(self.ligands):
                 print("    Ligand", jdx, lig.formula, lig.totcharge, lig.smiles)
@@ -1483,50 +1484,49 @@ class molecule(specie):
                 print("    Metal",  kdx, met.formula, met.charge)
         else:
             print("Non-Complex",  self.formula, self.totcharge, self.smiles)
-    #################   
+    #######################################################
     def create_bonds (self, debug: int=0):
-
+        
+        # First part: Non-complex molecule
         if not self.iscomplex and not self.has_IA_IIA and not self.has_post_transition_metal: 
-            result = create_bonds_specie(self, debug=debug)          ### Creates bonds between molecule.atoms using the molecule.rdkit_object
+            # Creates bonds between molecule.atoms using the molecule.rdkit_object
+            result = create_bonds_specie(self, debug=debug)          
             if result == False:
-                if debug >= 1: print(f"MOLECULE.CREATE_BONDS: error creating bonds for molecule {self.formula}")
+                if debug >= 1: 
+                    print(f"MOLECULE.CREATE_BONDS: error creating bonds for non-complex molecule {self.formula}")
                 self.error_create_bonds = True
-                return # Exit the function entirely if creating bonds fails for a non-complex molecule
+                return # Exit the function entirely if creating bonds fails
             else :
-                if debug > 2: print(f"MOLECULE.CREATE_BONDS: Bonds created for molecule {self.formula}")
+                if debug > 2: print(f"MOLECULE.CREATE_BONDS: Bonds created for non-complex molecule {self.formula}")
 
-        # Second part
+        # Second part: Complex molecule, add bonds for ligands
         if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
+            self.ligand_smiles_with_H = [lig.smiles for lig in self.ligands]
+            self.ligand_smiles = []
+            fix_zwitterions_ligands = []
+            
             for lig in self.ligands:
-                result = create_bonds_specie(lig, debug=debug)      ### Creates bonds between ligand.atoms, which also belong to molecule.atoms, using the ligand.rdkit_object
+                # Creates bonds between ligand.atoms, using the ligand.rdkit_object
+                result = create_bonds_specie(lig, debug=debug)      
                 if result == False:
                     if debug >= 1: print(f"MOLECULE.CREATE_BONDS: error creating bonds for ligand {lig.formula}")
                     self.error_create_bonds = True
                     return # Exit the function entirely if creating bonds fails for any ligand
                 
-                else :
-                    if debug > 1: print(f"MOLECULE.CREATE_BONDS: Bonds created for molecule {lig.formula}")
-        
-        if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:    
-            self.smiles_with_H = [lig.smiles for lig in self.ligands]
-            self.smiles = []
-            fix_zwitterions_ligands = []
-            # Fourth part : correction smiles of ligands
-            for lig in self.ligands:
-                if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Correcting Smiles for ligand {lig.formula}")
+                if debug > 1: print(f"MOLECULE.CREATE_BONDS: Bonds created for ligand {lig.formula}")
+                if debug > 1: print(f"MOLECULE.CREATE_BONDS: Correcting Smiles for ligand {lig.formula}")
                 result, fix_zwitterions = correct_smiles_ligand(lig, debug=debug)
                 if result == False:
-                    if debug >= 1: print(f"MOLECULE.CREATE_BONDS: error correcting smiles for ligand {lig.formula}")
+                    if debug > 1: print(f"MOLECULE.CREATE_BONDS: error correcting smiles for ligand {lig.formula}")
                     self.error_create_bonds = True
                     return # Exit the function entirely 
-                else :
-                    if debug > 2: print(f"MOLECULE.CREATE_BONDS: Smiles corrected for ligand {lig.formula}")
-                    if fix_zwitterions :
-                        fix_zwitterions_ligands.append(lig)
-                    else:
-                        self.smiles.append(lig.smiles)    
-            if len(fix_zwitterions_ligands) > 0:
-                if debug >= 1: print(f"MOLECULE.CREATE_BONDS: {len(fix_zwitterions_ligands)} zwitterion ligands found in the complex")
+                
+                if debug > 1: print(f"MOLECULE.CREATE_BONDS: Smiles corrected for ligand {lig.formula}")
+                if fix_zwitterions :
+                    fix_zwitterions_ligands.append(lig)
+                else:
+                    self.ligand_smiles.append(lig.smiles)   
+
             for lig in fix_zwitterions_ligands:
                 for atom in lig.atoms:
                     atom.bonds = []
@@ -1536,9 +1536,8 @@ class molecule(specie):
                     if debug >= 1: print(f"MOLECULE.CREATE_BONDS: error re-creating bonds for ligand {lig.formula}")
                     self.error_create_bonds = True
                     return
-                else :
-                    if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Bonds re-created for ligand {lig.formula} after zwitterion correction.")
-                    self.smiles.append(lig.smiles)
+                if debug >= 1: print(f"MOLECULE.CREATE_BONDS: Bonds re-created for ligand {lig.formula} after zwitterion correction.")
+                self.ligand_smiles.append(lig.smiles)
 
         # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
         if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
@@ -1546,7 +1545,6 @@ class molecule(specie):
             create_metal_metal_bonds(self, debug=debug)
 
         self.error_create_bonds = False
-
 
 ###############
 ### LIGAND ####
@@ -2632,7 +2630,7 @@ class metal(atom):
         connected_groups = []
         for lig in mol.ligands:
             for group in lig.groups:
-                if debug > 1:
+                if debug > 2:
                     print(group.formula, [m.atom_site_label for m in group.metals])
                 for met in group.metals:
                     if self == met:
@@ -3771,7 +3769,7 @@ class cell(BaseModel):
         # Placeholder implementation - the original method was very long and complex
         # This should be implemented based on the specific charge assignment logic needed
         pass
-
+    
     #######################################################
     def assign_charges_for_refcell(self, debug: int = 0):
         for specie in self.unique_species:
@@ -3786,10 +3784,17 @@ class cell(BaseModel):
                 else:
                     if ref.unique_index == specie.unique_index:
                         set_charge_state(specie, ref, mode=1, debug=debug)
-
+        temp = []
         for idx, ref in enumerate(self.refmoleclist):
+            ref.create_bonds(debug=debug)  
+            temp.append(ref.error_create_bonds)
             if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
-                prepare_mol(ref)
+                prepare_mol(ref, debug=debug)
+
+        if any(temp):
+            self.error_create_bonds = True
+        else:
+            self.error_create_bonds = False
 
         for idx, ref in enumerate(self.refmoleclist):
             print(f"ASSIGN_CHARGES: Refenrence Molecule {idx}: {ref.formula}")
@@ -3852,9 +3857,17 @@ class cell(BaseModel):
                                     ) == met.get_parent_index("reference"):
                                         met.set_charge(ref_met.charge)
 
+        temp = []
         for idx, mol in enumerate(self.moleclist):
+            mol.create_bonds(debug=debug)  
+            temp.append(mol.error_create_bonds)
             if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
-                prepare_mol(mol)
+                prepare_mol(mol, debug=debug)
+
+        if any(temp):
+            self.error_create_bonds = True
+        else:
+            self.error_create_bonds = False
 
         for idx, mol in enumerate(self.moleclist):
             print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")

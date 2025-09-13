@@ -106,25 +106,6 @@ def get_cell_parameters(structure):
 
     return cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops
 
-def get_unique_species_in_reference (refcell, debug):
-    """Processes the reference cell to obtain unique species and handle any errors."""
-    tini = time.time()
-
-    refcell.get_unique_species(debug=debug)
-
-    if debug >= 1:
-        print(f"Unique species: {[specie.formula for specie in refcell.unique_species]}")
-        print(f"Species list: {[specie.formula for specie in refcell.species_list]}\n")
-
-    refcell.get_selected_cs(debug=debug)
-    refcell.assess_errors(mode="possible_charges")
-    
-    tend = time.time()    
-    
-    if debug >= 1: print(f"\nAssign possible charges of Reference molecules. Total execution time: {tend - tini:.2f} seconds")
-    
-    return
-
 
 def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debug):
     """Handles the reconstruction, charge assignment, and spin assignment for molecules."""
