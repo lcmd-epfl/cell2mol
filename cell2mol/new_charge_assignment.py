@@ -216,7 +216,7 @@ def reorder_rdkit_atoms(ref_mol, ref_labels, target_labels):
 def set_charge_state(reference, target, mode, debug: int=0):
 
     final_charge = reference.totcharge
-    print("SET_CHARGE_STATE:", reference.charge_state)
+    if debug > 2: print("SET_CHARGE_STATE:", reference.charge_state)
     refcell = reference.get_parent("reference")
 
     if mode == 1 : # For "reference" cell. Their possible charge states are already calculated
@@ -327,16 +327,14 @@ def set_charge_state(reference, target, mode, debug: int=0):
         print(f"SET_CHARGE_STATE:{target.formula=} {target.totcharge=} {target.smiles=}")
     
 ######################################################
-def prepare_mol (mol):
+def prepare_mol (mol, debug: int=0):
     tmp_atcharge = np.zeros((mol.natoms), dtype=int)
-    tmp_smiles = []
     
     for lig in mol.ligands: 
         if lig.smiles is not None:
-            print(f"prepare_mol: {lig.formula=} {lig.smiles=}")
+            if debug >= 1: print(f"prepare_mol: {lig.formula=} {lig.smiles=}")
         else:
-            print(f"prepare_mol: {lig.formula=}")
-        tmp_smiles.append(lig.smiles)
+            if debug >= 1: print(f"prepare_mol: {lig.formula=}")
         parent_indices = lig.get_parent_indices("molecule")
         for kdx, a in enumerate(parent_indices):
             tmp_atcharge[a] = lig.atomic_charges[kdx]
@@ -344,9 +342,11 @@ def prepare_mol (mol):
     for met in mol.metals:  
         parent_index = met.get_parent_index("molecule")
         tmp_atcharge[parent_index] = met.charge
-        
-    mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge, smiles=tmp_smiles)
 
+    # mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge)
+    # mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge, smiles=tmp_smiles)
+    tmc_rdkit_obj, tmc_smiles = generate_tmc_rdkit_obj_smiles(mol, debug=debug)
+    mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge, smiles=tmc_smiles, rdkit_obj=tmc_rdkit_obj)
 ######################################################
 def create_bonds_specie (specie, rdkit_obj: object=None, debug: int=0):
     from cell2mol.classes import bond
@@ -548,3 +548,114 @@ def predict_metal_ox (metal:object, debug: int=0) -> None:
 
     return m_ox_rf
 ######################################################
+def generate_tmc_rdkit_obj_smiles(mol:object, debug: int=0) -> object:
+    
+    all_metals_indices = [
+        met.get_parent_index("molecule") for met in mol.metals
+    ]
+    if debug >= 2: 
+        print(f"\t\tTMC_SMILES: Found metals {[met.atom_site_label for met in mol.metals]} {all_metals_indices=}")    
+    temp_mol = Chem.RWMol()
+    
+    for met in mol.metals:
+        a = Chem.Atom(met.label)
+        a.SetFormalCharge(int(met.charge)) # Assign the metal oxidation state
+        a.SetIntProp("__mol_idx", met.get_parent_index("molecule"))
+        if getattr(met, "atom_site_label", None) is not None:
+            a.SetProp("__atom_site_label", met.atom_site_label)
+            
+        idx = temp_mol.AddAtom(a)
+        if debug >= 2: 
+            print(f"\t\tTMC_SMILES: Add metal atom {Chem.MolToSmiles(temp_mol)}")
+            
+    for lig in mol.ligands:        
+        # lig_atom : atom object from cell2mol
+        # a : atom object from rdkit object
+        for lig_atom, a in zip(lig.atoms, lig.rdkit_obj.GetAtoms()):
+            a.SetFormalCharge(int(lig_atom.charge))
+            a.SetIntProp("__mol_idx", lig_atom.get_parent_index("molecule"))    
+            
+            if getattr(lig_atom, "atom_site_label", None) is not None:
+                a.SetProp("__atom_site_label", lig_atom.atom_site_label)
+
+        if debug >= 2: 
+            print(f"\t\tTMC_SMILES: Add ligand with {lig.formula=} {lig.totcharge=}")#{lig.smiles=}")
+        
+        temp_mol = Chem.CombineMols(temp_mol, lig.rdkit_obj)
+
+        
+    new_mol = Chem.RWMol(temp_mol)
+    
+    if mol.natoms != new_mol.GetNumAtoms():
+        raise ValueError("Number of atoms in cell2mol and rkdit molecule object disagrees")
+    
+#     if getattr(mol, "atom_site_labels", None) is not None:
+#         new_order = []
+#         for l in mol.atom_site_labels:
+#             mol_idx = [
+#                 a.GetIdx() for a in new_mol.GetAtoms() if a.GetProp("__atom_site_label") == l
+#             ][0]
+#             new_order.append(mol_idx)
+
+#     new_order_by_idx = []
+#     for idx in range(mol.natoms):
+#         mol_idx = [
+#             a.GetIdx() for a in new_mol.GetAtoms() if a.GetIntProp("__mol_idx") == idx
+#         ][0]
+#         new_order_by_idx.append(mol_idx)   
+#     print(f"{(new_order==new_order_by_idx)=}")
+
+    new_order = []
+    for idx in range(mol.natoms):
+        mol_idx = [
+            a.GetIdx() for a in new_mol.GetAtoms() if a.GetIntProp("__mol_idx") == idx
+        ][0]
+        new_order.append(mol_idx)  
+
+    new_mol = Chem.RenumberAtoms(new_mol, new_order)
+    new_mol = Chem.RWMol(new_mol)    
+    
+    for met in mol.metals:
+        met_idx = met.get_parent_index("molecule")
+
+        coordinating_atoms_labels = [
+            atom.label for atom in met.coord_sphere
+        ]
+        
+        coordinating_atoms_indices = [
+            atom.get_parent_index("molecule") for atom in met.coord_sphere
+        ]
+        if debug >= 1: 
+            print(f"\t\tTMC_SMILES: {met.label} ({met.atom_site_label}) coordinates to {coordinating_atoms_labels} {coordinating_atoms_indices}")
+        
+        for idx in coordinating_atoms_indices:
+            #print(idx, new_mol.GetBondBetweenAtoms(idx, met_idx))
+            if new_mol.GetBondBetweenAtoms(idx, met_idx):
+                print("Already added", idx, new_mol.GetBondBetweenAtoms(idx, met_idx).GetBondType())
+            elif idx in all_metals_indices:
+                new_mol.AddBond(idx, met_idx, Chem.BondType.UNSPECIFIED)
+            else:
+                new_mol.AddBond(idx, met_idx, Chem.BondType.DATIVE)
+            #print(idx, new_mol.GetBondBetweenAtoms(idx, met_idx).GetBondType())
+
+    smiles = Chem.MolToSmiles(new_mol.GetMol())
+    if debug >= 1: print(f"\t\tTMC_SMILES: {smiles=}")
+          
+    tmc_rdkit_obj = Chem.MolFromSmiles(smiles) # Hydrogens are removed 
+
+    if debug >= 1: print(f"\t\tTMC_SMILES: {Chem.MolToSmiles(tmc_rdkit_obj)}")
+        
+    try:
+        Chem.SanitizeMol(tmc_rdkit_obj)
+    except:
+        print("\t\tTMC_SMILES: SanitizeMol with extra keywords")
+        Chem.SanitizeMol(tmc_rdkit_obj, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES, 
+                         catchErrors=True)
+    return  new_mol.GetMol(), Chem.MolToSmiles(tmc_rdkit_obj)
+    if mol.is_haptic:
+        print(f"\t\tTMC_SMILES: {mol.is_haptic=} {mol.haptic_type=}")
+        tmc_rdkit_obj = Chem.rdmolops.DativeBondsToHaptic(tmc_rdkit_obj)
+        print(f"\t\tTMC_SMILES: {Chem.MolToSmiles(tmc_rdkit_obj)}")
+    
+    tmc_smiles = Chem.MolToSmiles(tmc_rdkit_obj)
+    return tmc_rdkit_obj, tmc_smiles

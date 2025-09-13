@@ -161,9 +161,9 @@ def get_fragments_from_moiety (newcell, updated, indices_in_ref, refcell, cov_fa
     geom_bond_cif = refcell.geom_bond_cif
     moiety_indices = refcell.moiety_indices
     
-    if debug >= 2 : print(f"get_fragments: {updated=}")
-    if debug >= 2 : print(f"get_fragments: {indices_in_ref=}")
-    if debug >= 2 : print(f"get_fragments: {moiety_indices=}")
+    if debug > 2 : print(f"get_fragments: {updated=}")
+    if debug > 2 : print(f"get_fragments: {indices_in_ref=}")
+    if debug > 2 : print(f"get_fragments: {moiety_indices=}")
 
     updated_labels  = extract_from_list(updated, newcell.labels, dimension=1)
     updated_coord   = extract_from_list(updated, newcell.coord, dimension=1)
@@ -183,18 +183,18 @@ def get_fragments_from_moiety (newcell, updated, indices_in_ref, refcell, cov_fa
     # updated_moieties_indices_in_ref = [[indices_in_ref.index(i) for i in sublist if i in indices_in_ref] for sublist in moiety_indices]      
     # updated_moieties_list = [[updated[idx] for idx in sublist] for sublist in updated_moieties_indices_in_ref]
     # if debug >= 2 : print(f"get_fragments: updated_moieties_indices_in_ref", updated_moieties_indices_in_ref)
-    if debug >= 2 : print(f"get_fragments: updated_moieties_list", len(updated_moieties_list),  updated_moieties_list)
-    if debug >= 2 : print(f"get_fragments: updated_moieties_indices_in_ref_list", len(updated_moieties_indices_in_ref_list), updated_moieties_indices_in_ref_list)
+    if debug > 2 : print(f"get_fragments: updated_moieties_list", len(updated_moieties_list),  updated_moieties_list)
+    if debug > 2 : print(f"get_fragments: updated_moieties_indices_in_ref_list", len(updated_moieties_indices_in_ref_list), updated_moieties_indices_in_ref_list)
 
     tmp_blocklist=[]
     for updated_moieties, updated_moieties_indices_in_ref in zip(updated_moieties_list, updated_moieties_indices_in_ref_list):
         if len(updated_moieties) == 0: continue
-        if debug >= 2 : print("get_fragments: updated_moieties", updated_moieties)
+        if debug > 2 : print("get_fragments: updated_moieties", updated_moieties)
         updated_moieties_labels  = extract_from_list(updated_moieties, newcell.labels, dimension=1)
         updated_moieties_coord   = extract_from_list(updated_moieties, newcell.coord, dimension=1)
         updated_moieties_atom_site_labels = [atom_site_labels[i] for i in updated_moieties_indices_in_ref]
-        if debug >= 2 : print(f"get_fragments: updated_moieties_labels", updated_moieties_labels)
-        if debug >= 2 : print(f"get_fragments: updated_moieties_atom_site_labels", updated_moieties_atom_site_labels)
+        if debug > 2 : print(f"get_fragments: updated_moieties_labels", updated_moieties_labels)
+        if debug > 2 : print(f"get_fragments: updated_moieties_atom_site_labels", updated_moieties_atom_site_labels)
         block = split_species(updated_moieties_labels, 
                               updated_moieties_coord, 
                               indices=updated_moieties, 
@@ -203,15 +203,15 @@ def get_fragments_from_moiety (newcell, updated, indices_in_ref, refcell, cov_fa
                               debug=debug)
         tmp_blocklist.extend(block)
         
-    if debug >= 2 : print("get_fragments: tmp_blocklist", tmp_blocklist)
+    if debug > 2 : print("get_fragments: tmp_blocklist", tmp_blocklist)
 
     value_to_index = {val: idx for idx, val in enumerate(updated)}
     blocklist = [
         [value_to_index[val] for val in sublist if val in value_to_index]
         for sublist in tmp_blocklist
     ]
-    if debug >= 2 : print("get_fragments: blocklist", blocklist)
-    
+    if debug > 2 : print("get_fragments: blocklist", blocklist)
+
     fragments = []  
     for b in blocklist:
         if debug > 2 : print(f"get_fragments: doing block={b}")
@@ -233,7 +233,8 @@ def get_fragments_from_moiety (newcell, updated, indices_in_ref, refcell, cov_fa
         newmolec.origin = "cell.get_fragments"
         
         # Adds cell as parent of the molecule, with indices
-        newmolec.add_parent(newcell, indices=cell_indices)        
+        newmolec.add_parent(newcell, indices=cell_indices)
+        newmolec.add_parent(refcell, indices=ref_indices)
         newmolec.set_fractional_coord(mol_frac_coord)
         newmolec.set_adjacency_parameters(cov_factor=cov_factor, metal_factor=metal_factor)
         newmolec.set_atoms(create_adjacencies=True, atom_site_labels=mol_atom_site_labels, geom_bond_cif=geom_bond_cif, debug=debug)
@@ -250,9 +251,9 @@ def get_fragments_new (newcell, updated, indices_in_ref, refcell, cov_factor: fl
     geom_bond_cif = refcell.geom_bond_cif
     moiety_indices = refcell.moiety_indices
     
-    if debug >= 2 : print(f"get_fragments: {updated=}")
-    if debug >= 2 : print(f"get_fragments: {indices_in_ref=}")
-    if debug >= 2 : print(f"get_fragments: {moiety_indices=}")
+    if debug > 2 : print(f"get_fragments: {updated=}")
+    if debug > 2 : print(f"get_fragments: {indices_in_ref=}")
+    if debug > 2 : print(f"get_fragments: {moiety_indices=}")
     
     updated_labels  = extract_from_list(updated, newcell.labels, dimension=1)
     updated_coord   = extract_from_list(updated, newcell.coord, dimension=1)
@@ -261,7 +262,7 @@ def get_fragments_new (newcell, updated, indices_in_ref, refcell, cov_factor: fl
         blocklist = split_species(updated_labels, updated_coord, debug=debug)
     else:
         updated_moieties_list = [[updated[indices_in_ref.index(i)] for i in sublist if i in indices_in_ref] for sublist in moiety_indices]
-        if debug >= 2 : print(f"get_fragments: updated_moieties_list", updated_moieties_list)
+        if debug > 2 : print(f"get_fragments: updated_moieties_list", updated_moieties_list)
         tmp_blocklist=[]
         for updated_moieties in updated_moieties_list:
             if len(updated_moieties) == 0: continue
@@ -269,15 +270,15 @@ def get_fragments_new (newcell, updated, indices_in_ref, refcell, cov_factor: fl
             updated_moieties_coord   = extract_from_list(updated_moieties, newcell.coord, dimension=1)
             block = split_species(updated_moieties_labels, updated_moieties_coord, indices=updated_moieties, debug=debug)
             tmp_blocklist.extend(block)
-            if debug >= 2 : print("get_fragments: updated_moieties", updated_moieties)
-        if debug >= 2 : print("get_fragments: tmp_blocklist", tmp_blocklist)
+            if debug > 2 : print("get_fragments: updated_moieties", updated_moieties)
+        if debug > 2 : print("get_fragments: tmp_blocklist", tmp_blocklist)
 
         value_to_index = {val: idx for idx, val in enumerate(updated)}
         blocklist = [
             [value_to_index[val] for val in sublist if val in value_to_index]
             for sublist in tmp_blocklist
         ]
-    if debug >= 2 : print("get_fragments: blocklist", blocklist)
+    if debug > 2 : print("get_fragments: blocklist", blocklist)
     if blocklist is None:
         return []
 
@@ -302,7 +303,8 @@ def get_fragments_new (newcell, updated, indices_in_ref, refcell, cov_factor: fl
         newmolec.origin = "cell.get_fragments"
         
         # Adds cell as parent of the molecule, with indices
-        newmolec.add_parent(newcell, indices=cell_indices)        
+        newmolec.add_parent(newcell, indices=cell_indices)
+        newmolec.add_parent(refcell, indices=ref_indices)
         newmolec.set_fractional_coord(mol_frac_coord)
         newmolec.set_adjacency_parameters(cov_factor=cov_factor, metal_factor=metal_factor)
         newmolec.set_atoms(create_adjacencies=True, atom_site_labels=mol_atom_site_labels, geom_bond_cif=geom_bond_cif, debug=debug)
@@ -431,8 +433,8 @@ def merge_fragments (frags: list, cell_vector: list, refcell: object, cov_factor
     elif keep_idx == 1: move_idx = 0
     keep_frag = frags[keep_idx]
     move_frag = frags[move_idx]
-    if debug >= 2: print("MERGE_FRAGMENTS: keep_idx", keep_idx)
-    if debug >= 2: print("MERGE_FRAGMENTS: move_idx", move_idx)
+    if debug > 2: print("MERGE_FRAGMENTS: keep_idx", keep_idx)
+    if debug > 2: print("MERGE_FRAGMENTS: move_idx", move_idx)
 
     move_frag.get_centroid()
     
@@ -444,7 +446,7 @@ def merge_fragments (frags: list, cell_vector: list, refcell: object, cov_factor
     if len(tmatrix) == 0: return None
 
     for t in tmatrix:
-        if debug >= 2: print("MERGE_FRAGMENTS: translation", t)
+        if debug > 2: print("MERGE_FRAGMENTS: translation", t)
         ## Applies Translations and each time, it checks if a bigger molecule is formed
         ## meaning that the translation was successful
         reclabels = []
@@ -473,7 +475,7 @@ def merge_fragments (frags: list, cell_vector: list, refcell: object, cov_factor
         else:
             numspecs  = count_species(reclabels, reccoord, atom_site_labels=rec_ref_atom_site_labels, geom_bond_cif=refcell.geom_bond_cif, cov_factor=cov_factor, debug=debug)
         
-        if debug >= 0 : print("MERGE_FRAGMENTS: count_species found", numspecs)
+        if debug > 2 : print("MERGE_FRAGMENTS: count_species found", numspecs)
         if numspecs != 1 : continue
 
         if final_merge :
@@ -483,7 +485,7 @@ def merge_fragments (frags: list, cell_vector: list, refcell: object, cov_factor
                 blocklist = split_species(reclabels, reccoord, atom_site_labels=rec_ref_atom_site_labels, geom_bond_cif=refcell.geom_bond_cif, cov_factor=cov_factor, debug=debug)
             else :
                 blocklist = split_species(reclabels, reccoord, cov_factor=cov_factor, debug=debug)
-        if debug >= 0 : print("MERGE_FRAGMENTS: split_species found", len(blocklist), f"{blocklist=}")
+        if debug > 2 : print("MERGE_FRAGMENTS: split_species found", len(blocklist), f"{blocklist=}")
 
         if blocklist is None: continue
         else:
@@ -491,6 +493,7 @@ def merge_fragments (frags: list, cell_vector: list, refcell: object, cov_factor
             if len(blocklist) == 1: 
                 newmolec = molecule.from_positional(reclabels, reccoord, recfracs)
                 newmolec.origin = "cell.reconstruct"
+                newmolec.add_parent(refcell, indices=rec_ref_indices)
                 newmolec.ref_indices = rec_ref_indices
                 newmolec.cell_indices = rec_cell_indices
                 newmolec.atom_site_labels = rec_ref_atom_site_labels
@@ -720,7 +723,8 @@ def determine_wrap_keywords_pbc (atoms,refcell, wrap_keywords, debug: int=0):
 def reconstruct (refcell, newcell, sym_ops, debug: int=0):
     
     cell_labels = newcell.labels
-    print(f"{cell_labels=}")
+    #print(f"{refcell.geom_bond_cif=}")
+    #print(f"{cell_labels=}")
     if "D" in cell_labels:
         print("Deuterium is in the cell")
     cell_pos = newcell.coord
@@ -730,8 +734,8 @@ def reconstruct (refcell, newcell, sym_ops, debug: int=0):
     ref_labels = refcell.labels
     atom_site_labels = refcell.atom_site_labels
 
-    print(f"{ref_labels=}")
-    print(f"{atom_site_labels=}")
+    #print(f"{ref_labels=}")
+    #print(f"{atom_site_labels=}")
 
     if "D" in ref_labels:
         print("Deuterium is in the reference")
@@ -755,8 +759,8 @@ def reconstruct (refcell, newcell, sym_ops, debug: int=0):
         updated_lists = [i for i in indices_lists if i[1] not in all_found]   
         updated_ref_indices = [i[0] for i in updated_lists]
         updated_cell = [i[1] for i in updated_lists]
-        if debug >=2 : print(f"{len(updated_cell)=} {updated_cell=}")
-        if debug >=2 : print(f"{len(updated_ref_indices)=} {updated_ref_indices=}")
+        if debug > 2 : print(f"{len(updated_cell)=} {updated_cell=}")
+        if debug > 2 : print(f"{len(updated_ref_indices)=} {updated_ref_indices=}")
 
         all_found.extend(updated_cell)
         if debug >=2 : print(len(all_found))
@@ -909,19 +913,19 @@ def get_moleclist (newcell, refcell, all_molecules, debug: int=0):
     for mol in all_molecules:
         newmolec = molecule.from_positional(mol.labels, mol.coord, mol.frac_coord)
         mol_atom_site_labels = [refcell.atom_site_labels[idx] for idx in mol.ref_indices]
-        if debug >=2 : 
+        if debug > 2 : 
             print("GET_MOLECLIST: ", mol.formula)
             print("GET_MOLECLIST: ", mol.ref_indices)
             print("GET_MOLECLIST: ", mol.labels)
             print("GET_MOLECLIST: ", mol_atom_site_labels)
         
         newmolec.origin = "cell.reconstruct"
+        newmolec.add_parent(newcell, mol.cell_indices)
+        newmolec.add_parent(refcell, mol.ref_indices) 
         newmolec.set_adjacency_parameters(cov_factor, metal_factor)
         newmolec.set_atoms(create_adjacencies=True, 
                            atom_site_labels=mol_atom_site_labels, 
                            geom_bond_cif=refcell.geom_bond_cif, debug=debug)
-        newmolec.add_parent(newcell, mol.cell_indices)
-        newmolec.add_parent(refcell, mol.ref_indices) 
         for atom, idx in zip(newmolec.atoms, mol.cell_indices):
             atom.add_parent(newcell, index=idx)  
         for atom, idx in zip(newmolec.atoms, mol.ref_indices):
