@@ -1053,36 +1053,23 @@ def parse_formula_with_quantity(formula: str):
 def print_refmoleclist (cell):
     
     for i, ref in enumerate(cell.refmoleclist):
+        ref_info = f"Reference Molecule {i}: {ref.formula} "
+        if ref.iscomplex:
+            ref_info += "(TM Complex) "
+        if ref.has_IA_IIA:
+            ref_info += "(Complex with Alkali or Alkaline metals) "
+        if ref.has_post_transition_metal:
+            ref_info += "(Complex with Post-Transition metals) "
+        if not ref.iscomplex and not ref.has_IA_IIA and not ref.has_post_transition_metal:
+            ref_info += "(Non-complex)"
+        ref_info += "\n"
         if ref.totcharge is not None:
-            if ref.iscomplex:
-                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (TM complex)")
-            elif ref.has_IA_IIA:
-                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (Complex with Alkali or Alkaline metals)")
-            elif ref.has_post_transition_metal:
-                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge=} (Complex with Post-Transition metals)")
-            else:
-                if ref.smiles is not None:
-                    print(f"Reference Molecule {i} : {ref.formula} {ref.totcharge=} (Non-complex) {ref.smiles=}")
-                else:
-                    print(f"Reference Molecule {i} : {ref.formula} {ref.totcharge=} (Non-complex)")
-        elif ref.totcharge_cif is not None:
-            if ref.iscomplex:
-                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge_cif=} (TM complex)")
-            elif ref.has_IA_IIA:
-                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge_cif=} (Complex with Alkali or Alkaline metals)")
-            elif ref.has_post_transition_metal:
-                print(f"Reference Molecule {i}: {ref.formula} {ref.totcharge_cif=} (Complex with Post-Transition metals)")
-            else:
-                print(f"Reference Molecule {i} : {ref.formula} {ref.totcharge_cif=} (Non-complex)")        
-        else:
-            if ref.iscomplex:
-                print(f"Reference Molecule {i}: {ref.formula} (TM complex)")
-            elif ref.has_IA_IIA:
-                print(f"Reference Molecule {i}: {ref.formula} (Complex with Alkali or Alkaline metals)")
-            elif ref.has_post_transition_metal:
-                print(f"Reference Molecule {i}: {ref.formula} (Complex with Post-Transition metals)")
-            else:
-                print(f"Reference Molecule {i} : {ref.formula} (Non-complex)")
+            ref_info += f"totcharge={ref.totcharge} "
+        if ref.totcharge_cif is not None:
+            ref_info += f"totcharge_cif={ref.totcharge_cif} "
+        if ref.smiles is not None:
+            ref_info += f"smiles={ref.smiles}"
+        print(ref_info)
 
         if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
             for met in ref.metals:
@@ -1166,26 +1153,6 @@ def print_unique_species(cell):
 
         print("\t" + " ".join(parts))
 ######################################################
-# def print_unique_species (cell):
-#     if cell.unique_species is not None:
-#         print(f"\nUnique Species in {cell.subtype}:")
-#         for specie in cell.unique_species:
-#             if specie.subtype == "metal":
-#                 if specie.charge is not None:
-#                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.charge=}")
-#                 else:
-#                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=}")
-#             else:
-#                 if specie.totcharge is not None and specie.smiles is not None:
-#                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.smiles=} {specie.totcharge=}")
-#                 elif specie.totcharge is not None:
-#                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.totcharge=}")
-#                 else:
-#                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})")
-#     else:
-#         print("\nNo unique species found in the cell object.")
-
-######################################################
 def print_possible_charges (cell, debug=0):
     """
     Print the possible charges for each species in the cell object.
@@ -1198,7 +1165,6 @@ def print_possible_charges (cell, debug=0):
                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.possible_cs=}") 
                 else:
                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})\n\t{specie.possible_cs=}")
-                    if debug > 0 : print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})\n\t{specie.possible_cs=}")
             else:
                 if specie.subtype == "metal":
                     print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} No possible cs")
