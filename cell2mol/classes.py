@@ -2636,9 +2636,14 @@ class metal(atom):
                     if self == met:
                         connected_groups.append(group)
                         if debug >= 0:
-                            print(
-                                f"METAL.Get_connected_groups: Metal {self.label} ({self.atom_site_label}) is connected to group {group.formula}"
-                            )
+                            if self.atom_site_label is not None:
+                                print(
+                                    f"METAL.Get_connected_groups: Metal {self.label} ({self.atom_site_label}) is connected to group {group.formula}"
+                                )
+                            else:
+                                print(
+                                    f"METAL.Get_connected_groups: Metal {self.label} is connected to group {group.formula}"
+                                )
         final_connected_groups = []
         groups_atom_site_labels = [
             [a.atom_site_label for a in g.atoms] for g in connected_groups
@@ -2650,9 +2655,14 @@ class metal(atom):
                 final_connected_groups.append(group)
         self.groups = final_connected_groups
         if debug >= 1:
-            print(
-                f"METAL.Get_connected_groups: {self.label} ({self.atom_site_label}) connected groups: {[g.formula for g in self.groups]}"
-            )
+            if self.atom_site_label is not None:
+                print(
+                    f"METAL.Get_connected_groups: {self.label} ({self.atom_site_label}) connected groups: {[g.formula for g in self.groups]}"
+                )
+            else:
+                print(
+                    f"METAL.Get_connected_groups: {self.label} connected groups: {[g.formula for g in self.groups]}"
+                )
         return self.groups
     # def get_connected_groups(self, debug: int = 0):
     #     from cell2mol.connectivity import split_group
@@ -2897,7 +2907,10 @@ class metal(atom):
     #######################################################
     def get_coordination_geometry(self: object, debug: int = 0):
         if debug >= 1:
-            print(f"\nMETAL.Get_coord_geometry: {self.label} ({self.atom_site_label})")
+            if self.atom_site_label is not None:
+                print(f"\nMETAL.Get_coord_geometry: {self.label} ({self.atom_site_label})")
+            else:
+                print(f"\nMETAL.Get_coord_geometry: {self.label} (No atom site label)")
 
         coord_group = self.get_connected_groups(debug=debug)
 
@@ -3328,12 +3341,11 @@ class cell(BaseModel):
                         print(
                             f"GETREFS: found ref molecule with only one atom {ref.labels}"
                         )
-
+        if debug >= 0: print(f"GETREFS: isgood={isgood}")
         # If all good, then works with the reference molecules
         if isgood:
             self.has_isolated_H = False
             for ref in self.refmoleclist:
-
                 if ref.iscomplex: 
                     if debug >= 0: print(f"GETREFS: working with {ref.formula} with transition metals")
                     ref.get_hapticity(debug=debug)
@@ -3451,49 +3463,50 @@ class cell(BaseModel):
                         print(
                             f"GETREFS: found ref molecule with only one atom {ref.labels}"
                         )
-
         # If all good, then works with the reference molecules
         if isgood:
             self.has_isolated_H = False
-            for ref in self.refmoleclist:
-                if ref.iscomplex:
-                    if debug >= 0: print(f"GETREFS: working with {ref.formula} with transition metals")
-                    ref.get_hapticity(debug=debug)
-                    if len(ref.ligands) == 0:
-                        print(f"GETREFS: {ref.formula} is a metal cluster")
-                    else:
-                        for lig in ref.ligands:
-                            lig.get_denticity(debug=debug)
-                    for met in ref.metals:
-                        met.get_connected_metals(debug=debug)
-                        met.get_coordination_geometry(debug=debug)
-                        met.get_coord_sphere_formula(debug=debug)
-                elif ref.has_IA_IIA:
-                    if debug >= 0: print(f"GETREFS: working with {ref.formula} with alkali or alkali earth metals")
-                    if len(ref.ligands) == 0 :
-                        pass
-                    else:
-                        for lig in ref.ligands:
-                            lig.get_denticity(debug=debug)
-                    for met in ref.metals:
-                        met.get_connected_metals(debug=debug)
-                        met.get_coordination_geometry(debug=debug)
-                        met.get_coord_sphere_formula(debug=debug)
-                elif ref.has_post_transition_metal:
-                    if debug >= 0: print(f"GETREFS: working with {ref.formula} with post-transition metals")
-                    if debug >= 0: print(f"GETREFS: {[met.label for met in ref.metals]}")
-                    if debug >= 0: print(f"GETREFS: {[lig.formula for lig in ref.ligands]}")
-                    if len(ref.ligands) == 0 :
-                        pass
-                    else:
-                        for lig in ref.ligands:
-                            lig.get_denticity(debug=debug)
-                    for met in ref.metals:
-                        met.get_connected_metals(debug=debug)
-                        met.get_coordination_geometry(debug=debug)
-                        met.get_coord_sphere_formula(debug=debug)
         else:
             self.has_isolated_H = True
+        if debug >= 0: print(f"GETREFS: has_isolated_H={self.has_isolated_H}")
+
+        for ref in self.refmoleclist:
+            if ref.iscomplex:
+                if debug >= 0: print(f"GETREFS: working with {ref.formula} with transition metals")
+                ref.get_hapticity(debug=debug)
+                if len(ref.ligands) == 0:
+                    print(f"GETREFS: {ref.formula} is a metal cluster")
+                else:
+                    for lig in ref.ligands:
+                        lig.get_denticity(debug=debug)
+                for met in ref.metals:
+                    met.get_connected_metals(debug=debug)
+                    met.get_coordination_geometry(debug=debug)
+                    met.get_coord_sphere_formula(debug=debug)
+            elif ref.has_IA_IIA:
+                if debug >= 0: print(f"GETREFS: working with {ref.formula} with alkali or alkali earth metals")
+                if len(ref.ligands) == 0 :
+                    pass
+                else:
+                    for lig in ref.ligands:
+                        lig.get_denticity(debug=debug)
+                for met in ref.metals:
+                    met.get_connected_metals(debug=debug)
+                    met.get_coordination_geometry(debug=debug)
+                    met.get_coord_sphere_formula(debug=debug)
+            elif ref.has_post_transition_metal:
+                if debug >= 0: print(f"GETREFS: working with {ref.formula} with post-transition metals")
+                if debug >= 0: print(f"GETREFS: {[met.label for met in ref.metals]}")
+                if debug >= 0: print(f"GETREFS: {[lig.formula for lig in ref.ligands]}")
+                if len(ref.ligands) == 0 :
+                    pass
+                else:
+                    for lig in ref.ligands:
+                        lig.get_denticity(debug=debug)
+                for met in ref.metals:
+                    met.get_connected_metals(debug=debug)
+                    met.get_coordination_geometry(debug=debug)
+                    met.get_coord_sphere_formula(debug=debug)
 
         return self.refmoleclist
 

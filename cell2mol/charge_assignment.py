@@ -248,7 +248,7 @@ def select_charge_distr(charge_states: list, debug: int=0) -> list:
             if ((idx in listofminabs) or (idx in listofmintot)): 
                 tmplist.append(idx)
 
-    if debug >= 2: print("    NEW SELECT FUNCTION: We now select from the maxima of aromaticity:")
+    if debug >= 2: print(f"    NEW SELECT FUNCTION: We now select from the maxima of aromaticity: {tmplist=}")
     if len(listofmaxaromatic) == nlists:
         if debug >= 2: print("    NEW SELECT FUNCTION: All entries have the same aromaticity. pass ")
         pass
@@ -345,10 +345,10 @@ def check_possible_resonance(charge_state: object, debug: int = 0) -> object:
     natoms = prot.natoms
 
     # Only perform resonance checks for ligands
-    if prot.parent.subtype != "ligand":
-        if debug >= 2:
-            print(f"CHECK_POSSIBLE_RESONANCE: Skipping non-ligand type: {prot.parent.subtype}")
-        return charge_state
+    # if prot.parent.subtype != "ligand":
+    #     if debug >= 2:
+    #         print(f"CHECK_POSSIBLE_RESONANCE: Skipping non-ligand type: {prot.parent.subtype}")
+    #     return charge_state
 
     rdkit_obj = charge_state.rdkit_obj
     # coordinating_atoms = [
@@ -367,9 +367,9 @@ def check_possible_resonance(charge_state: object, debug: int = 0) -> object:
     best_res_mol = possible_res_mols[0]
     if best_res_mol is None:
         return charge_state
-    if prot.parent.formula == "H32-C20-N3-O-Si-P":
-        for i, tmp in enumerate(possible_res_mols):
-            print(f"CHECK_POSSIBLE_RESONANCE: Found resonance structure {i}: {Chem.MolToSmiles(tmp)} {Chem.MolToSmiles(tmp)==Chem.MolToSmiles(rdkit_obj)}")  
+    # if prot.parent.formula == "H32-C20-N3-O-Si-P":
+    #     for i, tmp in enumerate(possible_res_mols):
+    #         print(f"CHECK_POSSIBLE_RESONANCE: Found resonance structure {i}: {Chem.MolToSmiles(tmp)} {Chem.MolToSmiles(tmp)==Chem.MolToSmiles(rdkit_obj)}")  
 
     if debug >= 0:
         print(f"CHECK_POSSIBLE_RESONANCE: {prot.parent.formula} {len(possible_res_mols)=}")
@@ -495,7 +495,7 @@ def select_charge_distr_v2(charge_states: list, debug: int=0) -> list:
             if ((idx in listofminabs) or (idx in listofmintot)): 
                 tmplist.append(idx)
 
-    if debug >= 2: print("    NEW SELECT FUNCTION: We now select from the maxima of aromaticity:")
+    if debug >= 2: print(f"    NEW SELECT FUNCTION: We now select from the maxima of aromaticity: {tmplist=}")
     if len(listofmaxaromatic) == nlists:
         if debug >= 2: print("    NEW SELECT FUNCTION: All entries have the same aromaticity. pass ")
         pass
@@ -1338,7 +1338,26 @@ def move_element(lst, old_index, new_index):
     return lst
 #######################################################
 def get_charge_manual(spec, debug: int=0):
-    print(spec.parents)
+    
+    polyiodide = {
+        # "I3":  {"charge": -1, "smiles": "I[I-]I", "negative_atoms": [1]},
+        "I4":  {"charge": -2, "smiles": "I[I-][I-]I", "negative_atoms": [1, 2]},
+        "I5":  {"charge": -1, "smiles": "II[I-]II", "negative_atoms": [2]},
+        "I6":  {"charge": -2, "smiles": "I[I-]II[I-]I", "negative_atoms": [1, 4]},
+        # "I7":  {"charge": -1},
+        # "I8":  {"charge": -2},
+        # "I9":  {"charge": -1},
+        # "I10": {"charge": -2},  # Could also be -4 
+        # "I11": {"charge": -3},
+        # "I12": {"charge": -2},
+        # "I13": {"charge": -3},
+        # "I14": {"charge": -4},
+        # "I16": {"charge": -2},
+        # "I22": {"charge": -4},
+        # "I26": {"charge": -3},  # Could also be -4 
+        # "I28": {"charge": -4},
+        # "I29": {"charge": -3},
+    }
 
     if spec.formula == "O4-Cl":
         smiles = "[O-]Cl(=O)(=O)=O"
@@ -1441,11 +1460,6 @@ def get_charge_manual(spec, debug: int=0):
     
     return ch_state
 ########################################################
-############################################################
-# def aromatic_info(smiles):
-#     mol = Chem.MolFromSmiles(smiles)
-#     if mol is None:
-#         return "Invalid SMILES"
 def aromatic_info(mol: object):
     #print(f"aromatic_info: {mol=} {Chem.MolToSmiles(mol)}")
     aromatic_atoms = sum(1 for atom in mol.GetAtoms() if atom.GetIsAromatic())
@@ -1455,27 +1469,6 @@ def aromatic_info(mol: object):
         "Number of rings": len(Chem.GetSymmSSSR(mol)),
         "Aromatic rings": Chem.GetSSSR(mol),
     }
-########################################################
-polyiodide = {
-    # "I3":  {"charge": -1, "smiles": "I[I-]I", "negative_atoms": [1]},
-    "I4":  {"charge": -2, "smiles": "I[I-][I-]I", "negative_atoms": [1, 2]},
-    "I5":  {"charge": -1, "smiles": "II[I-]II", "negative_atoms": [2]},
-    "I6":  {"charge": -2, "smiles": "I[I-]II[I-]I", "negative_atoms": [1, 4]},
-    # "I7":  {"charge": -1},
-    # "I8":  {"charge": -2},
-    # "I9":  {"charge": -1},
-    # "I10": {"charge": -2},  # Could also be -4 
-    # "I11": {"charge": -3},
-    # "I12": {"charge": -2},
-    # "I13": {"charge": -3},
-    # "I14": {"charge": -4},
-    # "I16": {"charge": -2},
-    # "I22": {"charge": -4},
-    # "I26": {"charge": -3},  # Could also be -4 
-    # "I28": {"charge": -4},
-    # "I29": {"charge": -3},
-}
-
 ########################################################
 def aromatic_info_v2(mol: object, added_indices=None):
     if added_indices is None:
@@ -1589,10 +1582,12 @@ def get_charge(charge: int, prot: object, allow: bool=True, embed_chiral: bool=T
     if debug >= 2: print(f"GET_CHARGE. {total_charge=}")
     # Connectivity is checked
     iscorrect = check_rdkit_obj_connectivity(rdkit_obj, natoms, charge, debug=debug)
-    
+
+
     # Charge_state is initiated
     ch_state = charge_state.from_positional(iscorrect, total_charge, atom_charges, rdkit_obj, smiles, charge, allow, prot)
-
+    if iscorrect:
+        ch_state = check_possible_resonance(ch_state, debug=debug)
     return ch_state
 #######################################################
 def check_rdkit_obj_connectivity(mol: object, natoms: int, ich: int, debug: int=0): 
@@ -1652,8 +1647,11 @@ def get_list_of_charges_to_try_new (prot: object, debug: int=0) -> list:
     
     #### Educated Guess on the Maximum Charge one can expect from the spec[1]
     if spec.formula in ['C-O', "H2-O", "C-N",  "C-S", "C-Se", "C-Te", "C-P", "C-As", "C-Sb"]:
-        maxcharge = 0
-    elif   spec.subtype == "molecule" and (not spec.iscomplex and not spec.has_IA_IIA and not spec.has_post_transition_metal): 
+        lchar = [0]
+        return lchar
+    elif spec.natoms == 1 and spec.labels[0] in ["F", "Cl", "Br", "I", "H"]:
+        return [-1]
+    elif spec.subtype == "molecule" and (not spec.iscomplex and not spec.has_IA_IIA and not spec.has_post_transition_metal): 
         maxcharge = 3
     elif spec.subtype == "ligand":  # Since other charges will be handled by protonation states
         maxcharge = 0
@@ -1684,7 +1682,11 @@ def get_list_of_charges_to_try(prot: object, debug: int=0) -> list:
 
     #### Educated Guess on the Maximum Charge one can expect from the spec[1]
     if spec.formula in ['C-O', "H2-O", "C-N",  "C-S", "C-Se", "C-Te", "C-P", "C-As", "C-Sb"]:
-        maxcharge = 0
+        lchar = [0]
+        return lchar
+    elif spec.formula in ["F", "Cl", "Br", "I", "H"]:
+        lchar = [-1]
+        return lchar
     elif   spec.subtype == "molecule" and (not spec.iscomplex and not spec.has_IA_IIA and not spec.has_post_transition_metal): 
         maxcharge = 3
     elif spec.subtype == "ligand":  
