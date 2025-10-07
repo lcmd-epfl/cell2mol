@@ -1149,17 +1149,23 @@ def chiral_stereo_check(mol):
 
     """
     try:
-        #Chem.SanitizeMol(mol)
-        Chem.SanitizeMol(mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES, 
-                         catchErrors=True)
+        Chem.SanitizeMol(mol)
         Chem.DetectBondStereochemistry(mol, -1)
         Chem.AssignStereochemistry(mol, flagPossibleStereoCenters=True, force=True)
         Chem.AssignAtomChiralTagsFromStructure(mol, -1)
-        return True
-    
-    except rdkit.Chem.rdchem.AtomValenceException as e:
-        print(f"Failed to process molecule: {e}")
-        return False
+        return True        
+    except:
+        try:
+            Chem.SanitizeMol(mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES, 
+                            catchErrors=True)
+            Chem.DetectBondStereochemistry(mol, -1)
+            Chem.AssignStereochemistry(mol, flagPossibleStereoCenters=True, force=True)
+            Chem.AssignAtomChiralTagsFromStructure(mol, -1)
+            return True
+        
+        except rdkit.Chem.rdchem.AtomValenceException as e:
+            print(f"Failed to process molecule: {e}")
+            return False
     
 
 

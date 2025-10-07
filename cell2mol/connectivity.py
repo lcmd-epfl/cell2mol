@@ -651,8 +651,23 @@ def get_radii(labels: list) -> np.ndarray:
         #     radii.append(elemdatabase.CovalentRadius3[label])
     return np.array(radii)
 
+################################
+def get_scaled_radii(radii, metal_idxs, alkali_idxs, metal_factor, cov_factor):
+    #print(f"get_scaled_radii: {metal_idxs=}, {alkali_idxs=}, {metal_factor=}, {cov_factor=}")
+    #print(f"get_scaled_radii: {radii=}")
+    scaled_radii = np.zeros_like(radii, dtype=float)
+    for k in range(len(radii)):
+        if k in metal_idxs:
+            scaled_radii[k] = radii[k] * metal_factor
+        elif k in alkali_idxs:
+            scaled_radii[k] = radii[k] * metal_factor * 0.8
+        else:
+            scaled_radii[k] = radii[k] * cov_factor
+    #print(f"get_scaled_radii: {scaled_radii=}")
+    return scaled_radii
+
 ####################################
-def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default", metal_only: bool=False, add_atoms: bool=False) -> Tuple[int, list, list]:
+def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.0, radii="default", metal_factor=1.3, metal_only: bool=False, add_atoms: bool=False) -> Tuple[int, list, list]:
     
     isgood = True 
     clash_threshold = 0.3
@@ -664,7 +679,7 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
 
     metal_idxs = get_metal_idxs(labels)
     alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
-
+    print(f"get_adjmatrix: metal_idxs={metal_idxs}, alkali_alkaline_earth_metal_idxs={alkali_alkaline_earth_metal_idxs}, metal_only={metal_only}, add_atoms={add_atoms}")
     add_factor = 0.45
     #add_factor = 0.3
     # Sometimes argument radii np.ndarry, or list
@@ -673,6 +688,9 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
         if type(radii) == str:
             if radii == "default":
                 radii = get_radii(labels)
+                radii = get_scaled_radii(radii, metal_idxs, alkali_alkaline_earth_metal_idxs, metal_factor, cov_factor)
+        elif type(radii) == np.ndarray or type(radii) == list:
+            radii = get_scaled_radii(radii, metal_idxs, alkali_alkaline_earth_metal_idxs, metal_factor, cov_factor)
 
     # Creates Adjacency Matrix
     for i in range(natoms - 1):
@@ -680,14 +698,9 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.3, radii="default
             a = np.array(pos[i])
             b = np.array(pos[j])
             dist = np.linalg.norm(a - b)
-            alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])
-            if len(alkali_alkaline_earth_metal_idxs) > 0:
-                thres = (radii[i] + radii[j]) + 0.3
-            else:
-                thres = (radii[i] + radii[j]) + add_factor
-            #thres = min((radii[i] + radii[j]) * cov_factor, (radii[i] + radii[j]) + add_factor)
-            # if thres - (radii[i] + radii[j]) > 0.8:
-            #     thres = (radii[i] + radii[j]) + add_factor
+            
+            thres = (radii[i] + radii[j]) + add_factor
+
             if dist <= clash_threshold:
                 isgood = False # invalid molecule
                 print("Adjacency Matrix: Distance", round(dist, 3), "smaller than clash for atoms", i, j, labels[i], labels[j], a, b, cov_factor)
@@ -1096,7 +1109,7 @@ def count_species(labels: list, pos: list, radii: list=None, indices: list=None,
     return nblocks
 
 ####################################
-def split_species(labels: list, pos: list, radii: list=None, indices: list=None, atom_site_labels : list=None, geom_bond_cif: list=None, cov_factor: float=1.3, debug: int=0) -> Tuple[bool, list]:
+def split_species(labels: list, pos: list, radii: list=None, indices: list=None, atom_site_labels : list=None, geom_bond_cif: list=None, cov_factor: float=1.0, debug: int=0) -> Tuple[bool, list]:
     ## Function that identifies connected groups of atoms from their atomic coordinates and labels.
     
     # if debug >= 2:

@@ -4,18 +4,18 @@ import logging
 from contextlib import redirect_stdout
 from ase.io import read
 from cell2mol.classes import molecule
-from cell2mol.connectivity import split_species
-from cell2mol.read_write import print_molecule
-
+from cell2mol.connectivity import labels2formula, split_species
+from cell2mol.read_write import print_molecule, writexyz
+import os
 # Constants
 VERSION = "2.0"
-COV_FACTOR = 1.3
-METAL_FACTOR = 1.0
+COV_FACTOR = 1.0
+METAL_FACTOR = 1.2
 
 def get_molecule (input_path, name, input_charge, current_dir, debug=2):
 
     molec_fname = os.path.join(current_dir, f"Molecule_{name}.mol")
-    output_fname = os.path.join(current_dir, "mol.out")
+    output_fname = os.path.join(current_dir, f"mol_{name}.out")
 
     with open(output_fname, "w") as output:
         with redirect_stdout(output):
@@ -31,6 +31,11 @@ def get_molecule (input_path, name, input_charge, current_dir, debug=2):
             print(f"The number of molecules in the xyz : blocklist={len(blocklist)}")
             if len(blocklist) > 1:
                 print("Input file includes more than one molecules. Stopping")
+                for i, block in enumerate(blocklist):
+                    block_labels = [labels[i] for i in block]
+                    block_coords = [coords[i] for i in block]
+                    print(f"Found block {i}", labels2formula(block_labels), len(block_labels), "atoms")
+                    writexyz(os.getcwd(), f"Block_{name}_{i}.xyz", block_labels, block_coords)
                 return
             if len(blocklist) == 0:
                 print("No molecule found from the input file")
@@ -116,8 +121,10 @@ def get_molecule (input_path, name, input_charge, current_dir, debug=2):
 if __name__ == "__main__":
 
     input = sys.argv[1]
-    input_charge = sys.argv[2]
-    input_charge = int(input_charge) 
+    if len(sys.argv) > 2 and sys.argv[2].strip() != "":
+        input_charge = int(sys.argv[2])
+    else:
+        input_charge = None
     current_dir = os.getcwd()
     input_path = os.path.normpath(input)
     dir, file = os.path.split(input_path)

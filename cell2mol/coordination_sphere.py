@@ -64,7 +64,7 @@ def define_coordination_geometry (metal: object, coord_group: list, debug: int=0
         coordination_geometry = "Undefined"
         geom_deviation = "Undefined"
 
-    if debug >= 2 :
+    if debug >= 1 :
         # for haptic ligands, it's the mid point of haptic ligands
         print(f"METAL.DEFINE_coordination_geometry: The number of coordinating points: {coord_nr}")
         print(f"METAL.DEFINE_coordination_geometry: {posgeom_dev}")
