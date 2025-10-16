@@ -538,7 +538,8 @@ def validate_reference_molecules(self, debug):
 
 ######################################################
 def predict_metal_ox (metal:object, debug: int=0) -> None:
-    model = "Fe_mono_m_ox_5486.pkl"
+    # TODO: Update the model path
+    model = ""
     feature = generate_feature_vector (metal, target_prop = "m_ox", debug=debug)
     path_rf = os.path.join( os.path.abspath(os.path.dirname(__file__)), model)
     ramdom_forest = pickle.load(open(path_rf, 'rb'))
