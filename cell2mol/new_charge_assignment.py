@@ -2,7 +2,7 @@ import numpy as np
 import copy
 
 from cell2mol.charge_assignment import (
-    protonation,
+    Protonation,
     get_charge,
     get_charge_manual,
     aromatic_info_v2,
@@ -370,7 +370,7 @@ def set_charge_state(reference, target, mode, debug: int = 0):
                     f"SET_CHARGE_STATE:({target.subtype}) {target.formula} {final_charge=} Create Empty PROTONATION for this specie"
                 )
             empty_list = [int(0)] * len(target.labels)
-            empty_prot = protonation.from_positional(
+            empty_prot = Protonation.from_positional(
                 target.labels,
                 target.coord,
                 target.cov_factor,
@@ -505,7 +505,7 @@ def prepare_mol(mol, debug: int = 0):
 
 ######################################################
 def create_bonds_specie(specie, rdkit_obj: object = None, debug: int = 0):
-    from cell2mol.classes import bond
+    from cell2mol.classes import Bond
 
     if debug >= 1:
         print(
@@ -566,7 +566,7 @@ def create_bonds_specie(specie, rdkit_obj: object = None, debug: int = 0):
                                 specie.atoms[start].label,
                                 specie.atoms[end].label,
                             )
-                        new_bond = bond.from_positional(
+                        new_bond = Bond.from_positional(
                             specie.atoms[start], specie.atoms[end], bond_order
                         )
                         specie.atoms[idx].add_bond(new_bond)
@@ -600,7 +600,7 @@ def create_bonds_specie(specie, rdkit_obj: object = None, debug: int = 0):
                                 specie.atoms[start].label,
                                 specie.atoms[end].label,
                             )
-                        new_bond = bond.from_positional(
+                        new_bond = Bond.from_positional(
                             specie.atoms[start], specie.atoms[end], bond_order
                         )
                         specie.atoms[idx].add_bond(new_bond)
@@ -695,7 +695,7 @@ def create_bonds_specie(specie, rdkit_obj: object = None, debug: int = 0):
                                 specie.atoms[start].label,
                                 specie.atoms[end].label,
                             )
-                        new_bond = bond.from_positional(
+                        new_bond = Bond.from_positional(
                             specie.atoms[start], specie.atoms[end], bond_order
                         )
                         specie.atoms[idx].add_bond(new_bond)
@@ -740,7 +740,7 @@ def create_bonds_specie(specie, rdkit_obj: object = None, debug: int = 0):
 ######################################################
 def create_metal_ligand_bonds(mol, debug: int = 0):
     # Third Part. Adds Metal-Ligand Bonds, with a zero order:
-    from cell2mol.classes import bond
+    from cell2mol.classes import Bond
 
     if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
         for lig in mol.ligands:
@@ -757,7 +757,7 @@ def create_metal_ligand_bonds(mol, debug: int = 0):
                         else:
                             bond_startatom = met
                             bond_endatom = at
-                        newbond = bond.from_positional(bond_startatom, bond_endatom, 0)
+                        newbond = Bond.from_positional(bond_startatom, bond_endatom, 0)
                         # Chem.BondType.DATIVE
                         at.add_bond(newbond)
                         met.add_bond(newbond)
@@ -775,7 +775,7 @@ def create_metal_ligand_bonds(mol, debug: int = 0):
 
 ######################################################
 def create_metal_metal_bonds(mol, debug: int = 0):
-    from cell2mol.classes import bond
+    from cell2mol.classes import Bond
 
     # Adds Metal-Metal Bonds, with a zero order:
     if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
@@ -800,7 +800,7 @@ def create_metal_metal_bonds(mol, debug: int = 0):
                         else:
                             bond_startatom = met2
                             bond_endatom = met1
-                        newbond = bond.from_positional(bond_startatom, bond_endatom, 0)
+                        newbond = Bond.from_positional(bond_startatom, bond_endatom, 0)
                         met1.add_bond(newbond)
                         met2.add_bond(newbond)
 

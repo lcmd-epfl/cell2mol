@@ -4,7 +4,7 @@ import logging
 from cell2mol.refcell import process_refcell
 from contextlib import redirect_stdout
 from ase.io import read
-from cell2mol.classes import cell
+from cell2mol.classes import Cell
 from cell2mol.final_c2m_module import cell2mol_mode
 from cell2mol.other import handle_error
 from cell2mol.read_write import print_refmoleclist, print_possible_charges
@@ -55,7 +55,7 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
             )
 
             # Create and process unit cell
-            newcell = cell.from_positional(
+            newcell = Cell.from_positional(
                 name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param
             )
             newcell.set_subtype("unitcell")

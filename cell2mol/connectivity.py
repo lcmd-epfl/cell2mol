@@ -1830,7 +1830,7 @@ def mol_with_atom_index(mol):
 def split_group(
     original_group, conn_idx, final_ligand_indices, connected_metal, debug: int = 0
 ):
-    from cell2mol.classes import group
+    from cell2mol.classes import Group
 
     # Split the "group" to obtain the groups connected to a specific metal
     splitted_groups = []
@@ -1921,7 +1921,7 @@ def split_group(
         if debug > 1:
             print(f"\t\tGROUP.SPLIT_GROUP: {gr_atom_site_labels=}")
         # Create Group Object
-        newgroup = group.from_positional(
+        newgroup = Group.from_positional(
             gr_labels, gr_coord, gr_frac_coord, radii=gr_radii
         )
         if debug > 1:
