@@ -22,15 +22,19 @@ def test_cell2mol():
 
 
 def test_check_cell_vs_data():
-
     cell = test_cell2mol()
 
     assert cell.version == "V1.0"
     assert cell.refcode == "YOXKUS"
     assert np.allclose(
         cell.cellvec,
-        np.array([[15.136, 0.0, 0.0], [0.0, 8.798, 0.0], [-4.1830788, 0.0, 17.4721325]]))
-    assert np.allclose(cell.cellparam, np.array([15.136, 8.798, 17.9659, 90.0, 103.464, 90.0]))
+        np.array(
+            [[15.136, 0.0, 0.0], [0.0, 8.798, 0.0], [-4.1830788, 0.0, 17.4721325]]
+        ),
+    )
+    assert np.allclose(
+        cell.cellparam, np.array([15.136, 8.798, 17.9659, 90.0, 103.464, 90.0])
+    )
     assert cell.labels == [
         "Re",
         "Re",
@@ -470,7 +474,6 @@ def test_check_cell_vs_data():
 
 
 def test_check_cellrefmoleclist():
-
     cell = test_cell2mol()
     for mol in cell.refmoleclist:
         assert mol.refcode == "YOXKUS"

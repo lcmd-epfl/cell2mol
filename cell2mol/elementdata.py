@@ -979,8 +979,8 @@ class ElementData:
             "Mg": 0.880,  # Modded Sergi, Was 1.11
             "Al": 1.350,
             "Si": 1.100,
-            #"Si": 1.200,
-            "P": 0.820,   # Modded Sergi, Was 0.75
+            # "Si": 1.200,
+            "P": 0.820,  # Modded Sergi, Was 0.75
             "S": 1.020,
             "Cl": 0.990,
             "Ar": 1.570,
@@ -1079,36 +1079,36 @@ class ElementData:
             "Mt": 1.600,
         }
 
-        # Covalent radii, from DOI	https://doi.org/10.1039/B801115J Cordero et al. "Covalent radii revisited" (2008) 
+        # Covalent radii, from DOI	https://doi.org/10.1039/B801115J Cordero et al. "Covalent radii revisited" (2008)
         self.CovalentRadius3 = {
-            "H" : 0.31,
-            "D" : 0.31,
+            "H": 0.31,
+            "D": 0.31,
             "He": 0.28,
-            "Li": 1.28,  
-            "Be": 0.96,  
-            "B" : 0.84,
-            "C" : 0.73,   # Csp3 0.76 Csp2 0.73 Csp 0.69
-            "N" : 0.71,
-            "O" : 0.66,
-            "F" : 0.57,
+            "Li": 1.28,
+            "Be": 0.96,
+            "B": 0.84,
+            "C": 0.73,  # Csp3 0.76 Csp2 0.73 Csp 0.69
+            "N": 0.71,
+            "O": 0.66,
+            "F": 0.57,
             "Ne": 0.58,
-            "Na": 1.66,  
-            "Mg": 1.41,  
+            "Na": 1.66,
+            "Mg": 1.41,
             "Al": 1.21,
             "Si": 1.11,
-            "P" : 1.07,   
-            "S" : 1.05,
+            "P": 1.07,
+            "S": 1.05,
             "Cl": 1.02,
             "Ar": 1.06,
-            "K" : 2.03,  
+            "K": 2.03,
             "Ca": 1.76,
             "Sc": 1.70,
             "Ti": 1.60,
-            "V" : 1.53,
-            "Cr": 1.39, 
-            "Mn": 1.39,     # Mn low-spin 1.39 Mn high-spin 1.61
-            "Fe": 1.32,     # Fe low-spin 1.32 Fe high-spin 1.52
-            "Co": 1.26,     # Co low-spin 1.26 Co high-spin 1.50    
+            "V": 1.53,
+            "Cr": 1.39,
+            "Mn": 1.39,  # Mn low-spin 1.39 Mn high-spin 1.61
+            "Fe": 1.32,  # Fe low-spin 1.32 Fe high-spin 1.52
+            "Co": 1.26,  # Co low-spin 1.26 Co high-spin 1.50
             "Ni": 1.24,
             "Cu": 1.32,
             "Zn": 1.22,
@@ -1120,7 +1120,7 @@ class ElementData:
             "Kr": 1.16,
             "Rb": 2.20,
             "Sr": 1.95,
-            "Y" : 1.90,
+            "Y": 1.90,
             "Zr": 1.75,
             "Nb": 1.64,
             "Mo": 1.54,
@@ -1133,8 +1133,8 @@ class ElementData:
             "In": 1.42,
             "Sn": 1.39,
             "Sb": 1.39,
-            "Te": 1.38,  
-            "I" : 1.39,
+            "Te": 1.38,
+            "I": 1.39,
             "Xe": 1.40,
             "Cs": 2.44,
             "Ba": 2.15,
@@ -1155,7 +1155,7 @@ class ElementData:
             "Lu": 1.87,
             "Hf": 1.75,
             "Ta": 1.70,
-            "W" : 1.62,
+            "W": 1.62,
             "Re": 1.51,
             "Os": 1.44,
             "Ir": 1.41,
@@ -1173,7 +1173,7 @@ class ElementData:
             "Ac": 2.15,
             "Th": 2.06,
             "Pa": 2.00,
-            "U" : 1.96,
+            "U": 1.96,
             "Np": 1.90,
             "Pu": 1.87,
             "Am": 1.80,

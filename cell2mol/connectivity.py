@@ -1,6 +1,5 @@
 import warnings
 import numpy as np
-from scipy import sparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
 from typing import Tuple
@@ -9,12 +8,23 @@ from cell2mol.elementdata import ElementData
 from cell2mol.read_write import writexyz
 import os
 import networkx as nx
-import re
 from cell2mol.missingH import get_missingH_from_adjacency
+
 elemdatabase = ElementData()
 
+
 #######################################################
-def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: list, element: str="H", removed_idx: list=None, unconditional: bool=False, debug: int=0) -> Tuple[bool, list, list]:
+def add_atom(
+    labels: list,
+    coords: list,
+    site: int,
+    ligand: object,
+    metalist: list,
+    element: str = "H",
+    removed_idx: list = None,
+    unconditional: bool = False,
+    debug: int = 0,
+) -> Tuple[bool, list, list]:
     from cell2mol.other import get_dist
     # This function adds one atom of a given "element" to a given "site=atom index" of a "ligand".
     # It does so at the position of the closest "metal" atom to the "site"
@@ -28,16 +38,23 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
     newcoord = coords.copy()
     newlab.append(str(element))  # One H atom will be added
 
-    if debug > 2: print("ADD_ATOM: Metalist length", len(metalist))
-    if debug > 2: print("ADD_ATOM: Ligand Atoms", len(ligand.atoms))
-    if debug >= 2: print("ADD_ATOM: site=", site)
-    if debug >= 2: print("ADD_ATOM: target ligand atom ", ligand.atoms[site].label)
+    if debug > 2:
+        print("ADD_ATOM: Metalist length", len(metalist))
+    if debug > 2:
+        print("ADD_ATOM: Ligand Atoms", len(ligand.atoms))
+    if debug >= 2:
+        print("ADD_ATOM: site=", site)
+    if debug >= 2:
+        print("ADD_ATOM: target ligand atom ", ligand.atoms[site].label)
     # It is adding the element (H, O, or whatever) at the vector formed by the closest TM atom and the "site"
     for idx, a in enumerate(ligand.atoms):
         if idx == site:
             apos = np.array(a.coord.copy())
-            tgt  = a.get_closest_metal(metalist)
-            if debug >= 2: print(f"ADD_ATOM: evaluating atom position={apos} and metal position={tgt.coord}")
+            tgt = a.get_closest_metal(metalist)
+            if debug >= 2:
+                print(
+                    f"ADD_ATOM: evaluating atom position={apos} and metal position={tgt.coord}"
+                )
             # ligand_idx = tgt.get_parent_index("ligand")
             metal_idx = tgt.get_parent_index("molecule")
             dist = get_dist(apos, tgt.coord)
@@ -48,71 +65,107 @@ def add_atom(labels: list, coords: list, site: int, ligand: object, metalist: li
             newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])
 
             # Evaluates the new adjacency matrix.
-            dummy, tmpconmat, tmpconnec, warning = get_adjmatrix(newlab, newcoord, ligand.cov_factor, add_atoms=True)
+            dummy, tmpconmat, tmpconnec, warning = get_adjmatrix(
+                newlab, newcoord, ligand.cov_factor, add_atoms=True
+            )
             # if debug >= 2: print(f"ADD_ATOM: received {newlab=}")
             # if debug >= 2: print(f"ADD_ATOM: received {tmpconmat=}")
             # if debug >= 2: print(f"ADD_ATOM: received {tmpconnec=}")
-            if debug >= 2: print(f"ADD_ATOM: received tmpconnec[posadded]={int(tmpconnec[posadded])}")
+            if debug >= 2:
+                print(
+                    f"ADD_ATOM: received tmpconnec[posadded]={int(tmpconnec[posadded])}"
+                )
             newlab_with_metal = newlab.copy()
             newcoord_with_metal = newcoord.copy()
             newlab_with_metal.append(tgt.label)
             newcoord_with_metal.append(tgt.coord)
             # If no undesired adjacencies have been created, the coordinates are kept
-            if  unconditional:
+            if unconditional:
                 isadded = True
-                if debug >= 1: print(f"ADD_ATOM: {element} is added at site {site} of ligand {ligand.formula} to generate a protonation state")
+                if debug >= 1:
+                    print(
+                        f"ADD_ATOM: {element} is added at site {site} of ligand {ligand.formula} to generate a protonation state"
+                    )
             elif tmpconnec[posadded] <= 1:
                 isadded = True
-                if debug >= 2: print(f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} is added at site {site}")
+                if debug >= 2:
+                    print(
+                        f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} is added at site {site}"
+                    )
             # Otherwise, coordinates are reset
-            elif tmpconnec[posadded] > 1 and removed_idx is not None and len(removed_idx) > 0 :
-                set1 = set([i for i, c in enumerate(tmpconmat[posadded]) if c != 0 ])
+            elif (
+                tmpconnec[posadded] > 1
+                and removed_idx is not None
+                and len(removed_idx) > 0
+            ):
+                set1 = set([i for i, c in enumerate(tmpconmat[posadded]) if c != 0])
                 set2 = set(removed_idx)
-                if debug >= 1: print(f"ADD_ATOM: {element} is connected with ligand atoms with indices {set1}. previously removed indices {set2}")
+                if debug >= 1:
+                    print(
+                        f"ADD_ATOM: {element} is connected with ligand atoms with indices {set1}. previously removed indices {set2}"
+                    )
                 result = list(set1 - set2)
-                if debug >= 2: print(f"ADD_ATOM: {element} is connected with ligand atoms with indices {result=}. ")
+                if debug >= 2:
+                    print(
+                        f"ADD_ATOM: {element} is connected with ligand atoms with indices {result=}. "
+                    )
                 if len(result) <= 1:
                     isadded = True
-                    if debug >= 2: print(f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} is added at site {site} after previously removing atom {removed_idx}")
+                    if debug >= 2:
+                        print(
+                            f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} is added at site {site} after previously removing atom {removed_idx}"
+                        )
                 else:
-                    if debug >= 1: print(f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}")
-                    if debug > 2: writexyz(os.getcwd(), f"target_atom_{a.label}_{apos[0]}_newcoord_with_H_new{addedHcoords[0]}.xyz", newlab_with_metal, newcoord_with_metal)
+                    if debug >= 1:
+                        print(
+                            f"ADD_ATOM: Chosen Metal index {metal_idx}. {element} was added at site {site} but RESET due to connec={tmpconnec[posadded]}"
+                        )
+                    if debug > 2:
+                        writexyz(
+                            os.getcwd(),
+                            f"target_atom_{a.label}_{apos[0]}_newcoord_with_H_new{addedHcoords[0]}.xyz",
+                            newlab_with_metal,
+                            newcoord_with_metal,
+                        )
                     isadded = False
                     newlab = labels.copy()
                     newcoord = coords.copy()
 
     return isadded, newlab, newcoord
+
+
 #######################################################
 def point_along_vector(point1, point2, distance):
     """
     Calculate the coordinates of a point along the vector between two points
     with a specified distance from the first point.
-    
+
     Args:
     - point1: Coordinates of the first point (numpy array or list)
     - point2: Coordinates of the second point (numpy array or list)
     - distance: Distance from the first point to the new point (float)
-    
+
     Returns:
     - Coordinates of the new point (numpy array)
     """
     # Convert input to numpy arrays
     point1 = np.array(point1)
     point2 = np.array(point2)
-    
+
     # Calculate the vector between the two points
     vector = point2 - point1
-    
+
     # Normalize the vector
     normalized_vector = vector / np.linalg.norm(vector)
-    
+
     # Calculate the coordinates of the new point
     new_point = point1 + normalized_vector * distance
-    
+
     return new_point
 
+
 #######################################################
-def find_closest_metal(atom: object, metalist: list, debug: int=0):
+def find_closest_metal(atom: object, metalist: list, debug: int = 0):
     apos = np.array(atom.coord)
     dist = []
     for met in metalist:
@@ -121,9 +174,10 @@ def find_closest_metal(atom: object, metalist: list, debug: int=0):
     # returns the closest metal atom
     return np.argmin(dist)
 
+
 ################################
 def is_single_ring(labels, coord):
-    """ Check if the group is a ring """
+    """Check if the group is a ring"""
     isgood, adjmat, adjnum, warning = get_adjmatrix(labels, coord)
 
     # Convert adjacency matrix to a NetworkX graph
@@ -132,10 +186,10 @@ def is_single_ring(labels, coord):
     # Check if the graph is connected
     if not nx.is_connected(G):
         return False  # If not connected, can't form a single ring
-    
+
     # Check for cycles and ensure the graph forms a simple cycle
     cycle_basis = nx.cycle_basis(G)
-    
+
     # Check if there's exactly one cycle that includes all nodes (simple ring)
     if len(cycle_basis) == 1 and len(cycle_basis[0]) == len(G.nodes):
         print("Ring group", len(labels), labels)
@@ -145,9 +199,11 @@ def is_single_ring(labels, coord):
     #     return False, cycle_basis[0]  # The graph has a cycle but not all nodes are included
 
     return False  # Otherwise, not a ring compound
+
+
 ################################
-def check_blocklist (conn_labels, conn_coord, blocklist, debug: int=2):
-    """ Split a list of atoms into blocks of connected atoms """
+def check_blocklist(conn_labels, conn_coord, blocklist, debug: int = 2):
+    """Split a list of atoms into blocks of connected atoms"""
     new_blocklist = []
     for b in blocklist:
         if debug >= 2:
@@ -159,19 +215,27 @@ def check_blocklist (conn_labels, conn_coord, blocklist, debug: int=2):
         if nx.is_connected(G):
             cycle_basis = nx.cycle_basis(G)
             if len(cycle_basis) == 1:
-                print(f"\t\tCHECK_blocklist: Found single cycle in block {b}: {cycle_basis[0]}")
+                print(
+                    f"\t\tCHECK_blocklist: Found single cycle in block {b}: {cycle_basis[0]}"
+                )
                 if len(cycle_basis[0]) == len(G.nodes):
-                    #print([b[idx] for idx in cycle_basis[0]])
+                    # print([b[idx] for idx in cycle_basis[0]])
                     new_blocklist.append(b)
                 elif len(cycle_basis[0]) != len(G.nodes):
-                    print(f"\t\t{[b[idx] for idx in cycle_basis[0]], sorted([b[idx] for idx in cycle_basis[0]])}")
+                    print(
+                        f"\t\t{[b[idx] for idx in cycle_basis[0]], sorted([b[idx] for idx in cycle_basis[0]])}"
+                    )
                     new_blocklist.append(sorted([b[idx] for idx in cycle_basis[0]]))
                     remaining = [n for n in G.nodes if n not in cycle_basis[0]]
                     print(f"\t\tCHECK_blocklist: Remaining nodes in block: {remaining}")
-                    
-                    rem_labels = extract_from_list(remaining, conn_labels, dimension=1, debug=debug)
+
+                    rem_labels = extract_from_list(
+                        remaining, conn_labels, dimension=1, debug=debug
+                    )
                     rem_coord = extract_from_list(remaining, conn_coord, dimension=1)
-                    isgood, adjmat_rem, adjnum, warning = get_adjmatrix(rem_labels, rem_coord)
+                    isgood, adjmat_rem, adjnum, warning = get_adjmatrix(
+                        rem_labels, rem_coord
+                    )
                     G_rem = nx.from_numpy_array(np.array(adjmat_rem))
                     for comp in nx.connected_components(G_rem):
                         remaining_block = [remaining[idx] for idx in comp]
@@ -188,74 +252,115 @@ def check_blocklist (conn_labels, conn_coord, blocklist, debug: int=2):
 
 
 ################################
-def add_hydrogens (labels: list, coords: list, site: int, ligand: object, num_hydrogens: int, element: str="H", debug: int=0) -> Tuple[bool, list, list]:
+def add_hydrogens(
+    labels: list,
+    coords: list,
+    site: int,
+    ligand: object,
+    num_hydrogens: int,
+    element: str = "H",
+    debug: int = 0,
+) -> Tuple[bool, list, list]:
     # Original labels and coordinates are copied
     isadded = True
     newlab = labels.copy()
-    newcoord = coords.copy()   
+    newcoord = coords.copy()
     for idx, a in enumerate(ligand.atoms):
         if idx == site:
             apos = np.array(a.coord.copy())
             bonded_atom_coord = []
             bonded_atom_labels = []
-            
+
             for adj in a.adjacency:
                 n_label = ligand.get_parent("molecule").labels[adj]
                 n_coord = ligand.get_parent("molecule").coord[adj]
-                if elemdatabase.elementblock[n_label] == 'd' or elemdatabase.elementblock[n_label] == 'f':
-                        pass
+                if (
+                    elemdatabase.elementblock[n_label] == "d"
+                    or elemdatabase.elementblock[n_label] == "f"
+                ):
+                    pass
                 else:
                     bonded_atom_coord.append(n_coord)
                     bonded_atom_labels.append(n_label)
 
-            if debug >= 2: 
-                print("\t\tADD_HYDROGENS:", a.label, a.atom_site_label, a.adjacency, bonded_atom_labels, f"will add {num_hydrogens=}")
+            if debug >= 2:
+                print(
+                    "\t\tADD_HYDROGENS:",
+                    a.label,
+                    a.atom_site_label,
+                    a.adjacency,
+                    bonded_atom_labels,
+                    f"will add {num_hydrogens=}",
+                )
 
             if a.label == "C":
-                ismissingH, report, num_missingH = get_missingH_from_adjacency(a.atnum, a.coord, bonded_atom_coord, bonded_atom_labels)
-                if debug >= 2: print("\t\tADD_HYDROGENS: ismissingH", ismissingH, report, num_missingH)
+                ismissingH, report, num_missingH = get_missingH_from_adjacency(
+                    a.atnum, a.coord, bonded_atom_coord, bonded_atom_labels
+                )
+                if debug >= 2:
+                    print(
+                        "\t\tADD_HYDROGENS: ismissingH",
+                        ismissingH,
+                        report,
+                        num_missingH,
+                    )
             else:
                 ismissingH, report, num_missingH = True, "", 2
-            
+
             if num_hydrogens == 2:
                 if len(bonded_atom_labels) == 1:
-                    Hs = place_hydrogens(apos, bonded_atom_coord[0], hybridization="sp2")
+                    Hs = place_hydrogens(
+                        apos, bonded_atom_coord[0], hybridization="sp2"
+                    )
                 elif len(bonded_atom_labels) == 2:
-                    Hs = place_hydrogens(apos, bonded_atom_coord[0], bonded_atom_coord[1], hybridization="sp3")            
+                    Hs = place_hydrogens(
+                        apos,
+                        bonded_atom_coord[0],
+                        bonded_atom_coord[1],
+                        hybridization="sp3",
+                    )
                 if Hs.shape[0] == 2:
                     newcoord.append(Hs[0])
                     newcoord.append(Hs[1])
                     newlab.extend([str(element), str(element)])
-                    if debug >= 2: 
-                        print(f"\t\tADD_HYDROGENS: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec} and label={a.label} ({a.atom_site_label})")
+                    if debug >= 2:
+                        print(
+                            f"\t\tADD_HYDROGENS: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec} and label={a.label} ({a.atom_site_label})"
+                        )
             elif num_hydrogens == 3:
                 if len(bonded_atom_labels) == 1:
-                    Hs = place_hydrogens(apos, bonded_atom_coord[0], hybridization="sp3")
-           
+                    Hs = place_hydrogens(
+                        apos, bonded_atom_coord[0], hybridization="sp3"
+                    )
+
                 if Hs.shape[0] == 3:
                     newcoord.append(Hs[0])
                     newcoord.append(Hs[1])
                     newcoord.append(Hs[2])
                     newlab.extend([str(element), str(element), str(element)])
                     if debug >= 2:
-                        print(f"\t\tADD_HYDROGENS: Added three {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec} and label={a.label} ({a.atom_site_label})")
+                        print(
+                            f"\t\tADD_HYDROGENS: Added three {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec} and label={a.label} ({a.atom_site_label})"
+                        )
                 # if Hs.shape[0] == 2:
                 #     newcoord.append(Hs[0])
                 #     newcoord.append(Hs[1])
                 #     newlab.extend([str(element), str(element)])
-                #     if debug >= 2: 
+                #     if debug >= 2:
                 #         print(f"\t\tADD_TWO_HYDROGENS: Added two {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec} and label={a.label}")
                 # elif Hs.shape[0] == 1:
                 #     newcoord.append(Hs[0])
                 #     newlab.extend([str(element)])
-                #     if debug >= 2: 
+                #     if debug >= 2:
                 #         print(f"\t\tADD_TWO_HYDROGENS: Added one {element} to atom {site} with: a.mconnec={a.mconnec} a.connec={a.connec}  and label={a.label}")
 
     return isadded, newlab, newcoord
 
+
 def normalize(v):
     n = np.linalg.norm(v)
     return v / n if n != 0 else v
+
 
 def kabsch_rotation(P, Q):
     """
@@ -270,6 +375,7 @@ def kabsch_rotation(P, Q):
         Vt[-1, :] *= -1
         R = Vt.T @ U.T
     return R
+
 
 def _perp_unit(u):
     """Deterministic unit vector perpendicular to u."""
@@ -286,8 +392,17 @@ def _perp_unit(u):
             raise ValueError("Cannot construct a perpendicular direction.")
     return v / nv
 
-def place_hydrogens(C, N1=None, N2=None, N3=None, r_CH=1.09, hybridization="auto",
-                    sp2_angle_window=(95, 145), sp3_angle_window=(95, 125)):
+
+def place_hydrogens(
+    C,
+    N1=None,
+    N2=None,
+    N3=None,
+    r_CH=1.09,
+    hybridization="auto",
+    sp2_angle_window=(95, 145),
+    sp3_angle_window=(95, 125),
+):
     """
     Place hydrogens on a carbon with 1–3 existing neighbors.
 
@@ -318,14 +433,14 @@ def place_hydrogens(C, N1=None, N2=None, N3=None, r_CH=1.09, hybridization="auto
     for i, N in enumerate(neighbors):
         u = np.asarray(N, float) - C
         if np.linalg.norm(u) < 1e-12:
-            raise ValueError(f"Neighbor {i+1} coincides with C.")
+            raise ValueError(f"Neighbor {i + 1} coincides with C.")
         us.append(normalize(u))
 
     # Tetrahedral template (four directions)
-    u1 = normalize(np.array([ 1,  1,  1], float))
-    u2 = normalize(np.array([ 1, -1, -1], float))
-    u3 = normalize(np.array([-1,  1, -1], float))
-    u4 = normalize(np.array([-1, -1,  1], float))
+    u1 = normalize(np.array([1, 1, 1], float))
+    u2 = normalize(np.array([1, -1, -1], float))
+    u3 = normalize(np.array([-1, 1, -1], float))
+    u4 = normalize(np.array([-1, -1, 1], float))
     Utemp = [u1, u2, u3, u4]
 
     mode = hybridization.lower()
@@ -339,10 +454,10 @@ def place_hydrogens(C, N1=None, N2=None, N3=None, r_CH=1.09, hybridization="auto
             mode = "sp3"  # default to methyl (CH3)
         if mode == "sp2":
             # Planar CH2: two H's in plane ⟂? Actually in plane defined by a and some perp axis.
-            p1 = normalize(-a)          # opposite to neighbor
-            p2 = _perp_unit(a)          # any unit vector ⟂ a defines the plane
+            p1 = normalize(-a)  # opposite to neighbor
+            p2 = _perp_unit(a)  # any unit vector ⟂ a defines the plane
             c60 = 0.5
-            s60 = np.sqrt(3)/2.0
+            s60 = np.sqrt(3) / 2.0
             d1 = normalize(c60 * p1 + s60 * p2)
             d2 = normalize(c60 * p1 - s60 * p2)
             H1 = C + r_CH * d1
@@ -351,8 +466,8 @@ def place_hydrogens(C, N1=None, N2=None, N3=None, r_CH=1.09, hybridization="auto
         else:  # sp3 → three hydrogens (methyl)
             # Align template so one vertex aligns with neighbor; fix rotation using a ⟂ axis
             b_perp = _perp_unit(a)
-            P = np.stack([u1, u2], axis=1)        # template pair to pin orientation
-            Q = np.stack([a,   b_perp], axis=1)   # target pair
+            P = np.stack([u1, u2], axis=1)  # template pair to pin orientation
+            Q = np.stack([a, b_perp], axis=1)  # target pair
             R = kabsch_rotation(P, Q)
             dH2 = normalize(R @ u2)
             dH3 = normalize(R @ u3)
@@ -360,7 +475,7 @@ def place_hydrogens(C, N1=None, N2=None, N3=None, r_CH=1.09, hybridization="auto
             H2 = C + r_CH * dH2
             H3 = C + r_CH * dH3
             H4 = C + r_CH * dH4
-            return np.vstack([H2, H3, H4])        # three hydrogens
+            return np.vstack([H2, H3, H4])  # three hydrogens
 
     # ---------- CASE: 2 neighbors ----------
     if n_nb == 2:
@@ -373,24 +488,26 @@ def place_hydrogens(C, N1=None, N2=None, N3=None, r_CH=1.09, hybridization="auto
             # In-plane bisector opposite to existing bonds
             dH = -(a + b)
             if np.linalg.norm(dH) < 1e-8:
-                raise ValueError("Neighbors nearly opposite (sp-like). Cannot place sp2 hydrogen reliably.")
+                raise ValueError(
+                    "Neighbors nearly opposite (sp-like). Cannot place sp2 hydrogen reliably."
+                )
             dH = normalize(dH)
             return np.array([C + r_CH * dH])  # one hydrogen
 
         def add_sp3_two():
             # Align two template directions to a,b then use the other two for H's
-            P = np.stack([u1, u2], axis=1)   # 3x2 template
-            Q = np.stack([a,  b ], axis=1)   # 3x2 targets
+            P = np.stack([u1, u2], axis=1)  # 3x2 template
+            Q = np.stack([a, b], axis=1)  # 3x2 targets
             R = kabsch_rotation(P, Q)
             dH1 = normalize(R @ u3)
             dH2 = normalize(R @ u4)
             H1 = C + r_CH * dH1
             H2 = C + r_CH * dH2
-            return np.vstack([H1, H2])       # two hydrogens
+            return np.vstack([H1, H2])  # two hydrogens
 
         if mode == "auto":
-            in_sp3 = (sp3_angle_window[0] <= angle <= sp3_angle_window[1])
-            in_sp2 = (sp2_angle_window[0] <= angle <= sp2_angle_window[1])
+            in_sp3 = sp3_angle_window[0] <= angle <= sp3_angle_window[1]
+            in_sp2 = sp2_angle_window[0] <= angle <= sp2_angle_window[1]
             if in_sp3 and not in_sp2:
                 return add_sp3_two()
             if in_sp2 and not in_sp3:
@@ -412,11 +529,13 @@ def place_hydrogens(C, N1=None, N2=None, N3=None, r_CH=1.09, hybridization="auto
         if mode == "auto":
             mode = "sp3"
         if mode != "sp3":
-            raise ValueError("With 3 neighbors, only 'sp3' is supported (adds one hydrogen).")
+            raise ValueError(
+                "With 3 neighbors, only 'sp3' is supported (adds one hydrogen)."
+            )
         a, b, c = us
         # Align three template directions to the three neighbors; remaining vertex gives H
-        P = np.stack([u1, u2, u3], axis=1)    # 3x3 template
-        Q = np.stack([a,  b,  c ], axis=1)    # 3x3 targets
+        P = np.stack([u1, u2, u3], axis=1)  # 3x3 template
+        Q = np.stack([a, b, c], axis=1)  # 3x3 targets
         R = kabsch_rotation(P, Q)
         dH = normalize(R @ u4)
         H = C + r_CH * dH
@@ -424,9 +543,17 @@ def place_hydrogens(C, N1=None, N2=None, N3=None, r_CH=1.09, hybridization="auto
 
     # Should not reach here
     raise RuntimeError("Unhandled neighbor count.")
-        
-def place_hydrogens_v1 (C, N1, N2, r_CH=1.09, hybridization="auto",
-                    sp2_angle_window=(95, 145), sp3_angle_window=(95, 125)):
+
+
+def place_hydrogens_v1(
+    C,
+    N1,
+    N2,
+    r_CH=1.09,
+    hybridization="auto",
+    sp2_angle_window=(95, 145),
+    sp3_angle_window=(95, 125),
+):
     """
     Place hydrogens on a carbon with two existing neighbors.
 
@@ -470,20 +597,22 @@ def place_hydrogens_v1 (C, N1, N2, r_CH=1.09, hybridization="auto",
         # In-plane bisector opposite to existing bonds
         dH = -(a + b)
         if np.linalg.norm(dH) < 1e-8:
-            raise ValueError("Neighbors nearly opposite (sp-like). Cannot place sp2 hydrogen reliably.")
+            raise ValueError(
+                "Neighbors nearly opposite (sp-like). Cannot place sp2 hydrogen reliably."
+            )
         dH = normalize(dH)
         return np.array([C + r_CH * dH])
 
     def add_sp3():
         # Tetrahedral template (four directions)
-        u1 = normalize(np.array([ 1,  1,  1], float))
-        u2 = normalize(np.array([ 1, -1, -1], float))
-        u3 = normalize(np.array([-1,  1, -1], float))
-        u4 = normalize(np.array([-1, -1,  1], float))
+        u1 = normalize(np.array([1, 1, 1], float))
+        u2 = normalize(np.array([1, -1, -1], float))
+        u3 = normalize(np.array([-1, 1, -1], float))
+        u4 = normalize(np.array([-1, -1, 1], float))
 
         # Align template u1,u2 to actual directions a,b (order doesn't matter much)
         P = np.stack([u1, u2], axis=1)  # 3x2
-        Q = np.stack([a,  b ], axis=1)  # 3x2
+        Q = np.stack([a, b], axis=1)  # 3x2
         R = kabsch_rotation(P, Q)
 
         dH1 = normalize(R @ u3)
@@ -496,8 +625,8 @@ def place_hydrogens_v1 (C, N1, N2, r_CH=1.09, hybridization="auto",
     mode = hybridization.lower()
     if mode == "auto":
         # Prefer sp3 if close to tetrahedral, else sp2 if closer to trigonal
-        in_sp3 = (sp3_angle_window[0] <= angle <= sp3_angle_window[1])
-        in_sp2 = (sp2_angle_window[0] <= angle <= sp2_angle_window[1])
+        in_sp3 = sp3_angle_window[0] <= angle <= sp3_angle_window[1]
+        in_sp2 = sp2_angle_window[0] <= angle <= sp2_angle_window[1]
 
         if in_sp3 and not in_sp2:
             return add_sp3()
@@ -517,25 +646,32 @@ def place_hydrogens_v1 (C, N1, N2, r_CH=1.09, hybridization="auto",
         return add_sp2()
     else:
         raise ValueError("hybridization must be 'auto', 'sp2', or 'sp3'.")
+
+
 ################################
 def labels2formula(labels: list):
     elems = elemdatabase.elementnr.keys()
-    formula=[]
+    formula = []
     for z in elems:
         nz = list(labels).count(z)
-        if nz > 1:   formula.append(f"{z}{nz}-")
-        if nz == 1:  formula.append(f"{z}-")
-    formula = ''.join(formula)[:-1] 
-    return formula 
+        if nz > 1:
+            formula.append(f"{z}{nz}-")
+        if nz == 1:
+            formula.append(f"{z}-")
+    formula = "".join(formula)[:-1]
+    return formula
+
 
 ################################
 def labels2ratio(labels):
     elems = elemdatabase.elementnr.keys()
-    ratio=[]
+    ratio = []
     for z in elems:
         nz = list(labels).count(z)
-        if nz > 0: ratio.append(nz)
+        if nz > 0:
+            ratio.append(nz)
     return ratio
+
 
 ################################
 def labels2electrons(labels):
@@ -545,78 +681,117 @@ def labels2electrons(labels):
             eleccount += elemdatabase.elementnr[l]
     elif type(labels) == str:
         eleccount = elemdatabase.elementnr[labels]
-    return eleccount 
+    return eleccount
+
 
 ################################
-def get_metal_idxs(labels: list, debug: int=0):
+def get_metal_idxs(labels: list, debug: int = 0):
     from cell2mol.elementdata import ElementData
+
     elemdatabase = ElementData()
     metal_indices = []
     for idx, l in enumerate(labels):
-        if (elemdatabase.elementblock[l] == 'd' or elemdatabase.elementblock[l] == 'f'): metal_indices.append(idx)
+        if elemdatabase.elementblock[l] == "d" or elemdatabase.elementblock[l] == "f":
+            metal_indices.append(idx)
     return metal_indices
 
+
 ################################
-def get_alkali_alkaline_earth_metal_idxs(labels: list, debug: int=0):
-    """ alkali metals (Group 1) and alkaline earth metals (Group 2)  """
+def get_alkali_alkaline_earth_metal_idxs(labels: list, debug: int = 0):
+    """alkali metals (Group 1) and alkaline earth metals (Group 2)"""
     non_transition_metal_indices = []
     for idx, l in enumerate(labels):
-        if elemdatabase.elementgroup[l]==1 and l != "H" and l != "D": # Alkali Metals
+        if elemdatabase.elementgroup[l] == 1 and l != "H" and l != "D":  # Alkali Metals
             non_transition_metal_indices.append(idx)
-        elif elemdatabase.elementgroup[l]==2 :     # Alkaline Earth Metals
+        elif elemdatabase.elementgroup[l] == 2:  # Alkaline Earth Metals
             non_transition_metal_indices.append(idx)
     return non_transition_metal_indices
+
+
 #################################
-def get_non_transition_metal_idxs(labels: list, debug: int=0):
-    """ alkali metals (Group 1) and alkaline earth metals (Group 2)  """
+def get_non_transition_metal_idxs(labels: list, debug: int = 0):
+    """alkali metals (Group 1) and alkaline earth metals (Group 2)"""
     non_transition_metal_indices = []
     for idx, l in enumerate(labels):
         # if elemdatabase.elementgroup[l]==1 and l != "H" and l != "D": # Alkali Metals
         #     non_transition_metal_indices.append(idx)
         # elif elemdatabase.elementgroup[l]==2 :     # Alkaline Earth Metals
         #     non_transition_metal_indices.append(idx)
-        if l in ["Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi", "Po", "At"]: # Post-Transition Metals
+        if l in [
+            "Al",
+            "Ga",
+            "Ge",
+            "In",
+            "Sn",
+            "Tl",
+            "Pb",
+            "Bi",
+            "Po",
+            "At",
+        ]:  # Post-Transition Metals
             non_transition_metal_indices.append(idx)
-        elif l in ["B", "Si", "Ge", "As", "Sb", "Te"] : # Metalloids
+        elif l in ["B", "Si", "Ge", "As", "Sb", "Te"]:  # Metalloids
             non_transition_metal_indices.append(idx)
     return non_transition_metal_indices
 
+
 #################################
-def get_post_transition_metal_idxs(labels: list, debug: int=0):
-    """ Post-Transition Metals """
+def get_post_transition_metal_idxs(labels: list, debug: int = 0):
+    """Post-Transition Metals"""
     post_transition_metal_indices = []
     for idx, l in enumerate(labels):
-        if l in ["Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"]: # Post-Transition Metals
+        if l in [
+            "Al",
+            "Ga",
+            "Ge",
+            "In",
+            "Sn",
+            "Tl",
+            "Pb",
+            "Bi",
+        ]:  # Post-Transition Metals
             post_transition_metal_indices.append(idx)
     return post_transition_metal_indices
+
 
 ################################
 def get_metal_species(labels: list):
     from cell2mol.elementdata import ElementData
+
     elemdatabase = ElementData()
     metal_species = []
     elems = list(set(labels))
     for idx, l in enumerate(elems):
-        if l[-1].isdigit(): label = l[:-1]
-        else: label = l
-        if (elemdatabase.elementblock[label] == 'd' or elemdatabase.elementblock[label] == 'f') and l not in metal_species: metal_species.append(l)
+        if l[-1].isdigit():
+            label = l[:-1]
+        else:
+            label = l
+        if (
+            elemdatabase.elementblock[label] == "d"
+            or elemdatabase.elementblock[label] == "f"
+        ) and l not in metal_species:
+            metal_species.append(l)
     return metal_species
 
+
 ################################
-def get_element_count(labels: list, heavy_only: bool=False) -> np.ndarray:
+def get_element_count(labels: list, heavy_only: bool = False) -> np.ndarray:
     elems = list(elemdatabase.elementnr.keys())
-    count = np.zeros((len(elems)),dtype=int)
+    count = np.zeros((len(elems)), dtype=int)
     for l in labels:
         for jdx, elem in enumerate(elems):
-            if l == elem:                             count[jdx] += 1
-            if (l == 'H' or l == 'D') and heavy_only: count = 0
+            if l == elem:
+                count[jdx] += 1
+            if (l == "H" or l == "D") and heavy_only:
+                count = 0
     return count
+
 
 ################################
 def get_adjacency_types(label: list, conmat: np.ndarray) -> np.ndarray:
     elems = elemdatabase.elementnr.keys()
     natoms = len(label)
-    bondtypes = np.zeros((len(elems), len(elems)),dtype=int)
+    bondtypes = np.zeros((len(elems), len(elems)), dtype=int)
     found = np.zeros((natoms, natoms))
 
     for i in range(0, natoms):
@@ -636,12 +811,15 @@ def get_adjacency_types(label: list, conmat: np.ndarray) -> np.ndarray:
                             break
     return bondtypes
 
+
 ################################
 def get_radii(labels: list) -> np.ndarray:
     radii = []
     for l in labels:
-        if l[-1].isdigit(): label = l[:-1]
-        else: label = l
+        if l[-1].isdigit():
+            label = l[:-1]
+        else:
+            label = l
         radii.append(elemdatabase.CovalentRadius3[label])
         # if elemdatabase.elementgroup[label] == 1 and label != "H":
         #     radii.append(elemdatabase.IonicRadius[f"{label}1+"])
@@ -651,10 +829,11 @@ def get_radii(labels: list) -> np.ndarray:
         #     radii.append(elemdatabase.CovalentRadius3[label])
     return np.array(radii)
 
+
 ################################
 def get_scaled_radii(radii, metal_idxs, alkali_idxs, metal_factor, cov_factor):
-    #print(f"get_scaled_radii: {metal_idxs=}, {alkali_idxs=}, {metal_factor=}, {cov_factor=}")
-    #print(f"get_scaled_radii: {radii=}")
+    # print(f"get_scaled_radii: {metal_idxs=}, {alkali_idxs=}, {metal_factor=}, {cov_factor=}")
+    # print(f"get_scaled_radii: {radii=}")
     scaled_radii = np.zeros_like(radii, dtype=float)
     for k in range(len(radii)):
         if k in metal_idxs:
@@ -663,13 +842,21 @@ def get_scaled_radii(radii, metal_idxs, alkali_idxs, metal_factor, cov_factor):
             scaled_radii[k] = radii[k] * metal_factor * 0.8
         else:
             scaled_radii[k] = radii[k] * cov_factor
-    #print(f"get_scaled_radii: {scaled_radii=}")
+    # print(f"get_scaled_radii: {scaled_radii=}")
     return scaled_radii
 
+
 ####################################
-def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.0, radii="default", metal_factor=1.3, metal_only: bool=False, add_atoms: bool=False) -> Tuple[int, list, list]:
-    
-    isgood = True 
+def get_adjmatrix(
+    labels: list,
+    pos: list,
+    cov_factor: float = 1.0,
+    radii="default",
+    metal_factor=1.3,
+    metal_only: bool = False,
+    add_atoms: bool = False,
+) -> Tuple[int, list, list]:
+    isgood = True
     clash_threshold = 0.3
     natoms = len(labels)
     adjmat = np.zeros((natoms, natoms))
@@ -679,54 +866,92 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.0, radii="default
 
     metal_idxs = get_metal_idxs(labels)
     alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
-    print(f"get_adjmatrix: metal_idxs={metal_idxs}, alkali_alkaline_earth_metal_idxs={alkali_alkaline_earth_metal_idxs}, metal_only={metal_only}, add_atoms={add_atoms}")
+    print(
+        f"get_adjmatrix: metal_idxs={metal_idxs}, alkali_alkaline_earth_metal_idxs={alkali_alkaline_earth_metal_idxs}, metal_only={metal_only}, add_atoms={add_atoms}"
+    )
     add_factor = 0.45
-    #add_factor = 0.3
+    # add_factor = 0.3
     # Sometimes argument radii np.ndarry, or list
     with warnings.catch_warnings():
         warnings.simplefilter(action="ignore", category=FutureWarning)
         if type(radii) == str:
             if radii == "default":
                 radii = get_radii(labels)
-                radii = get_scaled_radii(radii, metal_idxs, alkali_alkaline_earth_metal_idxs, metal_factor, cov_factor)
+                radii = get_scaled_radii(
+                    radii,
+                    metal_idxs,
+                    alkali_alkaline_earth_metal_idxs,
+                    metal_factor,
+                    cov_factor,
+                )
         elif type(radii) == np.ndarray or type(radii) == list:
-            radii = get_scaled_radii(radii, metal_idxs, alkali_alkaline_earth_metal_idxs, metal_factor, cov_factor)
+            radii = get_scaled_radii(
+                radii,
+                metal_idxs,
+                alkali_alkaline_earth_metal_idxs,
+                metal_factor,
+                cov_factor,
+            )
 
     # Creates Adjacency Matrix
     for i in range(natoms - 1):
-        for j in range(i+1, natoms):      
+        for j in range(i + 1, natoms):
             a = np.array(pos[i])
             b = np.array(pos[j])
             dist = np.linalg.norm(a - b)
-            
+
             thres = (radii[i] + radii[j]) + add_factor
 
             if dist <= clash_threshold:
-                isgood = False # invalid molecule
-                print("Adjacency Matrix: Distance", round(dist, 3), "smaller than clash for atoms", i, j, labels[i], labels[j], a, b, cov_factor)
+                isgood = False  # invalid molecule
+                print(
+                    "Adjacency Matrix: Distance",
+                    round(dist, 3),
+                    "smaller than clash for atoms",
+                    i,
+                    j,
+                    labels[i],
+                    labels[j],
+                    a,
+                    b,
+                    cov_factor,
+                )
             elif dist <= thres:
-                # if not metal_only: 
+                # if not metal_only:
                 adjmat[i, j] = 1
                 adjmat[j, i] = 1
                 # if len(get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])) > 0:
                 #     adjmat[i, j] = 0
                 #     adjmat[j, i] = 0
-                #     print("Adjacency Matrix: Set Zeros for Alkali or Alkaline Earth Metal", labels[i], labels[j], f"{i=}", f"{j=}", f"{adjmat[i, j]=}")   
-                if metal_only: 
-                    if (elemdatabase.elementblock[labels[i]] == "d"
-                    or elemdatabase.elementblock[labels[i]] == "f"
-                    or elemdatabase.elementblock[labels[j]] == "d"
-                    or elemdatabase.elementblock[labels[j]] == "f"):
+                #     print("Adjacency Matrix: Set Zeros for Alkali or Alkaline Earth Metal", labels[i], labels[j], f"{i=}", f"{j=}", f"{adjmat[i, j]=}")
+                if metal_only:
+                    if (
+                        elemdatabase.elementblock[labels[i]] == "d"
+                        or elemdatabase.elementblock[labels[i]] == "f"
+                        or elemdatabase.elementblock[labels[j]] == "d"
+                        or elemdatabase.elementblock[labels[j]] == "f"
+                    ):
                         madjmat[i, j] = 1
                         madjmat[j, i] = 1
                     # elif len(get_non_transition_metal_idxs([labels[i], labels[j]])) > 0:
                     #     madjmat[i, j] = 1
                     #     madjmat[j, i] = 1
-                    elif len(get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])) > 0:
+                    elif (
+                        len(
+                            get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])
+                        )
+                        > 0
+                    ):
                         madjmat[i, j] = 1
-                        madjmat[j, i] = 1    
-                    if len(metal_idxs)== 0 and len(alkali_alkaline_earth_metal_idxs) == 0:
-                        if len(get_post_transition_metal_idxs([labels[i], labels[j]])) > 0:
+                        madjmat[j, i] = 1
+                    if (
+                        len(metal_idxs) == 0
+                        and len(alkali_alkaline_earth_metal_idxs) == 0
+                    ):
+                        if (
+                            len(get_post_transition_metal_idxs([labels[i], labels[j]]))
+                            > 0
+                        ):
                             madjmat[i, j] = 1
                             madjmat[j, i] = 1
 
@@ -734,76 +959,131 @@ def get_adjmatrix(labels: list, pos: list, cov_factor: float=1.0, radii="default
     if add_atoms:
         warning = False
     else:
-        isgood_valence, adjmat, madjmat, warning = correct_valence_violation(adjmat, madjmat, labels, pos, radii)
+        isgood_valence, adjmat, madjmat, warning = correct_valence_violation(
+            adjmat, madjmat, labels, pos, radii
+        )
         isgood = isgood and isgood_valence
 
     for i in range(0, natoms):
         adjnum[i] = np.sum(adjmat[i, :])
         madjnum[i] = np.sum(madjmat[i, :])
-    
+
     adjmat = adjmat.astype(int)
     adjnum = adjnum.astype(int)
     madjmat = madjmat.astype(int)
     madjnum = madjnum.astype(int)
 
-    if not metal_only: 
+    if not metal_only:
         return isgood, adjmat, adjnum, warning
     else:
         return isgood, madjmat, madjnum, warning
 
+
 ####################################
 def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: list):
     from cell2mol.xyz2mol import atomic_valence
+
     natoms = len(labels)
     isgood = True
-    #Checks if the valence of the atoms is correct
+    # Checks if the valence of the atoms is correct
     metal_idxs = get_metal_idxs(labels)
     non_transition_metal_idxs = get_non_transition_metal_idxs(labels)
     post_transition_metal_idxs = get_post_transition_metal_idxs(labels)
     alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
-    allowed = set(metal_idxs) | set(post_transition_metal_idxs) | set(alkali_alkaline_earth_metal_idxs)  
+    allowed = (
+        set(metal_idxs)
+        | set(post_transition_metal_idxs)
+        | set(alkali_alkaline_earth_metal_idxs)
+    )
     warning = False
     for i in range(0, natoms):
         indices = np.where(adjmat[i, :] != 0)[0]
         num_in_allowed = len(set(indices) & allowed)
         if num_in_allowed == len(indices):
-            continue # all connected atoms are metals
+            continue  # all connected atoms are metals
         a = np.array(pos[i])
         valence = np.sum(adjmat[i, :])
         atomicNum = elemdatabase.elementnr[labels[i]]
         if atomic_valence[atomicNum] == []:
             max_valence = 0
         else:
-            max_valence = max(atomic_valence[atomicNum]) 
+            max_valence = max(atomic_valence[atomicNum])
         if valence - num_in_allowed > max_valence:
-            print("Adjacency Matrix: Atom", i, labels[i], "has", valence, "valence bigger than allowed max valence", max_valence , "with metal bonding",  num_in_allowed, "in allowed total valence", valence)    
-            # if (i in alkali_alkaline_earth_metal_idxs or 
-            #     i in post_transition_metal_idxs or 
+            print(
+                "Adjacency Matrix: Atom",
+                i,
+                labels[i],
+                "has",
+                valence,
+                "valence bigger than allowed max valence",
+                max_valence,
+                "with metal bonding",
+                num_in_allowed,
+                "in allowed total valence",
+                valence,
+            )
+            # if (i in alkali_alkaline_earth_metal_idxs or
+            #     i in post_transition_metal_idxs or
             #     i in non_transition_metal_idxs):
-            if labels[i] in ["F", "Cl", "Br", "I"]: # Halogens
-                print("Adjacency Matrix: Atom", i, labels[i], "is a halogen with valence bigger than allowed max valence", max_valence, "and is connected to", indices, [labels[j] for j in indices])
+            if labels[i] in ["F", "Cl", "Br", "I"]:  # Halogens
+                print(
+                    "Adjacency Matrix: Atom",
+                    i,
+                    labels[i],
+                    "is a halogen with valence bigger than allowed max valence",
+                    max_valence,
+                    "and is connected to",
+                    indices,
+                    [labels[j] for j in indices],
+                )
                 # Do not correct the adjacency matrix for halogens
                 warning = True
                 pass
             elif labels[i] in ["B"]:  # Boron
                 warning = True
                 pass
-            elif i in alkali_alkaline_earth_metal_idxs or i in post_transition_metal_idxs:
+            elif (
+                i in alkali_alkaline_earth_metal_idxs or i in post_transition_metal_idxs
+            ):
                 warning = True
                 for j in indices:
                     b = np.array(pos[j])
                     dist = np.linalg.norm(a - b)
                     margin = dist - (radii[i] + radii[j])
-                    print("Adjacency Matrix: Atom", i, labels[i], "is connected to", j, labels[j], "distance", round(dist, 3), "bond margin", round(margin, 3))                       
+                    print(
+                        "Adjacency Matrix: Atom",
+                        i,
+                        labels[i],
+                        "is connected to",
+                        j,
+                        labels[j],
+                        "distance",
+                        round(dist, 3),
+                        "bond margin",
+                        round(margin, 3),
+                    )
             else:
-                connections = []                        
+                connections = []
                 for j in indices:
                     b = np.array(pos[j])
                     dist = np.linalg.norm(a - b)
                     margin = dist - (radii[i] + radii[j])
                     connections.append((j, margin))
-                    print("Adjacency Matrix: Atom", i, labels[i], "is connected to", j, labels[j], "distance", round(dist, 3), "bond margin", round(margin, 3))
-                sorted_connections = sorted(connections, key=lambda x: x[1], reverse=True)
+                    print(
+                        "Adjacency Matrix: Atom",
+                        i,
+                        labels[i],
+                        "is connected to",
+                        j,
+                        labels[j],
+                        "distance",
+                        round(dist, 3),
+                        "bond margin",
+                        round(margin, 3),
+                    )
+                sorted_connections = sorted(
+                    connections, key=lambda x: x[1], reverse=True
+                )
                 num_to_remove = len(connections) - max_valence - num_in_allowed
                 for idx in range(num_to_remove):
                     j, rem = sorted_connections[idx]
@@ -812,29 +1092,38 @@ def correct_valence_violation(adjmat, madjmat, labels: list, pos: list, radii: l
                     # madjmat[i, j] = 0
                     # madjmat[j, i] = 0
                     # print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
-                    if rem > 0.2: # Only remove bonds with a significant margin
+                    if rem > 0.2:  # Only remove bonds with a significant margin
                         adjmat[i, j] = 0
                         adjmat[j, i] = 0
                         madjmat[i, j] = 0
                         madjmat[j, i] = 0
-                        print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+                        print(
+                            f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})"
+                        )
                     else:
-                        print(f"Adjacency Matrix: Not removing bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+                        print(
+                            f"Adjacency Matrix: Not removing bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})"
+                        )
     return isgood, adjmat, madjmat, warning
+
 
 ####################################
 def correct_valence_violation_v1(adjmat, madjmat, labels: list, pos: list, radii: list):
-
     from cell2mol.xyz2mol import atomic_valence
+
     natoms = len(labels)
     isgood = True
-    #Checks if the valence of the atoms is correct
+    # Checks if the valence of the atoms is correct
     metal_idxs = get_metal_idxs(labels)
     non_transition_metal_idxs = get_non_transition_metal_idxs(labels)
     post_transition_metal_idxs = get_post_transition_metal_idxs(labels)
     alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
-    allowed = set(metal_idxs) | set(post_transition_metal_idxs) | set(alkali_alkaline_earth_metal_idxs)
-    
+    allowed = (
+        set(metal_idxs)
+        | set(post_transition_metal_idxs)
+        | set(alkali_alkaline_earth_metal_idxs)
+    )
+
     for i in range(0, natoms):
         indices = np.where(adjmat[i, :] != 0)[0]
         num_in_allowed = len(set(indices) & allowed)
@@ -848,39 +1137,79 @@ def correct_valence_violation_v1(adjmat, madjmat, labels: list, pos: list, radii
             if atomic_valence[atomicNum] == []:
                 max_valence = 0
             else:
-                max_valence = max(atomic_valence[atomicNum])    
+                max_valence = max(atomic_valence[atomicNum])
             num_in_allowed = sum(1 for j in indices if j in allowed)
-            
+
             if valence - num_in_allowed > max_valence:
                 print(num_in_allowed)
-            #if valence > max_valence:
-                print("Adjacency Matrix: Atom", i, labels[i], "has", valence, "valence bigger than allowed max valence", max_valence)                
+                # if valence > max_valence:
+                print(
+                    "Adjacency Matrix: Atom",
+                    i,
+                    labels[i],
+                    "has",
+                    valence,
+                    "valence bigger than allowed max valence",
+                    max_valence,
+                )
                 if i in non_transition_metal_idxs:
                     for j in indices:
                         if j in metal_idxs or j in alkali_alkaline_earth_metal_idxs:
                             b = np.array(pos[j])
                             dist = np.linalg.norm(a - b)
                             margin = dist - (radii[i] + radii[j])
-                            #connections.append((j, margin))                                
+                            # connections.append((j, margin))
                             adjmat[i, j] = 0
                             adjmat[j, i] = 0
                             madjmat[i, j] = 0
                             madjmat[j, i] = 0
-                            print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(margin, 3)})")
+                            print(
+                                f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(margin, 3)})"
+                            )
                     newindices = np.where(adjmat[i, :] != 0)[0]
                     new_valence = np.sum(adjmat[i, :])
                     if new_valence > max_valence:
-                        print("Adjacency Matrix: Atom", i, labels[i], "still has", new_valence, "valence bigger than allowed max valence", max_valence)
-                        print("Adjacency Matrix: Atom", i, labels[i], "is a non-transition metal with valence bigger than allowed max valence", max_valence, "and is connected to", newindices, [labels[j] for j in newindices])
-                        #isgood = False
-                        connections = []                        
+                        print(
+                            "Adjacency Matrix: Atom",
+                            i,
+                            labels[i],
+                            "still has",
+                            new_valence,
+                            "valence bigger than allowed max valence",
+                            max_valence,
+                        )
+                        print(
+                            "Adjacency Matrix: Atom",
+                            i,
+                            labels[i],
+                            "is a non-transition metal with valence bigger than allowed max valence",
+                            max_valence,
+                            "and is connected to",
+                            newindices,
+                            [labels[j] for j in newindices],
+                        )
+                        # isgood = False
+                        connections = []
                         for j in indices:
                             b = np.array(pos[j])
                             dist = np.linalg.norm(a - b)
                             margin = dist - (radii[i] + radii[j])
                             connections.append((j, margin))
-                            print("Adjacency Matrix: Atom", i, labels[i], "is connected to", j, labels[j], "distance", round(dist, 3), "bond margin", round(margin, 3))
-                        sorted_connections = sorted(connections, key=lambda x: x[1], reverse=True)
+                            print(
+                                "Adjacency Matrix: Atom",
+                                i,
+                                labels[i],
+                                "is connected to",
+                                j,
+                                labels[j],
+                                "distance",
+                                round(dist, 3),
+                                "bond margin",
+                                round(margin, 3),
+                            )
+                        sorted_connections = sorted(
+                            connections, key=lambda x: x[1], reverse=True
+                        )
                         num_to_remove = len(connections) - max_valence
                         for idx in range(num_to_remove):
                             j, rem = sorted_connections[idx]
@@ -888,26 +1217,62 @@ def correct_valence_violation_v1(adjmat, madjmat, labels: list, pos: list, radii
                             adjmat[j, i] = 0
                             madjmat[i, j] = 0
                             madjmat[j, i] = 0
-                            print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
+                            print(
+                                f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})"
+                            )
 
                     else:
-                        print("Adjacency Matrix: Atom", i, labels[i], "is a non-transition metal with valence bigger than allowed max valence", max_valence, \
-                              "and is now connected to", newindices, new_valence, [labels[j] for j in newindices], "after removing bonds to metals")
+                        print(
+                            "Adjacency Matrix: Atom",
+                            i,
+                            labels[i],
+                            "is a non-transition metal with valence bigger than allowed max valence",
+                            max_valence,
+                            "and is now connected to",
+                            newindices,
+                            new_valence,
+                            [labels[j] for j in newindices],
+                            "after removing bonds to metals",
+                        )
                 elif i in alkali_alkaline_earth_metal_idxs:
                     for j in indices:
                         b = np.array(pos[j])
                         dist = np.linalg.norm(a - b)
                         margin = dist - (radii[i] + radii[j])
-                        print("Adjacency Matrix: Atom", i, labels[i], "is connected to", j, labels[j], "distance", round(dist, 3), "bond margin", round(margin, 3))                       
+                        print(
+                            "Adjacency Matrix: Atom",
+                            i,
+                            labels[i],
+                            "is connected to",
+                            j,
+                            labels[j],
+                            "distance",
+                            round(dist, 3),
+                            "bond margin",
+                            round(margin, 3),
+                        )
                 else:
-                    connections = []                        
+                    connections = []
                     for j in indices:
                         b = np.array(pos[j])
                         dist = np.linalg.norm(a - b)
                         margin = dist - (radii[i] + radii[j])
                         connections.append((j, margin))
-                        print("Adjacency Matrix: Atom", i, labels[i], "is connected to", j, labels[j], "distance", round(dist, 3), "bond margin", round(margin, 3))
-                    sorted_connections = sorted(connections, key=lambda x: x[1], reverse=True)
+                        print(
+                            "Adjacency Matrix: Atom",
+                            i,
+                            labels[i],
+                            "is connected to",
+                            j,
+                            labels[j],
+                            "distance",
+                            round(dist, 3),
+                            "bond margin",
+                            round(margin, 3),
+                        )
+                    sorted_connections = sorted(
+                        connections, key=lambda x: x[1], reverse=True
+                    )
                     num_to_remove = len(connections) - max_valence
                     for idx in range(num_to_remove):
                         j, rem = sorted_connections[idx]
@@ -915,12 +1280,21 @@ def correct_valence_violation_v1(adjmat, madjmat, labels: list, pos: list, radii
                         adjmat[j, i] = 0
                         madjmat[i, j] = 0
                         madjmat[j, i] = 0
-                        print(f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})")
-    
+                        print(
+                            f"Adjacency Matrix: Removed bond {i} ({labels[i]}) - {j} ({labels[j]}) (margin = {round(rem, 3)})"
+                        )
+
     return isgood, adjmat, madjmat
 
+
 ########################################
-def get_adjmatrix_from_cif_bonds (labels: list, pos: list,  mol_atom_site_labels: list, bond_data: list, metal_only: bool = False) -> Tuple[int, list, list]:
+def get_adjmatrix_from_cif_bonds(
+    labels: list,
+    pos: list,
+    mol_atom_site_labels: list,
+    bond_data: list,
+    metal_only: bool = False,
+) -> Tuple[int, list, list]:
     isgood = True
     indices = {atom: idx for idx, atom in enumerate(mol_atom_site_labels)}
 
@@ -937,39 +1311,46 @@ def get_adjmatrix_from_cif_bonds (labels: list, pos: list,  mol_atom_site_labels
             dist = np.linalg.norm(a - b)
             if not metal_only:
                 # Allow a small tolerance for floating point comparison
-                if round(abs(dist - bond_distance),3) <= 1e-3: 
+                if round(abs(dist - bond_distance), 3) <= 1e-3:
                     adjmat[i, j] = 1
                     adjmat[j, i] = 1
                     # if len(get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])) > 0:
                     #     adjmat[i, j] = 0
                     #     adjmat[j, i] = 0
-                    #     print("Adjacency Matrix: Set Zeros for Alkali or Alkaline Earth Metal", labels[i], labels[j], f"{i=}", f"{j=}") 
+                    #     print("Adjacency Matrix: Set Zeros for Alkali or Alkaline Earth Metal", labels[i], labels[j], f"{i=}", f"{j=}")
                 # else:
-                    # print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
+                # print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
             if metal_only:
-                if round(abs(dist - bond_distance),3) <= 1e-3:
-                    if (elemdatabase.elementblock[labels[i]] == "d"
-                    or elemdatabase.elementblock[labels[i]] == "f"
-                    or elemdatabase.elementblock[labels[j]] == "d"
-                    or elemdatabase.elementblock[labels[j]] == "f"):
+                if round(abs(dist - bond_distance), 3) <= 1e-3:
+                    if (
+                        elemdatabase.elementblock[labels[i]] == "d"
+                        or elemdatabase.elementblock[labels[i]] == "f"
+                        or elemdatabase.elementblock[labels[j]] == "d"
+                        or elemdatabase.elementblock[labels[j]] == "f"
+                    ):
                         adjmat[i, j] = 1
                         adjmat[j, i] = 1
-                    elif len(get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])) > 0:
+                    elif (
+                        len(
+                            get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])
+                        )
+                        > 0
+                    ):
                         adjmat[i, j] = 1
-                        adjmat[j, i] = 1    
+                        adjmat[j, i] = 1
                     # if len(get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])) > 0:
                     #     adjmat[i, j] = 0
                     #     adjmat[j, i] = 0
-                    #     print("Adjacency Matrix: Set Zeros for Alkali or Alkaline Earth Metal", labels[i], labels[j], f"{i=}", f"{j=}") 
+                    #     print("Adjacency Matrix: Set Zeros for Alkali or Alkaline Earth Metal", labels[i], labels[j], f"{i=}", f"{j=}")
                 # else:
-                    # print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
+                # print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
 
     for i in range(0, natoms):
         adjnum[i] = np.sum(adjmat[i, :])
 
     adjmat = adjmat.astype(int)
     adjnum = adjnum.astype(int)
-    
+
     return isgood, adjmat, adjnum
 
 
@@ -1049,19 +1430,21 @@ def get_adjmatrix_from_cif_bonds (labels: list, pos: list,  mol_atom_site_labels
 #     adjmat = adjmat.astype(int)
 #     adjnum = adjnum.astype(int)
 
+
 #     return isgood, adjmat, adjnum
 ####################################
 def get_blocks(matrix: np.ndarray) -> Tuple[list, list]:
     # retrieves the blocks from a diagonal block matrix
     startlist = []  # List including the starting atom for all blocks
-    endlist = []    # List including the final atom for all blocks
+    endlist = []  # List including the final atom for all blocks
     start = 1
     pos = start
     posold = 0
     blockcount = 0
     j = 1
     while j < len(matrix):
-        if matrix[pos - 1, j] != 0.0: pos = j + 1
+        if matrix[pos - 1, j] != 0.0:
+            pos = j + 1
         if j == len(matrix) - 1:
             blockcount = blockcount + 1
             startlist.append(posold)
@@ -1072,28 +1455,47 @@ def get_blocks(matrix: np.ndarray) -> Tuple[list, list]:
             continue
         j += 1
 
-    if (blockcount == 0) and (len(matrix) == 1):  # if a 1x1 matrix is provided, it then finds 1 block
+    if (blockcount == 0) and (
+        len(matrix) == 1
+    ):  # if a 1x1 matrix is provided, it then finds 1 block
         startlist.append(0)
         endlist.append(0)
     return startlist, endlist
 
+
 #########################
-def count_species(labels: list, pos: list, radii: list=None, indices: list=None, atom_site_labels : list=None, geom_bond_cif: list=None, cov_factor: float=1.3, debug: int=0) -> Tuple[bool, list]:
+def count_species(
+    labels: list,
+    pos: list,
+    radii: list = None,
+    indices: list = None,
+    atom_site_labels: list = None,
+    geom_bond_cif: list = None,
+    cov_factor: float = 1.3,
+    debug: int = 0,
+) -> Tuple[bool, list]:
     # Gets the covalent radii
-    if radii is None:    radii = get_radii(labels)
-    if indices is None:  indices = [*range(0,len(labels),1)]
+    if radii is None:
+        radii = get_radii(labels)
+    if indices is None:
+        indices = [*range(0, len(labels), 1)]
 
     # Computes the adjacency matrix of what is received
-    # isgood indicates whether the adjacency matrix could be built normally, or errors were detected. 
+    # isgood indicates whether the adjacency matrix could be built normally, or errors were detected.
     if atom_site_labels is not None and geom_bond_cif is not None:
-        isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds (labels, pos, atom_site_labels, geom_bond_cif)
+        isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds(
+            labels, pos, atom_site_labels, geom_bond_cif
+        )
     else:
         isgood, adjmat, adjnum, warning = get_adjmatrix(labels, pos, cov_factor, radii)
 
-    if not isgood: return int(0)
+    if not isgood:
+        return int(0)
 
-    degree = np.diag(adjnum)  # creates a matrix with adjnum as diagonal values. Needed for the laplacian
-    lap = adjmat - degree     # computes laplacian
+    degree = np.diag(
+        adjnum
+    )  # creates a matrix with adjnum as diagonal values. Needed for the laplacian
+    lap = adjmat - degree  # computes laplacian
 
     # creates block matrix
     graph = csr_matrix(lap)
@@ -1108,28 +1510,45 @@ def count_species(labels: list, pos: list, radii: list=None, indices: list=None,
     nblocks = len(startlist)
     return nblocks
 
+
 ####################################
-def split_species(labels: list, pos: list, radii: list=None, indices: list=None, atom_site_labels : list=None, geom_bond_cif: list=None, cov_factor: float=1.0, debug: int=0) -> Tuple[bool, list]:
+def split_species(
+    labels: list,
+    pos: list,
+    radii: list = None,
+    indices: list = None,
+    atom_site_labels: list = None,
+    geom_bond_cif: list = None,
+    cov_factor: float = 1.0,
+    debug: int = 0,
+) -> Tuple[bool, list]:
     ## Function that identifies connected groups of atoms from their atomic coordinates and labels.
-    
+
     # if debug >= 2:
     #     print(f"SPLIT_SPECIES: {labels=}", len(labels))
     #     print(f"SPLIT_SPECIES: {indices=}")
 
     # Gets the covalent radii
-    if radii is None:    radii = get_radii(labels)
-    if indices is None:  indices = [*range(0,len(labels),1)]
+    if radii is None:
+        radii = get_radii(labels)
+    if indices is None:
+        indices = [*range(0, len(labels), 1)]
 
     # Computes the adjacency matrix of what is received
     # isgood indicates whether the adjacency matrix could be built normally, or errors were detected. Typically, those errors are steric clashes
     if atom_site_labels is not None and geom_bond_cif is not None:
-        isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds (labels, pos, atom_site_labels, geom_bond_cif)
+        isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds(
+            labels, pos, atom_site_labels, geom_bond_cif
+        )
     else:
         isgood, adjmat, adjnum, warning = get_adjmatrix(labels, pos, cov_factor, radii)
-    if not isgood: return None
+    if not isgood:
+        return None
 
-    degree = np.diag(adjnum)  # creates a matrix with adjnum as diagonal values. Needed for the laplacian
-    lap = adjmat - degree     # computes laplacian
+    degree = np.diag(
+        adjnum
+    )  # creates a matrix with adjnum as diagonal values. Needed for the laplacian
+    lap = adjmat - degree  # computes laplacian
 
     # creates block matrix
     graph = csr_matrix(lap)
@@ -1156,177 +1575,249 @@ def split_species(labels: list, pos: list, radii: list=None, indices: list=None,
     # assigns atoms to molecules
     blocklist = []
     for b in range(0, nblocks):
-        atlist = []    # atom indices in the original ordering
+        atlist = []  # atom indices in the original ordering
         for i in range(0, len(atomlistperm)):
             if atomlistperm[i] == b + 1:
                 atlist.append(indices[i])
         blocklist.append(atlist)
     return blocklist
 
+
 #####################
 def merge_atoms(atoms):
-    labels = [] 
-    coord  = [] 
+    labels = []
+    coord = []
     for a in atoms:
-        labels.append(a.label) 
-        coord.append(a.coord) 
+        labels.append(a.label)
+        coord.append(a.coord)
     return labels, coord
 
+
 #################################
-def compare_atoms(at1, at2, check_coordinates: bool=False, debug: int=0):
-    if debug > 0: 
+def compare_atoms(at1, at2, check_coordinates: bool = False, debug: int = 0):
+    if debug > 0:
         print("Comparing Atoms")
         print(at1)
         print(at2)
     # Compares Species, Coordinates, Charge and Spin
-    if (at1.label != at2.label): return False
+    if at1.label != at2.label:
+        return False
     if check_coordinates:
-        if (at1.coord[0] != at2.coord[0]): return False
-        if (at1.coord[1] != at2.coord[1]): return False
-        if (at1.coord[2] != at2.coord[2]): return False
-    if hasattr(at1,"charge") and hasattr(at2,"charge"):
-        if (at1.charge != at2.charge): return False
-    if hasattr(at1,"spin") and hasattr(at2,"spin"):
-        if (at1.spin != at2.spin): return False
+        if at1.coord[0] != at2.coord[0]:
+            return False
+        if at1.coord[1] != at2.coord[1]:
+            return False
+        if at1.coord[2] != at2.coord[2]:
+            return False
+    if hasattr(at1, "charge") and hasattr(at2, "charge"):
+        if at1.charge != at2.charge:
+            return False
+    if hasattr(at1, "spin") and hasattr(at2, "spin"):
+        if at1.spin != at2.spin:
+            return False
     return True
 
+
 #################################
-def compare_metals (at1, at2, check_coordinates: bool=False, debug: int=0):
-    if debug > 0: 
+def compare_metals(at1, at2, check_coordinates: bool = False, debug: int = 0):
+    if debug > 0:
         print("COMPARE_METALS. Comparing:")
         print(at1.label)
         print(at2.label)
 
-    if at1.subtype != "metal" or at2.subtype != "metal": 
-        if debug > 0: print("COMPARE_METALS. Different subtype")
-        if debug > 0: print(at1.subtype)
-        if debug > 0: print(at1.subtype)
+    if at1.subtype != "metal" or at2.subtype != "metal":
+        if debug > 0:
+            print("COMPARE_METALS. Different subtype")
+        if debug > 0:
+            print(at1.subtype)
+        if debug > 0:
+            print(at1.subtype)
         return False
 
-    if (at1.label != at2.label): 
-        if debug > 0: print("COMPARE_METALS. Different label")
+    if at1.label != at2.label:
+        if debug > 0:
+            print("COMPARE_METALS. Different label")
         return False
 
-    if at1.coord_sphere_formula is None: at1.get_coord_sphere_formula()
-    if at2.coord_sphere_formula is None: at2.get_coord_sphere_formula()
-    if (at1.coord_sphere_formula != at2.coord_sphere_formula):
-        if debug > 0: print("COMPARE_METALS. Different coordination sphere")
-        if debug > 0: print(at1.coord_sphere_formula)
-        if debug > 0: print(at2.coord_sphere_formula)
+    if at1.coord_sphere_formula is None:
+        at1.get_coord_sphere_formula()
+    if at2.coord_sphere_formula is None:
+        at2.get_coord_sphere_formula()
+    if at1.coord_sphere_formula != at2.coord_sphere_formula:
+        if debug > 0:
+            print("COMPARE_METALS. Different coordination sphere")
+        if debug > 0:
+            print(at1.coord_sphere_formula)
+        if debug > 0:
+            print(at2.coord_sphere_formula)
         return False
-    
+
     if check_coordinates:
-        if (at1.coord[0] != at2.coord[0]): return False
-        if (at1.coord[1] != at2.coord[1]): return False
-        if (at1.coord[2] != at2.coord[2]): return False
-        
+        if at1.coord[0] != at2.coord[0]:
+            return False
+        if at1.coord[1] != at2.coord[1]:
+            return False
+        if at1.coord[2] != at2.coord[2]:
+            return False
+
     return True
 
+
 #################################
-def compare_species(mol1, mol2, check_coordinates: bool=False, debug: int=0):
-    
+def compare_species(mol1, mol2, check_coordinates: bool = False, debug: int = 0):
     elems = elemdatabase.elementnr.keys()
 
-    if debug > 0: 
+    if debug > 0:
         print("COMPARE_SPECIES. Comparing:")
         print(mol1.formula)
         print(mol2.formula)
 
-    
     # a pair of species is compared on the basis of:
     # 1) the total number of atoms
-    if (mol1.natoms != mol2.natoms): 
-        if debug > 0: print("COMPARE_SPECIES. FALSE, different natoms:")
+    if mol1.natoms != mol2.natoms:
+        if debug > 0:
+            print("COMPARE_SPECIES. FALSE, different natoms:")
         return False
 
     # 2) the total number of electrons (as sum of atomic number)
-    if (mol1.eleccount != mol2.eleccount): 
-        if debug > 0: print("COMPARE_SPECIES. FALSE, different eleccount:")
+    if mol1.eleccount != mol2.eleccount:
+        if debug > 0:
+            print("COMPARE_SPECIES. FALSE, different eleccount:")
         return False
 
     # 3) the number of atoms of each type
-    if mol1.element_count is None: mol1.set_element_count()
-    if mol2.element_count is None: mol2.set_element_count()
+    if mol1.element_count is None:
+        mol1.set_element_count()
+    if mol2.element_count is None:
+        mol2.set_element_count()
     for kdx, elem in enumerate(mol1.element_count):
-        if elem != mol2.element_count[kdx]: 
-            if debug > 0: print(f"COMPARE_SPECIES. FALSE, different {elem} count:")
-            return False       
+        if elem != mol2.element_count[kdx]:
+            if debug > 0:
+                print(f"COMPARE_SPECIES. FALSE, different {elem} count:")
+            return False
     # writexyz(os.getcwd(), f"reordered.xyz", mol1.labels, mol1.coord)
     # 4) the number of adjacencies between each pair of element types
-    if mol1.adj_types is None:     mol1.set_adj_types()
-    if mol2.adj_types is None:     mol2.set_adj_types()
-    if debug == 2: print(f"{mol1.adj_types=}")
-    if debug == 2: print(f"{mol2.adj_types=}")
+    if mol1.adj_types is None:
+        mol1.set_adj_types()
+    if mol2.adj_types is None:
+        mol2.set_adj_types()
+    if debug == 2:
+        print(f"{mol1.adj_types=}")
+    if debug == 2:
+        print(f"{mol2.adj_types=}")
 
     count = 0
-    if debug > 0: print("COMPARE_SPECIES. kdx ldx elem1 - elem2 : reordered - reference")
+    if debug > 0:
+        print("COMPARE_SPECIES. kdx ldx elem1 - elem2 : reordered - reference")
     for kdx, (elem, row1) in enumerate(zip(elems, mol1.adj_types)):
         for ldx, (elem2, val1) in enumerate(zip(elems, row1)):
             val2 = mol2.adj_types[kdx, ldx]
-            if val1 != val2: 
+            if val1 != val2:
                 count += 1
-                if debug > 0: print(f"COMPARE_SPECIES. FALSE, different adjacency count")
-                if debug > 0: print(f"COMPARE_SPECIES. {kdx} {ldx} {elem} - {elem2} : {val1} - {val2}")
-                
-    if count > 0 : return False
-    else: return True
+                if debug > 0:
+                    print("COMPARE_SPECIES. FALSE, different adjacency count")
+                if debug > 0:
+                    print(
+                        f"COMPARE_SPECIES. {kdx} {ldx} {elem} - {elem2} : {val1} - {val2}"
+                    )
+
+    if count > 0:
+        return False
+    else:
+        return True
 
     if check_coordinates:
         # 5) Finally, the coordinates if the user wants it
-        for idx in range(0,mol1.natoms,1):
-            if (mol1.coord[idx][0] !=  mol2.coord[idx][0]): return False
-            if (mol1.coord[idx][1] !=  mol2.coord[idx][1]): return False
-            if (mol1.coord[idx][2] !=  mol2.coord[idx][2]): return False
+        for idx in range(0, mol1.natoms, 1):
+            if mol1.coord[idx][0] != mol2.coord[idx][0]:
+                return False
+            if mol1.coord[idx][1] != mol2.coord[idx][1]:
+                return False
+            if mol1.coord[idx][2] != mol2.coord[idx][2]:
+                return False
     return True
+
+
 #################################
-def compare_reference_indices (ref, mol, debug: int=0):
+def compare_reference_indices(ref, mol, debug: int = 0):
     if (ref.natoms == mol.natoms) & (ref.formula == mol.formula):
-        if (sorted(ref.get_parent_indices("reference")) == sorted(mol.get_parent_indices("reference"))):
-            if debug > 2: 
-                print("Matched", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
+        if sorted(ref.get_parent_indices("reference")) == sorted(
+            mol.get_parent_indices("reference")
+        ):
+            if debug > 2:
+                print(
+                    "Matched",
+                    mol.formula,
+                    ref.formula,
+                    ref.get_parent_indices("reference"),
+                    mol.get_parent_indices("reference"),
+                )
             issame = True
         else:
             if debug > 2:
-                print("Different indices", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
+                print(
+                    "Different indices",
+                    mol.formula,
+                    ref.formula,
+                    ref.get_parent_indices("reference"),
+                    mol.get_parent_indices("reference"),
+                )
             issame = False
-    else : 
+    else:
         if debug > 2:
-            print("Different numbers", mol.formula, ref.formula, ref.get_parent_indices("reference"), mol.get_parent_indices("reference"))
+            print(
+                "Different numbers",
+                mol.formula,
+                ref.formula,
+                ref.get_parent_indices("reference"),
+                mol.get_parent_indices("reference"),
+            )
         issame = False
     return issame
+
+
 #################################
-def arrange_data_for_reorder(reference: object, target: object, debug: int=0):
+def arrange_data_for_reorder(reference: object, target: object, debug: int = 0):
     # To do the reorder, we create new tags that include as much information as possible.
     # Ideally, we aim to include the label + the connectivity + the metal connectivity
     t_totconnec = 0
     t_totmconnec = 0
     for a in target.atoms:
-        t_totconnec  += a.connec
+        t_totconnec += a.connec
         t_totmconnec += a.mconnec
     r_totconnec = 0
     r_totmconnec = 0
     for a in reference.atoms:
-        r_totconnec  += a.connec
+        r_totconnec += a.connec
         r_totmconnec += a.mconnec
-    if t_totconnec == r_totconnec:   useconec = True
-    else:                            useconec = False
-    if t_totmconnec == r_totmconnec: usemconec = True
-    else:                            usemconec = False
+    if t_totconnec == r_totconnec:
+        useconec = True
+    else:
+        useconec = False
+    if t_totmconnec == r_totmconnec:
+        usemconec = True
+    else:
+        usemconec = False
     # For target
     target_data = []
     for a in target.atoms:
         data = a.label
-        if useconec:  data += str(a.connec)
-        if usemconec: data += str(a.mconnec)
+        if useconec:
+            data += str(a.connec)
+        if usemconec:
+            data += str(a.mconnec)
         target_data.append(data)
     # For reference
     ref_data = []
     for a in reference.atoms:
         data = a.label
-        if useconec:  data += str(a.connec)
-        if usemconec: data += str(a.mconnec)
+        if useconec:
+            data += str(a.connec)
+        if usemconec:
+            data += str(a.mconnec)
         ref_data.append(data)
     return ref_data, target_data
+
 
 #################################
 def mol_with_atom_index(mol):
@@ -1334,55 +1825,107 @@ def mol_with_atom_index(mol):
         atom.SetAtomMapNum(atom.GetIdx())
     return mol
 
+
 #################################
-def split_group(original_group, conn_idx, final_ligand_indices, connected_metal, debug: int=0):
+def split_group(
+    original_group, conn_idx, final_ligand_indices, connected_metal, debug: int = 0
+):
     from cell2mol.classes import group
+
     # Split the "group" to obtain the groups connected to a specific metal
     splitted_groups = []
-    
-    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {conn_idx=}")
-    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {original_group.labels=}")
-    if debug > 2: print(f"\t\tGROUP.SPLIT_GROUP: {original_group.coord=}")
-    conn_labels  = extract_from_list(conn_idx, original_group.labels, dimension=1)
-    conn_coord   = extract_from_list(conn_idx, original_group.coord, dimension=1)
+
+    if debug > 1:
+        print(f"\t\tGROUP.SPLIT_GROUP: {conn_idx=}")
+    if debug > 1:
+        print(f"\t\tGROUP.SPLIT_GROUP: {original_group.labels=}")
+    if debug > 2:
+        print(f"\t\tGROUP.SPLIT_GROUP: {original_group.coord=}")
+    conn_labels = extract_from_list(conn_idx, original_group.labels, dimension=1)
+    conn_coord = extract_from_list(conn_idx, original_group.coord, dimension=1)
     frac_coord = getattr(original_group, "frac_coord", None)
-    conn_frac_coord = extract_from_list(conn_idx, frac_coord, dimension=1) if frac_coord is not None else None
-    conn_radii   = extract_from_list(conn_idx, original_group.radii, dimension=1)
-    conn_atoms   = extract_from_list(conn_idx, original_group.atoms, dimension=1)
+    conn_frac_coord = (
+        extract_from_list(conn_idx, frac_coord, dimension=1)
+        if frac_coord is not None
+        else None
+    )
+    conn_radii = extract_from_list(conn_idx, original_group.radii, dimension=1)
+    conn_atoms = extract_from_list(conn_idx, original_group.atoms, dimension=1)
     atom_site_labels = getattr(original_group, "atom_site_labels", None)
-    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: original_group.atom_site_labels={atom_site_labels}")
-    conn_atom_site_labels = extract_from_list(conn_idx, atom_site_labels, dimension=1) if atom_site_labels is not None else None
+    if debug > 1:
+        print(
+            f"\t\tGROUP.SPLIT_GROUP: original_group.atom_site_labels={atom_site_labels}"
+        )
+    conn_atom_site_labels = (
+        extract_from_list(conn_idx, atom_site_labels, dimension=1)
+        if atom_site_labels is not None
+        else None
+    )
 
     # if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: connected_metal={connected_metal.atom_site_label}")
-    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {connected_metal=}")
-    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {conn_labels=}")
+    if debug > 1:
+        print(f"\t\tGROUP.SPLIT_GROUP: {connected_metal=}")
+    if debug > 1:
+        print(f"\t\tGROUP.SPLIT_GROUP: {conn_labels=}")
 
-    cov_factor=original_group.get_parent("ligand").cov_factor
+    cov_factor = original_group.get_parent("ligand").cov_factor
     refcell = original_group.get_parent("reference")
     geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
-    if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False) and geom_bond_cif is not None:
-        blocklist = split_species(conn_labels, conn_coord, atom_site_labels=conn_atom_site_labels, geom_bond_cif=geom_bond_cif, debug=debug)
-    else :
-        blocklist = split_species(conn_labels, conn_coord, radii=conn_radii, cov_factor=cov_factor, debug=debug)      
-    if debug > 0: print(f"\t\tGROUP.SPLIT_GROUP: {blocklist=}")
-    if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: final_ligand_indices={final_ligand_indices}")
-    ## Arranges Groups 
+    if (
+        refcell is not None
+        and getattr(refcell, "exist_cif_bond_moiety", False)
+        and geom_bond_cif is not None
+    ):
+        blocklist = split_species(
+            conn_labels,
+            conn_coord,
+            atom_site_labels=conn_atom_site_labels,
+            geom_bond_cif=geom_bond_cif,
+            debug=debug,
+        )
+    else:
+        blocklist = split_species(
+            conn_labels,
+            conn_coord,
+            radii=conn_radii,
+            cov_factor=cov_factor,
+            debug=debug,
+        )
+    if debug > 0:
+        print(f"\t\tGROUP.SPLIT_GROUP: {blocklist=}")
+    if debug > 1:
+        print(f"\t\tGROUP.SPLIT_GROUP: final_ligand_indices={final_ligand_indices}")
+    ## Arranges Groups
     for b in blocklist:
-        if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: block={b}")
-        gr_indices      = extract_from_list(b, conn_idx, dimension=1)
-        ligand_idx      = extract_from_list(b, final_ligand_indices, dimension=1)
-        gr_labels       = extract_from_list(b, conn_labels, dimension=1)
-        gr_coord        = extract_from_list(b, conn_coord, dimension=1)
-        gr_frac_coord   = extract_from_list(b, conn_frac_coord, dimension=1) if frac_coord is not None else None
-        gr_radii        = extract_from_list(b, conn_radii, dimension=1)
-        gr_atoms        = extract_from_list(b, conn_atoms, dimension=1)
-        gr_atom_site_labels = extract_from_list(b, conn_atom_site_labels, dimension=1) if atom_site_labels is not None else None
+        if debug > 1:
+            print(f"\t\tGROUP.SPLIT_GROUP: block={b}")
+        gr_indices = extract_from_list(b, conn_idx, dimension=1)
+        ligand_idx = extract_from_list(b, final_ligand_indices, dimension=1)
+        gr_labels = extract_from_list(b, conn_labels, dimension=1)
+        gr_coord = extract_from_list(b, conn_coord, dimension=1)
+        gr_frac_coord = (
+            extract_from_list(b, conn_frac_coord, dimension=1)
+            if frac_coord is not None
+            else None
+        )
+        gr_radii = extract_from_list(b, conn_radii, dimension=1)
+        gr_atoms = extract_from_list(b, conn_atoms, dimension=1)
+        gr_atom_site_labels = (
+            extract_from_list(b, conn_atom_site_labels, dimension=1)
+            if atom_site_labels is not None
+            else None
+        )
 
-        if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {gr_labels=}")
-        if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {gr_atom_site_labels=}")
+        if debug > 1:
+            print(f"\t\tGROUP.SPLIT_GROUP: {gr_labels=}")
+        if debug > 1:
+            print(f"\t\tGROUP.SPLIT_GROUP: {gr_atom_site_labels=}")
         # Create Group Object
-        newgroup = group.from_positional(gr_labels, gr_coord, gr_frac_coord, radii=gr_radii)
-        if debug > 1: print(f"\t\tGROUP.SPLIT_GROUP: {newgroup.labels=}")
+        newgroup = group.from_positional(
+            gr_labels, gr_coord, gr_frac_coord, radii=gr_radii
+        )
+        if debug > 1:
+            print(f"\t\tGROUP.SPLIT_GROUP: {newgroup.labels=}")
         # For debugging
         newgroup.origin = "split_group"
         # Define the GROUP as parent of the group. Bottom-Up hierarchy
@@ -1392,9 +1935,9 @@ def split_group(original_group, conn_idx, final_ligand_indices, connected_metal,
         # Inherit the adjacencies from molecule
         newgroup.inherit_adjmatrix("ligand")
         # Associate the Groups with the Metals
-        #newgroup.get_connected_metals(debug=debug)
-        #newgroup.get_closest_metal(debug=debug)
-        
+        # newgroup.get_connected_metals(debug=debug)
+        # newgroup.get_closest_metal(debug=debug)
+
         newgroup.metals = []
         newgroup.metals.extend(connected_metal)
         newgroup.get_hapticity(debug=debug)

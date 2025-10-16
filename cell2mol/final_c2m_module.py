@@ -43,7 +43,7 @@ def unitcell_reconstruction(newcell, refcell, sym_ops, debug):
     """Reconstruct the unit cell based on the reference cell and identify all molecules."""
     start_time = time.time()
 
-    if debug :
+    if debug:
         print("#########################################")
         print("        Unit Cell Reconstruction         ")
         print("#########################################")
@@ -67,6 +67,7 @@ def unitcell_reconstruction(newcell, refcell, sym_ops, debug):
 
     return newcell
 
+
 def charge_assignment(newcell, refcell, debug):
     """Assign charges to unique species to satisfy charge neutrality."""
     start_time = time.time()
@@ -82,14 +83,14 @@ def charge_assignment(newcell, refcell, debug):
 
     # Check for missing charge states
     refcell.get_selected_cs(debug=debug)
-    #refcell.assess_errors(mode="possible_charges")
+    # refcell.assess_errors(mode="possible_charges")
     if None in refcell.selected_cs:
         newcell.error_get_poscharges = True
     elif refcell.error_get_poscharges:
         newcell.error_get_poscharges = True
     else:
         newcell.error_get_poscharges = False
-        
+
     newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
     newcell.unique_species = copy.deepcopy(refcell.unique_species)
 
@@ -107,40 +108,44 @@ def charge_assignment(newcell, refcell, debug):
     dist_count = len(final_charge_distribution)
     newcell.error_multiple_distrib = dist_count > 1
     newcell.error_empty_distrib = dist_count == 0
-    
+
     # second_try = True
     second_try = False
     if dist_count != 1 and second_try:
         # Attempt to balance charges again with more specific conditions
-        if newcell.error_multiple_distrib :
+        if newcell.error_multiple_distrib:
             print("More than one possible distribution found.")
             second_final_charge_distribution, second_final_charges = balance_charge(
                 newcell.unique_indices,
                 refcell.unique_species,
-                aromatic=True, debug=debug,
-            )    
-        elif newcell.error_empty_distrib :
+                aromatic=True,
+                debug=debug,
+            )
+        elif newcell.error_empty_distrib:
             print("No valid distribution found.")
             second_final_charge_distribution, second_final_charges = balance_charge(
                 newcell.unique_indices,
                 refcell.unique_species,
-                rare=True, debug=debug,
-            )           
+                rare=True,
+                debug=debug,
+            )
         second_dist_count = len(second_final_charge_distribution)
         newcell.error_multiple_distrib = second_dist_count > 1
-        newcell.error_empty_distrib = second_dist_count == 0    
+        newcell.error_empty_distrib = second_dist_count == 0
 
         if second_dist_count == 1:
             final_charge_distribution = second_final_charge_distribution
             final_charges = second_final_charges
             print("Using the second distribution found.")
-            
+
     # If any error was flagged, report failure
-    if any([
-        newcell.error_get_poscharges,
-        newcell.error_multiple_distrib,
-        newcell.error_empty_distrib,
-    ]):
+    if any(
+        [
+            newcell.error_get_poscharges,
+            newcell.error_multiple_distrib,
+            newcell.error_empty_distrib,
+        ]
+    ):
         print_elapsed("Charge Assignment Failed.", start_time)
         return newcell, refcell
 
@@ -153,13 +158,13 @@ def charge_assignment(newcell, refcell, debug):
 
     # Assign charges to reference molecules in the reference cell
     refcell.assign_charges_for_refcell(debug=debug)
-    #refcell.create_bonds(debug=debug)
+    # refcell.create_bonds(debug=debug)
 
     if refcell.error_create_bonds:
         refcell.error_case = 8
         print_elapsed("Creating bonds Failed for reference cell.", start_time)
         return newcell, refcell
-    
+
     # Assign spin multiplicity to reference molecules with TMs
     # for ref in refcell.refmoleclist:
     #     if ref.iscomplex:
@@ -179,14 +184,15 @@ def charge_assignment(newcell, refcell, debug):
         return newcell, refcell
 
     print_elapsed("Charge Assignment Finished Normally.", start_time)
-    
+
     # for mol in newcell.moleclist:
     #     if mol.iscomplex:
     #         for metal in mol.metals:
     #             metal.get_spin(debug=debug)
     #         mol.get_spin(debug=debug)
-            
+
     return newcell, refcell
+
 
 def print_elapsed(message: str, start_time: float):
     """Print the elapsed time since start_time."""

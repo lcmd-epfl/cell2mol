@@ -3,11 +3,13 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment as lsa
 
+
 def center(X):
     X = np.array(X)
     C = X.mean(axis=0)
     X -= C
     return X, C
+
 
 def reorder_hungarian(z1, z2, coord1, coord2):
     unique_atoms = np.unique(z1)
@@ -22,10 +24,12 @@ def reorder_hungarian(z1, z2, coord1, coord2):
         map12[aidx1] = aidx2[v]
     return map12
 
+
 def hungarian(a, b):
     distances = cdist(a, b, "euclidean")
     ia, ib = lsa(distances)
     return ib
+
 
 def reorder(z1, z2, coord1, coord2):
     z1 = np.array(z1)
@@ -38,6 +42,7 @@ def reorder(z1, z2, coord1, coord2):
     z2 = z2[map12]
     coord2 = coord2[map12, :]
     return list(z2), list(coord2 + c2), map12
+
 
 def test_reorder():
     # Two water molecules with different order!
@@ -57,6 +62,7 @@ def test_reorder():
     for i, idx in enumerate(mapab):
         print(za[i], zb2[i], zb[idx])
         print(A[i], B2[i], B[idx])
+
 
 if __name__ == "__main__":
     test_reorder()

@@ -3,9 +3,10 @@
 import argparse
 import numpy as np
 
+
 def parsing_arguments():
     """Parses the arguments of the command line.
-    
+
     Returns:
         filename (str): filename of the input file
         step (int): step of the program to be executed
@@ -13,9 +14,9 @@ def parsing_arguments():
         quiet (bool): quiet flag
     """
     parser = argparse.ArgumentParser(
-        prog="cell2mol", 
+        prog="cell2mol",
         description="Interprets the crystallography file (.cif) of a molecular crystal, and stores the information in a python cell object",
-        add_help=True
+        add_help=True,
     )
 
     parser.add_argument(
@@ -75,7 +76,9 @@ def parsing_arguments():
     cell_para = None
     if args.filename.endswith(".xyz") and args.system_type == "unitcell":
         if args.cell_para is None:
-            parser.error("Cell parameters must be provided for .xyz file of an unit cell")
+            parser.error(
+                "Cell parameters must be provided for .xyz file of an unit cell"
+            )
         cell_para = np.array(args.cell_para)
 
     # if args.filename.endswith(".xyz") and args.system_type == "molecule":
@@ -83,7 +86,15 @@ def parsing_arguments():
     #         parser.error("Total charge must be provided for .xyz file of a molecule")
 
     debug_mode = determine_debug_level(args.verbose, args.quiet)
-    return args.filename, args.system_type, args.cif_bond_info, cell_para, args.charge, debug_mode
+    return (
+        args.filename,
+        args.system_type,
+        args.cif_bond_info,
+        cell_para,
+        args.charge,
+        debug_mode,
+    )
+
 
 def determine_debug_level(isverbose, isquiet):
     if isverbose and not isquiet:
