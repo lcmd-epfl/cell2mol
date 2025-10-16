@@ -865,7 +865,7 @@ def get_empty_protonation_state(specie: object, debug: int = 2) -> list:
     for i in range(len(specie.labels)):
         empty_list.append(int(0))
     elemlist = np.empty(len(specie.labels)).astype(str)
-    empty_protonation = protonation.from_positional(
+    empty_protonation = Protonation.from_positional(
         specie.labels,
         specie.coord,
         specie.cov_factor,
@@ -1635,7 +1635,7 @@ def get_protonation_states_specie(specie: object, debug: int = 0) -> list:
             print(f"{addedlist=} {block=} {added_atoms=} {elemlist=}")
         if debug >= 2:
             print(f"{len(newlab)=} {len(newcoord)=} {added_atoms=}")
-        new_prot = protonation.from_positional(
+        new_prot = Protonation.from_positional(
             newlab,
             newcoord,
             ligand.cov_factor,
@@ -1663,7 +1663,7 @@ def get_protonation_states_specie(specie: object, debug: int = 0) -> list:
             print(
                 f"{len(addedlist)=} {len(block)=} {added_atoms=} {len(elemlist)=} {len(pos_carbenes)=} {len(metal_electrons)=}"
             )
-        new_prot = protonation.from_positional(
+        new_prot = Protonation.from_positional(
             newlab,
             newcoord,
             ligand.cov_factor,
@@ -1853,7 +1853,7 @@ def get_protonation_states_specie(specie: object, debug: int = 0) -> list:
                     toallocate += 1
 
             smi = " "
-            new_prot = protonation.from_positional(
+            new_prot = Protonation.from_positional(
                 newlab,
                 newcoord,
                 ligand.cov_factor,
@@ -2030,7 +2030,7 @@ def get_charge_manual(spec, debug: int = 0):
     iscorrect = True
     allow = True
     prot = spec.get_protonation_states()[0]
-    ch_state = charge_state.from_positional(
+    ch_state = ChargeState.from_positional(
         iscorrect, total_charge, atom_charge, mol, smiles, charge, allow, prot
     )
 
@@ -2199,7 +2199,7 @@ def get_charge(
     iscorrect = check_rdkit_obj_connectivity(rdkit_obj, natoms, charge, debug=debug)
 
     # Charge_state is initiated
-    ch_state = charge_state.from_positional(
+    ch_state = ChargeState.from_positional(
         iscorrect, total_charge, atom_charges, rdkit_obj, smiles, charge, allow, prot
     )
     if iscorrect:
@@ -3314,7 +3314,7 @@ def reorder_protonation(prot, map, debug: int = 0):
         reordered_metal_electrons = [prot.metal_electrons[i] for i in map]
         reordered_elemlist = [prot.elemlist[i] for i in map]
 
-    reordered_protonation = protonation.from_positional(
+    reordered_protonation = Protonation.from_positional(
         reordered_labels,
         reordered_coords,
         prot.cov_factor,
@@ -3334,7 +3334,7 @@ def reorder_protonation(prot, map, debug: int = 0):
 
 
 #######################################################
-class protonation(BaseModel):
+class Protonation(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     # Required constructor parameters
@@ -3542,7 +3542,7 @@ class protonation(BaseModel):
         o_s: int = 0,
         typ: str = "Local",
         parent: object = None,
-    ) -> "protonation":
+    ) -> "Protonation":
         return cls(
             labels=labels,
             coords=coord,  # Note: using coords here to match the field name
@@ -3560,7 +3560,7 @@ class protonation(BaseModel):
 
 
 #######################################################
-class charge_state(BaseModel):
+class ChargeState(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     # Required constructor parameters
@@ -3667,7 +3667,7 @@ class charge_state(BaseModel):
         charge_tried: int,
         allow: bool,
         protonation: object,
-    ) -> "charge_state":
+    ) -> "ChargeState":
         return cls(
             status=status,
             uncorr_total_charge=uncorr_total_charge,
