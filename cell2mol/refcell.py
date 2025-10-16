@@ -2,7 +2,7 @@ import os
 import sys
 from ase.io import read
 from contextlib import redirect_stdout
-from cell2mol.classes import cell
+from cell2mol.classes import Cell
 from cell2mol.read_write import *
 from cell2mol.cell_operations import frac2cart_fromparam
 from cell2mol.other import handle_error
@@ -158,7 +158,7 @@ def create_reference(input_path, name, cell_vector, cell_param, cif_bond_info, d
     ref_pos = frac2cart_fromparam(ref_fracs, cell_param)
 
     # Generate the reference cell object
-    refcell = cell.from_positional(
+    refcell = Cell.from_positional(
         name, ref_labels, ref_pos, ref_fracs, cell_vector, cell_param
     )
     refcell.set_atom_site_labels(atom_site_labels)
@@ -220,7 +220,7 @@ def create_reference(input_path, name, cell_vector, cell_param, cif_bond_info, d
     return refcell
 
 
-def compare_with_CIF(input_path, refcell: cell, debug=0):
+def compare_with_CIF(input_path, refcell: Cell, debug=0):
     """Extract chemical name, metal oxidation state, and moiety information from the CIF file."""
 
     chemical_name = extract_chemical_name(input_path)

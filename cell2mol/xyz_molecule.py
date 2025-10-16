@@ -2,7 +2,7 @@ import os
 import sys
 from contextlib import redirect_stdout
 from ase.io import read
-from cell2mol.classes import molecule
+from cell2mol.classes import Molecule
 from cell2mol.connectivity import labels2formula, split_species
 from cell2mol.read_write import print_molecule, writexyz
 
@@ -47,7 +47,7 @@ def get_molecule(input_path, name, input_charge, current_dir, debug=2):
                 print("No molecule found from the input file")
                 return
 
-            newmolec = molecule.from_positional(labels, coords)
+            newmolec = Molecule.from_positional(labels, coords)
 
             newmolec.set_adjacency_parameters(
                 cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR

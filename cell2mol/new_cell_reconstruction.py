@@ -1,7 +1,7 @@
 import itertools
 import numpy as np
 from ase import Atoms
-from cell2mol.classes import molecule
+from cell2mol.classes import Molecule
 from cell2mol.other import additem, get_dist, extract_from_list, absolute_value
 from cell2mol.connectivity import (
     split_species,
@@ -310,7 +310,7 @@ def get_fragments(
         ref_indices = extract_from_list(b, indices_in_ref, dimension=1)
 
         # Creates Molecule Object
-        newmolec = molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
+        newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
 
         # For debugging
         newmolec.origin = "cell.get_fragments"
@@ -444,7 +444,7 @@ def get_fragments_from_moiety(
         # print(f"get_fragments: {mol_atom_site_labels=}")
 
         # Creates Molecule Object
-        newmolec = molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
+        newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
 
         # For debugging
         newmolec.origin = "cell.get_fragments"
@@ -550,7 +550,7 @@ def get_fragments_new(
         # print(f"get_fragments: {mol_atom_site_labels=}")
 
         # Creates Molecule Object
-        newmolec = molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
+        newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
 
         # For debugging
         newmolec.origin = "cell.get_fragments"
@@ -828,7 +828,7 @@ def merge_fragments(
             if len(blocklist) != 1:
                 continue
             if len(blocklist) == 1:
-                newmolec = molecule.from_positional(reclabels, reccoord, recfracs)
+                newmolec = Molecule.from_positional(reclabels, reccoord, recfracs)
                 newmolec.origin = "cell.reconstruct"
                 newmolec.add_parent(refcell, indices=rec_ref_indices)
                 newmolec.ref_indices = rec_ref_indices
@@ -1494,7 +1494,7 @@ def get_moleclist(newcell, refcell, all_molecules, debug: int = 0):
     newcell.moleclist = []
 
     for mol in all_molecules:
-        newmolec = molecule.from_positional(mol.labels, mol.coord, mol.frac_coord)
+        newmolec = Molecule.from_positional(mol.labels, mol.coord, mol.frac_coord)
         mol_atom_site_labels = [
             refcell.atom_site_labels[idx] for idx in mol.ref_indices
         ]

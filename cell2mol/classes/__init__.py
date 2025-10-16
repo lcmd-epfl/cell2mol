@@ -82,7 +82,7 @@ import pickle
 ##################################
 ####  CLASSES FOR CELL2MOL 2  ####
 ##################################
-class specie(BaseModel):
+class Specie(BaseModel):
     # Positional arguments
     labels: list[str]
     coord: list[list[float]]
@@ -90,7 +90,7 @@ class specie(BaseModel):
     radii: list[float] | None = None
 
     # Optional arguments
-    parents: list["specie"] = Field(default_factory=list)
+    parents: list["Specie"] = Field(default_factory=list)
     parents_indices: list[list[int]] = Field(default_factory=list)
     cov_factor: float = Field(default=1.3)
     metal_factor: float = Field(default=1.0)
@@ -390,14 +390,14 @@ class specie(BaseModel):
                     print(f"SPECIE.SET_ATOMS: {ismetal=}")
                 if self.frac_coord is not None:
                     if ismetal:
-                        newatom = metal.from_positional(
+                        newatom = Metal.from_positional(
                             l,
                             self.coord[idx],
                             self.frac_coord[idx],
                             radii=self.radii[idx],
                         )
                     else:
-                        newatom = atom.from_positional(
+                        newatom = Atom.from_positional(
                             l,
                             self.coord[idx],
                             self.frac_coord[idx],
@@ -405,11 +405,11 @@ class specie(BaseModel):
                         )
                 else:
                     if ismetal:
-                        newatom = metal.from_positional(
+                        newatom = Metal.from_positional(
                             l, self.coord[idx], radii=self.radii[idx]
                         )
                     else:
-                        newatom = atom.from_positional(
+                        newatom = Atom.from_positional(
                             l, self.coord[idx], radii=self.radii[idx]
                         )
                 if debug >= 2:
@@ -668,7 +668,7 @@ class specie(BaseModel):
 ###############
 ### MOLECULE ##
 ###############
-class molecule(specie):
+class Molecule(Specie):
     """
     A molecule is a specie that contains other specie objects.
     """
@@ -676,7 +676,7 @@ class molecule(specie):
     haptic_type: HapticType | None = None
     is_haptic: bool | None = None
     ligands: list | None = None
-    metals: list["atom"] | None = None
+    metals: list["Atom"] | None = None
     spin: Spin | None = None
     ref_indices: list[int] | None = None
     cell_indices: list[int] | None = None
@@ -705,13 +705,13 @@ class molecule(specie):
     @deprecated("Use molecule() with the keyword arguments instead.")
     def from_positional(
         cls, labels: list, coord: list, frac_coord: list = None, radii: list = None
-    ) -> "molecule":
+    ) -> "Molecule":
         return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
 
     def __repr__(self):
         to_print = ""
         to_print += "------------- Cell2mol MOLECULE Object --------------\n"
-        to_print += specie.__repr__(self, indirect=True)
+        to_print += Specie.__repr__(self, indirect=True)
         if self.ligands is not None:
             if self.ligands is not None:
                 # to_print += f" Ligands Smiles               = {self.ligand_smiles}\n"
@@ -739,7 +739,7 @@ class molecule(specie):
 
     ############
     def reset_charge(self):
-        specie.reset_charge(
+        Specie.reset_charge(
             self
         )  ## First uses the generic specie class function for itself and its atoms
         if self.ligands is not None:  ## Second removes for the child classes
@@ -874,11 +874,11 @@ class molecule(specie):
                         print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
 
                     if self.frac_coord is not None:
-                        newligand = ligand.from_positional(
+                        newligand = Ligand.from_positional(
                             lig_labels, lig_coord, lig_frac_coord, radii=lig_radii
                         )
                     else:
-                        newligand = ligand.from_positional(
+                        newligand = Ligand.from_positional(
                             lig_labels, lig_coord, radii=lig_radii
                         )
 
@@ -1041,11 +1041,11 @@ class molecule(specie):
                         print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
 
                     if self.frac_coord is not None:
-                        newligand = ligand.from_positional(
+                        newligand = Ligand.from_positional(
                             lig_labels, lig_coord, lig_frac_coord, radii=lig_radii
                         )
                     else:
-                        newligand = ligand.from_positional(
+                        newligand = Ligand.from_positional(
                             lig_labels, lig_coord, radii=lig_radii
                         )
 
@@ -1216,11 +1216,11 @@ class molecule(specie):
                         print(f"CREATING LIGAND: {labels2formula(lig_labels)}")
                     # Create Ligand Object
                     if self.frac_coord is not None:
-                        newligand = ligand.from_positional(
+                        newligand = Ligand.from_positional(
                             lig_labels, lig_coord, lig_frac_coord, radii=lig_radii
                         )
                     else:
-                        newligand = ligand.from_positional(
+                        newligand = Ligand.from_positional(
                             lig_labels, lig_coord, radii=lig_radii
                         )
 
@@ -1670,17 +1670,17 @@ class molecule(specie):
 ###############
 ### LIGAND ####
 ###############
-class ligand(specie):
+class Ligand(Specie):
     NO_type: NOType | None = None
-    connected_atoms: list["atom"] | None = None
+    connected_atoms: list["Atom"] | None = None
     connected_idx: list[int] | None = None
     denticity: int | None = None
-    groups: list["group"] | None = None
+    groups: list["Group"] | None = None
     haptic_type: HapticType | None = None
     is_haptic: bool | None = None
     is_nitrosyl: bool | None = None
     is_silylyne: bool | None = None
-    metals: list["metal"] | None = None
+    metals: list["Metal"] | None = None
     unique_index: int | None = None
 
     subtype: SubType = Field(default="ligand")
@@ -1697,7 +1697,7 @@ class ligand(specie):
     def __repr__(self):
         to_print = ""
         to_print += "------------- Cell2mol LIGAND Object --------------\n"
-        to_print += specie.__repr__(self, indirect=True)
+        to_print += Specie.__repr__(self, indirect=True)
         if self.groups is not None:
             to_print += f" Number of Groups             = {len(self.groups)}\n"
         to_print += "---------------------------------------------------\n"
@@ -1949,11 +1949,11 @@ class ligand(specie):
                 gr_atom_site_labels = None
             # Create Group Object
             if self.frac_coord is not None:
-                newgroup = group.from_positional(
+                newgroup = Group.from_positional(
                     gr_labels, gr_coord, gr_frac_coord, radii=gr_radii
                 )
             else:
-                newgroup = group.from_positional(gr_labels, gr_coord, radii=gr_radii)
+                newgroup = Group.from_positional(gr_labels, gr_coord, radii=gr_radii)
 
             # For debugging
             newgroup.origin = "split_ligand"
@@ -2079,12 +2079,12 @@ class ligand(specie):
 ###############
 #### GROUP ####
 ###############
-class group(specie):
+class Group(Specie):
     checked_coordination: bool | None = None
-    closest_metal: Optional["metal"] = None
+    closest_metal: Optional["Metal"] = None
     haptic_type: HapticType | None = None
     is_haptic: bool | None = None
-    metals: list["metal"] | None = None
+    metals: list["Metal"] | None = None
     denticity: int | None = None
 
     subtype: SubType = Field(default="group")
@@ -2105,7 +2105,7 @@ class group(specie):
     def __repr__(self):
         to_print = ""
         to_print += "------------- Cell2mol GROUP Object --------------\n"
-        to_print += specie.__repr__(self, indirect=True)
+        to_print += Specie.__repr__(self, indirect=True)
         if self.metals is not None:
             to_print += f" Number of Metals             = {len(self.metals)}\n"
         to_print += "---------------------------------------------------\n"
@@ -2302,7 +2302,7 @@ class group(specie):
 ###############
 ### BOND ######
 ###############
-class bond(BaseModel):
+class Bond(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     # Required constructor parameters
@@ -2352,14 +2352,14 @@ class bond(BaseModel):
     @deprecated("Use bond() with the keyword arguments instead.")
     def from_positional(
         cls, atom1: object, atom2: object, bond_order: float = 1
-    ) -> "bond":
+    ) -> "Bond":
         return cls(atom1=atom1, atom2=atom2, bond_order=bond_order)
 
 
 ###############
 ### ATOM ######
 ###############
-class atom(BaseModel):
+class Atom(BaseModel):
     label: str
     coord: list[float]
     frac_coord: list[float] | None = None
@@ -2407,7 +2407,7 @@ class atom(BaseModel):
     @deprecated("Use atom() with the keyword arguments instead.")
     def from_positional(
         cls, label: str, coord: list, frac_coord: list = None, radii: float = None
-    ) -> "atom":
+    ) -> "Atom":
         """
         Creates an atom instance using positional arguments.
 
@@ -2841,7 +2841,7 @@ class atom(BaseModel):
 ###############
 #### METAL ####
 ###############
-class metal(atom):
+class Metal(Atom):
     metals: list[object] = Field(default_factory=list)
     groups: list[object] = Field(default_factory=list)
     coord_nr: int | None = None
@@ -2856,7 +2856,7 @@ class metal(atom):
     bond_order: int | None = None
     bond_type: str | None = None
     bond_distance: float | None = None
-    coord_sphere: list[atom] | None = None
+    coord_sphere: list[Atom] | None = None
     coord_sphere_formula: str | None = None
     unique_index: int | None = None
     charge: int | None = None
@@ -3284,7 +3284,7 @@ class metal(atom):
 
     #######################################################
     def reset_charge(self):
-        atom.reset_charge(
+        Atom.reset_charge(
             self
         )  ## First uses the generic atom class function for itself
         if self.poscharges is not None:
@@ -3297,7 +3297,7 @@ class metal(atom):
     def __repr__(self):
         to_print = ""
         to_print += "------------- Cell2mol METAL Object --------------\n"
-        to_print += atom.__repr__(self, indirect=True)
+        to_print += Atom.__repr__(self, indirect=True)
         if self.coord_sphere_formula is not None:
             to_print += f" Coordination Sphere Formula  = {self.coord_sphere_formula}\n"
         if self.possible_cs is not None:
@@ -3309,7 +3309,7 @@ class metal(atom):
 ##############
 #### CELL ####
 ##############
-class cell(BaseModel):
+class Cell(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     # Required constructor parameters
@@ -3601,7 +3601,7 @@ class cell(BaseModel):
         ref_pos = frac2cart_fromparam(ref_fracs, self.cell_param)
 
         # Define reference cell
-        refcell = cell.from_positional(
+        refcell = Cell.from_positional(
             self.name, ref_labels, ref_pos, ref_fracs, self.cell_vector, self.cell_param
         )
         refcell.set_subtype("reference")
@@ -3634,7 +3634,7 @@ class cell(BaseModel):
             mol_frac_coord = extract_from_list(b, ref_fracs, dimension=1)
             mol_atom_site_labels = extract_from_list(b, atom_site_labels, dimension=1)
 
-            newmolec = molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
+            newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
             newmolec.add_parent(self, indices=b)
             # newmolec.add_parent(refcell, indices=b)
             newmolec.set_adjacency_parameters(cov_factor, metal_factor)
@@ -3735,7 +3735,7 @@ class cell(BaseModel):
         ref_pos = frac2cart_fromparam(ref_fracs, self.cell_param)
 
         # Define reference cell
-        refcell = cell.from_positional(
+        refcell = Cell.from_positional(
             self.name, ref_labels, ref_pos, ref_fracs, self.cell_vector, self.cell_param
         )
         refcell.set_subtype("reference")
@@ -3763,7 +3763,7 @@ class cell(BaseModel):
             mol_frac_coord = extract_from_list(b, ref_fracs, dimension=1)
             mol_atom_site_labels = extract_from_list(b, atom_site_labels, dimension=1)
 
-            newmolec = molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
+            newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
             newmolec.add_parent(self, indices=b)
             # newmolec.add_parent(refcell, indices=b)
             newmolec.set_adjacency_parameters(cov_factor, metal_factor)
@@ -3938,7 +3938,7 @@ class cell(BaseModel):
             mol_coord = extract_from_list(b, self.coord, dimension=1)
             mol_frac_coord = extract_from_list(b, self.frac_coord, dimension=1)
             # Creates Molecule Object
-            newmolec = molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
+            newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
             # For debugging
             newmolec.origin = "cell.get_moleclist"
             # Adds cell as parent of the molecule, with indices b
@@ -4065,7 +4065,7 @@ class cell(BaseModel):
             ## For consistency, we create the molecules once again, even if mol is already a molecule-class object.
             ## One must follow the same structure as in self.get_moleclist()
             for mol in reconstructed_molecules:
-                newmolec = molecule.from_positional(mol.labels, mol.coord)
+                newmolec = Molecule.from_positional(mol.labels, mol.coord)
                 newmolec.origin = "cell.reconstruct"
                 newmolec.set_adjacency_parameters(cov_factor, metal_factor)
                 newmolec.set_atoms(create_adjacencies=True, debug=debug)
@@ -4629,7 +4629,7 @@ class cell(BaseModel):
         frac_coord: list[list[float]],
         cell_vector: object,
         cell_param: object,
-    ) -> "cell":
+    ) -> "Cell":
         return cls(
             name=name,
             labels=labels,
