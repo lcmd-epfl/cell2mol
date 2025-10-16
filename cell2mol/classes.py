@@ -30,14 +30,12 @@ from cell2mol.connectivity import (
     get_adjmatrix_from_cif_bonds,
     check_blocklist,
 )
-from cell2mol.cell_reconstruction import classify_fragments, fragments_reconstruct
-from cell2mol.cell_operations import cart2frac, frac2cart_fromparam
+from cell2mol.cell_operations import frac2cart_fromparam
 
 from cell2mol.charge_assignment import (
     get_protonation_states_specie,
     get_possible_charge_state,
     get_metal_poscharges,
-    get_empty_protonation_state,
 )
 from cell2mol.charge_assignment import (
     prepare_unresolved,
