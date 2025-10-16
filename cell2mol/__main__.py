@@ -3,10 +3,8 @@ from __future__ import absolute_import
 
 import os
 import sys
-import cell2mol
-#from cell2mol import c2m_driver
+# from cell2mol import c2m_driver
 # from cell2mol import new_c2m_driver
-from cell2mol import final_c2m_driver
 
 if __package__ == "":
     path = os.path.dirname(os.path.dirname(__file__))
