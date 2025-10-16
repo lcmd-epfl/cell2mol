@@ -1,24 +1,21 @@
 #!/usr/bin/env python
 
-import os
-import os.path
 import sklearn
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split, StratifiedKFold
-from sklearn.metrics import confusion_matrix, accuracy_score, f1_score
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import accuracy_score, f1_score
 import matplotlib
 import pickle
 import pandas as pd
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 from sys import argv
-import ast
 from cell2mol.spin import make_geom_list
 
 
-dataframe=argv[1]
+dataframe = argv[1]
 metal = argv[2]
 mode = argv[3]
 
@@ -30,40 +27,51 @@ print("the length of dataframe", len(df))
 print(df.columns)
 
 df["geom_nr"] = ""
-for tmc in df.refcode :
-    df.loc[df.refcode==tmc, "geom_nr"] = make_geom_list()[df[df.refcode==tmc].geometry.item()]
+for tmc in df.refcode:
+    df.loc[df.refcode == tmc, "geom_nr"] = make_geom_list()[
+        df[df.refcode == tmc].geometry.item()
+    ]
 
 
 if metal == "total":
     pass
-else :
+else:
     if metal in df["metal"].unique():
         df = df[df["metal"] == metal]
-    else :
+    else:
         print("No such metal in the database")
         exit()
 
-print("the length of", metal,  len(df))
-#print(df[:10])
+print("the length of", metal, len(df))
+# print(df[:10])
 
-#exit()
+# exit()
 
 # prop = "spin_multiplicity"
 prop = "m_ox"
 # extract = ["elem_nr", "m_ox", "d_elec"] # F_TM
 # extract = ["CN", "geom_nr", "rel_m"] # F_CE
 # extract = ["elem_nr", "m_ox", "d_elec", "CN", "geom_nr", "rel_m"] # F_TM+CE
-extract = ["elem_nr", "d_elec", "CN", "geom_nr", "rel_m"] # for metal oxidation state prediction m_ox_v1
+extract = [
+    "elem_nr",
+    "d_elec",
+    "CN",
+    "geom_nr",
+    "rel_m",
+]  # for metal oxidation state prediction m_ox_v1
 # extract = ["elem_nr", "CN", "geom_nr", "rel_m"] # for metal oxidation state prediction m_ox_v2
 
-Nfix=list(df["refcode"])
+Nfix = list(df["refcode"])
 print("the number of complexes :", len(Nfix))
-Nfix=np.array(Nfix, dtype=str)
+Nfix = np.array(Nfix, dtype=str)
 
 X = np.vstack([np.array(df[df["refcode"] == name][extract]) for name in Nfix])
 print(extract)
 print("feature size", X.shape)
-Y = np.array( [ df[df.refcode==name][prop].item() for name in Nfix] , dtype=int,)
+Y = np.array(
+    [df[df.refcode == name][prop].item() for name in Nfix],
+    dtype=int,
+)
 print("reference data", Y.shape)
 
 
@@ -105,7 +113,7 @@ n_splits = 10
 acc_train = np.zeros((n_splits))
 acc_test = np.zeros((n_splits))
 
-f1_train_micro = np.zeros((n_splits)) 
+f1_train_micro = np.zeros((n_splits))
 f1_test_micro = np.zeros((n_splits))
 f1_train_macro = np.zeros((n_splits))
 f1_test_macro = np.zeros((n_splits))
@@ -132,7 +140,7 @@ for rep, (idx_tr, idx_te) in enumerate(skf.split(X, Y)):
     f1_train_micro[rep] = f1_score(y_tr, predictions, average="micro")
     f1_train_macro[rep] = f1_score(y_tr, predictions, average="macro")
     f1_train_weighted[rep] = f1_score(y_tr, predictions, average="weighted")
-    
+
     # Test set predict
     predictions = learner.predict(X_te)
     prediction_probs = np.around(learner.predict_proba(X_te), 4)
@@ -142,29 +150,44 @@ for rep, (idx_tr, idx_te) in enumerate(skf.split(X, Y)):
     f1_test_macro[rep] = f1_score(y_te, predictions, average="macro")
     f1_test_weighted[rep] = f1_score(y_te, predictions, average="weighted")
 
-
     is_certain = [True if np.max(probs) >= 0.5 else False for probs in prediction_probs]
     l_oos.extend(l_te)
-    #print(prediction_probs)
-    #print(np.amax(prediction_probs, axis=1))
+    # print(prediction_probs)
+    # print(np.amax(prediction_probs, axis=1))
     maxprob.extend(list(np.amax(prediction_probs, axis=1)))
     if print_incorrect:
         print(f"\n Incorrect predictions for replica {rep}:")
     for idx, sys in enumerate(is_correct):
         if not sys and print_incorrect:
             print(
-                f"System {l_te[idx]} has prediction {predictions[idx]} with probability {np.max(prediction_probs[idx])} and reference {y_te[idx]} metal {df[df.refcode==l_te[idx]]['metal'].item()}"
+                f"System {l_te[idx]} has prediction {predictions[idx]} with probability {np.max(prediction_probs[idx])} and reference {y_te[idx]} metal {df[df.refcode == l_te[idx]]['metal'].item()}"
             )
 
 print("\n \n Summary of replica results:")
-print(f"Training mean accuracy was {round(np.mean(acc_train),3)} with STD {round(np.std(acc_train),3)}")
-print(f"Test mean accuracy was {round(np.mean(acc_test),3)} with STD {round(np.std(acc_test),3)}")
-print(f"Training mean f1_score_micro was {np.mean(f1_train_micro)} with STD {np.std(f1_train_micro)}")
-print(f"Test mean f1_score_micro was {np.mean(f1_test_micro)} with STD {np.std(f1_test_micro)}")
-print(f"Training mean f1_score_macro was {np.mean(f1_train_macro)} with STD {np.std(f1_train_macro)}")
-print(f"Test mean f1_score_macro was {np.mean(f1_test_macro)} with STD {np.std(f1_test_macro)}")
-print(f"Training mean f1_score_weighted was {np.mean(f1_train_weighted)} with STD {np.std(f1_train_weighted)}")
-print(f"Test mean f1_score_weighted was {np.mean(f1_test_weighted)} with STD {np.std(f1_test_weighted)}")
+print(
+    f"Training mean accuracy was {round(np.mean(acc_train), 3)} with STD {round(np.std(acc_train), 3)}"
+)
+print(
+    f"Test mean accuracy was {round(np.mean(acc_test), 3)} with STD {round(np.std(acc_test), 3)}"
+)
+print(
+    f"Training mean f1_score_micro was {np.mean(f1_train_micro)} with STD {np.std(f1_train_micro)}"
+)
+print(
+    f"Test mean f1_score_micro was {np.mean(f1_test_micro)} with STD {np.std(f1_test_micro)}"
+)
+print(
+    f"Training mean f1_score_macro was {np.mean(f1_train_macro)} with STD {np.std(f1_train_macro)}"
+)
+print(
+    f"Test mean f1_score_macro was {np.mean(f1_test_macro)} with STD {np.std(f1_test_macro)}"
+)
+print(
+    f"Training mean f1_score_weighted was {np.mean(f1_train_weighted)} with STD {np.std(f1_train_weighted)}"
+)
+print(
+    f"Test mean f1_score_weighted was {np.mean(f1_test_weighted)} with STD {np.std(f1_test_weighted)}"
+)
 
 try:
     assert len(maxprob) == len(l_oos)
@@ -185,7 +208,6 @@ exit()
 
 # Not doing out of sample things because there is no out of sample
 if run_diagnosis:
-
     # Initializing the learner
     learner = learner = rf_random.best_estimator_.fit(X, Y)
 
@@ -217,7 +239,7 @@ if run_diagnosis:
 
         prediction, bias, contributions = ti.predict(learner, X)
         for idx, sys in enumerate(Nfix):
-            print(f"System {Nfix[idx]} has contributions {contributions[0,idx]}:")
+            print(f"System {Nfix[idx]} has contributions {contributions[0, idx]}:")
 
 # trained_model = pickle.load(open(filename, 'rb'))
 

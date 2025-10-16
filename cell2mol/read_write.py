@@ -16,39 +16,69 @@ import pandas as pd
 import networkx as nx
 
 transition_metals = {
-    'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
-    'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
-    'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg'
+    "Sc",
+    "Ti",
+    "V",
+    "Cr",
+    "Mn",
+    "Fe",
+    "Co",
+    "Ni",
+    "Cu",
+    "Zn",
+    "Y",
+    "Zr",
+    "Nb",
+    "Mo",
+    "Tc",
+    "Ru",
+    "Rh",
+    "Pd",
+    "Ag",
+    "Cd",
+    "Hf",
+    "Ta",
+    "W",
+    "Re",
+    "Os",
+    "Ir",
+    "Pt",
+    "Au",
+    "Hg",
 }
+
 
 #######################
 def screening_cif(cif_file_path):
-    
     radical = False
     disorder = False
     notfound_atom = False
 
-    with open(cif_file_path, 'r') as ciffile:
+    with open(cif_file_path, "r") as ciffile:
         file_content = ciffile.read()
-        if 'radical' in file_content:
+        if "radical" in file_content:
             radical = True
-        elif '_atom_site_fract_x' not in file_content:
+        elif "_atom_site_fract_x" not in file_content:
             notfound_atom = True
-        elif '?' in file_content:
-            if "_diffrn_ambient_temperature ?" not in file_content and "_chemical_melting_point ?" not in file_content:
+        elif "?" in file_content:
+            if (
+                "_diffrn_ambient_temperature ?" not in file_content
+                and "_chemical_melting_point ?" not in file_content
+            ):
                 disorder = True
             else:
-                num_greps = file_content.count('?')
+                num_greps = file_content.count("?")
                 if num_greps > 1:
                     disorder = True
-    
+
     moiety_dicts = extract_moiety(cif_file_path)
     if len(moiety_dicts) == 0:
         polymeric = False
     else:
-        polymeric = any("n(" in moiety['formula'] for moiety in moiety_dicts)
+        polymeric = any("n(" in moiety["formula"] for moiety in moiety_dicts)
 
     return radical, disorder, notfound_atom, polymeric
+
 
 #################
 def prefilter_cif(input_path):
@@ -58,13 +88,13 @@ def prefilter_cif(input_path):
     """
     # Check for radical, disorder, 3D fractional coordinates, and polymeric structure
     radical, disorder, notfound_atom, polymeric = screening_cif(input_path)
-    
+
     message = ""
 
     if any([radical, disorder, notfound_atom, polymeric]):
-        #print(f"{radical=}, {disorder=}, {notfound_atom=}, {polymeric=}")    
+        # print(f"{radical=}, {disorder=}, {notfound_atom=}, {polymeric=}")
         if radical:
-            message += "\nRadical found in .cif file."        
+            message += "\nRadical found in .cif file."
         if disorder:
             message += "\nDisorder found in .cif file."
         if notfound_atom:
@@ -72,14 +102,15 @@ def prefilter_cif(input_path):
         if polymeric:
             message += "\nPolymeric structure found in .cif file."
         return False, message
-    else :
+    else:
         print("Cif file is ready for processing")
         return True, message
-        
+
+
 #######################
-def get_wyckoff_positions_old (file_path):
+def get_wyckoff_positions_old(file_path):
     # Open and read the CIF file
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         lines = file.readlines()
 
     # Flags and storage for parsing
@@ -89,12 +120,12 @@ def get_wyckoff_positions_old (file_path):
     # Iterate through each line
     for line in lines:
         # Check if line contains the loop declaration for atomic sites
-        if '_atom_site_fract_z' in line:
+        if "_atom_site_fract_z" in line:
             start_parsing = True
             continue
 
         # Stop parsing if another loop starts or if data is done
-        if 'loop_' in line and start_parsing:
+        if "loop_" in line and start_parsing:
             break
 
         # Parse the atomic position data
@@ -103,9 +134,9 @@ def get_wyckoff_positions_old (file_path):
                 parts = line.split()
                 if len(parts) >= 4:  # Ensure there are enough parts to parse
                     # Clean and extract the coordinates before parentheses
-                    x = parts[2].split('(')[0]
-                    y = parts[3].split('(')[0]
-                    z = parts[4].split('(')[0]
+                    x = parts[2].split("(")[0]
+                    y = parts[3].split("(")[0]
+                    z = parts[4].split("(")[0]
                     # Append label, type, and cleaned fractional coordinates
                     data.append((parts[0], parts[1], float(x), float(y), float(z)))
 
@@ -116,10 +147,12 @@ def get_wyckoff_positions_old (file_path):
     # print(f"{len(ref_fracs)=} {ref_fracs}=")
 
     return ref_labels, ref_fracs
+
+
 #######################
-def get_geom_bond (file_path):
+def get_geom_bond(file_path):
     full_text = Path(file_path).read_text()
-    loop_sections = re.split(r'\nloop_\n', full_text)
+    loop_sections = re.split(r"\nloop_\n", full_text)
 
     geom_bond_data = []
 
@@ -128,20 +161,22 @@ def get_geom_bond (file_path):
         if not lines:
             continue
         # === _geom_bond block ===
-        if lines[0].startswith('_geom_bond'):
+        if lines[0].startswith("_geom_bond"):
             headers = []
             start_idx = -1
 
             for i, line in enumerate(lines):
-                if line.strip().startswith('_geom_bond'):
+                if line.strip().startswith("_geom_bond"):
                     headers.append(line.strip())
                 else:
                     start_idx = i
                     break
 
-            required = {'_geom_bond_atom_site_label_1',
-                        '_geom_bond_atom_site_label_2',
-                        '_geom_bond_distance'}
+            required = {
+                "_geom_bond_atom_site_label_1",
+                "_geom_bond_atom_site_label_2",
+                "_geom_bond_distance",
+            }
             if not required.issubset(headers):
                 continue
 
@@ -149,14 +184,14 @@ def get_geom_bond (file_path):
             # print("Bond header map:", header_map)
 
             for line in lines[start_idx:]:
-                if line.strip().startswith('_') or line.strip() == 'loop_':
+                if line.strip().startswith("_") or line.strip() == "loop_":
                     break
                 parts = line.split()
                 if len(parts) >= len(headers):
                     try:
-                        atom_1 = parts[header_map['_geom_bond_atom_site_label_1']]
-                        atom_2 = parts[header_map['_geom_bond_atom_site_label_2']]
-                        dist = float(parts[header_map['_geom_bond_distance']])
+                        atom_1 = parts[header_map["_geom_bond_atom_site_label_1"]]
+                        atom_2 = parts[header_map["_geom_bond_atom_site_label_2"]]
+                        dist = float(parts[header_map["_geom_bond_distance"]])
                         geom_bond_data.append((atom_1, atom_2, dist))
                     except (KeyError, ValueError, IndexError):
                         continue
@@ -172,13 +207,13 @@ def get_geom_bond (file_path):
     # print("Bond data (first 5):", geom_bond_data[:5])
     # print("Moieties:", moiety_list)
 
-    return geom_bond_data, moiety_list    
+    return geom_bond_data, moiety_list
+
 
 ######################
-def get_wyckoff_positions (file_path):
-
+def get_wyckoff_positions(file_path):
     full_text = Path(file_path).read_text()
-    loop_sections = re.split(r'\nloop_\n', full_text)
+    loop_sections = re.split(r"\nloop_\n", full_text)
 
     atom_site_data = []
 
@@ -188,36 +223,41 @@ def get_wyckoff_positions (file_path):
             continue
 
         # === _atom_site block ===
-        if lines[0].startswith('_atom_site'):
+        if lines[0].startswith("_atom_site"):
             headers = []
             start_idx = -1
 
             for i, line in enumerate(lines):
-                if line.strip().startswith('_atom_site'):
+                if line.strip().startswith("_atom_site"):
                     headers.append(line.strip())
                 else:
                     start_idx = i
                     break
 
-            required = {'_atom_site_label', '_atom_site_type_symbol',
-                        '_atom_site_fract_x', '_atom_site_fract_y', '_atom_site_fract_z'}
+            required = {
+                "_atom_site_label",
+                "_atom_site_type_symbol",
+                "_atom_site_fract_x",
+                "_atom_site_fract_y",
+                "_atom_site_fract_z",
+            }
             if not required.issubset(headers):
                 continue
 
             header_map = {h: idx for idx, h in enumerate(headers)}
-            #print("Atom site header map:", header_map)
+            # print("Atom site header map:", header_map)
 
             for line in lines[start_idx:]:
-                if line.strip().startswith('_') or line.strip() == 'loop_':
+                if line.strip().startswith("_") or line.strip() == "loop_":
                     break
                 parts = line.split()
                 if len(parts) >= len(headers):
                     try:
-                        label = parts[header_map['_atom_site_label']]
-                        symbol = parts[header_map['_atom_site_type_symbol']]
-                        x = float(parts[header_map['_atom_site_fract_x']].split('(')[0])
-                        y = float(parts[header_map['_atom_site_fract_y']].split('(')[0])
-                        z = float(parts[header_map['_atom_site_fract_z']].split('(')[0])
+                        label = parts[header_map["_atom_site_label"]]
+                        symbol = parts[header_map["_atom_site_type_symbol"]]
+                        x = float(parts[header_map["_atom_site_fract_x"]].split("(")[0])
+                        y = float(parts[header_map["_atom_site_fract_y"]].split("(")[0])
+                        z = float(parts[header_map["_atom_site_fract_z"]].split("(")[0])
                         atom_site_data.append((label, symbol, x, y, z))
                     except (KeyError, ValueError, IndexError):
                         continue
@@ -235,9 +275,9 @@ def get_wyckoff_positions (file_path):
 
     return atom_site_labels, ref_labels, ref_fracs
 
+
 ##################
 def get_moiety_indices_from_labels(atom_site_labels, moiety_list):
-    
     flat_list = [atom for moiety in moiety_list for atom in moiety]
 
     atom_site_labels = np.array(atom_site_labels)  # ensure it's a numpy array
@@ -248,8 +288,9 @@ def get_moiety_indices_from_labels(atom_site_labels, moiety_list):
     for i, atom in enumerate(atom_site_labels):
         if atom not in flat_list:
             moiety_indices.append([i])
-    
+
     return moiety_indices
+
 
 #######################
 def exit_with_error_input(message):
@@ -259,22 +300,25 @@ def exit_with_error_input(message):
         error_log.write(f"Error: {message}\n")
     sys.exit(message)
 
-#######################    
+
+#######################
 def exit_with_error_exception(e):
     """Logs the error details to a file and exits the program."""
     error_details = traceback.format_exc()
     error_log_path = os.path.join(os.getcwd(), f"error_{type(e).__name__}.out")
-    
+
     # Write the full error details to the log file
     with open(error_log_path, "w") as error_log:
         error_log.write(f"Error message: {type(e).__name__} - {str(e)}\n")
         error_log.write(f"Error details:\n{error_details}")
-    
+
     # Print the error details to the console
     print(f"An error occurred. Details have been logged to {error_log_path}")
     print(f"Error details:\n{error_details}")
-    
-    sys.exit(e)      
+
+    sys.exit(e)
+
+
 #######################
 def sum_formulas(formulas, ratios=None):
     """
@@ -283,13 +327,13 @@ def sum_formulas(formulas, ratios=None):
     Returns a dict {element: float_count}.
     """
     if ratios is None:
-        ratios = [1.0]*len(formulas)
+        ratios = [1.0] * len(formulas)
     if len(ratios) != len(formulas):
         return None
-        #raise ValueError("ratios and formulas must have the same length")
+        # raise ValueError("ratios and formulas must have the same length")
     if any(not isinstance(r, (int, float)) for r in ratios):
         return None
-        #raise ValueError("ratios contains non-float values")
+        # raise ValueError("ratios contains non-float values")
     total = Counter()
     for f, r in zip(formulas, ratios):
         c = parse_formula_string(f)
@@ -297,6 +341,7 @@ def sum_formulas(formulas, ratios=None):
             total[el] += n * float(r)
     # Convert to plain dict of floats
     return {el: float(n) for el, n in total.items()}
+
 
 def compare_totals(cif_totals: dict, ref_totals: dict, atol=1e-8):
     """
@@ -312,15 +357,25 @@ def compare_totals(cif_totals: dict, ref_totals: dict, atol=1e-8):
         delta = cif_val - ref_val
         ok = abs(delta) <= atol
         all_ok = all_ok and ok
-        rows.append({"Element": el, "CIF_total": cif_val, "Refcell_total": ref_val, "Delta (CIF-Ref)": delta, "OK": ok})
+        rows.append(
+            {
+                "Element": el,
+                "CIF_total": cif_val,
+                "Refcell_total": ref_val,
+                "Delta (CIF-Ref)": delta,
+                "OK": ok,
+            }
+        )
     df = pd.DataFrame(rows)
     return df, all_ok
 
+
 def parse_formula_string(formula_str: str) -> Counter:
     # One lowercase letter max (Cl, Ti, Fe, etc.)
-    tokens = re.findall(r'([A-Z][a-z]?)(\d*)', formula_str)
-#     tokens = re.findall(r'([A-Z][a-z]*)(\d*)', formula_str)
+    tokens = re.findall(r"([A-Z][a-z]?)(\d*)", formula_str)
+    #     tokens = re.findall(r'([A-Z][a-z]*)(\d*)', formula_str)
     return Counter({el: int(cnt) if cnt else 1 for el, cnt in tokens})
+
 
 def formula_diff_dict(f1: str, f2: str) -> dict:
     c1 = parse_formula_string(f1)
@@ -328,9 +383,11 @@ def formula_diff_dict(f1: str, f2: str) -> dict:
     all_elements = set(c1) | set(c2)
     return {el: abs(c1[el] - c2[el]) for el in all_elements if c1[el] != c2[el]}
 
+
 def _nonH_signature(counter: Counter):
     # Canonical signature ignoring hydrogens (order-independent)
-    return tuple(sorted((el, cnt) for el, cnt in counter.items() if el != 'H'))
+    return tuple(sorted((el, cnt) for el, cnt in counter.items() if el != "H"))
+
 
 def find_closest_matches(reference, target):
     # Pre-parse targets once
@@ -343,24 +400,27 @@ def find_closest_matches(reference, target):
         # 1) Exact match on full composition
         for tgt, c_tgt in parsed_targets:
             if c_tgt == c_ref:
-                matches[i] = {'ref': ref, 'match': tgt, 'diff_dict': {}}
+                matches[i] = {"ref": ref, "match": tgt, "diff_dict": {}}
                 break
         else:
             # 2) H-insensitive signature match (same non-H composition)
             sig_ref = _nonH_signature(c_ref)
-            hinsensitive = [(tgt, c_tgt) for tgt, c_tgt in parsed_targets
-                            if _nonH_signature(c_tgt) == sig_ref]
+            hinsensitive = [
+                (tgt, c_tgt)
+                for tgt, c_tgt in parsed_targets
+                if _nonH_signature(c_tgt) == sig_ref
+            ]
 
             if hinsensitive:
                 # Choose the one with minimal |ΔH|
                 best_tgt, best_ct = min(
                     hinsensitive,
-                    key=lambda x: abs(x[1].get('H', 0) - c_ref.get('H', 0))
+                    key=lambda x: abs(x[1].get("H", 0) - c_ref.get("H", 0)),
                 )
                 matches[i] = {
-                    'ref': ref,
-                    'match': best_tgt,
-                    'diff_dict': formula_diff_dict(ref, best_tgt)
+                    "ref": ref,
+                    "match": best_tgt,
+                    "diff_dict": formula_diff_dict(ref, best_tgt),
                 }
             else:
                 # 3) Weighted fallback: penalize non-H strongly, H lightly
@@ -369,52 +429,59 @@ def find_closest_matches(reference, target):
                     score = 0.0
                     for el in elems:
                         diff = abs(c_ref.get(el, 0) - c_tgt.get(el, 0))
-                        if el == 'H':
-                            score += 0.1 * diff      # hydrogens are cheap
+                        if el == "H":
+                            score += 0.1 * diff  # hydrogens are cheap
                         else:
-                            score += 10.0 * diff     # non-H differences matter a lot
+                            score += 10.0 * diff  # non-H differences matter a lot
                     return score
 
-                best_tgt, best_ct = min(parsed_targets, key=lambda x: weighted_score(x[1]))
+                best_tgt, best_ct = min(
+                    parsed_targets, key=lambda x: weighted_score(x[1])
+                )
                 matches[i] = {
-                    'ref': ref,
-                    'match': best_tgt,
-                    'diff_dict': formula_diff_dict(ref, best_tgt)
+                    "ref": ref,
+                    "match": best_tgt,
+                    "diff_dict": formula_diff_dict(ref, best_tgt),
                 }
 
     return matches
+
 
 def find_closest_matches_old(reference, target):
     matches = {}
     for i, ref in enumerate(reference):
         if ref in target:
-            matches[i] = {'ref': ref, 'match': ref, 'diff_dict': {}}
+            matches[i] = {"ref": ref, "match": ref, "diff_dict": {}}
         else:
             diffs = [(tgt, formula_diff_dict(ref, tgt)) for tgt in target]
             # Select the one with the smallest total difference
             best_match, best_diff = min(diffs, key=lambda x: sum(x[1].values()))
-            matches[i] = {'ref': ref, 'match': best_match, 'diff_dict': best_diff}
+            matches[i] = {"ref": ref, "match": best_match, "diff_dict": best_diff}
     return matches
+
+
 #######################
 def extract_chemical_name_v1(file_path):
     try:
-        with open(file_path, 'r') as file:
+        with open(file_path, "r") as file:
             start_reading = False
             chemical_name = ""
 
             for line in file:
                 # Check for line starting with '_chemical_name_systematic'
-                if line.startswith('_chemical_name_systematic'):
+                if line.startswith("_chemical_name_systematic"):
                     start_reading = True
-                    continue  
+                    continue
 
                 if start_reading:
                     chemical_name += line.strip()
 
-                    if chemical_name.count(';') >= 2:
+                    if chemical_name.count(";") >= 2:
                         # Extract content between the first and second ';'
                         # Reformat without extra line breaks or extra spaces
-                        chemical_name = ' '.join(chemical_name.split(';')[1].strip().split())
+                        chemical_name = " ".join(
+                            chemical_name.split(";")[1].strip().split()
+                        )
                         break
 
             return chemical_name
@@ -422,7 +489,9 @@ def extract_chemical_name_v1(file_path):
     except FileNotFoundError:
         print(f"File not found: {file_path}")
         return None
-#######################    
+
+
+#######################
 def extract_chemical_name(file_path, tag="_chemical_name_systematic"):
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -476,31 +545,45 @@ def extract_chemical_name(file_path, tag="_chemical_name_systematic"):
                 return None
         i += 1
     return None
+
+
 #######################
 def extract_metal_oxidation_state(chemical_name):
-
     oxidation_states = []
 
     # Regex pattern to capture any format like "iron(iii)"
-    pattern = r'(\b[a-zA-Z-]+\b)\((iii|ii|iv|v|vi|vii|i|0|o)\)'
+    pattern = r"(\b[a-zA-Z-]+\b)\((iii|ii|iv|v|vi|vii|i|0|o)\)"
 
     matches = re.findall(pattern, chemical_name, re.IGNORECASE)
     for metal, ox_state in matches:
-        ox_state_map = {'0': 0, 'o': 0, 'i': 1, 'ii': 2, 'iii': 3, 'iv': 4, 'v': 5, 'vi': 6, 'vii': 7}
-        oxidation_state = ox_state_map.get(ox_state.lower(), ox_state)  # Retain text if needed
+        ox_state_map = {
+            "0": 0,
+            "o": 0,
+            "i": 1,
+            "ii": 2,
+            "iii": 3,
+            "iv": 4,
+            "v": 5,
+            "vi": 6,
+            "vii": 7,
+        }
+        oxidation_state = ox_state_map.get(
+            ox_state.lower(), ox_state
+        )  # Retain text if needed
         oxidation_states.append((metal, oxidation_state))
 
     return oxidation_states
 
+
 #######################
 def parse_moiety(moiety: str) -> Tuple[str, float, int, str]:
-    """ Parse a moiety string and return its formula, ratio (float), charge, and type """
+    """Parse a moiety string and return its formula, ratio (float), charge, and type"""
     # Default values
     ratio = 1.0
     formula_with_charge = moiety.strip()
 
-    # Handle 'x(' 
-    x_match = re.match(r"^[^\d\W]\w*\((.*?)\)$", moiety)                     
+    # Handle 'x('
+    x_match = re.match(r"^[^\d\W]\w*\((.*?)\)$", moiety)
     if x_match:
         formula_with_charge = x_match.group(1)
         ratio = ""
@@ -510,50 +593,59 @@ def parse_moiety(moiety: str) -> Tuple[str, float, int, str]:
     if match:
         ratio = float(match.group(1))
         formula_with_charge = match.group(2)
-        
+
     # Extract charge at the end, e.g., "1+", "2-"
-    charge_match = re.search(r'(\d+[+-])$', formula_with_charge)
+    charge_match = re.search(r"(\d+[+-])$", formula_with_charge)
     if charge_match:
         charge_str = charge_match.group(1)
-        charge = int(charge_str[:-1]) * (1 if charge_str[-1] == '+' else -1)
-        formula = formula_with_charge.replace(charge_str, '').strip()
+        charge = int(charge_str[:-1]) * (1 if charge_str[-1] == "+" else -1)
+        formula = formula_with_charge.replace(charge_str, "").strip()
     else:
         charge = 0
         formula = formula_with_charge.strip()
 
     # Check if it contains any transition metal
-    is_complex = any(re.search(rf'{metal}\d*', formula) for metal in transition_metals)
+    is_complex = any(re.search(rf"{metal}\d*", formula) for metal in transition_metals)
     compound_type = "complex" if is_complex else "molecule"
 
     return (formula, ratio, charge, compound_type)
 
+
 ################################
 def cifformula_to_list(formula: str) -> list:
     # Match element symbols with optional numbers (e.g., 'C4', 'H2', 'N1')
-    tokens = re.findall(r'([A-Z][a-z]*)(\d*)', formula)
+    tokens = re.findall(r"([A-Z][a-z]*)(\d*)", formula)
     result = []
     for element, count in tokens:
         n = int(count) if count else 1
         result.extend([element] * n)
     return result
 
+
 #########################
 def extract_moiety(file_path: str) -> list:
-    """ Extracts the moiety information from a CIF file """
+    """Extracts the moiety information from a CIF file"""
     uploaded_file_path = Path(file_path)
     with uploaded_file_path.open("r", encoding="utf-8") as file:
         cif_data_uploaded = file.read()
     if "_chemical_formula_moiety" in cif_data_uploaded:
         # Extract the moiety block
-        moiety_match_uploaded = re.search(r"_chemical_formula_moiety\s*;\s*(.*?)\s*;", cif_data_uploaded, re.DOTALL)
-        moiety_string_uploaded = moiety_match_uploaded.group(1) if moiety_match_uploaded else ""
+        moiety_match_uploaded = re.search(
+            r"_chemical_formula_moiety\s*;\s*(.*?)\s*;", cif_data_uploaded, re.DOTALL
+        )
+        moiety_string_uploaded = (
+            moiety_match_uploaded.group(1) if moiety_match_uploaded else ""
+        )
 
         # # Split and parse moieties
-        moieties_uploaded = moiety_string_uploaded.split(',')
-        moieties_uploaded = [moiety.replace('\n', '') for moiety in moieties_uploaded]
+        moieties_uploaded = moiety_string_uploaded.split(",")
+        moieties_uploaded = [moiety.replace("\n", "") for moiety in moieties_uploaded]
 
         moiety_tuples = [parse_moiety(m.strip()) for m in moieties_uploaded]
-        moiety_dicts = [ {'formula': f, 'ratio': s, 'charge': c, 'type': t} for f, s, c, t in moiety_tuples ]
+        moiety_dicts = [
+            {"formula": f, "ratio": s, "charge": c, "type": t}
+            for f, s, c, t in moiety_tuples
+        ]
 
         # print("moiety_dicts=",moiety_dicts)
     else:
@@ -561,40 +653,91 @@ def extract_moiety(file_path: str) -> list:
         moiety_dicts = []
     return moiety_dicts
 
+
 ##########################
 def classify_metals(formula: str) -> Dict[str, Dict[str, int]]:
     # Define categories
     transition_metals = {
-        'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
-        'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
-        'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg'
+        "Sc",
+        "Ti",
+        "V",
+        "Cr",
+        "Mn",
+        "Fe",
+        "Co",
+        "Ni",
+        "Cu",
+        "Zn",
+        "Y",
+        "Zr",
+        "Nb",
+        "Mo",
+        "Tc",
+        "Ru",
+        "Rh",
+        "Pd",
+        "Ag",
+        "Cd",
+        "Hf",
+        "Ta",
+        "W",
+        "Re",
+        "Os",
+        "Ir",
+        "Pt",
+        "Au",
+        "Hg",
     }
 
-    alkali_metals = {'Li', 'Na', 'K', 'Rb', 'Cs', 'Fr'}
-    alkaline_earth_metals = {'Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra'}
+    alkali_metals = {"Li", "Na", "K", "Rb", "Cs", "Fr"}
+    alkaline_earth_metals = {"Be", "Mg", "Ca", "Sr", "Ba", "Ra"}
 
-    post_transition_metals = {
-        'Al', 'Ga', 'Ge', 'In', 'Sn', 'Tl', 'Pb', 'Bi'
-    }
+    post_transition_metals = {"Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"}
 
     lanthanides = {
-        'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy',
-        'Ho', 'Er', 'Tm', 'Yb', 'Lu'
+        "La",
+        "Ce",
+        "Pr",
+        "Nd",
+        "Pm",
+        "Sm",
+        "Eu",
+        "Gd",
+        "Tb",
+        "Dy",
+        "Ho",
+        "Er",
+        "Tm",
+        "Yb",
+        "Lu",
     }
 
     actinides = {
-        'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf',
-        'Es', 'Fm', 'Md', 'No', 'Lr'
+        "Ac",
+        "Th",
+        "Pa",
+        "U",
+        "Np",
+        "Pu",
+        "Am",
+        "Cm",
+        "Bk",
+        "Cf",
+        "Es",
+        "Fm",
+        "Md",
+        "No",
+        "Lr",
     }
 
     # Initialize category results
     result = {
-        'transition_metals': {},
-        'alkali_metals': {},
-        'alkaline_earth_metals': {},
-        'post_transition_metals': {},
-        'lanthanides': {},
-        'actinides': {}
+        "transition_metals": {},
+        "alkali_metals": {},
+        "alkaline_earth_metals": {},
+        "post_transition_metals": {},
+        "lanthanides": {},
+        "actinides": {},
     }
 
     # Split and parse
@@ -606,41 +749,55 @@ def classify_metals(formula: str) -> Dict[str, Dict[str, int]]:
             count = int(match.group(2)) if match.group(2) else 1
 
             if element in transition_metals:
-                result['transition_metals'][element] = result['transition_metals'].get(element, 0) + count
+                result["transition_metals"][element] = (
+                    result["transition_metals"].get(element, 0) + count
+                )
             elif element in alkali_metals:
-                result['alkali_metals'][element] = result['alkali_metals'].get(element, 0) + count
+                result["alkali_metals"][element] = (
+                    result["alkali_metals"].get(element, 0) + count
+                )
             elif element in alkaline_earth_metals:
-                result['alkaline_earth_metals'][element] = result['alkaline_earth_metals'].get(element, 0) + count
+                result["alkaline_earth_metals"][element] = (
+                    result["alkaline_earth_metals"].get(element, 0) + count
+                )
             elif element in post_transition_metals:
-                result['post_transition_metals'][element] = result['post_transition_metals'].get(element, 0) + count
+                result["post_transition_metals"][element] = (
+                    result["post_transition_metals"].get(element, 0) + count
+                )
             elif element in lanthanides:
-                result['lanthanides'][element] = result['lanthanides'].get(element, 0) + count
+                result["lanthanides"][element] = (
+                    result["lanthanides"].get(element, 0) + count
+                )
             elif element in actinides:
-                result['actinides'][element] = result['actinides'].get(element, 0) + count
+                result["actinides"][element] = (
+                    result["actinides"].get(element, 0) + count
+                )
 
     return result
 
+
 ##########################
-def metal_info (moiety_dicts: list) -> dict:
+def metal_info(moiety_dicts: list) -> dict:
     """
     Extracts metal information from moiety dictionaries.
     """
     metal_data = {}
     for moiety in moiety_dicts:
-        formula = moiety['formula']
-        ratio = moiety['ratio']
-        charge = moiety['charge']
-        compound_type = moiety['type']
+        formula = moiety["formula"]
+        ratio = moiety["ratio"]
+        charge = moiety["charge"]
+        compound_type = moiety["type"]
 
         # Classify metals
         classified_metals = classify_metals(formula)
         metal_data[formula] = {
-            'ratio': ratio,
-            'charge': charge,
-            'type': compound_type,
-            'classified_metals': classified_metals
+            "ratio": ratio,
+            "charge": charge,
+            "type": compound_type,
+            "classified_metals": classified_metals,
         }
     return metal_data
+
 
 ##########################
 def flatten_metal_info(metal_info_dict, refcode):
@@ -648,69 +805,81 @@ def flatten_metal_info(metal_info_dict, refcode):
 
     for i, (formula, info) in enumerate(metal_info_dict.items()):
         base = {
-            'refcode': refcode,  # Placeholder for refcode
-            'index': i,
-            'formula': formula,
-            'ratio': info['ratio'],
-            'charge': info['charge'],
-            'type': info['type']
+            "refcode": refcode,  # Placeholder for refcode
+            "index": i,
+            "formula": formula,
+            "ratio": info["ratio"],
+            "charge": info["charge"],
+            "type": info["type"],
         }
 
         found = False
-        classified = info['classified_metals']
+        classified = info["classified_metals"]
         for category, elements in classified.items():
             for element, count in elements.items():
                 row = base.copy()
-                row['metal_category'] = category
-                row['metal'] = element
-                row['count'] = count
+                row["metal_category"] = category
+                row["metal"] = element
+                row["count"] = count
                 flat_list.append(row)
                 found = True
 
         if not found:
             row = base.copy()
-            row['metal_category'] = None
-            row['metal'] = None
-            row['count'] = 0
+            row["metal_category"] = None
+            row["metal"] = None
+            row["count"] = 0
             flat_list.append(row)
 
     return flat_list
+
 
 ##########################
 def compare_formula_xyz_vs_cif(xyzfile: str, formula_str_from_cif: str) -> dict:
     """
     Compare the elements from CIF with the elements in the XYZ file.
     """
-    element_pattern = r'([A-Z][a-z]*)(\d*)'
+    element_pattern = r"([A-Z][a-z]*)(\d*)"
     parsed_formula_cif = dict()
-    for (element, count) in re.findall(element_pattern, formula_str_from_cif):
+    for element, count in re.findall(element_pattern, formula_str_from_cif):
         parsed_formula_cif[element] = int(count) if count else 1
     mol = read(xyzfile)
     element_list = mol.get_chemical_symbols()
     element_list_count = dict(Counter(element_list))
     comparison_result = {
-        'in_formula_cif': parsed_formula_cif,
-        'in_list_xyz': element_list_count,
-        'missing_in_xyz': {k: v-element_list_count.get(k, 0) for k, v in parsed_formula_cif.items() if element_list_count.get(k, 0) < v},
-        'extra_in_xyz': {k: v-parsed_formula_cif.get(k, 0) for k, v in element_list_count.items() if parsed_formula_cif.get(k, 0) < v}
+        "in_formula_cif": parsed_formula_cif,
+        "in_list_xyz": element_list_count,
+        "missing_in_xyz": {
+            k: v - element_list_count.get(k, 0)
+            for k, v in parsed_formula_cif.items()
+            if element_list_count.get(k, 0) < v
+        },
+        "extra_in_xyz": {
+            k: v - parsed_formula_cif.get(k, 0)
+            for k, v in element_list_count.items()
+            if parsed_formula_cif.get(k, 0) < v
+        },
     }
     return comparison_result
 
+
 #######################
-def save_binary(variable, pathfile, backup: bool=False):
+def save_binary(variable, pathfile, backup: bool = False):
     try:
-        file = open(pathfile,'wb')
-        pickle.dump(variable,file)
+        file = open(pathfile, "wb")
+        pickle.dump(variable, file)
         file.close()
     except Exception as exc:
         print("Error Saving Binary for pathfile:", pathfile)
         print(exc)
 
+
 #######################
 def load_binary(pathfile):
     with open(pathfile, "rb") as pickle_file:
         binary = pickle.load(pickle_file)
-    return binary            
+    return binary
+
 
 ##############
 def readxyz(file):
@@ -731,6 +900,7 @@ def readxyz(file):
 
     return labels, pos
 
+
 ################################
 def printxyz(labels, pos):
     print(len(labels))
@@ -738,8 +908,9 @@ def printxyz(labels, pos):
     for idx, l in enumerate(labels):
         print("%s  %.6f  %.6f  %.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]))
 
+
 ##############
-def writexyz(fdir, fname, labels, pos, charge: int=0, spin: int=1):
+def writexyz(fdir, fname, labels, pos, charge: int = 0, spin: int = 1):
     if fdir[-1] != "/":
         fdir = fdir + "/"
     natoms = len(labels)
@@ -750,6 +921,7 @@ def writexyz(fdir, fname, labels, pos, charge: int=0, spin: int=1):
         for label, (x, y, z) in zip(labels, pos):
             print(f"{label:<2}\t{x: .6f}\t{y: .6f}\t{z: .6f}", file=fil)
             # print("%s\t%.6f\t%.6f\t%.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]),file=fil)
+
 
 ##############
 def search_string_in_file(file_name, string_to_search):
@@ -763,9 +935,9 @@ def search_string_in_file(file_name, string_to_search):
 
     return list_of_results
 
+
 ##############
 def readinfo(filepath):
-
     info = open(filepath, "r")
     lines = list(info.readlines())
     info.close()
@@ -784,7 +956,6 @@ def readinfo(filepath):
         for stx, string in enumerate(strings):
             if string in line:
                 lint[stx] = l
-
 
     latparamsone = int(lint[0] + 2)
     latparamstwo = int(lint[1] - 1)
@@ -813,7 +984,7 @@ def readinfo(filepath):
             line_data = line.split()
             if len(line_data) == 4:
                 label, x, y, z = line.split()
-            elif len(line_data) == 5:  #sometimes, an occupation value is also given.
+            elif len(line_data) == 5:  # sometimes, an occupation value is also given.
                 label, x, y, z, occ = line.split()
             fracs.append([float(x), float(y), float(z)])
             lfracs.append(label)
@@ -828,17 +999,16 @@ def readinfo(filepath):
             line_data = line.split()
             if len(line_data) == 4:
                 label, x, y, z = line.split()
-            elif len(line_data) == 5:  #sometimes, an occupation value is also given.
+            elif len(line_data) == 5:  # sometimes, an occupation value is also given.
                 label, x, y, z, occ = line.split()
             pos.append([float(x), float(y), float(z)])
             labels.append(label)
 
-
     return labels, pos, lfracs, fracs, cellvec, cellparam
+
 
 ##############
 def readcif(filepath):
-
     info = open(filepath, "r")
     lines = list(info.readlines())
     info.close()
@@ -893,13 +1063,13 @@ def readcif(filepath):
 
     return journal, chemname, labels, radii
 
+
 ###########
 def print_molecule(mol, name, ext, folder):
     filename = str(folder) + "/" + str(name) + "." + str(ext)
 
     if ext == "xyz" or ext == "txt":
         with open(filename, "w") as fil:
-
             # XYZ
             if ext == "xyz":
                 print(mol.natoms, file=fil)
@@ -912,7 +1082,11 @@ def print_molecule(mol, name, ext, folder):
                     print("", file=fil)
 
                 for a in mol.atoms:
-                    print("%s   %.6f   %.6f   %.6f" % (a.label, a.coord[0], a.coord[1], a.coord[2]),file=fil)
+                    print(
+                        "%s   %.6f   %.6f   %.6f"
+                        % (a.label, a.coord[0], a.coord[1], a.coord[2]),
+                        file=fil,
+                    )
 
             # TXT
             elif ext == "txt":
@@ -920,7 +1094,6 @@ def print_molecule(mol, name, ext, folder):
 
     elif ext == "gmol" or ext == "mol" or ext == "npy" or ext == "dict":
         with open(filename, "wb") as fil:
-
             # GMOL
             if ext == "gmol":
                 pickle.dump(mol, fil)
@@ -941,9 +1114,9 @@ def print_molecule(mol, name, ext, folder):
     else:
         print(ext, "not found as a valid print extension in print_molecule")
 
+
 #############
 def savemolecules(moleclist, output_dir, print_types, option_print_repeated=True):
-
     # DEFAULTS
     print_xyz = True
     print_gmol = True
@@ -994,9 +1167,9 @@ def savemolecules(moleclist, output_dir, print_types, option_print_repeated=True
                 if print_mol:
                     print_molecule(mol, mol.name, "mol", output_dir)
 
+
 ###########
 def print_unit_cell(cell, output_dir):
-
     # Print Original cell
     print("Original_Cell.xyz")
     writexyz(output_dir, "Original_Cell.xyz", cell.labels, cell.pos)
@@ -1016,11 +1189,12 @@ def print_unit_cell(cell, output_dir):
             for a in mol.atoms:
                 print(a.label, a.coord[0], a.coord[1], a.coord[2], file=fil)
 
+
 ############
 def extract_chemical_formula_moiety(file_path):
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         cif_content = file.read()
-    
+
     # Find the chemical formula moiety using regex
     pattern = r"_chemical_formula_moiety\s+['\";]([^;'\"]+)['\";]"
     match = re.search(pattern, cif_content)
@@ -1028,6 +1202,7 @@ def extract_chemical_formula_moiety(file_path):
         raise ValueError("Chemical formula moiety not found.")
     formula = match.group(1).strip()
     return formula
+
 
 def parse_formula_with_quantity(formula: str):
     element_pattern = r"(\d*)\(?([A-Za-z0-9\s]+)\)?(\d*)(\d+[+-]?)"
@@ -1042,16 +1217,14 @@ def parse_formula_with_quantity(formula: str):
         charge_str = match[3]
         charge = int(charge_str[:-1]) * (1 if charge_str.endswith("+") else -1)
 
-        moieties_info.append({
-            "elements": dict(elements),
-            "quantity": quantity,
-            "charge": charge
-        })
+        moieties_info.append(
+            {"elements": dict(elements), "quantity": quantity, "charge": charge}
+        )
     return moieties_info
 
+
 ######################################################
-def print_refmoleclist (cell):
-    
+def print_refmoleclist(cell):
     for i, ref in enumerate(cell.refmoleclist):
         ref_info = f"Reference Molecule {i}: {ref.formula} "
         if ref.iscomplex:
@@ -1060,7 +1233,11 @@ def print_refmoleclist (cell):
             ref_info += "(Complex with Alkali or Alkaline metals) "
         if ref.has_post_transition_metal:
             ref_info += "(Complex with Post-Transition metals) "
-        if not ref.iscomplex and not ref.has_IA_IIA and not ref.has_post_transition_metal:
+        if (
+            not ref.iscomplex
+            and not ref.has_IA_IIA
+            and not ref.has_post_transition_metal
+        ):
             ref_info += "(Non-complex)"
         ref_info += "\n"
         if ref.totcharge is not None:
@@ -1081,15 +1258,32 @@ def print_refmoleclist (cell):
                 print(met_info)
 
                 if met.coord_sphere_formula is not None:
-                    print(f"\t|--Coordination information coord_sphere_formula={met.coord_sphere_formula}")
+                    print(
+                        f"\t|--Coordination information coord_sphere_formula={met.coord_sphere_formula}"
+                    )
 
-                if all(hasattr(met, attr) for attr in ["coord_nr", "coord_geometry", "geom_deviation"]):
-                    print(f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}")
+                if all(
+                    hasattr(met, attr)
+                    for attr in ["coord_nr", "coord_geometry", "geom_deviation"]
+                ):
+                    print(
+                        f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}"
+                    )
 
-                if all(hasattr(met, attr) for attr in ["coord_nr_with_metal_bonds", "coord_geometry_with_metal_bonds", "geom_deviation_with_metal_bonds", "metals"]):
+                if all(
+                    hasattr(met, attr)
+                    for attr in [
+                        "coord_nr_with_metal_bonds",
+                        "coord_geometry_with_metal_bonds",
+                        "geom_deviation_with_metal_bonds",
+                        "metals",
+                    ]
+                ):
                     bonded_metals = [m.label for m in met.metals]
                     if len(bonded_metals) > 0:
-                        print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
+                        print(
+                            f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}"
+                        )
 
             for lig in ref.ligands:
                 lig_info = f"\t{lig.formula} ({lig.subtype})"
@@ -1119,7 +1313,8 @@ def print_refmoleclist (cell):
                         # if group.closest_metal is not None:
                         #     group_info += f" closest_metal.label={group.closest_metal.label}"
                         print(group_info)
-                    
+
+
 ######################################################
 def print_unique_species(cell):
     unique_species = getattr(cell, "unique_species", None)
@@ -1152,8 +1347,10 @@ def print_unique_species(cell):
                 parts.append(f"{specie.totcharge=}")
 
         print("\t" + " ".join(parts))
+
+
 ######################################################
-def print_possible_charges (cell, debug=0):
+def print_possible_charges(cell, debug=0):
     """
     Print the possible charges for each species in the cell object.
     """
@@ -1162,41 +1359,65 @@ def print_possible_charges (cell, debug=0):
         for specie in cell.species_list:
             if specie.possible_cs is not None:
                 if specie.subtype == "metal":
-                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.possible_cs=}") 
+                    print(
+                        f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.possible_cs=}"
+                    )
                 else:
-                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})\n\t{specie.possible_cs=}")
+                    print(
+                        f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})\n\t{specie.possible_cs=}"
+                    )
             else:
                 if specie.subtype == "metal":
-                    print(f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} No possible cs")
+                    print(
+                        f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} No possible cs"
+                    )
                 else:
-                    print(f"\t{specie.unique_index=} {specie.formula}, {specie.subtype}  No possible cs") #[p.subtype for p in specie.parents])    
+                    print(
+                        f"\t{specie.unique_index=} {specie.formula}, {specie.subtype}  No possible cs"
+                    )  # [p.subtype for p in specie.parents])
     else:
         print("\nNo species list found in the cell object.")
     print("")
+
+
 ######################################################
 def print_moleclist(cell):
     if cell.moleclist is not None:
-        print(f"\nMolecules in {cell.subtype}:")                 
+        print(f"\nMolecules in {cell.subtype}:")
         for i, mol in enumerate(cell.moleclist):
             if mol.totcharge is not None:
                 if mol.iscomplex:
-                    print(f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (TM complex)")
+                    print(
+                        f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (TM complex)"
+                    )
                 elif mol.has_IA_IIA:
-                    print(f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex with Alkali or Alkaline metals)")
+                    print(
+                        f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex with Alkali or Alkaline metals)"
+                    )
                 elif mol.has_post_transition_metal:
-                    print(f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex with Post-Transition metals)")
+                    print(
+                        f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex with Post-Transition metals)"
+                    )
                 else:
                     if mol.smiles is not None:
-                        print(f"Unitcell Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex) {mol.smiles=}")
+                        print(
+                            f"Unitcell Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex) {mol.smiles=}"
+                        )
                     else:
-                        print(f"Unitcell Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex)")
+                        print(
+                            f"Unitcell Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex)"
+                        )
             else:
                 if mol.iscomplex:
                     print(f"Unitcell Molecule {i}: {mol.formula} (TM complex)")
                 elif mol.has_IA_IIA:
-                    print(f"Unitcell Molecule {i}: {mol.formula} (Complex with Alkali or Alkaline metals)")
+                    print(
+                        f"Unitcell Molecule {i}: {mol.formula} (Complex with Alkali or Alkaline metals)"
+                    )
                 elif mol.has_post_transition_metal:
-                    print(f"Unitcell Molecule {i}: {mol.formula} (Complex with Post-Transition metals)")
+                    print(
+                        f"Unitcell Molecule {i}: {mol.formula} (Complex with Post-Transition metals)"
+                    )
                 else:
                     print(f"Unitcell Molecule {i} : {mol.formula} (Non-complex)")
 
@@ -1212,15 +1433,32 @@ def print_moleclist(cell):
 
                     for attr in ["coord_sphere_formula"]:
                         if hasattr(met, attr):
-                            print(f"\t|--Coordination information {attr}={getattr(met, attr)}")
+                            print(
+                                f"\t|--Coordination information {attr}={getattr(met, attr)}"
+                            )
 
-                    if all(hasattr(met, attr) for attr in ["coord_nr", "coord_geometry", "geom_deviation"]):
-                        print(f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}")
+                    if all(
+                        hasattr(met, attr)
+                        for attr in ["coord_nr", "coord_geometry", "geom_deviation"]
+                    ):
+                        print(
+                            f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}"
+                        )
 
-                    if all(hasattr(met, attr) for attr in ["coord_nr_with_metal_bonds", "coord_geometry_with_metal_bonds", "geom_deviation_with_metal_bonds", "metals"]):
+                    if all(
+                        hasattr(met, attr)
+                        for attr in [
+                            "coord_nr_with_metal_bonds",
+                            "coord_geometry_with_metal_bonds",
+                            "geom_deviation_with_metal_bonds",
+                            "metals",
+                        ]
+                    ):
                         bonded_metals = [m.label for m in met.metals]
                         if len(bonded_metals) > 0:
-                            print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
+                            print(
+                                f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}"
+                            )
                 print("")
 
                 for lig in mol.ligands:
@@ -1251,17 +1489,22 @@ def print_moleclist(cell):
     else:
         print("\nNo molecules found in the cell object.")
 
+
 ######################################################
 def print_molecule(mol):
     if mol is not None:
-        print(f"\nMolecule:")                 
+        print("\nMolecule:")
         if mol.totcharge is not None:
             if mol.iscomplex:
                 print(f"{mol.formula} {mol.totcharge=} (TM complex)")
             elif mol.has_IA_IIA:
-                print(f"{mol.formula} {mol.totcharge=} (Complex with Alkali or Alkaline metals)")
+                print(
+                    f"{mol.formula} {mol.totcharge=} (Complex with Alkali or Alkaline metals)"
+                )
             elif mol.has_post_transition_metal:
-                print(f"{mol.formula} {mol.totcharge=} (Complex with Post-Transition metals)")
+                print(
+                    f"{mol.formula} {mol.totcharge=} (Complex with Post-Transition metals)"
+                )
             else:
                 if mol.smiles is not None:
                     print(f"{mol.formula} {mol.totcharge=} (Non-complex) {mol.smiles=}")
@@ -1289,15 +1532,32 @@ def print_molecule(mol):
 
                 for attr in ["coord_sphere_formula"]:
                     if hasattr(met, attr):
-                        print(f"\t|--Coordination information {attr}={getattr(met, attr)}")
+                        print(
+                            f"\t|--Coordination information {attr}={getattr(met, attr)}"
+                        )
 
-                if all(hasattr(met, attr) for attr in ["coord_nr", "coord_geometry", "geom_deviation"]):
-                    print(f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}")
+                if all(
+                    hasattr(met, attr)
+                    for attr in ["coord_nr", "coord_geometry", "geom_deviation"]
+                ):
+                    print(
+                        f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}"
+                    )
 
-                if all(hasattr(met, attr) for attr in ["coord_nr_with_metal_bonds", "coord_geometry_with_metal_bonds", "geom_deviation_with_metal_bonds", "metals"]):
+                if all(
+                    hasattr(met, attr)
+                    for attr in [
+                        "coord_nr_with_metal_bonds",
+                        "coord_geometry_with_metal_bonds",
+                        "geom_deviation_with_metal_bonds",
+                        "metals",
+                    ]
+                ):
                     bonded_metals = [m.label for m in met.metals]
                     if len(bonded_metals) > 0:
-                        print(f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}")
+                        print(
+                            f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}"
+                        )
             print("")
 
             for lig in mol.ligands:

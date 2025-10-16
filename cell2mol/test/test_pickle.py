@@ -24,7 +24,9 @@ def run_cell2mol(infofile):
     return cell
 
 
-@pytest.mark.parametrize("refcode",["DAPGAF", "EGITOF", "ISIPIJ", "KANYUT", "YOXKUS", "ROKQAM", "LOKXUG"])
+@pytest.mark.parametrize(
+    "refcode", ["DAPGAF", "EGITOF", "ISIPIJ", "KANYUT", "YOXKUS", "ROKQAM", "LOKXUG"]
+)
 def test_check_info_vs_pickle(refcode):
     infofile = f"{refcode}.info"
     cell = run_cell2mol(infofile)
@@ -50,9 +52,10 @@ def test_check_info_vs_pickle(refcode):
     assert cell.warning_after_reconstruction == result.warning_after_reconstruction
 
 
-@pytest.mark.parametrize("refcode",["DAPGAF", "EGITOF", "ISIPIJ", "KANYUT", "YOXKUS", "ROKQAM", "LOKXUG"])
-def test_load_cell_reset_charges (refcode):
-
+@pytest.mark.parametrize(
+    "refcode", ["DAPGAF", "EGITOF", "ISIPIJ", "KANYUT", "YOXKUS", "ROKQAM", "LOKXUG"]
+)
+def test_load_cell_reset_charges(refcode):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     cellpath = os.path.join(dir_path, "infodata", f"Cell_{refcode}.gmol")
 

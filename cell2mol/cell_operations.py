@@ -2,9 +2,10 @@
 
 import numpy as np
 
+
 #######################################################
 def frac2cart_fromcellvec(frac_coord, cellvec):
-    """ Convert fractional coordinates to cartesian coordinates
+    """Convert fractional coordinates to cartesian coordinates
     Parameters:
         frac_coord (list): list of fractional coordinates
         cellvec (list): list of cell vectors
@@ -13,15 +14,22 @@ def frac2cart_fromcellvec(frac_coord, cellvec):
     """
     cartesian = []
     for idx, frac in enumerate(frac_coord):
-        xcar = (frac[0] * cellvec[0][0] + frac[1] * cellvec[1][0] + frac[2] * cellvec[2][0])
-        ycar = (frac[0] * cellvec[0][1] + frac[1] * cellvec[1][1] + frac[2] * cellvec[2][1])
-        zcar = (frac[0] * cellvec[0][2] + frac[1] * cellvec[1][2] + frac[2] * cellvec[2][2])
+        xcar = (
+            frac[0] * cellvec[0][0] + frac[1] * cellvec[1][0] + frac[2] * cellvec[2][0]
+        )
+        ycar = (
+            frac[0] * cellvec[0][1] + frac[1] * cellvec[1][1] + frac[2] * cellvec[2][1]
+        )
+        zcar = (
+            frac[0] * cellvec[0][2] + frac[1] * cellvec[1][2] + frac[2] * cellvec[2][2]
+        )
         cartesian.append([float(xcar), float(ycar), float(zcar)])
     return cartesian
 
+
 #######################################################
 def frac2cart_fromparam(frac_coord, cellparam):
-    """ Convert fractional coordinates to cartesian coordinates
+    """Convert fractional coordinates to cartesian coordinates
     Parameters:
         frac_coord (list): list of fractional coordinates
         cellparam (list): list of cell parameters
@@ -36,7 +44,18 @@ def frac2cart_fromparam(frac_coord, cellparam):
     beta = np.radians(cellparam[4])
     gamma = np.radians(cellparam[5])
 
-    volume = (a*b*c* np.sqrt(1- np.cos(alpha) ** 2 - np.cos(beta) ** 2 - np.cos(gamma) ** 2 + 2 * np.cos(alpha) * np.cos(beta) * np.cos(gamma)))
+    volume = (
+        a
+        * b
+        * c
+        * np.sqrt(
+            1
+            - np.cos(alpha) ** 2
+            - np.cos(beta) ** 2
+            - np.cos(gamma) ** 2
+            + 2 * np.cos(alpha) * np.cos(beta) * np.cos(gamma)
+        )
+    )
 
     m = np.zeros((3, 3))
     m[0][0] = a
@@ -56,6 +75,7 @@ def frac2cart_fromparam(frac_coord, cellparam):
         zcar = frac[0] * m[2][0] + frac[1] * m[2][1] + frac[2] * m[2][2]
         cartesian.append([float(xcar), float(ycar), float(zcar)])
     return cartesian
+
 
 ############################;###########################
 def translate(vector, coords, cellvec):
@@ -82,9 +102,10 @@ def translate(vector, coords, cellvec):
         newcoord.append([float(newx), float(newy), float(newz)])
     return newcoord
 
+
 #######################################################
 def cart2frac(cartCoords, cellvec):
-    """ Convert cartesian coordinates to fractional coordinates
+    """Convert cartesian coordinates to fractional coordinates
 
     Parameters:
         cartCoords (list): list of cartesian coordinates
@@ -132,9 +153,10 @@ def cart2frac(cartCoords, cellvec):
         fracCoords.append([aPos, bPos, cPos])
     return fracCoords
 
+
 #######################################################
 def det3(mat):
-    """ Calculate the determinant of a 3x3 matrix
+    """Calculate the determinant of a 3x3 matrix
 
     Args:
         mat (list): list of 3x3 matrix
@@ -150,9 +172,10 @@ def det3(mat):
         - (mat[0][0] * mat[1][2] * mat[2][1])
     )
 
+
 #######################################################
 def translate(vector, coords, cellvec):
-    """ Translate coordinates by a vector
+    """Translate coordinates by a vector
     Parameters:
         vector (list): list of vector components
         coords (list): list of coordinates
@@ -182,5 +205,5 @@ def translate(vector, coords, cellvec):
             + vector[2] * cellvec[2][2]
         )
         newcoord.append([float(newx), float(newy), float(newz)])
-    
+
     return newcoord
