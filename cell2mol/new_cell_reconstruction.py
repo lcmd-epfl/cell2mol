@@ -1,7 +1,6 @@
 import numpy as np
 from ase import Atoms
 from cell2mol.classes import molecule
-from cell2mol.cell_reconstruction import tmatgenerator
 from cell2mol.other import get_dist, extract_from_list
 from cell2mol.connectivity import split_species, count_species, compare_reference_indices
 from cell2mol.cell_operations import translate
@@ -10,6 +9,136 @@ from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 import os
 from cell2mol.read_write import writexyz
+
+
+def tmatgenerator(centroid, thres=0.40, full=False, debug: int=0):
+    # This function generates a list of the translations that a fragment should undergo depending on the centroid of its fractional coordinates
+    # For instance, if the centroid of a fragment is at 0.9 in any given axis, it is unlikely that a one-cell-length translation along such axis (resulting in 1.9) would help.
+    # Also, a fragment right at the center of the unit cell (centroid=(0.5, 0.5, 0.5) is unlikely to require reconstruction
+    # The threshold defines the window. If thres=0.4, the function will suggest positive translation for any fragment between 0 and 0.4, and negative translation between 0.6 and 1.0.
+    # If full is asked, then all translations are applied
+
+    tmax = 1 - thres
+    tmin = thres
+
+    if not full:
+        tmatrix = []
+        tmatrix = additem((0, 0, 0), tmatrix)
+
+        # X positive
+        if centroid[0] >= tmax:
+            tmatrix = additem((-1, 0, 0), tmatrix)
+            if centroid[1] >= tmax:
+                tmatrix = additem((-1, -1, 0), tmatrix)
+                tmatrix = additem((0, -1, 0), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((-1, -1, -1), tmatrix)
+                    tmatrix = additem((0, -1, -1), tmatrix)
+                    tmatrix = additem((0, 0, -1), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((-1, -1, 1), tmatrix)
+                    tmatrix = additem((0, -1, 1), tmatrix)
+                    tmatrix = additem((0, 0, 1), tmatrix)
+            if centroid[1] <= tmin:
+                tmatrix = additem((-1, 1, 0), tmatrix)
+                tmatrix = additem((0, 1, 0), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((-1, 1, -1), tmatrix)
+                    tmatrix = additem((0, 1, -1), tmatrix)
+                    tmatrix = additem((0, 0, -1), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((-1, 1, 1), tmatrix)
+                    tmatrix = additem((0, 1, 1), tmatrix)
+                    tmatrix = additem((0, 0, 1), tmatrix)
+            if centroid[2] >= tmax:
+                tmatrix = additem((-1, 0, -1), tmatrix)
+                tmatrix = additem((0, 0, -1), tmatrix)
+            if centroid[2] <= tmin:
+                tmatrix = additem((-1, 0, 1), tmatrix)
+                tmatrix = additem((0, 0, 1), tmatrix)
+
+        if centroid[1] >= tmax:
+            tmatrix = additem((0, -1, 0), tmatrix)
+            if centroid[2] >= tmax:
+                tmatrix = additem((0, -1, -1), tmatrix)
+                tmatrix = additem((0, 0, -1), tmatrix)
+            if centroid[2] <= tmin:
+                tmatrix = additem((0, -1, 1), tmatrix)
+                tmatrix = additem((0, 0, 1), tmatrix)
+
+        if centroid[2] >= tmax:
+            tmatrix = additem((0, 0, -1), tmatrix)
+
+        if centroid[0] <= tmin:
+            tmatrix = additem((1, 0, 0), tmatrix)
+            if centroid[1] <= tmin:
+                tmatrix = additem((1, 1, 0), tmatrix)
+                tmatrix = additem((0, 1, 0), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((1, 1, 1), tmatrix)
+                    tmatrix = additem((0, 1, 1), tmatrix)
+                    tmatrix = additem((0, 0, 1), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((1, 1, -1), tmatrix)
+                    tmatrix = additem((0, 1, -1), tmatrix)
+                    tmatrix = additem((0, 0, -1), tmatrix)
+            if centroid[1] >= tmax:
+                tmatrix = additem((1, -1, 0), tmatrix)
+                tmatrix = additem((0, -1, 0), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((1, -1, -1), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((1, -1, 1), tmatrix)
+            if centroid[2] <= tmin:
+                tmatrix = additem((1, 0, 1), tmatrix)
+                tmatrix = additem((0, 0, 1), tmatrix)
+            if centroid[2] >= tmax:
+                tmatrix = additem((1, 0, -1), tmatrix)
+                tmatrix = additem((0, 0, -1), tmatrix)
+
+        if centroid[1] <= tmin:
+            tmatrix = additem((0, 1, 0), tmatrix)
+            if centroid[2] <= tmin:
+                tmatrix = additem((0, 1, 1), tmatrix)
+                tmatrix = additem((0, 0, 1), tmatrix)
+            if centroid[2] >= tmax:
+                tmatrix = additem((0, 1, -1), tmatrix)
+                tmatrix = additem((0, 0, -1), tmatrix)
+        if centroid[2] <= tmin:
+            tmatrix = additem((0, 0, 1), tmatrix)
+
+        if (centroid[0] > tmin) and (centroid[0] < tmax):
+            if centroid[1] <= tmin:
+                tmatrix = additem((0, 1, 0), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((0, 1, -1), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((0, 1, 1), tmatrix)
+            if centroid[1] >= tmax:
+                tmatrix = additem((0, -1, 0), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((0, -1, -1), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((0, -1, 1), tmatrix)
+            if centroid[2] <= tmin:
+                tmatrix = additem((0, 0, 1), tmatrix)
+                if centroid[1] >= tmax:
+                    tmatrix = additem((0, -1, 1), tmatrix)
+                if centroid[1] <= tmin:
+                    tmatrix = additem((0, 1, 1), tmatrix)
+            if centroid[2] >= tmax:
+                tmatrix = additem((0, 0, -1), tmatrix)
+                if centroid[1] >= tmax:
+                    tmatrix = additem((0, -1, -1), tmatrix)
+                if centroid[1] <= tmin:
+                    tmatrix = additem((0, 1, -1), tmatrix)
+    elif full:
+        x = [-1, 0, 1]
+        tmatrix = [p for p in itertools.product(x, repeat=3)]
+
+    tmatrix.sort(key=absolute_value)
+
+    return tmatrix
 
 ######################################################
 def modify_cov_factor_due_to_H (refcell, debug: int=0):
