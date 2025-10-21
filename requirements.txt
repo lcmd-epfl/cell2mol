@@ -1,0 +1,9 @@
+numpy
+networkx
+rdkit
+ase
+scipy
+scikit-learn
+pydantic
+pyyaml
+pandas
