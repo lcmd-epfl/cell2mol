@@ -329,38 +329,38 @@ class Specie(BaseModel):
                 self.labels
             )
 
-            for idx, l in enumerate(self.labels):
+            for idx, label in enumerate(self.labels):
                 if debug >= 2:
-                    print(f"SPECIE.SET_ATOMS: creating atom for label {l}")
-                ## For each l in labels, create an atom class object.
+                    print(f"SPECIE.SET_ATOMS: creating atom for label {label}")
+                ## For each label in labels, create an atom class object.
                 ismetal = (
-                    elemdatabase.elementblock[l] == "d"
-                    or elemdatabase.elementblock[l] == "f"
+                    elemdatabase.elementblock[label] == "d"
+                    or elemdatabase.elementblock[label] == "f"
                 )
                 # non transition metals
-                # if len(get_non_transition_metal_idxs([l])) > 0: ismetal = True
-                if len(get_alkali_alkaline_earth_metal_idxs([l])) > 0:
+                # if len(get_non_transition_metal_idxs([label])) > 0: ismetal = True
+                if len(get_alkali_alkaline_earth_metal_idxs([label])) > 0:
                     ismetal = True
                 if len(metal_idxs) == 0 and len(alkali_alkaline_earth_metal_idxs) == 0:
-                    if len(get_post_transition_metal_idxs([l])) > 0:
+                    if len(get_post_transition_metal_idxs([label])) > 0:
                         ismetal = True
 
                 if ismetal:
                     if debug >= 2:
-                        print(f"SPECIE.SET_ATOMS: {l}")
+                        print(f"SPECIE.SET_ATOMS: {label} identified as metal")
                 if debug >= 2:
                     print(f"SPECIE.SET_ATOMS: {ismetal=}")
                 if self.frac_coord is not None:
                     if ismetal:
                         newatom = Metal.from_positional(
-                            l,
+                            label,
                             self.coord[idx],
                             self.frac_coord[idx],
                             radii=self.radii[idx],
                         )
                     else:
                         newatom = Atom.from_positional(
-                            l,
+                            label,
                             self.coord[idx],
                             self.frac_coord[idx],
                             radii=self.radii[idx],
@@ -368,11 +368,11 @@ class Specie(BaseModel):
                 else:
                     if ismetal:
                         newatom = Metal.from_positional(
-                            l, self.coord[idx], radii=self.radii[idx]
+                            label, self.coord[idx], radii=self.radii[idx]
                         )
                     else:
                         newatom = Atom.from_positional(
-                            l, self.coord[idx], radii=self.radii[idx]
+                            label, self.coord[idx], radii=self.radii[idx]
                         )
                 if debug >= 2:
                     print(f"SPECIE.SET_ATOMS: added atom to specie: {self.formula}")
@@ -502,8 +502,8 @@ class Specie(BaseModel):
                 if self.ligands is None:
                     self.split_complex()
                 if self.ligands is not None:
-                    for l in self.ligands:
-                        issame = compare_species(substructure, l, debug=1)
+                    for lig in self.ligands:
+                        issame = compare_species(substructure, lig, debug=1)
                         if issame:
                             occurrence += 1
                     done = True
@@ -511,10 +511,10 @@ class Specie(BaseModel):
                 if self.ligands is None:
                     self.split_complex()
                 if self.ligands is not None:
-                    for l in self.ligands:
-                        if l.groups is None:
+                    for lig in self.ligands:
+                        if lig.groups is None:
                             self.split_ligand()
-                        for g in l.groups:
+                        for g in lig.groups:
                             issame = compare_species(substructure, g, debug=1)
                             if issame:
                                 occurrence += 1
@@ -580,10 +580,10 @@ class Specie(BaseModel):
     def print_xyz(self):
         print(self.natoms)
         print("")
-        for idx, l in enumerate(self.labels):
+        for idx, label in enumerate(self.labels):
             print(
                 "%s  %.6f  %.6f  %.6f"
-                % (l, self.coord[idx][0], self.coord[idx][1], self.coord[idx][2])
+                % (label, self.coord[idx][0], self.coord[idx][1], self.coord[idx][2])
             )
 
     ############

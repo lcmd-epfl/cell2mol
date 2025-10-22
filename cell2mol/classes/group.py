@@ -2,7 +2,6 @@ from __future__ import annotations
 from typing import Optional
 from typing_extensions import deprecated
 import numpy as np
-
 from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
@@ -11,12 +10,8 @@ from cell2mol.connectivity import (
     labels2formula,
     get_adjmatrix,
     is_single_ring,
-)
-from cell2mol.connectivity import (
     get_adjmatrix_from_cif_bonds,
 )
-
-
 from cell2mol.other import compute_centroid
 from cell2mol.elementdata import ElementData
 from cell2mol.coordination_sphere import (
@@ -86,9 +81,9 @@ class Group(Specie):
         )  ### Assuming neutral specie (so basically this is the sum of atomic numbers)
         self.natoms = len(self.labels)
         self.iscomplex = any(
-            (elemdatabase.elementblock[l] == "d")
-            or (elemdatabase.elementblock[l] == "f")
-            for l in self.labels
+            (elemdatabase.elementblock[label] == "d")
+            or (elemdatabase.elementblock[label] == "f")
+            for label in self.labels
         )
         if debug > 0:
             print("GROUP.REMOVE_ATOM. Group after removing atom:")
@@ -184,7 +179,7 @@ class Group(Specie):
         )  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
         numP = self.labels.count("P")
         numO = self.labels.count("O")  # For h4-Enone
-        numN = self.labels.count("N")
+        # numN = self.labels.count("N")
 
         ## Carbon-based Haptic Ligands
         if numC == 2 and totnum == 2:
@@ -237,7 +232,7 @@ class Group(Specie):
             self, conn_idx, final_ligand_indices, group_metals_indices = (
                 coordination_correction_for_haptic(self, debug=debug)
             )
-        if self.is_haptic == False:
+        if self.is_haptic is False:
             self, conn_idx, final_ligand_indices, group_metals_indices = (
                 coordination_correction_for_nonhaptic(self, debug=debug)
             )

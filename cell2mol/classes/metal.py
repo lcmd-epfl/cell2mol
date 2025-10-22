@@ -2,24 +2,16 @@ from __future__ import annotations
 from typing import Literal
 from typing_extensions import deprecated
 import numpy as np
-
 from pydantic import Field
 from cell2mol.connectivity import (
     labels2formula,
     get_adjmatrix,
 )
-
-from cell2mol.charge_assignment import (
-    get_metal_poscharges,
-)
-
-
+from cell2mol.charge_assignment import get_metal_poscharges
 from cell2mol.spin import assign_spin_metal, predict_ox_state
 from cell2mol.other import compute_centroid, get_dist
 from cell2mol.elementdata import ElementData
-from cell2mol.coordination_sphere import (
-    define_coordination_geometry,
-)
+from cell2mol.coordination_sphere import define_coordination_geometry
 from cell2mol.my_types import (
     Spin,
     SubType,
@@ -308,7 +300,7 @@ class Metal(Atom):
             self.get_connected_groups(debug=debug)
         diff_list = []
         for group in self.groups:
-            if group.is_haptic == False:
+            if not group.is_haptic:
                 for atom in group.atoms:
                     diff = round(
                         float(

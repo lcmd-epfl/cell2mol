@@ -9,17 +9,11 @@ from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
 from cell2mol.connectivity import (
     get_adjmatrix,
-)
-from cell2mol.connectivity import (
+    get_adjmatrix_from_cif_bonds,
+    check_blocklist,
     split_species,
     split_group,
 )
-from cell2mol.connectivity import (
-    get_adjmatrix_from_cif_bonds,
-    check_blocklist,
-)
-
-
 from cell2mol.other import extract_from_list, get_angle
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import (
@@ -31,9 +25,9 @@ from cell2mol.my_types import (
 elemdatabase = ElementData()
 
 
-###############
-### LIGAND ####
-###############
+################
+#### LIGAND ####
+################
 class Ligand(Specie):
     NO_type: NOType | None = None
     connected_atoms: list[Atom] | None = None
