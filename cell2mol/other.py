@@ -1,8 +1,7 @@
-## File for small functions
 import numpy as np
 
 
-################################
+#######################################################
 def extract_from_list(
     entrylist: list, old_array: list, dimension: int = 2, debug: int = 0
 ) -> list:
@@ -61,7 +60,7 @@ def det3(mat):
     )
 
 
-####################################
+#######################################################
 def inv(perm: list) -> list:
     inverse = [0] * len(perm)
     for i, p in enumerate(perm):
@@ -87,7 +86,7 @@ def get_dist(atom1_pos: list, atom2_pos: list) -> float:
     return dist
 
 
-##############################
+#######################################################
 def get_angle(vec1, vec2) -> float:
     norm1 = np.linalg.norm(vec1)
     norm2 = np.linalg.norm(vec2)

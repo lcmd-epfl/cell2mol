@@ -11,7 +11,7 @@ from cell2mol.read_write import print_refmoleclist, print_possible_charges
 import copy
 
 VERSION = "2.0"
-COV_FACTOR = 1.3
+COV_FACTOR = 1.0
 METAL_FACTOR = 1.0
 
 # Set up logging for debug information
@@ -37,7 +37,7 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
         # Redirect stdout to file for logging
         if (
             refcell.disagree_with_cif_formula is not None
-            and refcell.disagree_with_cif_formula == True
+            and refcell.disagree_with_cif_formula
         ):
             logging.info(
                 "Discrepancies found between refcell and CIF. This will cause errors in the charge prediction!"
@@ -108,7 +108,7 @@ def get_cell_parameters(structure):
     """Extracts cell parameters and symmetry operations from structure."""
     wrap_keywords = {"pbc": True, "center": (0.5, 0.5, 0.5)}
     cell_labels = []
-    for l, n, m in zip(
+    for label, n, m in zip(
         structure.get_chemical_symbols(),
         structure.get_atomic_numbers(),
         structure.get_masses(),
@@ -116,7 +116,7 @@ def get_cell_parameters(structure):
         if n == 1 and (m > 2 or m == 2.01355):  # Deuterium
             cell_labels.append("D")
         else:
-            cell_labels.append(l)
+            cell_labels.append(label)
 
     cell_pos = structure.get_positions(wrap=True, **wrap_keywords)
     cell_fracs = structure.get_scaled_positions()

@@ -74,8 +74,6 @@ def get_missingH_from_adjacency(Z, center, points, bonded_atom_labels):
         num_missingH = shapeval - val_e
 
     # Saves report
-    # print(f"Summary of facts:\n -Atom has {num_adj_atoms} adjacent atoms \n -with total bond order {sum_bond_order} \n -arranged in a shape {shape} that suggests coordination {shapeval} \n -with formal charge {charge} \n -valence {valence} and {lonepairs} lone pairs.")
-    # report += str(f"Summary of facts:\n -Atom has {num_adj_atoms} adjacent atoms \n -with total bond order {sum_bond_order} \n -arranged in a shape {shape} that suggests coordination {shapeval} \n -with formal charge {charge} \n -valence {valence} and {lonepairs} lone pairs. \n")
     report += str(f"Summary of facts:\n -Atom has {num_adj_atoms} adjacent atoms \n")
     if val_e == 1 and missingH:
         report += str(

@@ -39,12 +39,12 @@ def balance_charge(
         toadd = []
 
         if spec.subtype == "metal":
-            if rare == True:
+            if rare:
                 rare_m_ox = [x for x in all_possible_m_ox if x not in spec.possible_cs]
                 print(f"RARE METAL OXIDATION STATES: {spec.formula} {rare_m_ox}")
                 for tch in rare_m_ox:
                     toadd.append(tch)
-            elif predict == True:
+            elif predict:
                 tch = predict_metal_ox(spec, debug=debug)
                 toadd.append(tch)
             else:
@@ -224,25 +224,6 @@ def print_possible_and_selected_cs(newcell, refcell, debug: int = 0):
                 print(
                     f"WARNING: {specie.formula=} {specie.unique_index=} {idx=} from newcell unique indices"
                 )
-
-
-#######################################################
-def get_reordered_protonation(refcell: object, reference: object, target: object):
-    temp_prot = copy.deepcopy(reference.charge_state.protonation)
-    temp_prot.parent = target
-
-    ref_indices = reference.get_parent_indices("reference")
-    target_indices = target.get_parent_indices("reference")
-
-    ref_data = [refcell.atom_site_labels[idx] for idx in ref_indices]
-    target_data = [refcell.atom_site_labels[idx] for idx in target_indices]
-
-    index_map = {value: index for index, value in enumerate(target_data)}
-    sorted_indices = sorted(range(len(ref_data)), key=lambda i: index_map[ref_data[i]])
-
-    reordered_prot = temp_prot.reorder(sorted_indices)
-
-    return reordered_prot
 
 
 #######################################################
@@ -806,8 +787,6 @@ def create_metal_metal_bonds(mol, debug: int = 0):
 
 
 ######################################################
-
-
 def assign_charge_to_specie(specie, final_charge, debug: int = 0):
     """Assign the charge to a specific species based on its type."""
     if debug >= 1:
@@ -833,22 +812,6 @@ def assign_charge_to_specie(specie, final_charge, debug: int = 0):
         specie.set_charge(final_charge)
         if debug >= 1:
             print(specie.unique_index, specie.formula, specie.charge)
-
-
-######################################################
-
-
-def validate_reference_molecules(self, debug):
-    """Validate reference molecules by checking ligand and metal charges."""
-    for idx, ref in enumerate(self.refmoleclist):
-        if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
-            if debug >= 1:
-                print(f"VALIDATE_REFERENCE_MOLECULES: {ref.formula=}")
-            self.validate_complex_ligands(ref, idx, debug)
-            self.validate_complex_metals(ref, debug)
-            prepare_mol(ref)
-        else:
-            self.validate_non_complex_molecule(ref, debug)
 
 
 ######################################################
