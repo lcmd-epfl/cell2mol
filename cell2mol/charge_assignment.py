@@ -1,45 +1,32 @@
 #!/usr/bin/env python
 import numpy as np
-from cell2mol.my_types import Type
-from cell2mol.elementdata import ElementData
-from cell2mol.connectivity import *
-from collections import defaultdict
+import rdkit
 import itertools
-import sys
-from cell2mol.xyz2mol import xyz2mol, chiral_stereo_check
-from cell2mol.utils.pydantic import BaseModel
 import time
+import networkx as nx
+from collections import defaultdict
+from typing import Tuple
+
+from cell2mol.elementdata import ElementData
+from cell2mol.connectivity import (
+    get_metal_idxs,
+    get_alkali_alkaline_earth_metal_idxs,
+    add_atom,
+    add_hydrogens,
+    get_non_transition_metal_idxs,
+    get_radii,
+    get_adjmatrix,
+    get_post_transition_metal_idxs,
+)
+from cell2mol.xyz2mol import xyz2mol, chiral_stereo_check
+from cell2mol.classes.protonation import Protonation
+from cell2mol.classes.charge_state import ChargeState
 
 # Pydantic imports for the converted classes
-from pydantic import Field, computed_field
-from typing import Any
-from typing_extensions import deprecated
-from numpy.typing import NDArray
+from rdkit import Chem
 from rdkit.Chem import rdchem
 
 elemdatabase = ElementData()
-
-#############################
-### Loads Rdkit & xyz2mol ###
-#############################
-import rdkit
-from rdkit import Chem
-from rdkit.Chem.Draw.MolDrawing import (
-    DrawingOptions,
-)  # Only needed if modifying defaults
-
-DrawingOptions.bondLineWidth = 2.2
-
-# IPythonConsole.ipython_useSVG = False
-from rdkit import rdBase
-
-if "ipykernel" in sys.modules:
-    try:
-        from rdkit.Chem.Draw import IPythonConsole
-    except ModuleNotFoundError:
-        pass
-# print("RDKIT Version:", rdBase.rdkitVersion)
-rdBase.DisableLog("rdApp.*")
 
 fullerene = ["C60", "C72", "C80"]
 manual_assign = ["O4-Cl", "N3", "N2", "N-O", "I3", "I4", "I5", "I6"]
@@ -139,38 +126,6 @@ def get_possible_charge_state(spec: object, debug: int = 0):
     # if len(possible_cs) == 0:    return None
     # else:                        return possible_cs
     return possible_cs
-
-
-########################################################
-def extract_charge_state_metrics(charge_states, debug):
-    metrics = {
-        "uncorr_total": [],
-        "uncorr_abs_total": [],
-        "uncorr_abs_atcharge": [],
-        "uncorr_zwitt": [],
-        "coincide": [],
-        "aromatic_atoms": [],
-        "aromatic_rings": [],
-        "added_into_aromatic": [],
-    }
-
-    for chs in charge_states:
-        metrics["uncorr_total"].append(chs.uncorr_total_charge)
-        metrics["uncorr_abs_total"].append(chs.uncorr_abstotal)
-        metrics["uncorr_abs_atcharge"].append(chs.uncorr_abs_atcharge)
-        metrics["uncorr_zwitt"].append(chs.uncorr_zwitt)
-        metrics["coincide"].append(chs.coincide)
-
-        added_indices = [
-            idx for idx, val in enumerate(chs.protonation.addedlist) if val != 0
-        ]
-
-        aromatic_dict = aromatic_info_v2(chs.rdkit_obj, added_indices)
-        metrics["aromatic_atoms"].append(aromatic_dict["Aromatic atoms"])
-        metrics["aromatic_rings"].append(aromatic_dict["Number of aromatic rings"])
-        metrics["added_into_aromatic"].append(aromatic_dict["Added to aromatic atoms"])
-
-    return metrics
 
 
 #######################################################
@@ -1893,13 +1848,6 @@ def get_protonation_states_specie(specie: object, debug: int = 0) -> list:
 
 
 #######################################################
-def move_to_front(lst, index):
-    element = lst.pop(index)  # Remove the element from its current position
-    lst.insert(0, element)  # Insert the element at the beginning
-    return lst
-
-
-#######################################################
 def move_element(lst, old_index, new_index):
     element = lst.pop(old_index)  # Remove the element from its current position
     lst.insert(new_index, element)  # Insert the element at the new position
@@ -2038,18 +1986,6 @@ def get_charge_manual(spec, debug: int = 0):
 
 
 ########################################################
-def aromatic_info(mol: object):
-    # print(f"aromatic_info: {mol=} {Chem.MolToSmiles(mol)}")
-    aromatic_atoms = sum(1 for atom in mol.GetAtoms() if atom.GetIsAromatic())
-    aromatic_rings = Chem.GetSSSR(mol)  # SSSR = smallest set of smallest rings
-    return {
-        "Aromatic atoms": aromatic_atoms,
-        "Number of rings": len(Chem.GetSymmSSSR(mol)),
-        "Aromatic rings": Chem.GetSSSR(mol),
-    }
-
-
-########################################################
 def aromatic_info_v2(mol: object, added_indices=None):
     if added_indices is None:
         added_indices = []
@@ -2094,7 +2030,7 @@ def get_charge(
     # prot.coords and prot.cov_factor will not be used
     tini = time.time()
 
-    if prot.status == False:  # or prot.added_atoms > 0:
+    if not prot.status:  # or prot.added_atoms > 0:
         allow = False
     if debug >= 0:
         print(
@@ -2306,55 +2242,6 @@ def check_rdkit_obj_connectivity(mol: object, natoms: int, ich: int, debug: int 
 
 
 #######################################################
-def get_list_of_charges_to_try_new(prot: object, debug: int = 0) -> list:
-    ### Determines which charges are worth trying for a given specie and a protonation state
-    lchar = []
-    spec = prot.parent
-
-    #### Educated Guess on the Maximum Charge one can expect from the spec[1]
-    if spec.formula in [
-        "C-O",
-        "H2-O",
-        "C-N",
-        "C-S",
-        "C-Se",
-        "C-Te",
-        "C-P",
-        "C-As",
-        "C-Sb",
-    ]:
-        lchar = [0]
-        return lchar
-    elif spec.natoms == 1 and spec.labels[0] in ["F", "Cl", "Br", "I", "H"]:
-        return [-1]
-    elif spec.subtype == "molecule" and (
-        not spec.iscomplex
-        and not spec.has_IA_IIA
-        and not spec.has_post_transition_metal
-    ):
-        maxcharge = 3
-    elif (
-        spec.subtype == "ligand"
-    ):  # Since other charges will be handled by protonation states
-        maxcharge = 0
-    else:
-        maxcharge = 2
-    if debug >= 2:
-        print(f"MAXCHARGE: maxcharge set at {maxcharge}")
-
-    # Defines list of charges that will try
-    for magn in range(0, int(maxcharge + 1)):
-        if magn == 0:
-            signlist = [1]
-        elif magn != 0:
-            signlist = [-1, 1]
-        for sign in signlist:
-            ich = int(magn * sign)
-            lchar.append(ich)
-    return lchar
-
-
-#######################################################
 def get_list_of_charges_to_try(prot: object, debug: int = 0) -> list:
     ### Determines which charges are worth trying for a given specie and a protonation state
     lchar = []
@@ -2431,112 +2318,6 @@ def get_list_of_charges_to_try(prot: object, debug: int = 0) -> list:
             ich = int(magn * sign)
             lchar.append(ich)
     return lchar
-
-
-#######################################################
-def eval_chargelist(atom_charges: list, debug: int = 0) -> Tuple[int, int, bool]:
-    abstotal = int(np.abs(np.sum(atom_charges)))
-    abs_atlist = []
-    for a in atom_charges:
-        abs_atlist.append(abs(a))
-    abs_atcharge = int(np.sum(abs_atlist))
-    if any(b > 0 for b in atom_charges) and any(b < 0 for b in atom_charges):
-        zwitt = True
-    else:
-        zwitt = False
-    return abstotal, abs_atcharge, zwitt
-
-
-#######################################################
-def check_missing_hydrogens_from_adjacency(
-    atom: object, ligand: object, debug: int = 0
-) -> Tuple[bool, str, int]:
-    bonded_atom_labels = []
-    bonded_atom_coord = []
-    adj_indices = [adj for adj in atom.adjacency]  # Get the adjacency of the atom
-    metal_adj_indices = [
-        m_adj for m_adj in atom.metal_adjacency
-    ]  # Get the adjacency of the atom with respect to the metal
-
-    for adj in adj_indices:
-        if adj in metal_adj_indices:
-            # If the atom is connected to the metal, we do not consider it
-            continue
-        bonded_atom_labels.append(ligand.get_parent("molecule").labels[adj])
-        bonded_atom_coord.append(ligand.get_parent("molecule").coord[adj])
-
-    ismissingH, report, num_missingH = get_missingH_from_adjacency(
-        atom.atnum, atom.coord, bonded_atom_coord, bonded_atom_labels
-    )
-    print(
-        f"CHECK_MISSING_HYDROGENS_IN_CARBON: {atom.label} has {bonded_atom_labels}) \
-           ismissingH={ismissingH}, num_missingH={num_missingH}, report={report}"
-    )
-    return ismissingH, report, num_missingH
-
-
-#######################################################
-def check_carbenes(
-    atom: object, ligand: object, debug: int = 0
-) -> Tuple[bool, str, int, int]:
-    # Function that determines whether a given connected "atom" of a "ligand" of a "molecule" is a carbene
-    # This function is in progress. Ideally, should be able to identify Fischer, Schrock and N-Heterocyclic Carbenes
-    # The former two cases probably require rules that involve other ligands in the molecule, hence why the "molecule" is provided
-    #:return iscarbene: Boolean variable. True/False
-    #:return element:   Type of element that will be later added in the "add_atom" function below
-    #:return addedlist: List of integers which track in which atom of the ligand we're adding "elements"
-    #:return metal_electrons: List of integers, similar to addedlist, which track in which atom of the ligand we're counting on metal_electrons.
-
-    # about Metal electrons: This variable is a way to contemplate cases in which the metal atom is actually contributing with electrons to the metal-ligand bond.
-    # about Metal electrons: In reality, I'm not sure about how to use it correctly, and now is used without much chemical sense
-
-    iscarbene = False
-    element = "H"
-    addedlist = 0
-    metal_electrons = 0
-
-    # Initial attempt with Carbenes, but they are much more complex
-    # Looks for Neighbouring N atoms
-    bonded_atom_labels = []
-    bonded_atom_coord = []
-    adj_indices = [adj for adj in atom.adjacency]  # Get the adjacency of the atom
-    metal_adj_indices = [
-        m_adj for m_adj in atom.metal_adjacency
-    ]  # Get the adjacency of the atom with respect to the metal
-
-    for adj in adj_indices:
-        if adj in metal_adj_indices:
-            # If the atom is connected to the metal, we do not consider it
-            continue
-        bonded_atom_labels.append(ligand.get_parent("molecule").labels[adj])
-        bonded_atom_coord.append(ligand.get_parent("molecule").coord[adj])
-    print(
-        f"CHECK_CARBENES: {atom.label} has {bonded_atom_labels}. Checking for carbenes"
-    )
-
-    ismissingH, report, num_missingH = get_missingH_from_adjacency(
-        atom.atnum, atom.coord, bonded_atom_coord, bonded_atom_labels
-    )
-    print(
-        f"CHECK_CARBENES: {atom.label} has {bonded_atom_labels}. ismissingH={ismissingH}, num_missingH={num_missingH}, report={report}"
-    )
-
-    if len(bonded_atom_labels) == 2:
-        if num_missingH == 2:
-            # if (num_missingH == 2) and bonded_atom_labels.count("H") == 0:
-            iscarbene = True
-            element = "H"
-            addedlist = 2
-            metal_electrons = 2
-        elif num_missingH == 1:
-            iscarbene = False
-            element = "H"
-            addedlist = 1
-            metal_electrons = 0
-    print(
-        f"CHECK_CARBENES: {atom.label} ({atom.atom_site_label}) iscarbene={iscarbene}, element={element}, addedlist={addedlist}, metal_electrons={metal_electrons}"
-    )
-    return iscarbene, element, addedlist, metal_electrons
 
 
 #######################################################
@@ -2666,260 +2447,6 @@ def get_metal_poscharges(metal: object, debug: int = 0) -> list:
             poscharges.append(int(0))
 
     return poscharges
-
-
-#######################################################
-def balance_charge(unique_indices: list, unique_species: list, debug: int = 0) -> list:
-    # Function to Select the Best Charge Distribution for the unique species.
-    # It accepts multiple charge options for each molecule/ligand/metal (poscharge, etc...).
-    # NO: It should select the best one depending on whether the final metal charge makes sense or not.
-    # In some cases, can accept metal oxidation state = 0, if no other makes sense
-
-    iserror = False
-    iterlist = []
-    for idx, spec in enumerate(unique_species):
-        toadd = []
-        if spec.subtype == "metal":
-            for tch in spec.possible_cs:
-                toadd.append(tch)
-        else:
-            if len(spec.possible_cs) == 1:
-                toadd.append(spec.possible_cs[0].corr_total_charge)
-            elif len(spec.possible_cs) > 1:
-                for tch in spec.possible_cs:
-                    toadd.append(tch.corr_total_charge)
-            elif len(spec.possible_cs) == 0:
-                iserror = True
-                toadd.append("-")
-        iterlist.append(toadd)
-
-    if debug >= 2:
-        print("BALANCE: iterlist", iterlist)
-    if debug >= 2:
-        print("BALANCE: unique_indices", unique_indices)
-
-    if not iserror:
-        tmpdistr = list(itertools.product(*iterlist))
-        if debug >= 2:
-            print("BALANCE: tmpdistr", tmpdistr)
-
-        # Expands tmpdistr to include same species, generating alldistr:
-        alldistr = []
-        final_charges = []
-        for distr in tmpdistr:
-            tmp = []
-            for u in unique_indices:
-                tmp.append(distr[u])
-            alldistr.append(tmp)
-            if debug >= 2:
-                print("BALANCE: alldistr added:", tmp)
-
-            final_charge_distribution = []
-            for idx, d in enumerate(alldistr):
-                if debug >= 2:
-                    print(f"BALANCE: distribution={d}")
-                charges_sum = np.sum(d)
-                if charges_sum == 0:
-                    final_charge_distribution.append(d)
-                    final_charges.append(distr)
-    elif iserror:
-        if debug >= 1:
-            print("Error found in BALANCE: one species has no possible charges")
-        final_charge_distribution = []
-
-    return final_charge_distribution, final_charges
-
-
-#######################################################
-def prepare_unresolved(
-    unique_indices: list, unique_species: list, distributions: list, debug: int = 0
-):
-    list_molecules = []
-    list_indices = []
-    list_options = []
-    if debug >= 2:
-        print("")
-
-    # spec_tuple[0] is the subtype of the specie
-    # spec_tuple[1] is the specie object
-    # spec_tuple[2] is the molecule object to which the specie belongs
-    for idx, spec in enumerate(unique_species):
-        if spec.subtype == "metal":
-            position = [jdx for jdx, uni in enumerate(unique_indices) if uni == idx]
-            if debug >= 2:
-                print(
-                    f"UNRESOLVED: found metal in positions={position} of the distribution"
-                )
-            values = [distr[position[0]] for distr in distributions]
-            options = list(set(values))
-            if debug >= 2:
-                print(f"UNRESOLVED: list of values={values}\n")
-            if debug >= 2:
-                print(f"UNRESOLVED: options={options}\n")
-
-            if len(options) > 1:
-                list_molecules.append(spec)
-                list_indices.append(spec.get_parent_index("molecule"))
-                list_options.append(options)
-
-    # TODO: we use metal OS predicted by ML to select the best charge distribution
-
-    return list_molecules, list_indices, list_options
-
-
-#######################################################
-def set_final_charge(
-    specie, unique_indices, unique_species, final_charge_distribution, debug
-):
-    spec = unique_species[specie.unique_index]
-    indices = [
-        index
-        for index, value in enumerate(unique_indices)
-        if value == specie.unique_index
-    ]
-    final_charge = [final_charge_distribution[i] for i in indices][0]
-    if debug > 1:
-        print("SET_FINAL_CHARGE:", spec, indices, final_charge)
-
-    if (
-        specie.subtype == "molecule"
-        and not specie.iscomplex
-        and not specie.has_IA_IIA
-        and not specie.has_post_transition_metal
-    ) or (specie.subtype == "ligand"):
-        formula = specie.formula
-        charge_list = [cs.corr_total_charge for cs in spec.possible_cs]
-
-    elif specie.subtype == "metal":
-        formula = specie.label
-        charge_list = spec.possible_cs
-
-    if final_charge in charge_list:
-        if debug > 1:
-            print(
-                f"SET_FINAL_CHARGE: Target charge {final_charge} of {formula} exists in {charge_list}."
-            )
-    else:
-        if debug >= 1:
-            print(
-                f"SET_FINAL_CHARGE: ERROR!! Target charge {final_charge} of {formula} does not exist in {charge_list}."
-            )
-        return None
-
-    if (
-        specie.subtype == "molecule"
-        and not specie.iscomplex
-        and not specie.has_IA_IIA
-        and not specie.has_post_transition_metal
-    ) or (specie.subtype == "ligand"):
-        if debug > 1:
-            print("SET_FINAL_CHARGE:", specie.formula)
-        specie.get_protonation_states(debug=debug)
-        specie.get_possible_cs(debug=debug)
-        formula = specie.formula
-        charge_list = [cs.corr_total_charge for cs in specie.possible_cs]
-
-        if final_charge in charge_list:
-            if debug > 1:
-                print(
-                    f"SET_FINAL_CHARGE: Target charge {final_charge} of {formula} exists in {charge_list}."
-                )
-            idx = charge_list.index(final_charge)
-            cs = specie.possible_cs[idx]
-            specie.set_charges(
-                cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj
-            )
-        else:
-            if debug >= 1:
-                print(
-                    f"SET_FINAL_CHARGE: ERROR!! Target charge {final_charge} of {formula} does not exist in {charge_list}."
-                )
-            return None
-
-    elif specie.subtype == "metal":
-        if debug > 1:
-            print("SET_FINAL_CHARGE:", specie.label)
-        specie.get_possible_cs(debug=debug)
-        formula = specie.label
-        charge_list = spec.possible_cs
-
-        if final_charge in charge_list:
-            if debug > 1:
-                print(
-                    f"SET_FINAL_CHARGE: Target charge {final_charge} of {formula} exists in {charge_list}."
-                )
-            idx = charge_list.index(final_charge)
-            cs = specie.possible_cs[idx]
-            specie.set_charge(cs)
-        else:
-            if debug >= 1:
-                print(
-                    f"SET_FINAL_CHARGE: ERROR!! Target charge {final_charge} of {formula} does not exist in {charge_list}."
-                )
-            return None
-
-
-#######################################################
-def prepare_mols(
-    moleclist: list,
-    unique_indices: list,
-    unique_species: list,
-    final_charge_distribution: list,
-    debug: int = 0,
-):
-    count = 0
-    for mol in moleclist:
-        if (
-            not mol.iscomplex
-            and not mol.has_IA_IIA
-            and not mol.has_post_transition_metal
-        ):
-            set_final_charge(
-                mol, unique_indices, unique_species, final_charge_distribution, debug
-            )
-            count += 1
-
-        else:
-            tmp_atcharge = np.zeros((mol.natoms))
-            tmp_smiles = []
-
-            for lig in mol.ligands:
-                set_final_charge(
-                    lig,
-                    unique_indices,
-                    unique_species,
-                    final_charge_distribution,
-                    debug,
-                )
-                count += 1
-
-                tmp_smiles.append(lig.smiles)
-                parent_indices = lig.get_parent_indices("molecule")
-                for kdx, a in enumerate(parent_indices):
-                    tmp_atcharge[a] = lig.atomic_charges[kdx]
-
-            for met in mol.metals:
-                set_final_charge(
-                    met,
-                    unique_indices,
-                    unique_species,
-                    final_charge_distribution,
-                    debug,
-                )
-                count += 1
-                parent_index = met.get_parent_index("molecule")
-                tmp_atcharge[parent_index] = met.charge
-
-            mol.set_charges(
-                int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge, smiles=tmp_smiles
-            )
-
-    if count != len(final_charge_distribution):
-        Warning = True
-    else:
-        Warning = False
-
-    return moleclist, Warning
 
 
 #######################################################
@@ -3203,481 +2730,90 @@ def fix_zwitterions_in_adjacent_atoms(mol, debug=0):
 
 
 #######################################################
-def get_smiles_complex(mol: object, debug: int = 0) -> Tuple[str, object]:
-    ## Receives a molecule class object and constructs the smiles and the rdkit_obj object from scratch, using atoms and bond information
+# def get_smiles_complex(mol: object, debug: int = 0) -> Tuple[str, object]:
+#     ## Receives a molecule class object and constructs the smiles and the rdkit_obj object from scratch, using atoms and bond information
 
-    Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
-    #### Creates an empty editable molecule
-    rwmol = Chem.RWMol()
+#     Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
+#     #### Creates an empty editable molecule
+#     rwmol = Chem.RWMol()
 
-    # Adds atoms with their formal charge
-    for jdx, atom in enumerate(mol.atoms):
-        rdkit_atom = Chem.Atom(atom.atnum)
-        rdkit_atom.SetFormalCharge(int(atom.charge))
-        rdkit_atom.SetNoImplicit(True)
-        rwmol.AddAtom(rdkit_atom)
+#     # Adds atoms with their formal charge
+#     for jdx, atom in enumerate(mol.atoms):
+#         rdkit_atom = Chem.Atom(atom.atnum)
+#         rdkit_atom.SetFormalCharge(int(atom.charge))
+#         rdkit_atom.SetNoImplicit(True)
+#         rwmol.AddAtom(rdkit_atom)
 
-    # Sets bond information and hybridization
-    for jdx, atom in enumerate(mol.atoms):
-        nbonds = 0
-        for b in atom.bonds:
-            begin_idx = b.atom1.get_parent_index("molecule")
-            end_idx = b.atom2.get_parent_index("molecule")
-            nbonds += 1
-            if b.order == 1.0:
-                btype = Chem.BondType.SINGLE
-            elif b.order == 2.0:
-                btype = Chem.BondType.DOUBLE
-            elif b.order == 3.0:
-                btype = Chem.BondType.TRIPLE
-            elif b.order == 1.5:
-                btype = Chem.BondType.AROMATIC
-                rdkit_atom.SetIsAromatic(True)
-            elif b.order == 0.0:
-                btype = Chem.BondType.ZERO
-            if debug >= 2:
-                print(
-                    b.atom1.label,
-                    b.atom2.label,
-                    b.order,
-                    f"{begin_idx=} {end_idx=} {btype=}",
-                )
+#     # Sets bond information and hybridization
+#     for jdx, atom in enumerate(mol.atoms):
+#         nbonds = 0
+#         for b in atom.bonds:
+#             begin_idx = b.atom1.get_parent_index("molecule")
+#             end_idx = b.atom2.get_parent_index("molecule")
+#             nbonds += 1
+#             if b.order == 1.0:
+#                 btype = Chem.BondType.SINGLE
+#             elif b.order == 2.0:
+#                 btype = Chem.BondType.DOUBLE
+#             elif b.order == 3.0:
+#                 btype = Chem.BondType.TRIPLE
+#             elif b.order == 1.5:
+#                 btype = Chem.BondType.AROMATIC
+#                 rdkit_atom.SetIsAromatic(True)
+#             elif b.order == 0.0:
+#                 btype = Chem.BondType.ZERO
+#             if debug >= 2:
+#                 print(
+#                     b.atom1.label,
+#                     b.atom2.label,
+#                     b.order,
+#                     f"{begin_idx=} {end_idx=} {btype=}",
+#                 )
 
-            if begin_idx == jdx and end_idx > jdx:
-                rwmol.AddBond(begin_idx, end_idx, btype)
-                if debug >= 2:
-                    print(
-                        "AddBond:",
-                        b.atom1.label,
-                        b.atom2.label,
-                        b.order,
-                        f"{begin_idx=} {end_idx=} {btype=}",
-                    )
+#             if begin_idx == jdx and end_idx > jdx:
+#                 rwmol.AddBond(begin_idx, end_idx, btype)
+#                 if debug >= 2:
+#                     print(
+#                         "AddBond:",
+#                         b.atom1.label,
+#                         b.atom2.label,
+#                         b.order,
+#                         f"{begin_idx=} {end_idx=} {btype=}",
+#                     )
 
-        if nbonds == 1:
-            hyb = Chem.HybridizationType.S
-        elif nbonds == 2:
-            hyb = Chem.HybridizationType.SP
-        elif nbonds == 3:
-            hyb = Chem.HybridizationType.SP2
-        elif nbonds == 4:
-            hyb = Chem.HybridizationType.SP3
-        else:
-            hyb = Chem.HybridizationType.UNSPECIFIED
-        rdkit_atom.SetHybridization(hyb)
+#         if nbonds == 1:
+#             hyb = Chem.HybridizationType.S
+#         elif nbonds == 2:
+#             hyb = Chem.HybridizationType.SP
+#         elif nbonds == 3:
+#             hyb = Chem.HybridizationType.SP2
+#         elif nbonds == 4:
+#             hyb = Chem.HybridizationType.SP3
+#         else:
+#             hyb = Chem.HybridizationType.UNSPECIFIED
+#         rdkit_atom.SetHybridization(hyb)
 
-    # Creates Molecule
-    obj = rwmol.GetMol()
-    smiles = Chem.MolToSmiles(obj)
+#     # Creates Molecule
+#     obj = rwmol.GetMol()
+#     smiles = Chem.MolToSmiles(obj)
 
-    # Chem.SanitizeMol(obj)
-    Chem.DetectBondStereochemistry(obj, -1)
-    Chem.AssignStereochemistry(obj, flagPossibleStereoCenters=True, force=True)
-    Chem.AssignAtomChiralTagsFromStructure(obj, -1)
+#     # Chem.SanitizeMol(obj)
+#     Chem.DetectBondStereochemistry(obj, -1)
+#     Chem.AssignStereochemistry(obj, flagPossibleStereoCenters=True, force=True)
+#     Chem.AssignAtomChiralTagsFromStructure(obj, -1)
 
-    ## visulize a corrected rdkit object
-    if debug >= 1:
-        from IPython.display import display
-        from rdkit.Chem.Draw import IPythonConsole
+#     ## visulize a corrected rdkit object
+#     if debug >= 1:
+#         from IPython.display import display
+#         from rdkit.Chem.Draw import IPythonConsole
 
-        IPythonConsole.drawOptions.addAtomIndices = True
-        IPythonConsole.molSize = 300, 300
+#         IPythonConsole.drawOptions.addAtomIndices = True
+#         IPythonConsole.molSize = 300, 300
 
-        print(f"{mol.formula=} {smiles=}")
-        display(obj)
+#         print(f"{mol.formula=} {smiles=}")
+#         display(obj)
 
-    return smiles, obj
-
-
-#######################################################
-def reorder_protonation(prot, map, debug: int = 0):
-    if debug > 0:
-        print("PROTONATION.REORDER. labels:", prot.labels)
-    if debug > 0:
-        print("PROTONATION.REORDER. received map:", map)
-
-    ## for protonation states with added atoms, the reorder map will have fewer items. Correct it here
-    mapext = np.copy(map)
-    if prot.added_atoms > 0 and len(map) < len(prot.labels):
-        for ldx in range(0, prot.added_atoms):
-            mapext = np.append(mapext, len(map) + ldx)
-        if debug > 0:
-            print("PROTONATION.REORDER. extended map:", mapext)
-
-    assert len(mapext) == len(prot.labels)
-    assert len(map) == len(prot.addedlist)
-    if len(map) > 0:
-        reordered_labels = [prot.labels[i] for i in mapext]
-        reordered_coords = [prot.coords[i] for i in mapext]
-        reordered_addedlist = [prot.addedlist[i] for i in map]
-        reordered_block = [prot.block[i] for i in map]
-        reordered_metal_electrons = [prot.metal_electrons[i] for i in map]
-        reordered_elemlist = [prot.elemlist[i] for i in map]
-
-    reordered_protonation = Protonation.from_positional(
-        reordered_labels,
-        reordered_coords,
-        prot.cov_factor,
-        prot.added_atoms,
-        reordered_addedlist,
-        reordered_block,
-        reordered_metal_electrons,
-        reordered_elemlist,
-        tmpsmiles=prot.tmpsmiles,
-        o_s=prot.o_s,
-        typ="Reordered",
-        parent=prot.parent,
-    )
-    print("CREATED REORDERED PROTONATION", reordered_protonation)
-
-    return reordered_protonation
-
-
-#######################################################
-class Protonation(BaseModel):
-    model_config = {"arbitrary_types_allowed": True}
-
-    # Required constructor parameters
-    labels: list[str]
-    coords: list[list[float]]  # Note: renamed from 'coord' to match usage
-    cov_factor: float
-    added_atoms: int
-    addedlist: list[int]
-    block: list[int]
-    metal_electrons: list[int]
-    elemlist: list[str]
-
-    # Optional constructor parameters with defaults
-    tmpsmiles: str = Field(default=" ")
-    o_s: int = Field(default=0)
-    typ: str = Field(default="Local")
-    parent: object | None = Field(default=None)
-
-    # Computed attributes with proper defaults
-    natoms: int | None = None
-    formula: str | None = None
-    atnums: list[int] | None = None
-    radii: list[float] | None = None
-
-    # Conditionally set attributes with None defaults (eliminates hasattr need)
-    atom_site_labels_indices: list[int] | None = None
-    atom_site_labels: list[str] | None = None
-    status: bool | None = None
-    adjmat: NDArray | None = None
-    adjnum: NDArray | None = None
-
-    # Frozen fields
-    version: str = Field(default="2.0", frozen=True)
-    type: Type = Field(default="protonation")
-
-    @computed_field
-    @property
-    def computed_natoms(self) -> int:
-        return len(self.labels)
-
-    @computed_field
-    @property
-    def computed_formula(self) -> str:
-        return labels2formula(self.labels)
-
-    @computed_field
-    @property
-    def computed_atnums(self) -> list[int]:
-        return [elemdatabase.elementnr[l] for l in self.labels]
-
-    @computed_field
-    @property
-    def computed_radii(self) -> list[float]:
-        return get_radii(self.labels)
-
-    def model_post_init(self, __context: Any) -> None:
-        # Set computed values
-        self.natoms = self.computed_natoms
-        self.formula = self.computed_formula
-        self.atnums = self.computed_atnums
-        self.radii = self.computed_radii
-
-        # Handle conditional attribute setting based on parent
-        if self.parent is not None:
-            refcell = self.parent.get_parent("reference")
-            geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
-
-            if refcell is not None:
-                self.atom_site_labels_indices = [
-                    atom.get_parent_index("reference") for atom in self.parent.atoms
-                ]
-                self.atom_site_labels = [
-                    refcell.atom_site_labels[idx]
-                    for idx in self.atom_site_labels_indices
-                ]
-                # print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
-                # print("PROTONATION.atom_site_labels", self.atom_site_labels)
-
-            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
-                self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(
-                    self.labels, self.coords, self.atom_site_labels, geom_bond_cif
-                )
-                print(
-                    "PROTONATION.get_adjmatrix_from_cif_bonds",
-                    adjmat.shape,
-                    adjnum.shape,
-                )
-                count = 0
-                if len(self.addedlist) > 0:
-                    for idx, add in enumerate(self.addedlist):
-                        if add != 0:
-                            count += 1
-                            added_idx = len(self.addedlist) - 1 + count
-                            print("PROTONATION.added_idx", f"{idx=} {added_idx=}")
-                            adjmat[idx, added_idx] += 1
-                            adjmat[added_idx, idx] += 1
-                            adjnum[idx] += 1
-                            adjnum[added_idx] += 1
-
-                self.adjmat = adjmat
-                self.adjnum = adjnum
-            else:
-                self.status, self.adjmat, self.adjnum, warning = get_adjmatrix(
-                    self.labels, self.coords, self.cov_factor, self.radii
-                )
-                if warning:
-                    print("PROTONATION.get_adjmatrix warning:", warning)
-                    self.status = False
-
-    def reorder(self, map, debug: int = 0):
-        if debug > 0:
-            print("PROTONATION.REORDER. labels:", self.labels)
-        if debug > 0:
-            print("PROTONATION.REORDER. received map:", map)
-
-        ## for protonation states with added atoms, the reorder map will have fewer items. Correct it here
-        mapext = np.copy(map)
-        if self.added_atoms > 0 and len(map) < len(self.labels):
-            for ldx in range(0, self.added_atoms):
-                mapext = np.append(mapext, len(map) + ldx)
-            if debug > 0:
-                print("PROTONATION.REORDER. extended map:", mapext)
-        print("PROTONATION.REORDER. extended map:", mapext, len(mapext))
-        print("PROTONATION.REORDER. map:", map, len(map))
-        print("PROTONATION.REORDER. labels:", self.labels, len(self.labels))
-        print("PROTONATION.REORDER. addedlist:", self.addedlist, len(self.addedlist))
-        assert len(mapext) == len(self.labels)
-        assert len(map) == len(self.addedlist)
-        if len(map) > 0:
-            self.labels = list(np.array(self.labels)[mapext])
-            self.coords = list(np.array(self.coords)[mapext])
-            self.atnums = list(np.array(self.atnums)[mapext])
-            self.radii = list(np.array(self.radii)[mapext])
-            # No more hasattr check needed - atom_site_labels is always defined (can be None)
-            if self.atom_site_labels is not None:
-                self.atom_site_labels = list(np.array(self.atom_site_labels)[map])
-            self.addedlist = list(np.array(self.addedlist)[map])
-            self.block = list(np.array(self.block)[map])
-            self.metal_electrons = list(np.array(self.metal_electrons)[map])
-            self.elemlist = list(np.array(self.elemlist)[map])
-
-            self.typ = "Reordered"
-            refcell = self.parent.get_parent("reference")
-            geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
-            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
-                self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(
-                    self.labels, self.coords, self.atom_site_labels, geom_bond_cif
-                )
-                print(
-                    "PROTONATION.get_adjmatrix_from_cif_bonds",
-                    adjmat.shape,
-                    adjnum.shape,
-                )
-                count = 0
-                if len(self.addedlist) > 0:
-                    for idx, add in enumerate(self.addedlist):
-                        if add != 0:
-                            count += 1
-                            added_idx = len(self.addedlist) - 1 + count
-                            print("PROTONATION.added_idx", f"{idx=} {added_idx=}")
-                            adjmat[idx, added_idx] += 1
-                            adjmat[added_idx, idx] += 1
-                            adjnum[idx] += 1
-                            adjnum[added_idx] += 1
-
-                self.adjmat = adjmat
-                self.adjnum = adjnum
-            else:
-                self.status, self.adjmat, self.adjnum, warning = get_adjmatrix(
-                    self.labels, self.coords, self.cov_factor, self.radii
-                )
-        return self
-
-    def __str__(self):
-        # This will make print(object) behave like before
-        return self.__repr__()
-
-    def __repr__(self):
-        to_print = ""
-        to_print += "------------- Cell2mol Protonation ----------------\n"
-        to_print += f" Status                          = {self.status}\n"
-        to_print += f" Labels                          = {self.labels}\n"
-        # No more hasattr check needed - atom_site_labels is always defined (can be None)
-        if self.atom_site_labels is not None:
-            to_print += f" Atom site labels                = {self.atom_site_labels}\n"
-        to_print += f" Type                            = {self.typ}\n"
-        to_print += f" Atoms added in positions        = {self.addedlist}\n"
-        to_print += f" Atoms blocked (no atoms added)  = {self.block}\n"
-        to_print += "---------------------------------------------------\n"
-        return to_print
-
-    @classmethod
-    @deprecated("Use protonation() with the keyword arguments instead.")
-    def from_positional(
-        cls,
-        labels: list[str],
-        coord: list[list[float]],
-        cov_factor: float,
-        added_atoms: int,
-        addedlist: list[int],
-        block: list[int],
-        metal_electrons: list[int],
-        elemlist: list[str],
-        tmpsmiles: str = " ",
-        o_s: int = 0,
-        typ: str = "Local",
-        parent: object = None,
-    ) -> "Protonation":
-        return cls(
-            labels=labels,
-            coords=coord,  # Note: using coords here to match the field name
-            cov_factor=cov_factor,
-            added_atoms=added_atoms,
-            addedlist=addedlist,
-            block=block,
-            metal_electrons=metal_electrons,
-            elemlist=elemlist,
-            tmpsmiles=tmpsmiles,
-            o_s=o_s,
-            typ=typ,
-            parent=parent,
-        )
-
-
-#######################################################
-class ChargeState(BaseModel):
-    model_config = {"arbitrary_types_allowed": True}
-
-    # Required constructor parameters
-    status: bool
-    uncorr_total_charge: int
-    uncorr_atom_charges: list[int]
-    rdkit_obj: object
-    smiles: str
-    charge_tried: int
-    allow: bool
-    protonation: object  # protonation object
-
-    # Computed attributes with proper defaults
-    uncorr_abstotal: int | None = None
-    uncorr_abs_atcharge: int | None = None
-    uncorr_zwitt: bool | None = None
-    coincide: bool | None = None
-
-    # Copied from protonation with proper defaults
-    addedlist: list[int] | None = None
-    metal_electrons: list[int] | None = None
-    elemlist: list[str] | None = None
-
-    # Initialized attributes with defaults
-    corr_total_charge: int = Field(default=0)
-    corr_atom_charges: list[int] = Field(default_factory=list)
-
-    # Final computed attributes with proper defaults
-    corr_abstotal: int | None = None
-    corr_abs_atcharge: int | None = None
-    corr_zwitt: bool | None = None
-
-    # Frozen fields
-    version: str = Field(default="2.0", frozen=True)
-    type: str = Field(default="charge_state", frozen=True)
-
-    def model_post_init(self, __context: Any) -> None:
-        # Compute initial derived values
-        self.uncorr_abstotal, self.uncorr_abs_atcharge, self.uncorr_zwitt = (
-            eval_chargelist(self.uncorr_atom_charges)
-        )
-
-        # Set coincide flag
-        self.coincide = self.uncorr_total_charge == self.charge_tried
-
-        # Copy attributes from protonation
-        self.addedlist = self.protonation.addedlist
-        self.metal_electrons = self.protonation.metal_electrons
-        self.elemlist = self.protonation.elemlist
-
-        # Corrects the Charge of atoms with addedH
-        count = 0
-        if len(self.addedlist) > 0:
-            for idx, add in enumerate(
-                self.addedlist
-            ):  # Iterates over the original number of ligand atoms, thus without the added H
-                if add != 0:
-                    count += 1
-                    corrected = (
-                        self.uncorr_atom_charges[idx]
-                        - self.addedlist[idx]
-                        + self.metal_electrons[idx]
-                        - self.uncorr_atom_charges[len(self.addedlist) - 1 + count]
-                    )
-                    self.corr_atom_charges.append(corrected)
-                    # last term corrects for cases in which a charge has been assigned to the added atom
-                else:
-                    self.corr_atom_charges.append(self.uncorr_atom_charges[idx])
-            self.corr_total_charge = int(np.sum(self.corr_atom_charges))
-        else:
-            self.corr_total_charge = self.uncorr_total_charge
-            self.corr_atom_charges = self.uncorr_atom_charges.copy()
-
-        self.corr_abstotal, self.corr_abs_atcharge, self.corr_zwitt = eval_chargelist(
-            self.corr_atom_charges
-        )
-
-    def __str__(self):
-        # This will make print(object) behave like before
-        return self.__repr__()
-
-    def __repr__(self):
-        to_print = ""
-        to_print += "------------- Cell2mol Charge State ---------------\n"
-        to_print += f" Status                          = {self.status}\n"
-        to_print += f" Smiles                          = {self.smiles}\n"
-        to_print += f" Charge Tried                    = {self.charge_tried}\n"
-        to_print += f" Uncorrected Total Charge        = {self.uncorr_total_charge}\n"
-        to_print += f" Corrected Total Charge          = {self.corr_total_charge}\n"
-        to_print += f" Corrected Absolute Total Charge = {self.corr_abs_atcharge}\n"
-        to_print += f" Corrected Is Zwitterion?        = {self.corr_zwitt}\n"
-        to_print += "---------------------------------------------------\n"
-        return to_print
-
-    @classmethod
-    @deprecated("Use charge_state() with the keyword arguments instead.")
-    def from_positional(
-        cls,
-        status: bool,
-        uncorr_total_charge: int,
-        uncorr_atom_charges: list[int],
-        rdkit_obj: object,
-        smiles: str,
-        charge_tried: int,
-        allow: bool,
-        protonation: object,
-    ) -> "ChargeState":
-        return cls(
-            status=status,
-            uncorr_total_charge=uncorr_total_charge,
-            uncorr_atom_charges=uncorr_atom_charges,
-            rdkit_obj=rdkit_obj,
-            smiles=smiles,
-            charge_tried=charge_tried,
-            allow=allow,
-            protonation=protonation,
-        )
+#     return smiles, obj
 
 
 #######################################################

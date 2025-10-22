@@ -3,17 +3,30 @@ import sys
 from ase.io import read
 from contextlib import redirect_stdout
 from cell2mol.classes import Cell
-from cell2mol.read_write import *
 from cell2mol.cell_operations import frac2cart_fromparam
 from cell2mol.other import handle_error
 from cell2mol.connectivity import labels2formula, get_alkali_alkaline_earth_metal_idxs
 import time
 from cell2mol.elementdata import ElementData
+from cell2mol.read_write import (
+    writexyz,
+    print_refmoleclist,
+    print_unique_species,
+    get_wyckoff_positions,
+    get_geom_bond,
+    extract_chemical_name,
+    extract_metal_oxidation_state,
+    extract_moiety,
+    cifformula_to_list,
+    find_closest_matches,
+    sum_formulas,
+    compare_totals,
+)
 
 elemdatabase = ElementData()
 
 VERSION = "2.0"
-COV_FACTOR = 1.3
+COV_FACTOR = 1.0
 METAL_FACTOR = 1.0
 
 
@@ -111,7 +124,7 @@ def process_refcell(input_path, name, current_dir, cif_bond_info, debug=0):
         print_error_case(refcell.error_case, error_fname)
         if (
             refcell.disagree_with_cif_formula is not None
-            and refcell.disagree_with_cif_formula == True
+            and refcell.disagree_with_cif_formula
         ):
             disagree_fname = os.path.join(current_dir, "disagree_with_cif_formula.out")
             print_error_case(9, disagree_fname)

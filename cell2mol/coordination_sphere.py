@@ -2,7 +2,7 @@ import numpy as np
 import os
 from cell2mol import __file__
 import yaml
-from cell2mol.other import *
+from cell2mol.other import compute_centroid, get_dist
 from cell2mol.connectivity import (
     add_atom,
     get_adjmatrix,
@@ -60,7 +60,7 @@ def define_coordination_geometry(
             symbols.append(group.label)
             positions.append(group.coord)
             count += 1
-        elif group.is_haptic == False:
+        elif not group.is_haptic:
             for atom in group.atoms:
                 symbols.append(atom.label)
                 positions.append(atom.coord)
@@ -141,48 +141,6 @@ def shape_measure(symbols: list, positions: list, debug: int = 0) -> dict:
             for geom, ideal_shape in ideal_shapes.items():
                 chsm = calc_cshm_fast(positions, ideal_shape)
                 posgeom_dev[geom] = round(float(chsm), 3)
-        except:
-            print(
-                f"SHAPE_MEASURE: {cn} Vertices not found in shape_structure_references"
-            )
-
-    return posgeom_dev
-
-
-#######################################################
-def shape_measure_old(symbols: list, positions: list, debug: int = 0) -> dict:
-    from cosymlib import Geometry
-    # Get shape measure of a set of coordinates
-
-    if debug >= 2:
-        print(f"SHAPE_MEASURE: {symbols=}")
-    if debug >= 2:
-        print(f"SHAPE_MEASURE: {positions=}")
-
-    cn = len(symbols) - 1  # coordination number of metal center
-
-    connectivity = [[1, i] for i in range(2, cn + 2)]
-    if debug >= 2:
-        print(f"SHAPE_MEASURE: coordination number of metal center {cn}")
-    if debug >= 2:
-        print(f"SHAPE_MEASURE: connectivity of metal center(1) {connectivity}")
-    geometry = Geometry(positions=positions, symbols=symbols, connectivity=connectivity)
-
-    if cn == 0:
-        posgeom_dev = {}
-    elif cn == 1:
-        posgeom_dev = {"Linear": 0.0}
-    else:
-        posgeom_dev = {}
-        try:
-            ref_geom = np.array(
-                shape_structure_references_simplified["{} Vertices".format(cn)],
-                dtype=object,
-            )
-            for idx, rg in enumerate(ref_geom[:, 0]):
-                shp_measure = geometry.get_shape_measure(rg, central_atom=1)
-                geom = str(ref_geom[:, 3][idx])
-                posgeom_dev[geom] = round(shp_measure, 3)
         except:
             print(
                 f"SHAPE_MEASURE: {cn} Vertices not found in shape_structure_references"
@@ -717,74 +675,3 @@ def coordination_correction_for_haptic(group: object, debug: int = 0):
         final_ligand_indices_by_metal,
         group_metals_indices,
     )
-
-
-#######################################################
-def coordination_correction_for_haptic_old(group: object, debug: int = 0):
-    add_factor = 0.45
-    if debug > 0:
-        print("Entering COORD_CORR_HAPTIC:")
-
-    distances = []
-    for idx, atom in enumerate(group.atoms):
-        metal = atom.get_closest_metal()
-        dist = get_dist(atom.coord, metal.coord)
-        thres = (metal.radii + atom.radii) + add_factor
-        # ratio_list.append(round(dist/thres,3))
-        distances.append(round(dist, 3))
-        if debug >= 2:
-            print(
-                f"\tAtom {idx} :",
-                atom.label,
-                "\tMetal :",
-                metal.label,
-                "\tdistance :",
-                round(dist, 3),
-                "\tthres :",
-                thres,
-            )
-    mean = np.mean(distances)
-    std_dev = round(float(np.std(distances)), 3)
-    if debug >= 2:
-        print(f"\t{distances=} {mean=} {std_dev=}")
-
-    is_ring = is_single_ring(group.labels, group.coord)
-    conn_idx = []
-    final_ligand_indices = []
-    for idx, (atom, dist) in enumerate(zip(group.atoms, distances)):
-        if atom.label == "H":
-            if debug >= 1:
-                print(
-                    "\t!!! Wrong metal-coordination assignment for Atom",
-                    idx,
-                    atom.label,
-                    get_dist(atom.coord, metal.coord),
-                    "due to H",
-                )
-            if debug >= 1:
-                print(atom.label)
-            atom.reset_mconnec(metal, debug=1)
-        elif is_ring:
-            if std_dev > 0.1:
-                if dist < mean - std_dev:
-                    conn_idx.append(idx)
-                    final_ligand_indices.append(atom.get_parent_index("ligand"))
-                else:
-                    atom.reset_mconnec(metal, debug=1)
-            else:
-                conn_idx.append(idx)
-                final_ligand_indices.append(atom.get_parent_index("ligand"))
-        else:
-            conn_idx.append(idx)
-            final_ligand_indices.append(atom.get_parent_index("ligand"))
-
-    conn_idx = sorted(list(set(conn_idx)))
-    conn_idx = [conn_idx]
-    print(f"conn_idx: {conn_idx=}")
-    return group, conn_idx, final_ligand_indices
-    # final_group_indices = extract_final_indices(range(len(group.atoms)), conn_idx)
-    # print(f"final_group_indices: {final_group_indices=}")
-    # return group, final_group_indices, final_ligand_indices
-
-
-#######################################################
