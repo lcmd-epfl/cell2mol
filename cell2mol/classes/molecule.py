@@ -1,28 +1,23 @@
 from __future__ import annotations
+import pickle
 from typing_extensions import deprecated
-
 from pydantic import Field
 from cell2mol.classes.atom import Atom
 from cell2mol.classes.ligand import Ligand
 from cell2mol.classes.specie import Specie
+
 from cell2mol.connectivity import (
     labels2formula,
-)
-from cell2mol.connectivity import (
     get_metal_idxs,
     get_non_transition_metal_idxs,
     split_species,
     get_alkali_alkaline_earth_metal_idxs,
-)
-from cell2mol.connectivity import (
     compare_species,
     compare_metals,
 )
-
 from cell2mol.charge_assignment import (
     correct_smiles_ligand,
 )
-
 from cell2mol.new_charge_assignment import (
     set_charge_state,
     prepare_mol,
@@ -45,7 +40,6 @@ from cell2mol.my_types import (
 )
 
 elemdatabase = ElementData()
-import pickle
 
 
 ###############
@@ -144,8 +138,8 @@ class Molecule(Specie):
             geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
 
             post_transition_metal_indices = []
-            for idx, l in enumerate(self.labels):
-                if l in ["Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"]:
+            for idx, label in enumerate(self.labels):
+                if label in ["Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"]:
                     post_transition_metal_indices.append(idx)
 
             self.ligands = []
@@ -315,12 +309,14 @@ class Molecule(Specie):
             geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
 
             IA_IIA_metal_indices = []
-            for idx, l in enumerate(self.labels):
+            for idx, label in enumerate(self.labels):
                 if (
-                    elemdatabase.elementgroup[l] == 1 and l != "H" and l != "D"
+                    elemdatabase.elementgroup[label] == 1
+                    and label != "H"
+                    and label != "D"
                 ):  # Alkali Metals
                     IA_IIA_metal_indices.append(idx)
-                elif elemdatabase.elementgroup[l] == 2:  # Alkaline Earth Metals
+                elif elemdatabase.elementgroup[label] == 2:  # Alkaline Earth Metals
                     IA_IIA_metal_indices.append(idx)
 
             self.ligands = []
@@ -965,7 +961,7 @@ class Molecule(Specie):
         ):
             # Creates bonds between molecule.atoms using the molecule.rdkit_object
             result = create_bonds_specie(self, debug=debug)
-            if result == False:
+            if not result:
                 if debug >= 1:
                     print(
                         f"MOLECULE.CREATE_BONDS: error creating bonds for non-complex molecule {self.formula}"
@@ -987,7 +983,7 @@ class Molecule(Specie):
             for lig in self.ligands:
                 # Creates bonds between ligand.atoms, using the ligand.rdkit_object
                 result = create_bonds_specie(lig, debug=debug)
-                if result == False:
+                if not result:
                     if debug >= 1:
                         print(
                             f"MOLECULE.CREATE_BONDS: error creating bonds for ligand {lig.formula}"
@@ -1004,7 +1000,7 @@ class Molecule(Specie):
                         f"MOLECULE.CREATE_BONDS: Correcting Smiles for ligand {lig.formula}"
                     )
                 result, fix_zwitterions = correct_smiles_ligand(lig, debug=debug)
-                if result == False:
+                if not result:
                     if debug > 1:
                         print(
                             f"MOLECULE.CREATE_BONDS: error correcting smiles for ligand {lig.formula}"
@@ -1029,7 +1025,7 @@ class Molecule(Specie):
                         f"MOLECULE.CREATE_BONDS: Re-running create_bonds_specie for ligand {lig.formula} due to zwitterion correction."
                     )
                 result = create_bonds_specie(lig, debug=debug)
-                if result == False:
+                if not result:
                     if debug >= 1:
                         print(
                             f"MOLECULE.CREATE_BONDS: error re-creating bonds for ligand {lig.formula}"

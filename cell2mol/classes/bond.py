@@ -2,16 +2,10 @@ from __future__ import annotations
 from typing import Any
 from typing_extensions import deprecated
 import numpy as np
-
 from pydantic import Field
-
-
-
 from cell2mol.elementdata import ElementData
 from cell2mol.utils import BaseModel
-from cell2mol.my_types import (
-    Type,
-)
+from cell2mol.my_types import Type
 
 elemdatabase = ElementData()
 

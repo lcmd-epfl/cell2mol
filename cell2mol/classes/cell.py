@@ -1,34 +1,23 @@
 from __future__ import annotations
+import numpy as np
+import pickle
 from typing import Any
 from typing_extensions import deprecated
-import numpy as np
-
 from pydantic import Field
 from cell2mol.classes.molecule import Molecule
-
-from cell2mol.connectivity import (
-    split_species,
-)
 from cell2mol.connectivity import (
     compare_species,
     compare_metals,
     compare_reference_indices,
+    split_species,
 )
 from cell2mol.cell_operations import frac2cart_fromparam
-
-from cell2mol.charge_assignment import (
-    prepare_unresolved,
-    prepare_mols,
-)
-
 from cell2mol.new_charge_assignment import (
     set_charge_state,
     prepare_mol,
-    balance_charge,
 )
 
-from cell2mol.other import extract_from_list
-from cell2mol.other import handle_error
+from cell2mol.other import extract_from_list, handle_error
 from cell2mol.elementdata import ElementData
 from cell2mol.read_write import get_moiety_indices_from_labels
 from cell2mol.utils import BaseModel
@@ -38,7 +27,6 @@ from cell2mol.my_types import (
 )
 
 elemdatabase = ElementData()
-import pickle
 
 
 ##############
@@ -404,7 +392,7 @@ class Cell(BaseModel):
         for ref in self.refmoleclist:
             if ref.natoms == 1:
                 label = ref.atoms[0].label
-                group = elemdatabase.elementgroup[label]
+                # group = elemdatabase.elementgroup[label]
                 if label == "H" or label == "D":
                     isgood = False
                 else:  # (group == 1 or group == 2 or group == 17)
@@ -535,7 +523,7 @@ class Cell(BaseModel):
         for ref in self.refmoleclist:
             if ref.natoms == 1:
                 label = ref.atoms[0].label
-                group = elemdatabase.elementgroup[label]
+                # group = elemdatabase.elementgroup[label]
                 if label == "H" or label == "D":
                     isgood = False
                 else:  # (group == 1 or group == 2 or group == 17)
@@ -599,96 +587,6 @@ class Cell(BaseModel):
                     met.get_coord_sphere_formula(debug=debug)
 
         return self.refmoleclist
-
-    #######################################################
-    def get_moleclist(
-        self, cov_factor: float = 1.3, metal_factor: float = 1.0, debug: int = 0
-    ):
-        if debug > 3:
-            print(f"Entered CELL.MOLECLIST with debug={debug}")
-        if self.labels is None or self.coord is None:
-            if debug > 3:
-                print("CELL.MOLECLIST. Labels or coordinates not found. Returning None")
-            return None
-        if len(self.labels) == 0 or len(self.coord) == 0:
-            if debug > 3:
-                print("CELL.MOLECLIST. Empty labels or coordinates. Returning None")
-            return None
-        if debug > 3:
-            print("CELL.MOLECLIST passed initial checks")
-
-        ions_idx = []
-        for ref in self.refmoleclist:
-            if ref.natoms == 1:
-                label = ref.atoms[0].label
-                ions_idx.extend(
-                    [idx for idx, l in enumerate(self.labels) if l == label]
-                )
-                if debug > 3:
-                    print(f"CELL.MOLECLIST: {ions_idx=} with {label=}")
-
-        if len(ions_idx) > 0:
-            cell_indices = [*range(0, len(self.labels), 1)]
-            if debug > 3:
-                print(f"CELL.MOLECLIST: found {len(ions_idx)} ions")
-            rest_idx = list(idx for idx in cell_indices if idx not in ions_idx)
-            if debug > 3:
-                print(f"CELL.MOLECLIST: {rest_idx=}")
-            rest_labels = extract_from_list(rest_idx, self.labels, dimension=1)
-            rest_coord = extract_from_list(rest_idx, self.coord, dimension=1)
-            rest_indices = extract_from_list(rest_idx, cell_indices, dimension=1)
-            if debug > 3:
-                print(f"CELL.MOLECLIST: {rest_labels=}")
-            if debug > 3:
-                print(f"CELL.MOLECLIST: {rest_coord=}")
-            if debug > 3:
-                print(f"CELL.MOLECLIST: {rest_indices=}")
-            blocklist = split_species(
-                rest_labels,
-                rest_coord,
-                indices=rest_indices,
-                cov_factor=cov_factor,
-                debug=debug,
-            )
-            for idx in ions_idx:
-                blocklist.append([idx])
-        else:
-            blocklist = split_species(
-                self.labels, self.coord, cov_factor=cov_factor, debug=debug
-            )
-
-        if blocklist is None:
-            return None
-        else:
-            if debug > 3:
-                print(f"CELL.MOLECLIST: found {len(blocklist)} blocks")
-            if debug > 3:
-                print(f"CELL.MOLECLIST: {blocklist=}")
-
-        self.moleclist = []
-        for b in blocklist:
-            if debug > 3:
-                print(f"CELL.MOLECLIST: doing block={b}")
-            mol_labels = extract_from_list(b, self.labels, dimension=1)
-            mol_coord = extract_from_list(b, self.coord, dimension=1)
-            mol_frac_coord = extract_from_list(b, self.frac_coord, dimension=1)
-            # Creates Molecule Object
-            newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
-            # For debugging
-            newmolec.origin = "cell.get_moleclist"
-            # Adds cell as parent of the molecule, with indices b
-            newmolec.add_parent(self, indices=b)
-            newmolec.set_adjacency_parameters(cov_factor, metal_factor)
-            # Creates The atom objects with adjacencies
-            newmolec.set_atoms(create_adjacencies=True, debug=debug)
-            # The split_complex must be below the frac_coord, so they are carried on to the ligands
-            # if newmolec.iscomplex:
-            #     if debug > 0: print(f"CELL.MOLECLIST: splitting complex")
-            #     newmolec.split_complex(debug=debug)
-            # Not needed here, as the reconstruction will take care of it
-            self.moleclist.append(newmolec)
-
-        return self.moleclist
 
     #######################################################
     def arrange_cell_coord(self):
@@ -769,16 +667,6 @@ class Cell(BaseModel):
             self.error_get_poscharges = True
         else:
             self.error_get_poscharges = False
-
-    #######################################################
-    #######################################################
-    def assign_charges(self, debug: int = 0):
-        # if self.unique_species is None: self.get_unique_species(debug=debug)
-        # if debug >= 1: print(f"{len(self.unique_species)} Species (Metal or Ligand or Molecules) to Characterize")
-
-        # Placeholder implementation - the original method was very long and complex
-        # This should be implemented based on the specific charge assignment logic needed
-        pass
 
     #######################################################
     def assign_charges_for_refcell(self, debug: int = 0):
@@ -941,96 +829,6 @@ class Cell(BaseModel):
                 self.is_neutral = True
             else:
                 self.is_neutral = False
-
-    #######################################################
-    def assign_charges_old(self, debug: int = 0) -> object:
-        #########
-        # CHARGE#
-        #########
-        # This function drives the determination of the charge the species in the unit cell
-        # The whole process is done by 4 functions, which are run at the specie class level:
-        # 1) spec.get_protonation_states(), which determines which atoms of the specie must have added elements (see above) to have a meaningful Lewis structure
-        # 2) spec.get_possible_cs(), which retrieves the possible charge states associated with the specie
-        # 3) spec.get_possible_charge_state(), which generates one connectivity for a set of charges
-        # 4) cell.select_charge_distr() chooses the best connectivity among the generated ones.
-
-        # Basically, this function connects these other three functions,
-        # while managing some key information for those
-        # Initiates variables
-        ############
-
-        # (0) Makes sure the cell is reconstructed
-        # if self.is_fragmented is None: self.reconstruct(debug=debug)
-        # if self.is_fragmented: return # Stopping. self.is_fragmented must be false to determine the charges of the cell
-
-        # (1) Indentify unique chemical species
-        if self.unique_species is None:
-            self.get_unique_species(debug=debug)
-        if debug >= 1:
-            print(
-                f"{len(self.unique_species)} Species (Metal or Ligand or Molecules) to Characterize"
-            )
-
-        # (2) Gets a preliminary list of possible charge states for each specie (former drive_poscharge)
-        selected_cs = []
-        for idx, spec in enumerate(self.unique_species):
-            tmp = spec.get_possible_cs(debug=debug)
-            if tmp is None:
-                self.error_get_poscharges = True
-                return  # Stopping. Empty list of possible charges received.
-            elif spec.subtype != "metal":
-                selected_cs.append(
-                    list([cs.corr_total_charge for cs in spec.possible_cs])
-                )
-            else:
-                selected_cs.append(spec.possible_cs)
-        self.error_get_poscharges = False
-
-        # Finds the charge_state that satisfies that the crystal must be neutral
-        final_charge_distribution = balance_charge(
-            self.unique_indices, self.unique_species, debug=debug
-        )
-
-        if len(final_charge_distribution) > 1:
-            if debug >= 1:
-                print(
-                    "More than one Possible Distribution Found:",
-                    final_charge_distribution,
-                )
-            self.error_multiple_distrib = True
-            self.error_empty_distrib = False
-            pp_mols, pp_idx, pp_opt = prepare_unresolved(
-                self.unique_indices,
-                self.unique_species,
-                final_charge_distribution,
-                debug=debug,
-            )
-            self.data_for_postproc(pp_mols, pp_idx, pp_opt)
-            return  # Stopping.
-
-        elif len(final_charge_distribution) == 0:  #
-            if debug >= 1:
-                print("No valid Distribution Found", final_charge_distribution)
-            self.error_multiple_distrib = False
-            self.error_empty_distrib = True
-            return  # Stopping.
-
-        else:  # Only one possible charge distribution -> getcharge for the repeated species
-            self.error_multiple_distrib = False
-            self.error_empty_distrib = False
-
-            self.moleclist, self.error_prepare_mols = prepare_mols(
-                self.moleclist,
-                self.unique_indices,
-                self.unique_species,
-                final_charge_distribution[0],
-                debug=debug,
-            )
-
-            if self.error_prepare_mols:
-                return  # Stopping. Error while preparing molecules
-            else:
-                return self.moleclist
 
     #######################################################
     def create_bonds(self, debug: int = 0):
