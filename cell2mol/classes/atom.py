@@ -1,8 +1,8 @@
 from __future__ import annotations
 import numpy as np
-from typing import Any
+from typing import Annotated, Any
 from typing_extensions import deprecated
-from pydantic import Field, computed_field
+from pydantic import Field, PlainSerializer, computed_field
 from cell2mol.connectivity import (
     get_radii,
     get_adjmatrix,
@@ -10,6 +10,7 @@ from cell2mol.connectivity import (
 )
 from cell2mol.elementdata import ElementData
 from cell2mol.utils import BaseModel
+from cell2mol.utils.pydantic import serialize_circular_references
 
 elemdatabase = ElementData()
 
@@ -22,7 +23,9 @@ class Atom(BaseModel):
     coord: list[float]
     frac_coord: list[float] | None = None
     radii: float | None = None
-    parents: list[object] = Field(default_factory=list)
+    parents: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
+        Field(default_factory=list)
+    )
     parents_index: list[int] = Field(default_factory=list)
 
     # Seem to be set in various places depending on the context, might need to check this
@@ -33,10 +36,11 @@ class Atom(BaseModel):
     mconnec: int | None = None
     adjacency: list[object] = Field(default_factory=list)
     metal_adjacency: list[object] = Field(default_factory=list)
-    closest_metal: object | None = None
     metal_factor: float | None = None
     charge: int | None = None
-    bonds: list[object] = Field(default_factory=list)
+    bonds: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
+        Field(default_factory=list)
+    )
 
     version: str = Field(default="2.0", frozen=True)
     type: str = Field(default="atom", frozen=True)
@@ -192,6 +196,10 @@ class Atom(BaseModel):
                 self.metal_adjacency.append(idx)
 
     #######################################################
+    @property
+    def closest_metal(self):
+        return self.get_closest_metal()
+
     def get_closest_metal(self, debug: int = 0):
         ## Here, the list of metal atoms must be provided
         apos = self.coord
@@ -200,8 +208,8 @@ class Atom(BaseModel):
         for met in mol.metals:
             bpos = np.array(met.coord)
             dist.append(np.linalg.norm(apos - bpos))
-        self.closest_metal = mol.metals[np.argmin(dist)]
-        return self.closest_metal
+        closest_metal = mol.metals[np.argmin(dist)]
+        return closest_metal
 
     #######################################################
     def information(self, cov_factor: float, metal_factor: float) -> None:
