@@ -30,10 +30,10 @@ def assign_spin_metal(metal: object, debug: int = 0) -> None:
             return 1
         elif valence_elec in [1, 9]:
             return 2
-        elif valence_elec in [2, 3] and metal.get_parent("molecule").is_haptic == False:
+        elif valence_elec in [2, 3] and not metal.get_parent("molecule").is_haptic:
             return valence_elec + 1
         elif valence_elec in [4, 5, 6, 7, 8] or (
-            valence_elec in [2, 3] and metal.get_parent("molecule").is_haptic == True
+            valence_elec in [2, 3] and metal.get_parent("molecule").is_haptic
         ):
             if metal.coord_geometry is not None and metal.coord_geometry != "Undefined":
                 # Predict spin multiplicity of metal based on Random Forest model
