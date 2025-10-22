@@ -1,5 +1,7 @@
 import numpy as np
 from typing import Any, Tuple
+from cell2mol.classes.protonation import Protonation
+from cell2mol.my_types import RDKitObject
 from cell2mol.utils.pydantic import BaseModel
 from pydantic import Field
 from typing_extensions import deprecated
@@ -27,11 +29,11 @@ class ChargeState(BaseModel):
     status: bool
     uncorr_total_charge: int
     uncorr_atom_charges: list[int]
-    rdkit_obj: object
+    rdkit_obj: RDKitObject
     smiles: str
     charge_tried: int
     allow: bool
-    protonation: object  # protonation object
+    protonation: Protonation = Field(...)
 
     # Computed attributes with proper defaults
     uncorr_abstotal: int | None = None

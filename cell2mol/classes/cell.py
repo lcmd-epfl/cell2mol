@@ -5,6 +5,7 @@ from typing import Any
 from typing_extensions import deprecated
 from pydantic import Field
 from cell2mol.classes.molecule import Molecule
+from cell2mol.classes.specie import Specie
 from cell2mol.connectivity import (
     compare_species,
     compare_metals,
@@ -22,11 +23,15 @@ from cell2mol.elementdata import ElementData
 from cell2mol.read_write import get_moiety_indices_from_labels
 from cell2mol.utils import BaseModel
 from cell2mol.my_types import (
+    NDArray,
     Type,
     SubType,
 )
 
 elemdatabase = ElementData()
+
+
+Labels = list[str]
 
 
 ##############
@@ -37,13 +42,13 @@ class Cell(BaseModel):
 
     # Required constructor parameters
     name: str
-    labels: list[str]
-    coord: list[list[float]] = Field(
+    labels: Labels
+    coord: list[float] | NDArray = Field(
         alias="pos"
     )  # Using alias to match original parameter name
-    frac_coord: list[list[float]]
-    cell_vector: object
-    cell_param: object
+    frac_coord: list[float] | NDArray
+    cell_vector: NDArray
+    cell_param: NDArray
 
     # Computed in constructor
     natoms: int | None = None
@@ -59,9 +64,9 @@ class Cell(BaseModel):
     moiety_indices: object | None = None
 
     # Unique species related attributes
-    unique_species: list[object] | None = None
+    unique_species: list[Specie] | None = None
     unique_indices: list[int] | None = None
-    species_list: list[object] | None = None
+    species_list: list[Specie] | None = None
 
     # Missing H related attributes
     missing_H_in_Carbon: bool | None = None
@@ -314,7 +319,7 @@ class Cell(BaseModel):
     #######################################################
     def get_reference_molecules_from_moiety(
         self,
-        ref_labels: list,
+        ref_labels: Labels,
         ref_fracs: list,
         cov_factor: float = 1.3,
         metal_factor: float = 1.0,

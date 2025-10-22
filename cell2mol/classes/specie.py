@@ -1,10 +1,11 @@
 from __future__ import annotations
-from typing import Any
+from typing import Annotated, Any
 from typing_extensions import deprecated
 import numpy as np
 
-from pydantic import Field, computed_field
+from pydantic import Field, PlainSerializer
 from cell2mol.classes.atom import Atom
+from cell2mol.classes.charge_state import ChargeState
 from cell2mol.classes.metal import Metal
 from cell2mol.connectivity import (
     get_adjacency_types,
@@ -35,10 +36,11 @@ from cell2mol.other import extract_from_list, compute_centroid
 from cell2mol.elementdata import ElementData
 from cell2mol.utils import BaseModel
 from cell2mol.my_types import (
+    RDKitObject,
     SubType,
     NDArray,
-    ChargeState,
 )
+from cell2mol.utils.pydantic import serialize_circular_references
 
 elemdatabase = ElementData()
 
@@ -47,14 +49,18 @@ elemdatabase = ElementData()
 ####  CLASSES FOR CELL2MOL 2  ####
 ##################################
 class Specie(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
     # Positional arguments
     labels: list[str]
     coord: list[list[float]]
     frac_coord: list[list[float]] | None = None
-    radii: list[float] | None = None
+    radii: list[float] | NDArray | None = None
 
     # Optional arguments
-    parents: list[Specie] = Field(default_factory=list)
+    parents: Annotated[list[Specie], PlainSerializer(serialize_circular_references)] = (
+        Field(default_factory=list)
+    )
     parents_indices: list[list[int]] = Field(default_factory=list)
     cov_factor: float = Field(default=1.3)
     metal_factor: float = Field(default=1.0)
@@ -62,24 +68,24 @@ class Specie(BaseModel):
     # Defined in other methods
     adj_types: NDArray | None = None  # TOFIX romaingrx: NDarray not pydantic compatible
     adjmat: NDArray | None = None
-    adjnum: list | None = None
-    atnums: list | None = None
-    atom_site_labels: list | None = None
-    atomic_charges: list | None = None
-    atoms: list | None = None
+    adjnum: list | NDArray | None = None
+    atnums: list[int] | None = None
+    atom_site_labels: list[str] | None = None
+    atomic_charges: list[int] | NDArray | None = None
+    atoms: list[Atom] | None = None
     centroid: list | None = None
-    element_count: int | None = None
+    element_count: NDArray | None = None
     frac_centroid: list | None = None
     madjmat: NDArray | None = None
-    madjnum: list | None = None
+    madjnum: NDArray | None = None
     protonation_states: list | None = None
-    rdkit_obj: object | None = None
+    rdkit_obj: RDKitObject | None = Field(default=None)
     smiles: str | None = None
     subtype: SubType | None = None
     totcharge: int | None = None
 
     charge_state: ChargeState | None = None
-    possible_cs: list[ChargeState] | None = None
+    possible_cs: list[ChargeState] | None = Field(default=None)
 
     # TODO romaingrx: need clarification where we need this, it seems to be used
     # for molecules and ligands
@@ -89,23 +95,19 @@ class Specie(BaseModel):
     type: str = Field(default="specie", frozen=True)
     version: str = Field(default="2.0", frozen=True)
 
-    @computed_field
     @property
     def formula(self) -> str:
         return labels2formula(self.labels)
 
-    @computed_field
     @property
     def eleccount(self) -> int:
         # Assuming neutral specie (so basically this is the sum of atomic numbers)
         return labels2electrons(self.labels)
 
-    @computed_field
     @property
     def natoms(self) -> int:
         return len(self.labels)
 
-    @computed_field
     @property
     def iscomplex(self) -> bool:
         return any(
@@ -114,7 +116,6 @@ class Specie(BaseModel):
             for label in self.labels
         )
 
-    @computed_field
     @property
     def has_IA_IIA(self) -> bool:
         return any(
@@ -123,7 +124,6 @@ class Specie(BaseModel):
             for label in self.labels
         )
 
-    @computed_field
     @property
     def has_post_transition_metal(self) -> bool:
         post_transition_metals = {"Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"}
@@ -133,7 +133,6 @@ class Specie(BaseModel):
             and any(label in post_transition_metals for label in self.labels)
         )
 
-    @computed_field
     @property
     def indices(self) -> list[int]:
         ## Indices might be the atom ordering within a given specie. e.g. 1st, 2nd, 3rd atom of a specie.
