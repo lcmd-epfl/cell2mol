@@ -1,5 +1,6 @@
+import json
 import numpy as np
-from typing import Any
+from typing import Annotated, Any
 from cell2mol.my_types import Type
 from cell2mol.connectivity import (
     get_radii,
@@ -7,12 +8,12 @@ from cell2mol.connectivity import (
     get_adjmatrix_from_cif_bonds,
     labels2formula,
 )
-from cell2mol.utils.pydantic import BaseModel
+from cell2mol.utils.pydantic import BaseModel, serialize_circular_references
+from cell2mol.my_types import NDArray
 
 # Pydantic imports for the converted classes
-from pydantic import Field, computed_field
+from pydantic import Field, PlainSerializer, computed_field, model_serializer
 from typing_extensions import deprecated
-from numpy.typing import NDArray
 from cell2mol.elementdata import ElementData
 
 elemdatabase = ElementData()
@@ -20,8 +21,6 @@ elemdatabase = ElementData()
 
 #######################################################
 class Protonation(BaseModel):
-    model_config = {"arbitrary_types_allowed": True}
-
     # Required constructor parameters
     labels: list[str]
     coords: list[list[float]]  # Note: renamed from 'coord' to match usage
@@ -36,7 +35,9 @@ class Protonation(BaseModel):
     tmpsmiles: str = Field(default=" ")
     o_s: int = Field(default=0)
     typ: str = Field(default="Local")
-    parent: object | None = Field(default=None)
+    parent: Annotated[object | None, PlainSerializer(serialize_circular_references)] = (
+        Field(default=None)
+    )
 
     # Computed attributes with proper defaults
     natoms: int | None = None
@@ -54,6 +55,14 @@ class Protonation(BaseModel):
     # Frozen fields
     version: str = Field(default="2.0", frozen=True)
     type: Type = Field(default="protonation")
+
+    @model_serializer(
+        mode="plain",
+    )
+    def model_dump_json(self, **kwargs) -> str:
+        print("PROTONATION.model_dump_json")
+        # TODO romaingrx: add this back in the final json later
+        return "{}"
 
     @computed_field
     @property

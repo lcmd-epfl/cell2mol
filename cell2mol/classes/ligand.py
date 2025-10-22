@@ -1,8 +1,9 @@
 from __future__ import annotations
+from typing import Annotated
 from typing_extensions import deprecated
 import numpy as np
 
-from pydantic import Field
+from pydantic import Field, PlainSerializer
 from cell2mol.classes.atom import Atom
 from cell2mol.classes.group import Group
 from cell2mol.classes.metal import Metal
@@ -21,6 +22,7 @@ from cell2mol.my_types import (
     SubType,
     NOType,
 )
+from cell2mol.utils.pydantic import serialize_circular_references
 
 elemdatabase = ElementData()
 
@@ -29,16 +31,24 @@ elemdatabase = ElementData()
 #### LIGAND ####
 ################
 class Ligand(Specie):
+    model_config = {"arbitrary_types_allowed": True}
+
     NO_type: NOType | None = None
-    connected_atoms: list[Atom] | None = None
+    connected_atoms: Annotated[
+        list[Atom] | None, PlainSerializer(serialize_circular_references)
+    ] = Field(default=None)
     connected_idx: list[int] | None = None
     denticity: int | None = None
-    groups: list[Group] | None = None
+    groups: Annotated[
+        list[Group] | None, PlainSerializer(serialize_circular_references)
+    ] = Field(default=None)
     haptic_type: HapticType | None = None
     is_haptic: bool | None = None
     is_nitrosyl: bool | None = None
     is_silylyne: bool | None = None
-    metals: list[Metal] | None = None
+    metals: Annotated[
+        list[Metal] | None, PlainSerializer(serialize_circular_references)
+    ] = Field(default=None)
     unique_index: int | None = None
 
     subtype: SubType = Field(default="ligand")
