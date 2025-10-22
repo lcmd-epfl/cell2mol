@@ -25,7 +25,6 @@ def add_atom(
     unconditional: bool = False,
     debug: int = 0,
 ) -> Tuple[bool, list, list]:
-    from cell2mol.other import get_dist
     # This function adds one atom of a given "element" to a given "site=atom index" of a "ligand".
     # It does so at the position of the closest "metal" atom to the "site"
     #:return newlab: labels of the original ligand, plus the label of the new element
@@ -57,7 +56,7 @@ def add_atom(
                 )
             # ligand_idx = tgt.get_parent_index("ligand")
             metal_idx = tgt.get_parent_index("molecule")
-            dist = get_dist(apos, tgt.coord)
+            # dist = get_dist(apos, tgt.coord)
             idealdist = a.radii + elemdatabase.CovalentRadius3[element]
             # addedHcoords = apos + (tgt.coord - apos) * (idealdist / dist)  # the factor idealdist/dist[tgt] controls the distance
             # newcoord.append([addedHcoords[0], addedHcoords[1], addedHcoords[2]])     # adds H at the position of the closest Metal Atom
@@ -162,17 +161,6 @@ def point_along_vector(point1, point2, distance):
     new_point = point1 + normalized_vector * distance
 
     return new_point
-
-
-#######################################################
-def find_closest_metal(atom: object, metalist: list, debug: int = 0):
-    apos = np.array(atom.coord)
-    dist = []
-    for met in metalist:
-        bpos = np.array(met.coord)
-        dist.append(np.linalg.norm(apos - bpos))
-    # returns the closest metal atom
-    return np.argmin(dist)
 
 
 ################################
@@ -441,7 +429,7 @@ def place_hydrogens(
     u2 = normalize(np.array([1, -1, -1], float))
     u3 = normalize(np.array([-1, 1, -1], float))
     u4 = normalize(np.array([-1, -1, 1], float))
-    Utemp = [u1, u2, u3, u4]
+    # Utemp = [u1, u2, u3, u4]
 
     mode = hybridization.lower()
     if mode not in ("auto", "sp2", "sp3"):
@@ -675,11 +663,11 @@ def labels2ratio(labels):
 
 ################################
 def labels2electrons(labels):
-    if type(labels) == list:
+    if isinstance(labels, list):
         eleccount = 0
-        for l in labels:
-            eleccount += elemdatabase.elementnr[l]
-    elif type(labels) == str:
+        for label in labels:
+            eleccount += elemdatabase.elementnr[label]
+    elif isinstance(labels, str):
         eleccount = elemdatabase.elementnr[labels]
     return eleccount
 
@@ -690,8 +678,11 @@ def get_metal_idxs(labels: list, debug: int = 0):
 
     elemdatabase = ElementData()
     metal_indices = []
-    for idx, l in enumerate(labels):
-        if elemdatabase.elementblock[l] == "d" or elemdatabase.elementblock[l] == "f":
+    for idx, label in enumerate(labels):
+        if (
+            elemdatabase.elementblock[label] == "d"
+            or elemdatabase.elementblock[label] == "f"
+        ):
             metal_indices.append(idx)
     return metal_indices
 
@@ -700,10 +691,12 @@ def get_metal_idxs(labels: list, debug: int = 0):
 def get_alkali_alkaline_earth_metal_idxs(labels: list, debug: int = 0):
     """alkali metals (Group 1) and alkaline earth metals (Group 2)"""
     non_transition_metal_indices = []
-    for idx, l in enumerate(labels):
-        if elemdatabase.elementgroup[l] == 1 and l != "H" and l != "D":  # Alkali Metals
+    for idx, label in enumerate(labels):
+        if (
+            elemdatabase.elementgroup[label] == 1 and label != "H" and label != "D"
+        ):  # Alkali Metals
             non_transition_metal_indices.append(idx)
-        elif elemdatabase.elementgroup[l] == 2:  # Alkaline Earth Metals
+        elif elemdatabase.elementgroup[label] == 2:  # Alkaline Earth Metals
             non_transition_metal_indices.append(idx)
     return non_transition_metal_indices
 
@@ -712,12 +705,12 @@ def get_alkali_alkaline_earth_metal_idxs(labels: list, debug: int = 0):
 def get_non_transition_metal_idxs(labels: list, debug: int = 0):
     """alkali metals (Group 1) and alkaline earth metals (Group 2)"""
     non_transition_metal_indices = []
-    for idx, l in enumerate(labels):
-        # if elemdatabase.elementgroup[l]==1 and l != "H" and l != "D": # Alkali Metals
+    for idx, label in enumerate(labels):
+        # if elemdatabase.elementgroup[label]==1 and label != "H" and label != "D": # Alkali Metals
         #     non_transition_metal_indices.append(idx)
-        # elif elemdatabase.elementgroup[l]==2 :     # Alkaline Earth Metals
+        # elif elemdatabase.elementgroup[label]==2 :     # Alkaline Earth Metals
         #     non_transition_metal_indices.append(idx)
-        if l in [
+        if label in [
             "Al",
             "Ga",
             "Ge",
@@ -730,7 +723,7 @@ def get_non_transition_metal_idxs(labels: list, debug: int = 0):
             "At",
         ]:  # Post-Transition Metals
             non_transition_metal_indices.append(idx)
-        elif l in ["B", "Si", "Ge", "As", "Sb", "Te"]:  # Metalloids
+        elif label in ["B", "Si", "Ge", "As", "Sb", "Te"]:  # Metalloids
             non_transition_metal_indices.append(idx)
     return non_transition_metal_indices
 
@@ -739,8 +732,8 @@ def get_non_transition_metal_idxs(labels: list, debug: int = 0):
 def get_post_transition_metal_idxs(labels: list, debug: int = 0):
     """Post-Transition Metals"""
     post_transition_metal_indices = []
-    for idx, l in enumerate(labels):
-        if l in [
+    for idx, label in enumerate(labels):
+        if label in [
             "Al",
             "Ga",
             "Ge",
@@ -852,7 +845,7 @@ def get_adjmatrix(
     pos: list,
     cov_factor: float = 1.0,
     radii="default",
-    metal_factor=1.3,
+    metal_factor=1.0,
     metal_only: bool = False,
     add_atoms: bool = False,
 ) -> Tuple[int, list, list]:
@@ -874,7 +867,7 @@ def get_adjmatrix(
     # Sometimes argument radii np.ndarry, or list
     with warnings.catch_warnings():
         warnings.simplefilter(action="ignore", category=FutureWarning)
-        if type(radii) == str:
+        if isinstance(radii, str):
             if radii == "default":
                 radii = get_radii(labels)
                 radii = get_scaled_radii(
@@ -884,7 +877,7 @@ def get_adjmatrix(
                     metal_factor,
                     cov_factor,
                 )
-        elif type(radii) == np.ndarray or type(radii) == list:
+        elif isinstance(radii, (np.ndarray, list)):
             radii = get_scaled_radii(
                 radii,
                 metal_idxs,
