@@ -26,9 +26,6 @@ from cell2mol.connectivity import labels2formula
 
 elemdatabase = ElementData()
 
-###############################
-#### RUBEN Changes for V14 ####
-###############################
 valence_electrons = []
 for i in elemdatabase.elementsym:
     try:
@@ -601,34 +598,6 @@ def get_UA_pairs(UA, AC, use_graph=True):
     return UA_pairs
 
 
-def get_sorted_valences_list_v2(valences_list_of_lists, atoms):
-    """
-    Sort all Cartesian assignments of valences_list_of_lists by the lexicographic
-    tuple of element-grouped values: (O_vals, N_vals, C_vals, P_vals, S_vals).
-    This preserves your original behavior (tuples, not sums).
-    """
-    # Precompute index groups for speed
-    idx_O = [i for i, Z in enumerate(atoms) if Z == 8]
-    idx_N = [i for i, Z in enumerate(atoms) if Z == 7]
-    idx_C = [i for i, Z in enumerate(atoms) if Z == 6]
-    idx_P = [i for i, Z in enumerate(atoms) if Z == 15]
-    idx_S = [i for i, Z in enumerate(atoms) if Z == 16]
-
-    def key_fn(assignment):
-        # Build the order key directly from the assignment; no extra products, no dict
-        return (
-            tuple(assignment[i] for i in idx_O),
-            tuple(assignment[i] for i in idx_N),
-            tuple(assignment[i] for i in idx_C),
-            tuple(assignment[i] for i in idx_P),
-            tuple(assignment[i] for i in idx_S),
-        )
-
-    # Generate all assignments once and sort by the key
-    assignments = itertools.product(*valences_list_of_lists)
-    return sorted(assignments, key=key_fn)
-
-
 def get_sorted_valences_list(valences_list_of_lists, atoms):
     valences_list = itertools.product(*valences_list_of_lists)
     O_valences = [
@@ -1050,137 +1019,6 @@ def read_xyz_file(filename, look_for_charge=True):
     atoms = [int_atom(atom) for atom in atomic_symbols]
 
     return atoms, charge, xyz_coordinates
-
-
-# def xyz2AC(atoms, xyz, charge, covalent_factor, use_huckel=False):
-#    """
-#
-#    atoms and coordinates to atom connectivity (AC)
-#
-#    args:
-#        atoms - int atom types
-#        xyz - coordinates
-#        charge - molecule charge
-#
-#    optional:
-#        use_huckel - Use Huckel method for atom connecitivty
-#
-#    returns
-#        ac - atom connectivity matrix
-#        mol - rdkit molecule
-#
-#    """
-#
-#    if use_huckel:
-#        return xyz2AC_huckel(atoms, xyz, charge)
-#    else:
-#        return xyz2AC_vdW(atoms, xyz, covalent_factor)
-#
-#
-# def xyz2AC_vdW(atoms, xyz, covalent_factor):
-#
-#    # Get mol template
-#    mol = get_proto_mol(atoms)
-#
-#    # Set coordinates
-#    conf = Chem.Conformer(mol.GetNumAtoms())
-#    for i in range(mol.GetNumAtoms()):
-#        conf.SetAtomPosition(i, (xyz[i][0], xyz[i][1], xyz[i][2]))
-#    mol.AddConformer(conf)
-#
-#    AC = get_AC(mol, covalent_factor)
-#
-#    return AC, mol
-#
-#
-# def get_AC(mol, covalent_factor=1.3):
-#    """
-#
-#    Generate adjacent matrix from atoms and coordinates.
-#
-#    AC is a (num_atoms, num_atoms) matrix with 1 being covalent bond and 0 is not
-#
-#
-#    covalent_factor - 1.3 is an arbitrary factor
-#
-#    args:
-#        mol - rdkit molobj with 3D conformer
-#
-#    optional
-#        covalent_factor - increase covalent bond length threshold with facto
-#
-#    returns:
-#        AC - adjacent matrix
-#
-#    """
-#
-#    # Calculate distance matrix
-#    dMat = Chem.Get3DDistanceMatrix(mol)
-#
-#    pt = Chem.GetPeriodicTable()
-#    num_atoms = mol.GetNumAtoms()
-#    AC = np.zeros((num_atoms, num_atoms), dtype=int)
-#
-#    for i in range(num_atoms):
-#        a_i = mol.GetAtomWithIdx(i)
-#        Rcov_i = pt.GetRcovalent(a_i.GetAtomicNum()) * covalent_factor
-#        for j in range(i + 1, num_atoms):
-#            a_j = mol.GetAtomWithIdx(j)
-#            Rcov_j = pt.GetRcovalent(a_j.GetAtomicNum()) * covalent_factor
-#            if dMat[i, j] <= Rcov_i + Rcov_j:
-#                AC[i, j] = 1
-#                AC[j, i] = 1
-#
-#    return AC
-#
-#
-## http://rdkit.blogspot.com/2019/06/doing-extended-hueckel-calculations.html
-#
-#
-# def xyz2AC_huckel(atomicNumList, xyz, charge):
-#    """
-#
-#    args
-#        atomicNumList - atom type list
-#        xyz - coordinates
-#        charge - molecule charge
-#
-#    returns
-#        ac - atom connectivity
-#        mol - rdkit molecule
-#
-#    """
-#    mol = get_proto_mol(atomicNumList)
-#
-#    conf = Chem.Conformer(mol.GetNumAtoms())
-#    for i in range(mol.GetNumAtoms()):
-#        conf.SetAtomPosition(i, (xyz[i][0], xyz[i][1], xyz[i][2]))
-#    mol.AddConformer(conf)
-#
-#    num_atoms = len(atomicNumList)
-#    AC = np.zeros((num_atoms, num_atoms)).astype(int)
-#
-#    mol_huckel = Chem.Mol(mol)
-#    mol_huckel.GetAtomWithIdx(0).SetFormalCharge(
-#        charge
-#    )  # mol charge arbitrarily added to 1st atom
-#
-#    passed, result = rdEHTTools.RunMol(mol_huckel)
-#    opop = (
-#        result.GetReducedOverlapPopulationMatrix()
-#    )  # The reduced overlap population matrix provides the Mulliken overlap population between atoms in the molecule. It's returned as a vector representing a symmetric matrix
-#    tri = np.zeros((num_atoms, num_atoms))
-#    tri[
-#        np.tril(np.ones((num_atoms, num_atoms), dtype=bool))
-#    ] = opop  # lower triangular to square matrix
-#    for i in range(num_atoms):
-#        for j in range(i + 1, num_atoms):
-#            pair_pop = abs(tri[j, i])
-#            if pair_pop >= 0.15:  # arbitry cutoff for bond. May need adjustment
-#                AC[i, j] = 1
-#                AC[j, i] = 1
-#
-#    return AC, mol
 
 
 def chiral_stereo_check(mol):
