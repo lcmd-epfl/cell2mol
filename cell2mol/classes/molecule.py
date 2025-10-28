@@ -947,6 +947,18 @@ class Molecule(Specie):
             else:
                 if self.unique_index == specie.unique_index:
                     set_charge_state(specie, self, mode=1, debug=debug)
+
+        temp = []
+        self.create_bonds(debug=debug)
+        temp.append(self.error_create_bonds)
+        if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
+            prepare_mol(self, debug=debug)
+
+        if any(temp):
+            self.error_create_bonds = True
+        else:
+            self.error_create_bonds = False
+
         if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
             prepare_mol(self, debug=debug)
             print("Complex", self.formula, self.totcharge)
