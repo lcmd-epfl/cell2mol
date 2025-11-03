@@ -1055,13 +1055,13 @@ class Cell(BaseModel):
         # to_print += f' Cell Vector           = {self.cell_vector}\n'
         if self.moleclist is not None:
             to_print += f" # Molecules:          = {len(self.moleclist)}\n"
-            to_print += " With Formulae:                               \n"
+            to_print += " with Formula:                               \n"
             for idx, m in enumerate(self.moleclist):
                 to_print += f"    {idx}: {m.formula} \n"
         to_print += "---------------------------------------------------\n"
         if self.refmoleclist is not None:
             to_print += f" # of Ref Molecules:   = {len(self.refmoleclist)}\n"
-            to_print += " With Formulae:                                  \n"
+            to_print += " with Formula:                                  \n"
             for idx, ref in enumerate(self.refmoleclist):
                 to_print += f"    {idx}: {ref.formula} \n"
         return to_print

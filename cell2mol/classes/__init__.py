@@ -3,6 +3,7 @@ from .molecule import Molecule
 from .ligand import Ligand
 from .metal import Metal
 from .cell import Cell
+from .cells import Cells
 from .bond import Bond
 from .specie import Specie
 from .group import Group
@@ -15,6 +16,7 @@ __all__ = [
     "Ligand",
     "Metal",
     "Cell",
+    "Cells",
     "Bond",
     "Specie",
     "Group",
