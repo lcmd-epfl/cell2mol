@@ -3,6 +3,7 @@ import sys
 from ase.io import read
 from contextlib import redirect_stdout
 from cell2mol.classes import Cell
+from cell2mol.classes.cells import Cells
 from cell2mol.cell_operations import frac2cart_fromparam
 from cell2mol.other import handle_error
 from cell2mol.connectivity import labels2formula, get_alkali_alkaline_earth_metal_idxs
@@ -21,6 +22,7 @@ from cell2mol.read_write import (
     find_closest_matches,
     sum_formulas,
     compare_totals,
+    get_cell_parameters,
 )
 
 elemdatabase = ElementData()
@@ -44,6 +46,7 @@ def process_refcell(input_path, name, current_dir, cif_bond_info, debug=0):
     """
 
     ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
+    cells_fname = os.path.join(current_dir, f"Cells_{name}.cell")
     output_fname = os.path.join(current_dir, "cell2mol.out")
 
     with open(output_fname, "w") as output:
@@ -53,8 +56,15 @@ def process_refcell(input_path, name, current_dir, cif_bond_info, debug=0):
             print(f"Debug level: {debug}")
 
             structure = read(input_path)
-            cell_vector = structure.cell.array
-            cell_param = structure.cell.cellpar()
+            cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops = (
+                get_cell_parameters(structure)
+            )
+
+            # Create the unit cell
+            newcell = Cell.from_positional(
+                name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param
+            )
+            newcell.set_subtype("unitcell")
 
             # Create the reference cell
             refcell = create_reference(
@@ -103,6 +113,14 @@ def process_refcell(input_path, name, current_dir, cif_bond_info, debug=0):
                     f"Error occurred in processing reference cell: error case {refcell.error_case}"
                 )
             refcell.save(ref_cell_fname)
+            cells = Cells(
+                name=name,
+                reference=refcell,
+                unitcell=newcell,
+                cell_vector=cell_vector,
+                cell_param=cell_param,
+            )
+            cells.save(cells_fname)
 
         # Print summary information
         summary_fname = os.path.join(current_dir, "reference_summary.out")

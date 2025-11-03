@@ -840,6 +840,35 @@ def writexyz(fdir, fname, labels, pos, charge: int = 0, spin: int = 1):
 
 
 ######################################################
+def get_cell_parameters(structure):
+    """Extracts cell parameters and symmetry operations from structure."""
+    wrap_keywords = {"pbc": True, "center": (0.5, 0.5, 0.5)}
+    cell_labels = []
+    for label, n, m in zip(
+        structure.get_chemical_symbols(),
+        structure.get_atomic_numbers(),
+        structure.get_masses(),
+    ):
+        if n == 1 and (m > 2 or m == 2.01355):  # Deuterium
+            cell_labels.append("D")
+        else:
+            cell_labels.append(label)
+
+    cell_pos = structure.get_positions(wrap=True, **wrap_keywords)
+    cell_fracs = structure.get_scaled_positions()
+    cell_vector = structure.cell.array
+    cell_param = structure.cell.cellpar()
+    space_group = structure.info.get("spacegroup")
+    sym_ops = space_group.get_op() if space_group else None
+    # print(f"Cell parameters: {cell_param}")
+    # print(f"Cell vectors: {cell_vector}")
+    # print(f"Space group: {space_group if space_group else 'N/A'}")
+    # print("Symmetry operations:", sym_ops if sym_ops else "No symmetry operations found")
+
+    return cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops
+
+
+######################################################
 def print_refmoleclist(cell):
     for i, ref in enumerate(cell.refmoleclist):
         ref_info = f"Reference Molecule {i}: {ref.formula} "
