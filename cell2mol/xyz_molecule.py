@@ -9,7 +9,7 @@ from cell2mol.read_write import print_molecule, writexyz
 # Constants
 VERSION = "2.0"
 COV_FACTOR = 1.0
-METAL_FACTOR = 1.2
+METAL_FACTOR = 1.0
 
 
 def get_molecule(input_path, name, input_charge, current_dir, debug=2):

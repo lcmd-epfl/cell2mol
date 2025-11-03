@@ -5,25 +5,27 @@ from cell2mol.refcell import process_refcell
 from contextlib import redirect_stdout
 from ase.io import read
 from cell2mol.classes import Cell
+from cell2mol.classes.cells import Cells
+
 from cell2mol.final_c2m_module import cell2mol_mode
 from cell2mol.other import handle_error
-from cell2mol.read_write import print_refmoleclist, print_possible_charges
+from cell2mol.read_write import (
+    print_refmoleclist,
+    print_possible_charges,
+    get_cell_parameters,
+)
 import copy
 
 VERSION = "2.0"
 COV_FACTOR = 1.0
 METAL_FACTOR = 1.0
 
-# Set up logging for debug information
-logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
 
 def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
     # Set up file paths
     cell_fname = os.path.join(current_dir, f"Cell_{name}.cell")
     ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
+    cells_fname = os.path.join(current_dir, f"Cells_{name}.cell")
     output_fname = os.path.join(current_dir, "cell2mol.out")
 
     # Process reference cell
@@ -59,20 +61,17 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
                 name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param
             )
             newcell.set_subtype("unitcell")
-            perform_cell2mol(
-                newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debug
-            )
+            perform_cell2mol(newcell, refcell, sym_ops, debug)
             refcell.save(ref_cell_fname)
             newcell.save(cell_fname)
-
-            # Print summary information for the unit cell
-            # summary_fname = os.path.join(current_dir, "unitcell_summary.out")
-            # with open(summary_fname, "w") as summary:
-            #     with redirect_stdout(summary):
-            #         print(name)
-            #         print_refmoleclist(newcell)
-            #         print_unique_species(newcell)
-            #         print_moleclist(newcell)
+            cells = Cells(
+                name=name,
+                reference=refcell,
+                unitcell=newcell,
+                cell_vector=cell_vector,
+                cell_param=cell_param,
+            )
+            cells.save(cells_fname)
 
             summary_fname_ref = os.path.join(current_dir, "reference_summary.out")
             with open(summary_fname_ref, "a") as summary_ref:
@@ -104,46 +103,9 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
             return newcell
 
 
-def get_cell_parameters(structure):
-    """Extracts cell parameters and symmetry operations from structure."""
-    wrap_keywords = {"pbc": True, "center": (0.5, 0.5, 0.5)}
-    cell_labels = []
-    for label, n, m in zip(
-        structure.get_chemical_symbols(),
-        structure.get_atomic_numbers(),
-        structure.get_masses(),
-    ):
-        if n == 1 and (m > 2 or m == 2.01355):  # Deuterium
-            cell_labels.append("D")
-        else:
-            cell_labels.append(label)
-
-    cell_pos = structure.get_positions(wrap=True, **wrap_keywords)
-    cell_fracs = structure.get_scaled_positions()
-    cell_vector = structure.cell.array
-    cell_param = structure.cell.cellpar()
-    space_group = structure.info.get("spacegroup")
-    sym_ops = space_group.get_op() if space_group else None
-    # print(f"Cell parameters: {cell_param}")
-    # print(f"Cell vectors: {cell_vector}")
-    # print(f"Space group: {space_group if space_group else 'N/A'}")
-    # print("Symmetry operations:", sym_ops if sym_ops else "No symmetry operations found")
-
-    return cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops
-
-
-def perform_cell2mol(newcell, refcell, sym_ops, cell_fname, ref_cell_fname, debug):
+def perform_cell2mol(newcell, refcell, sym_ops, debug):
     """Handles the reconstruction, charge assignment, and spin assignment for molecules."""
-    cov_factor = (
-        refcell.refmoleclist[0].cov_factor if refcell.refmoleclist else COV_FACTOR
-    )
 
-    # if refcell.error_case == 0:
-    #     get_unique_species_in_reference(refcell, debug)
-    # else:
-    #     print(f"Error occurred in processing reference cell: error case {refcell.error_case}")
-
-    # Copy reference molecules from refcell
     newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
 
     newcell.has_isolated_H = refcell.has_isolated_H
