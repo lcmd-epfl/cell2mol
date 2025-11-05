@@ -582,74 +582,82 @@ def coordination_correction_for_haptic(group: object, debug: int = 0):
     conn_idx = sorted(list(set(conn_idx)))
     split_groups = []
     final_ligand_indices_by_metal = {jdx: [] for jdx, met in enumerate(group.metals)}
-    for jdx, indices in conn_idx_by_metal.items():
-        metal = group.metals[jdx]
-        if indices:
-            print(
-                f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}"
-            )
-            if single_ring:
-                # For single ring, we need to check distances
-                print("Checking distances for a single ring")
-                distances = [
-                    get_dist(metal.coord, group.atoms[i].coord) for i in indices
-                ]
-                mean = round(np.mean(distances), 3)
-                std_dev = round(float(np.std(distances)), 3)
-                z_scores = (distances - mean) / std_dev
 
-                print(
-                    f"Distances: {distances}, Mean: {mean}, Std Dev: {std_dev}, Z-scores: {z_scores}"
-                )
-                std_thresh = 0.1
-                z_hi = 2.0  # too far (large positive z)
-                z_lo = 1.2  # very close (large negative z)
-                too_far_idx = [i for i, z in enumerate(z_scores) if z > z_hi]
-                very_close_idx = [i for i, z in enumerate(z_scores) if z < -z_lo]
-                print(
-                    f"Too far indices: {too_far_idx}, Very close indices: {very_close_idx}"
-                )
-                new_group = []
-                if std_dev > std_thresh:
-                    if len(too_far_idx) > 0 and len(very_close_idx) == 0:
-                        print(f"Found too far indices: {too_far_idx}")
-                        for idx, z in zip(indices, z_scores):
-                            if idx in too_far_idx:
-                                print(
-                                    f"Distance {distances[idx]} has a z-score {z_scores[idx]} > {z_hi}, resetting mconnec for atom {group.atoms[idx].label}"
-                                )
-                                group.atoms[idx].reset_mconnec(metal, debug=1)
-                            else:
-                                new_group.append(idx)
-                    elif len(very_close_idx) > 0 and len(too_far_idx) == 0:
-                        print(f"Found very close indices: {very_close_idx}")
-                        for idx, z in zip(indices, z_scores):
-                            if idx in very_close_idx:
-                                new_group.append(idx)
-                            else:
-                                print(
-                                    f"Distance {distances[idx]} has a z-score {z_scores[idx]} > {-z_lo}, resetting mconnec for atom {group.atoms[idx].label}"
-                                )
-                                group.atoms[idx].reset_mconnec(metal, debug=1)
-                    else:
-                        print("Figure out why std_dev is high")  # e.g. EBUFOW
-                        for idx, z in zip(indices, z_scores):
-                            if z < 0:
-                                new_group.append(idx)
-                            else:
-                                group.atoms[idx].reset_mconnec(metal, debug=1)
-                                print(
-                                    f"Distance {distances[idx]} has a z-score {z_scores[idx]}, resetting mconnec for atom {group.atoms[idx].label}"
-                                )
-                    print(f"New group after distance check: {new_group}")
-                else:
-                    print(
-                        f"std_dev is too low ({std_dev}), adding all indices to conn_idx"
-                    )
-                    new_group = [i for i in indices]
-            else:
+    if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
+        for jdx, indices in conn_idx_by_metal.items():
+            metal = group.metals[jdx]
+            if indices:
                 new_group = [i for i in indices]
-            split_groups.append(new_group)
+                split_groups.append(new_group)
+    else:
+        for jdx, indices in conn_idx_by_metal.items():
+            metal = group.metals[jdx]
+            if indices:
+                print(
+                    f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}"
+                )
+                if single_ring:
+                    # For single ring, we need to check distances
+                    print("Checking distances for a single ring")
+                    distances = [
+                        get_dist(metal.coord, group.atoms[i].coord) for i in indices
+                    ]
+                    mean = round(np.mean(distances), 3)
+                    std_dev = round(float(np.std(distances)), 3)
+                    z_scores = (distances - mean) / std_dev
+
+                    print(
+                        f"Distances: {distances}, Mean: {mean}, Std Dev: {std_dev}, Z-scores: {z_scores}"
+                    )
+                    std_thresh = 0.1
+                    z_hi = 2.0  # too far (large positive z)
+                    z_lo = 1.2  # very close (large negative z)
+                    too_far_idx = [i for i, z in enumerate(z_scores) if z > z_hi]
+                    very_close_idx = [i for i, z in enumerate(z_scores) if z < -z_lo]
+                    print(
+                        f"Too far indices: {too_far_idx}, Very close indices: {very_close_idx}"
+                    )
+                    new_group = []
+                    if std_dev > std_thresh:
+                        if len(too_far_idx) > 0 and len(very_close_idx) == 0:
+                            print(f"Found too far indices: {too_far_idx}")
+                            for idx, z in zip(indices, z_scores):
+                                if idx in too_far_idx:
+                                    print(
+                                        f"Distance {distances[idx]} has a z-score {z_scores[idx]} > {z_hi}, resetting mconnec for atom {group.atoms[idx].label}"
+                                    )
+                                    group.atoms[idx].reset_mconnec(metal, debug=1)
+                                else:
+                                    new_group.append(idx)
+                        elif len(very_close_idx) > 0 and len(too_far_idx) == 0:
+                            print(f"Found very close indices: {very_close_idx}")
+                            for idx, z in zip(indices, z_scores):
+                                if idx in very_close_idx:
+                                    new_group.append(idx)
+                                else:
+                                    print(
+                                        f"Distance {distances[idx]} has a z-score {z_scores[idx]} > {-z_lo}, resetting mconnec for atom {group.atoms[idx].label}"
+                                    )
+                                    group.atoms[idx].reset_mconnec(metal, debug=1)
+                        else:
+                            print("Figure out why std_dev is high")  # e.g. EBUFOW
+                            for idx, z in zip(indices, z_scores):
+                                if z < 0:
+                                    new_group.append(idx)
+                                else:
+                                    group.atoms[idx].reset_mconnec(metal, debug=1)
+                                    print(
+                                        f"Distance {distances[idx]} has a z-score {z_scores[idx]}, resetting mconnec for atom {group.atoms[idx].label}"
+                                    )
+                        print(f"New group after distance check: {new_group}")
+                    else:
+                        print(
+                            f"std_dev is too low ({std_dev}), adding all indices to conn_idx"
+                        )
+                        new_group = [i for i in indices]
+                else:
+                    new_group = [i for i in indices]
+                split_groups.append(new_group)
 
     for jdx, indices in enumerate(split_groups):
         for idx in indices:

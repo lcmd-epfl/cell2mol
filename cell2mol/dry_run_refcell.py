@@ -37,8 +37,8 @@ def extract_xyz_from_reference(
     ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
     cif_okay, error_message = prefilter_cif(input_path)
     if not cif_okay:
-        sys.exit(f"CIF file is not suitable for processing {error_message}")
-
+        print(f"[INFO] CIF file is not suitable for processing {error_message}")
+        sys.exit(0)
     structure = read(input_path)
     cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops = (
         get_cell_parameters(structure)
@@ -94,13 +94,13 @@ def extract_xyz_from_reference(
                 print(
                     f"Ref molecule {i} {ref.formula} ligand {lig.formula} written to xyz file"
                 )
-        if refcell.error_case == 0:
-            get_unique_species_in_reference(refcell, debug)
-        else:
-            print(
-                f"Error occurred in processing reference cell: error case {refcell.error_case}"
-            )
-        refcell.save(ref_cell_fname)
+    if refcell.error_case == 0:
+        get_unique_species_in_reference(refcell, debug)
+    else:
+        print(
+            f"Error occurred in processing reference cell: error case {refcell.error_case}"
+        )
+    refcell.save(ref_cell_fname)
 
 
 def remove_disorder_atoms(atom_site_labels, ref_labels, ref_fracs, debug=0):
