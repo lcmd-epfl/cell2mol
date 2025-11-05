@@ -37,22 +37,24 @@ def extract_xyz_from_reference(
     ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
     cif_okay, error_message = prefilter_cif(input_path)
     if not cif_okay:
-        print(f"[INFO] CIF file is not suitable for processing {error_message}")
+        print(f"[INFO] {name} CIF file is not suitable for processing {error_message}")
         sys.exit(0)
     structure = read(input_path)
     cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops = (
         get_cell_parameters(structure)
     )
-    structure.info["refcode"] = name
-    structure.info["cell_param"] = cell_param
-    io.write(f"{name}.xyz", structure)
+
+    # structure.info["refcode"] = name
+    # structure.info["cell_param"] = cell_param
+    # io.write(f"{name}.xyz", structure)
+
     # Create the reference cell
     refcell = create_reference(
         input_path, name, cell_vector, cell_param, cif_bond_info, debug
     )
 
     for i, ref in enumerate(refcell.refmoleclist):
-        if ref.totcharge_cif is not None:
+        if ref.totcharge_cif is not None and ref.iscomplex:
             N = 0
             for atom in ref.labels:
                 N += elemdatabase.elementnr[atom]
@@ -76,24 +78,24 @@ def extract_xyz_from_reference(
             print(
                 f"Ref molecule {i} {ref.formula} total charge {ref.totcharge_cif} lowest spin multiplicity {spin}"
             )
-        if ref.iscomplex:
-            for j, lig in enumerate(ref.ligands):
-                coord_indices = []
-                for gr in lig.groups:
-                    for atom in gr.atoms:
-                        coord_indices.append(atom.get_parent_index("ligand"))
-                writexyz(
-                    current_dir,
-                    f"{name}_Ref_{i}_Ligand_{j}_{lig.formula}.xyz",
-                    lig.labels,
-                    lig.coord,
-                    charge=None,
-                    spin=None,
-                    info=f"{coord_indices=}",
-                )
-                print(
-                    f"Ref molecule {i} {ref.formula} ligand {lig.formula} written to xyz file"
-                )
+        # if ref.iscomplex:
+        #     for j, lig in enumerate(ref.ligands):
+        #         coord_indices = []
+        #         for gr in lig.groups:
+        #             for atom in gr.atoms:
+        #                 coord_indices.append(atom.get_parent_index("ligand"))
+        #         writexyz(
+        #             current_dir,
+        #             f"{name}_Ref_{i}_Ligand_{j}_{lig.formula}.xyz",
+        #             lig.labels,
+        #             lig.coord,
+        #             charge=None,
+        #             spin=None,
+        #             info=f"{coord_indices=}",
+        #         )
+        #         print(
+        #             f"Ref molecule {i} {ref.formula} ligand {lig.formula} written to xyz file"
+        #         )
     if refcell.error_case == 0:
         get_unique_species_in_reference(refcell, debug)
     else:
