@@ -408,61 +408,59 @@ class Cell(BaseModel):
                         print(
                             f"GETREFS: found ref molecule with only one atom {ref.labels}"
                         )
-        if debug >= 0:
-            print(f"GETREFS: isgood={isgood}")
-        # If all good, then works with the reference molecules
         if isgood:
             self.has_isolated_H = False
-            for ref in self.refmoleclist:
-                if ref.iscomplex:
-                    if debug >= 0:
-                        print(
-                            f"GETREFS: working with {ref.formula} with transition metals"
-                        )
-                    ref.get_hapticity(debug=debug)
-                    if len(ref.ligands) == 0:
-                        print(f"GETREFS: {ref.formula} is a metal cluster")
-                    else:
-                        for lig in ref.ligands:
-                            lig.get_denticity(debug=debug)
-                    for met in ref.metals:
-                        met.get_connected_metals(debug=debug)
-                        met.get_coordination_geometry(debug=debug)
-                        met.get_coord_sphere_formula(debug=debug)
-                elif ref.has_IA_IIA:
-                    if debug >= 0:
-                        print(
-                            f"GETREFS: working with {ref.formula} with alkali or alkali earth metals"
-                        )
-                    if len(ref.ligands) == 0:
-                        pass
-                    else:
-                        for lig in ref.ligands:
-                            lig.get_denticity(debug=debug)
-                    for met in ref.metals:
-                        met.get_connected_metals(debug=debug)
-                        met.get_coordination_geometry(debug=debug)
-                        met.get_coord_sphere_formula(debug=debug)
-                elif ref.has_post_transition_metal:
-                    if debug >= 0:
-                        print(
-                            f"GETREFS: working with {ref.formula} with post-transition metals"
-                        )
-                    if debug >= 0:
-                        print(f"GETREFS: {[met.label for met in ref.metals]}")
-                    if debug >= 0:
-                        print(f"GETREFS: {[lig.formula for lig in ref.ligands]}")
-                    if len(ref.ligands) == 0:
-                        pass
-                    else:
-                        for lig in ref.ligands:
-                            lig.get_denticity(debug=debug)
-                    for met in ref.metals:
-                        met.get_connected_metals(debug=debug)
-                        met.get_coordination_geometry(debug=debug)
-                        met.get_coord_sphere_formula(debug=debug)
         else:
             self.has_isolated_H = True
+        if debug >= 0:
+            print(f"GETREFS: has_isolated_H={self.has_isolated_H}")
+
+        for ref in self.refmoleclist:
+            if ref.iscomplex:
+                if debug >= 0:
+                    print(f"GETREFS: working with {ref.formula} with transition metals")
+                ref.get_hapticity(debug=debug)
+                if len(ref.ligands) == 0:
+                    print(f"GETREFS: {ref.formula} is a metal cluster")
+                else:
+                    for lig in ref.ligands:
+                        lig.get_denticity(debug=debug)
+                for met in ref.metals:
+                    met.get_connected_metals(debug=debug)
+                    met.get_coordination_geometry(debug=debug)
+                    met.get_coord_sphere_formula(debug=debug)
+            elif ref.has_IA_IIA:
+                if debug >= 0:
+                    print(
+                        f"GETREFS: working with {ref.formula} with alkali or alkali earth metals"
+                    )
+                if len(ref.ligands) == 0:
+                    pass
+                else:
+                    for lig in ref.ligands:
+                        lig.get_denticity(debug=debug)
+                for met in ref.metals:
+                    met.get_connected_metals(debug=debug)
+                    met.get_coordination_geometry(debug=debug)
+                    met.get_coord_sphere_formula(debug=debug)
+            elif ref.has_post_transition_metal:
+                if debug >= 0:
+                    print(
+                        f"GETREFS: working with {ref.formula} with post-transition metals"
+                    )
+                if debug >= 0:
+                    print(f"GETREFS: {[met.label for met in ref.metals]}")
+                if debug >= 0:
+                    print(f"GETREFS: {[lig.formula for lig in ref.ligands]}")
+                if len(ref.ligands) == 0:
+                    pass
+                else:
+                    for lig in ref.ligands:
+                        lig.get_denticity(debug=debug)
+                for met in ref.metals:
+                    met.get_connected_metals(debug=debug)
+                    met.get_coordination_geometry(debug=debug)
+                    met.get_coord_sphere_formula(debug=debug)
 
         return self.refmoleclist
 
@@ -557,7 +555,7 @@ class Cell(BaseModel):
                         print(
                             f"GETREFS: found ref molecule with only one atom {ref.labels}"
                         )
-        # If all good, then works with the reference molecules
+
         if isgood:
             self.has_isolated_H = False
         else:
