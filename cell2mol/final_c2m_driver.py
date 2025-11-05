@@ -26,7 +26,6 @@ def main():
         exit_with_error_input(f"Input file not found: {input_path}")
     if extension == ".cif":
         # Check for radical, disorder, 3D fractional coordinates, and polymeric structure
-        radical, disorder, notfound_atom, polymeric = screening_cif(input_path)
         cif_okay, error_message = prefilter_cif(input_path)
         if cif_okay:
             # if not any([notfound_atom]):
