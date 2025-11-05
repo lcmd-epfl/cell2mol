@@ -382,6 +382,9 @@ class Cell(BaseModel):
                 newmolec.split_complex()
             elif newmolec.has_IA_IIA:
                 newmolec.split_IA_IIA()
+            elif newmolec.has_post_transition_metal:
+                print(f"GETREFS: {newmolec.formula} has post-transition metal")
+                newmolec.split_post_transition_metal()
             else:
                 newmolec.add_parent(newmolec, indices=[*range(0, newmolec.natoms, 1)])
             self.refmoleclist.append(newmolec)
@@ -431,6 +434,24 @@ class Cell(BaseModel):
                         print(
                             f"GETREFS: working with {ref.formula} with alkali or alkali earth metals"
                         )
+                    if len(ref.ligands) == 0:
+                        pass
+                    else:
+                        for lig in ref.ligands:
+                            lig.get_denticity(debug=debug)
+                    for met in ref.metals:
+                        met.get_connected_metals(debug=debug)
+                        met.get_coordination_geometry(debug=debug)
+                        met.get_coord_sphere_formula(debug=debug)
+                elif ref.has_post_transition_metal:
+                    if debug >= 0:
+                        print(
+                            f"GETREFS: working with {ref.formula} with post-transition metals"
+                        )
+                    if debug >= 0:
+                        print(f"GETREFS: {[met.label for met in ref.metals]}")
+                    if debug >= 0:
+                        print(f"GETREFS: {[lig.formula for lig in ref.ligands]}")
                     if len(ref.ligands) == 0:
                         pass
                     else:
