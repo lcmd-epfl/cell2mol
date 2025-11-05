@@ -195,7 +195,10 @@ def compare_with_CIF(input_path, refcell: Cell, debug=0):
     """Extract chemical name, metal oxidation state, and moiety information from the CIF file."""
 
     chemical_name = extract_chemical_name(input_path)
-    reported_metal_os = extract_metal_oxidation_state(chemical_name)
+    if chemical_name is None:
+        reported_metal_os = None
+    else:
+        reported_metal_os = extract_metal_oxidation_state(chemical_name)
     moiety_dicts = extract_moiety(input_path)
 
     refcell.chemical_name = chemical_name
