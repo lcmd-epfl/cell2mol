@@ -164,8 +164,9 @@ def check_missingH(refmoleclist: list, debug: int = 0):
         print("##################")
     for idx, ref in enumerate(refmoleclist):
         if (
-            not ref.iscomplex and not ref.has_IA_IIA
-            # and not ref.has_post_transition_metal
+            not ref.iscomplex
+            and not ref.has_IA_IIA
+            and not ref.has_post_transition_metal
         ):
             if ref.natoms == 1 and "O" in ref.labels:
                 Missing_H_in_Water = True

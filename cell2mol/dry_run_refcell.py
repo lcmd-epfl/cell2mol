@@ -54,7 +54,7 @@ def extract_xyz_from_reference(
     )
 
     for i, ref in enumerate(refcell.refmoleclist):
-        if ref.totcharge_cif is not None and ref.iscomplex:
+        if ref.totcharge_cif is not None:
             N = 0
             for atom in ref.labels:
                 N += elemdatabase.elementnr[atom]
@@ -66,7 +66,7 @@ def extract_xyz_from_reference(
             if ref.iscomplex:
                 filename = f"{name}_Ref_{i}_Complex_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz"
             else:
-                filename = f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz"
+                filename = f"{name}_Ref_{i}_Molecule_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz"
             writexyz(
                 current_dir,
                 filename,
