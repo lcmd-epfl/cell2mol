@@ -826,17 +826,18 @@ def printxyz(labels, pos):
 
 
 ##############
-def writexyz(fdir, fname, labels, pos, charge: int = 0, spin: int = 1):
-    if fdir[-1] != "/":
-        fdir = fdir + "/"
+def writexyz(fdir, fname, labels, pos, charge: int = 0, spin: int = 1, info: str = ""):
+    """Writes an XYZ file with given labels and positions."""
+    os.makedirs(fdir, exist_ok=True)
+
+    fullname = os.path.join(fdir, fname)
     natoms = len(labels)
-    fullname = fdir + fname
+
     with open(fullname, "w") as fil:
         print(natoms, file=fil)
-        print(charge, spin, file=fil)
+        print(f"{charge=} {spin=} {info}", file=fil)
         for label, (x, y, z) in zip(labels, pos):
-            print(f"{label:<2}\t{x: .6f}\t{y: .6f}\t{z: .6f}", file=fil)
-            # print("%s\t%.6f\t%.6f\t%.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]),file=fil)
+            fil.write(f"{label:<2}  {x:15.8f}  {y:15.8f}  {z:15.8f}\n")
 
 
 ######################################################
