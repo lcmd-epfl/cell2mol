@@ -1294,6 +1294,8 @@ def get_adjmatrix_from_cif_bonds(
     natoms = len(labels)
     adjmat = np.zeros((natoms, natoms))
     adjnum = np.zeros((natoms))
+    metal_idxs = get_metal_idxs(labels)
+    alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
 
     for atom1, atom2, bond_distance in bond_data:
         if atom1 in mol_atom_site_labels and atom2 in mol_atom_site_labels:
@@ -1331,12 +1333,17 @@ def get_adjmatrix_from_cif_bonds(
                     ):
                         adjmat[i, j] = 1
                         adjmat[j, i] = 1
-                    # if len(get_alkali_alkaline_earth_metal_idxs([labels[i], labels[j]])) > 0:
-                    #     adjmat[i, j] = 0
-                    #     adjmat[j, i] = 0
-                    #     print("Adjacency Matrix: Set Zeros for Alkali or Alkaline Earth Metal", labels[i], labels[j], f"{i=}", f"{j=}")
-                # else:
-                # print(f"Adjacency Matrix: Distance {round(dist, 3)} {dist=} is different with the bond distance {round(bond_distance, 3)} {bond_distance=} for atoms {i=} {j=} {labels[i]} {labels[j]} {atom1=} {atom2=}")
+
+                    if (
+                        len(metal_idxs) == 0
+                        and len(alkali_alkaline_earth_metal_idxs) == 0
+                    ):
+                        if (
+                            len(get_post_transition_metal_idxs([labels[i], labels[j]]))
+                            > 0
+                        ):
+                            adjmat[i, j] = 1
+                            adjmat[j, i] = 1
 
     for i in range(0, natoms):
         adjnum[i] = np.sum(adjmat[i, :])
