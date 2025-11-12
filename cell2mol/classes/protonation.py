@@ -43,7 +43,7 @@ class Protonation(BaseModel):
     natoms: int | None = None
     formula: str | None = None
     atnums: list[int] | None = None
-    radii: list[float] | None = None
+    radii: NDArray | None = None
 
     # Conditionally set attributes with None defaults (eliminates hasattr need)
     atom_site_labels_indices: list[int] | None = None

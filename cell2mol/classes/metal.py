@@ -28,17 +28,14 @@ class Metal(Atom):
     metals: list[object] = Field(default_factory=list)
     groups: list[object] = Field(default_factory=list)
     coord_nr: int | None = None
-    coord_geometry: object | Literal["Undefined"] | None = None
+    coord_geometry: str | Literal["Undefined"] | None = None
     geom_deviation: float | Literal["Undefined"] | None = None
     rel_metal_radius: float | None = None
     coord_nr_with_metal_bonds: int | None = None
-    coord_geometry_with_metal_bonds: object | Literal["Undefined"] | None = None
+    coord_geometry_with_metal_bonds: str | Literal["Undefined"] | None = None
     geom_deviation_with_metal_bonds: float | Literal["Undefined"] | None = None
     metal_factor: float | None = None
     cov_factor: float | None = None
-    bond_order: int | None = None
-    bond_type: str | None = None
-    bond_distance: float | None = None
     coord_sphere: list[Atom] | None = None
     coord_sphere_formula: str | None = None
     unique_index: int | None = None

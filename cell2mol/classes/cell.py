@@ -43,10 +43,8 @@ class Cell(BaseModel):
     # Required constructor parameters
     name: str
     labels: Labels
-    coord: list[float] | NDArray = Field(
-        alias="pos"
-    )  # Using alias to match original parameter name
-    frac_coord: list[float] | NDArray
+    coord: NDArray = Field(alias="pos")  # Using alias to match original parameter name
+    frac_coord: NDArray
     cell_vector: NDArray
     cell_param: NDArray
 
@@ -58,10 +56,10 @@ class Cell(BaseModel):
     atom_site_labels: list[str] | None = None
 
     # CIF bond/moiety related attributes
-    geom_bond_cif: object | None = None
-    moiety_list_cif: object | None = None
+    geom_bond_cif: list[tuple] | None = None
+    moiety_list_cif: list[list[str]] | None = None
     exist_cif_bond_moiety: bool | None = None
-    moiety_indices: object | None = None
+    moiety_indices: list[list[int]] | None = None
 
     # Unique species related attributes
     unique_species: list[Specie] | None = None
@@ -76,8 +74,8 @@ class Cell(BaseModel):
     has_isolated_H: bool | None = None
 
     # Molecule lists
-    refmoleclist: list[object] | None = None
-    moleclist: list[object] | None = None
+    refmoleclist: list[Molecule] | None = None
+    moleclist: list[Molecule] | None = None
 
     # Reconstruction related attributes
     is_fragmented: bool | None = None
@@ -90,7 +88,7 @@ class Cell(BaseModel):
     error_empty_distrib: bool | None = None
     error_prepare_mols: bool | None = None
     error_get_poscharges: bool | None = None
-    selected_cs: list[object] | None = None
+    selected_cs: list[list[int]] | None = None
 
     # Bond creation related attributes
     error_create_bonds: bool | None = None
@@ -98,20 +96,14 @@ class Cell(BaseModel):
     # Charge neutrality
     is_neutral: bool | None = None
 
-    # Post-processing data
-    pp_molecules: list[object] | None = None
-    pp_indices: list[int] | None = None
-    pp_options: list[object] | None = None
-
     # Error assessment
-    error_case: str | None = None
+    error_case: int | None = None
 
     # TOFIX @choglass: See if we keep here, it's assigned in refcell.py#146
     # KEEP IT FOR NOW
     chemical_name: str | None = None
-    reported_metal_os: str | None = None
-    moiety_dicts: list[object] | None = None
-    # refcell.py#186
+    reported_metal_os: list[tuple[str, int]] | None = None
+    moiety_dicts: list[dict] | None = None
     disagree_with_cif_formula: bool | None = None
 
     # Frozen fields
@@ -635,12 +627,6 @@ class Cell(BaseModel):
                     if issame:
                         occurrence += 1
         return occurrence
-
-    #######################################################
-    def data_for_postproc(self, molecules: list, indices: list, options: list):
-        self.pp_molecules = molecules
-        self.pp_indices = indices
-        self.pp_options = options
 
     #######################################################
     def reset_charge_assignment(self, debug: int = 0):

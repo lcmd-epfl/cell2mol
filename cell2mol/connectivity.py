@@ -703,7 +703,6 @@ def get_alkali_alkaline_earth_metal_idxs(labels: list, debug: int = 0):
 
 #################################
 def get_non_transition_metal_idxs(labels: list, debug: int = 0):
-    """alkali metals (Group 1) and alkaline earth metals (Group 2)"""
     non_transition_metal_indices = []
     for idx, label in enumerate(labels):
         # if elemdatabase.elementgroup[label]==1 and label != "H" and label != "D": # Alkali Metals
