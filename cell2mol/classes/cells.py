@@ -1,13 +1,11 @@
 from __future__ import annotations
 from cell2mol.classes.cell import Cell
 from cell2mol.utils import BaseModel
-from cell2mol.classes.molecule import Molecule
 from typing_extensions import deprecated
 from pydantic import Field
 from cell2mol.my_types import (
     NDArray,
     Type,
-    SubType,
 )
 
 import pickle
