@@ -11,6 +11,9 @@ from cell2mol.connectivity import (
 from cell2mol.elementdata import ElementData
 from cell2mol.utils import BaseModel
 from cell2mol.utils.pydantic import serialize_circular_references
+from cell2mol.my_types import (
+    NDArray,
+)
 
 elemdatabase = ElementData()
 
@@ -34,8 +37,8 @@ class Atom(BaseModel):
     atom_site_label: str | None = None
     connec: int | None = None
     mconnec: int | None = None
-    adjacency: list[object] = Field(default_factory=list)
-    metal_adjacency: list[object] = Field(default_factory=list)
+    adjacency: list[int] = Field(default_factory=list)
+    metal_adjacency: list[int] = Field(default_factory=list)
     metal_factor: float | None = None
     charge: int | None = None
     bonds: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
@@ -176,7 +179,7 @@ class Atom(BaseModel):
 
     #######################################################
     def set_charge(self, charge: int) -> None:
-        self.charge = charge
+        self.charge = int(charge)
 
     #######################################################
     def set_adjacencies(self, adjmat, madjmat, adjnum: int, madjnum: int):

@@ -468,7 +468,7 @@ def extract_metal_oxidation_state(chemical_name):
     oxidation_states = []
 
     # Regex pattern to capture any format like "iron(iii)"
-    pattern = r"(\b[a-zA-Z-]+\b)\((iii|ii|iv|v|vi|vii|i|0|o)\)"
+    pattern = r"(\b[a-zA-Z-]+\b)\((iii|ii|iv|v|vi|vii|viii|ix|x|i|0|o)\)"
 
     matches = re.findall(pattern, chemical_name, re.IGNORECASE)
     for metal, ox_state in matches:
@@ -482,6 +482,9 @@ def extract_metal_oxidation_state(chemical_name):
             "v": 5,
             "vi": 6,
             "vii": 7,
+            "viii": 8,
+            "ix": 9,  # [IrO4]+
+            "x": 10,  # theoretically possible
         }
         oxidation_state = ox_state_map.get(
             ox_state.lower(), ox_state
