@@ -30,8 +30,7 @@ from cell2mol.charge_assignment import (
     get_protonation_states_specie,
     get_possible_charge_state,
 )
-
-
+from cell2mol.classes.protonation import Protonation
 from cell2mol.other import extract_from_list, compute_centroid
 from cell2mol.elementdata import ElementData
 from cell2mol.utils import BaseModel
@@ -55,10 +54,10 @@ class Specie(BaseModel):
     labels: list[str]
     coord: list[list[float]]
     frac_coord: list[list[float]] | None = None
-    radii: list[float] | NDArray | None = None
+    radii: NDArray | None = None
 
     # Optional arguments
-    parents: Annotated[list[Specie], PlainSerializer(serialize_circular_references)] = (
+    parents: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
         Field(default_factory=list)
     )
     parents_indices: list[list[int]] = Field(default_factory=list)
@@ -68,17 +67,17 @@ class Specie(BaseModel):
     # Defined in other methods
     adj_types: NDArray | None = None  # TOFIX romaingrx: NDarray not pydantic compatible
     adjmat: NDArray | None = None
-    adjnum: list | NDArray | None = None
+    adjnum: NDArray | None = None
     atnums: list[int] | None = None
     atom_site_labels: list[str] | None = None
-    atomic_charges: list[int] | NDArray | None = None
+    atomic_charges: list[int] | None = None
     atoms: list[Atom] | None = None
-    centroid: list | None = None
+    centroid: NDArray | None = None
     element_count: NDArray | None = None
-    frac_centroid: list | None = None
+    frac_centroid: NDArray | None = None
     madjmat: NDArray | None = None
     madjnum: NDArray | None = None
-    protonation_states: list | None = None
+    protonation_states: list[Protonation] | None = None
     rdkit_obj: RDKitObject | None = Field(default=None)
     smiles: str | None = None
     subtype: SubType | None = None

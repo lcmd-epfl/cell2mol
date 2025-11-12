@@ -3,7 +3,7 @@ import pickle
 from typing import Annotated
 from typing_extensions import deprecated
 from pydantic import Field, PlainSerializer
-from cell2mol.classes.atom import Atom
+from cell2mol.classes.metal import Metal
 from cell2mol.classes.ligand import Ligand
 from cell2mol.classes.specie import Specie
 
@@ -58,7 +58,7 @@ class Molecule(Specie):
         list[Ligand] | None, PlainSerializer(serialize_circular_references)
     ] = Field(default=None)
     metals: Annotated[
-        list[Atom] | None, PlainSerializer(serialize_circular_references)
+        list[Metal] | None, PlainSerializer(serialize_circular_references)
     ] = Field(default=None)
     spin: Spin | None = None
     ref_indices: list[int] | None = None
@@ -75,9 +75,9 @@ class Molecule(Specie):
 
     # Needed in get_molecule in xyz_molecule.py
     input_charge: int | None = None
-    unique_species: list[object] | None = None
+    unique_species: list[Specie] | None = None
     unique_indices: list[int] | None = None
-    species_list: list[object] | None = None
+    species_list: list[Specie] | None = None
     selected_cs: list[object] | None = None
     error_get_poscharges: bool = False
     error_multiple_distrib: bool = False
