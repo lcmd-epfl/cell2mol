@@ -819,7 +819,7 @@ def get_radii(labels: list) -> np.ndarray:
         #     radii.append(elemdatabase.IonicRadius[f"{label}2+"])
         # else:
         #     radii.append(elemdatabase.CovalentRadius3[label])
-    return np.array(radii)
+    return radii
 
 
 ################################

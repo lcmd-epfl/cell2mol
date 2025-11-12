@@ -11,9 +11,6 @@ from cell2mol.connectivity import (
 from cell2mol.elementdata import ElementData
 from cell2mol.utils import BaseModel
 from cell2mol.utils.pydantic import serialize_circular_references
-from cell2mol.my_types import (
-    NDArray,
-)
 
 elemdatabase = ElementData()
 

@@ -43,7 +43,7 @@ class Protonation(BaseModel):
     natoms: int | None = None
     formula: str | None = None
     atnums: list[int] | None = None
-    radii: NDArray | None = None
+    radii: list | None = None
 
     # Conditionally set attributes with None defaults (eliminates hasattr need)
     atom_site_labels_indices: list[int] | None = None
@@ -60,7 +60,7 @@ class Protonation(BaseModel):
         mode="plain",
     )
     def model_dump_json(self, **kwargs) -> str:
-        print("PROTONATION.model_dump_json")
+        # print("PROTONATION.model_dump_json")
         # TODO romaingrx: add this back in the final json later
         return "{}"
 

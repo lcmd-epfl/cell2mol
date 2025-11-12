@@ -868,6 +868,8 @@ def get_cell_parameters(structure):
     # print(f"Cell vectors: {cell_vector}")
     # print(f"Space group: {space_group if space_group else 'N/A'}")
     # print("Symmetry operations:", sym_ops if sym_ops else "No symmetry operations found")
+    cell_pos = cell_pos.tolist()
+    cell_fracs = cell_fracs.tolist()
 
     return cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops
 

@@ -52,9 +52,9 @@ class Specie(BaseModel):
 
     # Positional arguments
     labels: list[str]
-    coord: list[list[float]]
-    frac_coord: list[list[float]] | None = None
-    radii: NDArray | None = None
+    coord: list[list[float]] | list[float]
+    frac_coord: list[list[float]] | list[float] | None = None
+    radii: list[float] | float | None = None
 
     # Optional arguments
     parents: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
@@ -84,7 +84,7 @@ class Specie(BaseModel):
     totcharge: int | None = None
 
     charge_state: ChargeState | None = None
-    possible_cs: list[ChargeState] | None = Field(default=None)
+    possible_cs: list[ChargeState] | list[int] | None = Field(default=None)
 
     # TODO romaingrx: need clarification where we need this, it seems to be used
     # for molecules and ligands
