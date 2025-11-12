@@ -472,7 +472,7 @@ def prepare_mol(mol, debug: int = 0):
     for met in mol.metals:
         parent_index = met.get_parent_index("molecule")
         tmp_atcharge[parent_index] = met.charge
-
+    tmp_atcharge = tmp_atcharge.tolist()
     # mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge)
     # mol.set_charges(int(sum(tmp_atcharge)), atomic_charges=tmp_atcharge, smiles=tmp_smiles)
     tmc_rdkit_obj, tmc_smiles = generate_tmc_rdkit_obj_smiles(mol, debug=debug)
