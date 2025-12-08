@@ -1,0 +1,46 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata from this file."
+title: "lcmd-epfl/cell2mol: Unit Cell to Molecule Interpretation"
+authors:
+- affiliation: LCMD EPFL
+  family-names: Cho
+  given-names: Yuri
+  orcid: https://orcid.org/0000-0002-8133-2490
+- affiliation: LCMD EPFL
+  family-names: Graux
+  given-names: Romain
+  orcid: https://orcid.org/0000-0002-2465-3175
+- affiliation: Universitat de Barcelona
+  family-names: Vela
+  given-names: Sergi
+  orcid: https://orcid.org/0000-0002-3431-2470
+- family-names: Laplaza
+  given-names: Rubén
+  orcid: https://orcid.org/0000-0001-6315-4398
+  affiliation: LCMD EPFL
+preferred-citation:
+  title: "cell2mol: encoding chemistry to interpret crystallographic data"
+  year: 2022
+  type: article
+  doi: 10.1038/s41524-022-00874-9
+  authors:
+  - family-names: Cho
+    given-names: Yuri
+    orcid: https://orcid.org/0000-0002-8133-2490
+  - family-names: Graux
+    given-names: Romain
+    orcid: https://orcid.org/0000-0002-2465-3175
+  - family-names: Vela
+    given-names: Sergi
+    orcid: https://orcid.org/0000-0002-3431-2470
+  - family-names: Laplaza
+    given-names: Rubén
+    orcid: https://orcid.org/0000-0001-6315-4398
+  - family-names: Corminboeuf
+    given-names: Clemence
+    orcid: https://orcid.org/0000-0001-7993-2879
+license:
+- GPL-3.0+
+repository-code: https://github.com/lcmd-epfl/cell2mol/
+type: software
+
