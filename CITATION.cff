@@ -1,6 +1,11 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it using the metadata from this file."
 title: "lcmd-epfl/cell2mol: Unit Cell to Molecule Interpretation"
+license: GPL-3.0+
+repository-code: https://github.com/lcmd-epfl/cell2mol/
+type: software
+version: v2.0.0-rc1
+date-released: 2025-12-09
 authors:
 - affiliation: LCMD EPFL
   family-names: Cho
@@ -36,8 +41,4 @@ preferred-citation:
   - family-names: Corminboeuf
     given-names: Clemence
     orcid: https://orcid.org/0000-0001-7993-2879
-license:
-- GPL-3.0+
-repository-code: https://github.com/lcmd-epfl/cell2mol/
-type: software
 
