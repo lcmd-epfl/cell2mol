@@ -44,10 +44,8 @@ class Cell(BaseModel):
     # Required constructor parameters
     name: str
     labels: Labels
-    coord: list[list[float]] = Field(
-        alias="pos"
-    )  # Using alias to match original parameter name
-    frac_coord: list[list[float]]
+    coord: NDArray = Field(alias="pos")  # Using alias to match original parameter name
+    frac_coord: NDArray
     cell_vector: NDArray
     cell_param: NDArray
 

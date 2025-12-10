@@ -49,9 +49,9 @@ class Specie(BaseModel):
 
     # Positional arguments
     labels: list[str]
-    coord: list[list[float]] | list[float]
-    frac_coord: list[list[float]] | list[float] | None = None
-    radii: list[float] | float | None = None
+    coord: NDArray
+    frac_coord: NDArray | None = None
+    radii: NDArray | None = None
 
     # Optional arguments
     parents: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (

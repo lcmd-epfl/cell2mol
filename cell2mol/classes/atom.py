@@ -9,6 +9,7 @@ from cell2mol.connectivity import (
     get_adjmatrix_from_cif_bonds,
 )
 from cell2mol.elementdata import ElementData
+from cell2mol.my_types import NDArray
 from cell2mol.utils import BaseModel
 from cell2mol.utils.pydantic import serialize_circular_references
 
@@ -20,8 +21,8 @@ elemdatabase = ElementData()
 ###############
 class Atom(BaseModel):
     label: str
-    coord: list[float]
-    frac_coord: list[float] | None = None
+    coord: NDArray
+    frac_coord: NDArray | None = None
     radii: float | None = None
     parents: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
         Field(default_factory=list)
