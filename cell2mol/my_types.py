@@ -1,6 +1,7 @@
 from typing import Annotated, Literal
-from pydantic import BeforeValidator, PlainSerializer
+
 import pydantic_numpy.typing as pnd
+from pydantic import BeforeValidator, PlainSerializer
 from rdkit import Chem
 from rdkit.Chem import Mol
 
@@ -11,6 +12,8 @@ SubType = Literal["reference", "unitcell", "molecule", "ligand", "metal", "group
 NOType = Literal["Linear", "Bent"]
 
 NDArray = pnd.NpNDArray
+
+Format = Literal["json", "pickle"]
 
 
 def serialize_mol(mol: Mol) -> str:

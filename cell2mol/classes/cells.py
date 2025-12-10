@@ -1,18 +1,23 @@
 from __future__ import annotations
-from cell2mol.classes.cell import Cell
-from cell2mol.utils import BaseModel
-from typing_extensions import deprecated
-from pydantic import Field
-from cell2mol.my_types import (
-    NDArray,
-    Type,
-)
 
+import logging
 import pickle
+from pathlib import Path
+from typing import Any, Self, override
+
+from pydantic import Field
+from pydantic.config import ExtraValues
+from typing_extensions import deprecated
+
+from cell2mol.classes.cell import Cell
+from cell2mol.my_types import Format, NDArray, Type
+from cell2mol.utils import BaseModel
 
 ###############
 #### CELLS ####
 ###############
+
+logger = logging.getLogger(__name__)
 
 
 class Cells(BaseModel):
@@ -30,10 +35,79 @@ class Cells(BaseModel):
     type: Type = Field(default="cells")
 
     #######################################################
-    def save(self, path):
-        print(f"SAVING cell2mol CELLS object to {path}")
+    def save(self, path: str | Path, *, format: Format = "json"):
+        if format == "json":
+            self._save_as_json(path)
+        elif format == "pickle":
+            self._save_as_pickle(path)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+
+    @classmethod
+    def load(cls, path: str | Path, *, format: Format = "json") -> Self:
+        if format == "json":
+            return cls._load_from_json(path)
+        elif format == "pickle":
+            return cls._load_from_pickle(path)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+
+    @deprecated("Use json format instead")
+    def _save_as_pickle(
+        self,
+        path: str | Path,
+    ):
+        logger.warning("Use json format instead")
         with open(path, "wb") as fil:
             pickle.dump(self, fil)
+
+    def _save_as_json(
+        self,
+        path: str | Path,
+    ):
+        if not str(path).endswith(".json"):
+            logger.warning("Use `.json` extension instead for path: %s", path)
+        with open(path, "w") as fd:
+            fd.write(self.model_dump_json(indent=4))
+
+    @classmethod
+    def _load_from_json(
+        cls,
+        path: str | Path,
+    ):
+        return cls.model_validate_json(open(path, "r").read())
+
+    @classmethod
+    @deprecated("Use json format instead")
+    def _load_from_pickle(
+        cls,
+        path: str | Path,
+    ):
+        with open(path, "rb") as fil:
+            return pickle.load(fil)
+
+    @override
+    @classmethod
+    def model_validate_json(
+        cls,
+        json_data: str | bytes | bytearray,
+        *,
+        strict: bool | None = None,
+        extra: ExtraValues | None = None,
+        context: Any | None = None,
+        by_alias: bool | None = None,
+        by_name: bool | None = None,
+    ):
+        obj = super().model_validate_json(
+            json_data,
+            strict=strict,
+            extra=extra,
+            context=context,
+            by_alias=by_alias,
+            by_name=by_name,
+        )
+        obj.resolve_references()
+        return obj
 
     #######################################################
     def __str__(self):
