@@ -12,7 +12,7 @@ from cell2mol.utils.pydantic import BaseModel, serialize_circular_references
 from cell2mol.my_types import NDArray
 
 # Pydantic imports for the converted classes
-from pydantic import Field, PlainSerializer, computed_field, model_serializer
+from pydantic import Field, PlainSerializer, computed_field
 from typing_extensions import deprecated
 from cell2mol.elementdata import ElementData
 
@@ -56,13 +56,8 @@ class Protonation(BaseModel):
     version: str = Field(default="2.0", frozen=True)
     type: Type = Field(default="protonation")
 
-    @model_serializer(
-        mode="plain",
-    )
-    def model_dump_json(self, **kwargs) -> str:
-        # print("PROTONATION.model_dump_json")
-        # TODO romaingrx: add this back in the final json later
-        return "{}"
+    # NOTE: Removed custom model_serializer that was returning "{}" string.
+    # This was breaking deserialization. Protonation now serializes normally.
 
     @computed_field
     @property
@@ -92,7 +87,8 @@ class Protonation(BaseModel):
         self.radii = self.computed_radii
 
         # Handle conditional attribute setting based on parent
-        if self.parent is not None:
+        # Note: parent may be a string UUID during deserialization, skip in that case
+        if self.parent is not None and not isinstance(self.parent, str):
             refcell = self.parent.get_parent("reference")
             geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Annotated, Optional
 from typing_extensions import deprecated
 import numpy as np
-from pydantic import Field
+from pydantic import Field, PlainSerializer
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
 from cell2mol.connectivity import (
@@ -22,6 +22,7 @@ from cell2mol.my_types import (
     HapticType,
     SubType,
 )
+from cell2mol.utils.pydantic import serialize_circular_references
 
 elemdatabase = ElementData()
 
@@ -31,10 +32,16 @@ elemdatabase = ElementData()
 ###############
 class Group(Specie):
     checked_coordination: bool | None = None
-    closest_metal: Optional[Metal] = None
+    # Cross-reference: points to a metal in parent Molecule
+    closest_metal: Annotated[
+        Optional[Metal | str], PlainSerializer(serialize_circular_references)
+    ] = None
     haptic_type: HapticType | None = None
     is_haptic: bool | None = None
-    metals: list[Metal] | None = None
+    # Cross-reference: points to metals in parent Molecule
+    metals: Annotated[
+        list[Metal | str] | None, PlainSerializer(serialize_circular_references)
+    ] = None
     denticity: int | None = None
 
     subtype: SubType = Field(default="group")

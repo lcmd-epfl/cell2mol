@@ -4,6 +4,7 @@ import pickle
 from typing import Any
 from typing_extensions import deprecated
 from pydantic import Field
+from cell2mol.classes.metal import Metal
 from cell2mol.classes.molecule import Molecule
 from cell2mol.classes.specie import Specie
 from cell2mol.connectivity import (
@@ -38,7 +39,7 @@ Labels = list[str]
 #### CELL ####
 ##############
 class Cell(BaseModel):
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = {"arbitrary_types_allowed": True, "populate_by_name": True}
 
     # Required constructor parameters
     name: str
@@ -63,10 +64,10 @@ class Cell(BaseModel):
     exist_cif_bond_moiety: bool | None = None
     moiety_indices: list[list[int]] | None = None
 
-    # Unique species related attributes
-    unique_species: list[Specie] | None = None
+    # Unique species related attributes (Specie for molecules/ligands, Metal for metals)
+    unique_species: list[Specie | Metal] | None = None
     unique_indices: list[int] | None = None
-    species_list: list[Specie] | None = None
+    species_list: list[Specie | Metal] | None = None
 
     # Missing H related attributes
     missing_H_in_Carbon: bool | None = None
