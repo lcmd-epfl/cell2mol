@@ -16,11 +16,15 @@ elemdatabase = ElementData()
 ### BOND ######
 ###############
 class Bond(BaseModel):
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = {"arbitrary_types_allowed": True, "populate_by_name": True}
 
-    # Required constructor parameters
-    atom1: Annotated[Atom, PlainSerializer(serialize_circular_references)] = Field(...)
-    atom2: Annotated[Atom, PlainSerializer(serialize_circular_references)] = Field(...)
+    # Required constructor parameters - cross-references to atoms
+    atom1: Annotated[Atom | str, PlainSerializer(serialize_circular_references)] = (
+        Field(...)
+    )
+    atom2: Annotated[Atom | str, PlainSerializer(serialize_circular_references)] = (
+        Field(...)
+    )
     order: float = Field(
         default=1, alias="bond_order"
     )  # Using alias to match original parameter name
@@ -33,13 +37,16 @@ class Bond(BaseModel):
     type: Type = Field(default="bond")
 
     def model_post_init(self, __context: Any) -> None:
-        # Compute distance between atoms
-        self.distance = round(
-            float(
-                np.linalg.norm(np.array(self.atom1.coord) - np.array(self.atom2.coord))
-            ),
-            3,
-        )
+        # Compute distance between atoms (only if atoms are resolved, not UUIDs)
+        if isinstance(self.atom1, Atom) and isinstance(self.atom2, Atom):
+            self.distance = round(
+                float(
+                    np.linalg.norm(
+                        np.array(self.atom1.coord) - np.array(self.atom2.coord)
+                    )
+                ),
+                3,
+            )
 
     def __str__(self):
         # This will make print(object) behave like before

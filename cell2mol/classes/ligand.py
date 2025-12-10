@@ -34,20 +34,21 @@ class Ligand(Specie):
     model_config = {"arbitrary_types_allowed": True}
 
     NO_type: NOType | None = None
+    # Cross-reference: points to atoms already in self.atoms
     connected_atoms: Annotated[
-        list[Atom] | None, PlainSerializer(serialize_circular_references)
+        list[Atom | str] | None, PlainSerializer(serialize_circular_references)
     ] = Field(default=None)
     connected_idx: list[int] | None = None
     denticity: int | None = None
-    groups: Annotated[
-        list[Group] | None, PlainSerializer(serialize_circular_references)
-    ] = Field(default=None)
+    # Ownership: groups are children of this ligand
+    groups: list[Group] | None = Field(default=None)
     haptic_type: HapticType | None = None
     is_haptic: bool | None = None
     is_nitrosyl: bool | None = None
     is_silylyne: bool | None = None
+    # Cross-reference: points to metals in parent Molecule
     metals: Annotated[
-        list[Metal] | None, PlainSerializer(serialize_circular_references)
+        list[Metal | str] | None, PlainSerializer(serialize_circular_references)
     ] = Field(default=None)
     unique_index: int | None = None
 

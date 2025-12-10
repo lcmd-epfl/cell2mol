@@ -1,8 +1,7 @@
 from __future__ import annotations
 import pickle
-from typing import Annotated
 from typing_extensions import deprecated
-from pydantic import Field, PlainSerializer
+from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.ligand import Ligand
 from cell2mol.classes.specie import Specie
@@ -39,7 +38,6 @@ from cell2mol.my_types import (
     HapticType,
     SubType,
 )
-from cell2mol.utils.pydantic import serialize_circular_references
 
 elemdatabase = ElementData()
 
@@ -54,12 +52,8 @@ class Molecule(Specie):
 
     haptic_type: HapticType | None = None
     is_haptic: bool | None = None
-    ligands: Annotated[
-        list[Ligand] | None, PlainSerializer(serialize_circular_references)
-    ] = Field(default=None)
-    metals: Annotated[
-        list[Metal] | None, PlainSerializer(serialize_circular_references)
-    ] = Field(default=None)
+    ligands: list[Ligand] | None = Field(default=None)
+    metals: list[Metal] | None = Field(default=None)
     spin: Spin | None = None
     ref_indices: list[int] | None = None
     cell_indices: list[int] | None = None

@@ -1,44 +1,41 @@
 from __future__ import annotations
-from typing import Annotated, Any
-from typing_extensions import deprecated
-import numpy as np
 
+from typing import Annotated, Any
+
+import numpy as np
 from pydantic import Field, PlainSerializer
+from typing_extensions import deprecated
+
+from cell2mol.charge_assignment import (
+    get_possible_charge_state,
+    get_protonation_states_specie,
+)
 from cell2mol.classes.atom import Atom
 from cell2mol.classes.charge_state import ChargeState
 from cell2mol.classes.metal import Metal
-from cell2mol.connectivity import (
-    get_adjacency_types,
-    get_element_count,
-    labels2electrons,
-    labels2formula,
-    get_adjmatrix,
-)
-from cell2mol.connectivity import (
-    get_metal_idxs,
-    get_radii,
-    get_alkali_alkaline_earth_metal_idxs,
-    get_post_transition_metal_idxs,
-)
+from cell2mol.classes.protonation import Protonation
 from cell2mol.connectivity import (
     compare_atoms,
     compare_species,
+    get_adjacency_types,
+    get_adjmatrix,
     get_adjmatrix_from_cif_bonds,
+    get_alkali_alkaline_earth_metal_idxs,
+    get_element_count,
+    get_metal_idxs,
+    get_post_transition_metal_idxs,
+    get_radii,
+    labels2electrons,
+    labels2formula,
 )
-
-from cell2mol.charge_assignment import (
-    get_protonation_states_specie,
-    get_possible_charge_state,
-)
-from cell2mol.classes.protonation import Protonation
-from cell2mol.other import extract_from_list, compute_centroid
 from cell2mol.elementdata import ElementData
-from cell2mol.utils import BaseModel
 from cell2mol.my_types import (
+    NDArray,
     RDKitObject,
     SubType,
-    NDArray,
 )
+from cell2mol.other import compute_centroid, extract_from_list
+from cell2mol.utils import BaseModel
 from cell2mol.utils.pydantic import serialize_circular_references
 
 elemdatabase = ElementData()
@@ -70,7 +67,7 @@ class Specie(BaseModel):
     adjnum: NDArray | None = None
     atnums: list[int] | None = None
     atom_site_labels: list[str] | None = None
-    atomic_charges: list[int] | None = None
+    atomic_charges: list[int] | NDArray | None = None
     atoms: list[Atom] | None = None
     centroid: NDArray | None = None
     element_count: NDArray | None = None
@@ -143,7 +140,12 @@ class Specie(BaseModel):
         if self.frac_coord is not None:
             assert len(self.coord) == len(self.frac_coord)
         if self.radii is not None:
-            assert len(self.labels) == len(self.radii)
+            # Handle both list and scalar radii (scalar can happen during deserialization)
+            if isinstance(self.radii, (list, tuple)):
+                assert len(self.labels) == len(self.radii)
+            # If radii is a scalar and we have multiple atoms, expand it or recompute
+            elif len(self.labels) > 1:
+                self.radii = get_radii(self.labels)
         else:
             self.radii = get_radii(self.labels)
 
@@ -278,8 +280,8 @@ class Specie(BaseModel):
     def set_charges(
         self,
         totcharge: int = None,
-        atomic_charges: list = None,
-        smiles: str = None,
+        atomic_charges: list[int] | NDArray | None = None,
+        smiles: str | None = None,
         rdkit_obj: object = None,
     ) -> None:
         ## Sets total charge

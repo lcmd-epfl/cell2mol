@@ -1,8 +1,8 @@
 from __future__ import annotations
-from typing import Literal
+from typing import Annotated, Literal
 from typing_extensions import deprecated
 import numpy as np
-from pydantic import Field
+from pydantic import Field, PlainSerializer
 from cell2mol.connectivity import (
     labels2formula,
     get_adjmatrix,
@@ -17,6 +17,7 @@ from cell2mol.my_types import (
     SubType,
 )
 from cell2mol.classes.atom import Atom
+from cell2mol.utils.pydantic import serialize_circular_references
 
 elemdatabase = ElementData()
 
@@ -25,8 +26,14 @@ elemdatabase = ElementData()
 #### METAL ####
 ###############
 class Metal(Atom):
-    metals: list[object] = Field(default_factory=list)
-    groups: list[object] = Field(default_factory=list)
+    # Cross-reference: points to other metals in parent Molecule
+    metals: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
+        Field(default_factory=list)
+    )
+    # Cross-reference: points to groups in ligands
+    groups: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
+        Field(default_factory=list)
+    )
     coord_nr: int | None = None
     coord_geometry: str | Literal["Undefined"] | None = None
     geom_deviation: float | Literal["Undefined"] | None = None
