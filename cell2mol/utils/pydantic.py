@@ -1,11 +1,11 @@
-import uuid
 import contextvars
+import uuid
+from abc import ABC, abstractmethod
 from typing import Any
-from typing_extensions import deprecated
+
 import pydantic
 from pydantic import model_validator
-from abc import ABC, abstractmethod
-
+from typing_extensions import deprecated
 
 # Context variable to store objects during deserialization
 # Using contextvars for thread-safety
