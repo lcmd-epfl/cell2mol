@@ -1,10 +1,10 @@
 import contextvars
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Self
 
 import pydantic
-from pydantic import model_validator
+from pydantic import model_validator, ModelWrapValidatorHandler
 from typing_extensions import deprecated
 
 # Context variable to store objects during deserialization
@@ -43,11 +43,41 @@ class BaseModel(pydantic.BaseModel, ABC):
     def from_positional(cls, *args, **kwargs):
         raise NotImplementedError("This method should be implemented by the subclass")
 
+    @model_validator(mode="wrap")
+    @classmethod
+    def _deduplicate_on_load(
+        cls,
+        data: Any,
+        handler: ModelWrapValidatorHandler[Self],
+    ) -> Self:
+        """Return existing object if one with same ID exists, otherwise create new.
+
+        This prevents duplicate Python objects with the same UUID during JSON
+        deserialization. When pydantic encounters a dict with an 'id' field,
+        we check if an object with that ID already exists in the registry.
+        If so, we return the existing instance instead of creating a new one.
+        """
+        if isinstance(data, dict) and "id" in data:
+            registry = get_registry()
+            obj_id = data["id"]
+            if obj_id in registry:
+                existing = registry[obj_id]
+                # Only reuse if EXACT same type (not subclass)
+                if type(existing) is cls:
+                    return existing
+        # Create new object normally
+        return handler(data)
+
     @model_validator(mode="after")
-    def _register_in_registry(self) -> "BaseModel":
-        """Register this object in the registry after construction."""
+    def _register_in_registry(self) -> Self:
+        """Register this object in the registry after construction.
+
+        Only registers if no object with this ID exists yet.
+        This ensures the first instance created becomes the canonical one.
+        """
         registry = get_registry()
-        registry[self.id] = self
+        if self.id not in registry:
+            registry[self.id] = self
         return self
 
     def resolve_references(self) -> None:
@@ -59,14 +89,16 @@ class BaseModel(pydantic.BaseModel, ABC):
         self._resolve_references_recursive(registry, set())
 
     def _resolve_references_recursive(
-        self, registry: dict[str, "BaseModel"], visited: set[str]
+        self, registry: dict[str, "BaseModel"], visited: set[int]
     ) -> None:
         """Recursively resolve references in this object and its children."""
-        # Ensure self.id is a string
-        obj_id = self.id if isinstance(self.id, str) else str(id(self))
-        if obj_id in visited:
+        # Use Python object id (not UUID) for visited tracking.
+        # This ensures we process all duplicate objects in the tree,
+        # even if they share the same UUID.
+        python_id = id(self)
+        if python_id in visited:
             return
-        visited.add(obj_id)
+        visited.add(python_id)
 
         for field_name, field_info in self.model_fields.items():
             value = getattr(self, field_name, None)
@@ -88,7 +120,12 @@ class BaseModel(pydantic.BaseModel, ABC):
                         item._resolve_references_recursive(registry, visited)
 
     def _resolve_value(self, value: Any, registry: dict[str, "BaseModel"]) -> Any:
-        """Resolve a single value, replacing UUID strings with objects."""
+        """Resolve UUID strings to actual objects.
+
+        Note: Duplicate object handling is no longer needed here because
+        the wrap validator (_deduplicate_on_load) prevents duplicates
+        from being created in the first place.
+        """
         if isinstance(value, str) and value in registry:
             return registry[value]
         elif isinstance(value, list):
