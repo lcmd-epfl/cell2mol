@@ -3,10 +3,9 @@ from __future__ import annotations
 import logging
 import pickle
 from pathlib import Path
-from typing import Any, Self, override
+from typing import Self
 
 from pydantic import Field
-from pydantic.config import ExtraValues
 from typing_extensions import deprecated
 
 from cell2mol.classes.cell import Cell
@@ -68,14 +67,15 @@ class Cells(BaseModel):
         if not str(path).endswith(".json"):
             logger.warning("Use `.json` extension instead for path: %s", path)
         with open(path, "w") as fd:
-            fd.write(self.model_dump_json(indent=4))
+            fd.write(self.to_json(indent=4))
 
     @classmethod
     def _load_from_json(
         cls,
         path: str | Path,
-    ):
-        return cls.model_validate_json(open(path, "r").read())
+    ) -> Self:
+        with open(path, "r") as fd:
+            return cls.from_json(fd.read())
 
     @classmethod
     @deprecated("Use json format instead")
@@ -85,29 +85,6 @@ class Cells(BaseModel):
     ):
         with open(path, "rb") as fil:
             return pickle.load(fil)
-
-    @override
-    @classmethod
-    def model_validate_json(
-        cls,
-        json_data: str | bytes | bytearray,
-        *,
-        strict: bool | None = None,
-        extra: ExtraValues | None = None,
-        context: Any | None = None,
-        by_alias: bool | None = None,
-        by_name: bool | None = None,
-    ):
-        obj = super().model_validate_json(
-            json_data,
-            strict=strict,
-            extra=extra,
-            context=context,
-            by_alias=by_alias,
-            by_name=by_name,
-        )
-        obj.resolve_references()
-        return obj
 
     #######################################################
     def __str__(self):
