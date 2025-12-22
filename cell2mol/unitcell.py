@@ -71,7 +71,8 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
                 cell_vector=cell_vector,
                 cell_param=cell_param,
             )
-            cells.save(cells_fname)
+            cells.save(cells_fname, format="pickle")
+            cells.save(f"Cells_{name}.json", format="json")
 
             summary_fname_ref = os.path.join(current_dir, "reference_summary.out")
             with open(summary_fname_ref, "a") as summary_ref:

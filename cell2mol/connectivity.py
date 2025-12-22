@@ -33,8 +33,8 @@ def add_atom(
     # Original labels and coordinates are copied
     isadded = False
     posadded = len(labels)
-    newlab = labels.copy()
-    newcoord = coords.copy()
+    newlab = list(labels.copy())
+    newcoord = list(coords.copy())
     newlab.append(str(element))  # One H atom will be added
 
     if debug > 2:

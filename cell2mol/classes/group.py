@@ -138,8 +138,8 @@ class Group(Specie):
 
         if refcell is not None and refcell.exist_cif_bond_moiety:
             for met in lig.metals:
-                tmplabels = self.labels.copy()
-                tmpcoord = self.coord.copy()
+                tmplabels = list(self.labels.copy())
+                tmpcoord = list(self.coord.copy())
                 atom_site_labels = [atom.atom_site_label for atom in self.atoms]
                 tmplabels.append(met.label)
                 tmpcoord.append(met.coord)
@@ -160,8 +160,8 @@ class Group(Specie):
                         )
         else:
             for met in lig.metals:
-                tmplabels = self.labels.copy()
-                tmpcoord = self.coord.copy()
+                tmplabels = list(self.labels.copy())
+                tmpcoord = list(self.coord.copy())
                 tmplabels.append(met.label)
                 tmpcoord.append(met.coord)
                 isgood, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
