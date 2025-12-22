@@ -5,7 +5,6 @@ from scipy.sparse.csgraph import reverse_cuthill_mckee
 from typing import Tuple
 from cell2mol.other import inv, extract_from_list
 from cell2mol.elementdata import ElementData
-from cell2mol.read_write import writexyz
 import os
 import networkx as nx
 from cell2mol.missingH import get_missingH_from_adjacency
@@ -29,6 +28,7 @@ def add_atom(
     # It does so at the position of the closest "metal" atom to the "site"
     #:return newlab: labels of the original ligand, plus the label of the new element
     #:return newcoord: same as above but for coordinates
+    from cell2mol.read_write import writexyz
 
     # Original labels and coordinates are copied
     isadded = False

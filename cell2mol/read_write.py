@@ -14,6 +14,12 @@ from pathlib import Path
 from typing import Dict
 import pandas as pd
 import networkx as nx
+from cell2mol.other import handle_error
+from cell2mol.connectivity import labels2formula, get_alkali_alkaline_earth_metal_idxs
+from contextlib import redirect_stdout
+from cell2mol.elementdata import ElementData
+
+elemdatabase = ElementData()
 
 transition_metals = {
     "Sc",
@@ -103,7 +109,6 @@ def prefilter_cif(input_path):
             message += "\nPolymeric structure found in .cif file."
         return False, message
     else:
-        print("Cif file is ready for processing")
         return True, message
 
 
@@ -828,7 +833,7 @@ def printxyz(labels, pos):
         print("%s  %.6f  %.6f  %.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]))
 
 
-##############
+################################
 def writexyz(fdir, fname, labels, pos, charge: int = 0, spin: int = 1, info: str = ""):
     """Writes an XYZ file with given labels and positions."""
     os.makedirs(fdir, exist_ok=True)
@@ -841,6 +846,228 @@ def writexyz(fdir, fname, labels, pos, charge: int = 0, spin: int = 1, info: str
         print(f"{charge=} {spin=} {info}", file=fil)
         for label, (x, y, z) in zip(labels, pos):
             fil.write(f"{label:<2}  {x:15.8f}  {y:15.8f}  {z:15.8f}\n")
+
+
+################################
+def extract_refmoleclist_xyz(fdir, refmoleclist, name: str):
+    """Extracts reference molecules to XYZ files.
+
+    Args:
+        fdir (str): Directory to save the XYZ files.
+        refmoleclist (list): List of reference molecule objects.
+        name (str): Base name for the output files.
+    """
+    for i, ref in enumerate(refmoleclist):
+        if ref.iscomplex:
+            if ref.totcharge_cif is not None:
+                N = 0
+                for atom in ref.labels:
+                    N += elemdatabase.elementnr[atom]
+                N -= ref.totcharge_cif
+                if N % 2 == 0:
+                    spin = 1
+                else:
+                    spin = 2
+                writexyz(
+                    fdir,
+                    f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz",
+                    ref.labels,
+                    ref.coord,
+                    charge=ref.totcharge_cif,
+                    spin=spin,
+                )
+                print(
+                    f"Ref molecule {i} {ref.formula} total charge {ref.totcharge_cif} lowest spin multiplicity {spin}"
+                )
+            else:
+                writexyz(
+                    fdir,
+                    f"{name}_Ref_{i}_{ref.formula}.xyz",
+                    ref.labels,
+                    ref.coord,
+                    charge="",
+                    spin="",
+                )
+                print(
+                    f"Ref molecule {i} {ref.formula} without charge and spin information"
+                )
+
+
+################################
+def print_error_case_reference(error_case, error_fname):
+    """Prints the error case to a file."""
+
+    with open(error_fname, "w") as error_output:
+        with redirect_stdout(error_output):
+            if error_case == 2 or error_case == 3 or error_case == 4:
+                handle_error(2)
+                if error_case == 2:
+                    print("    - Missing Hydrogens in Water Molecules")
+                elif error_case == 3:
+                    print("    - Missing Hydrogens in Coordinated Water Molecules")
+                elif error_case == 4:
+                    print("    - Missing Hydrogens in Carbon Atoms")
+            elif error_case == 9:
+                handle_error(9)
+                print(
+                    "    - Missing elements in Reference Molecules compared to moieties reported in CIF"
+                )
+            elif error_case == "X":
+                print("    - Empty Reference Molecules list")
+            else:
+                handle_error(error_case)
+    return
+
+
+def remove_disorder_atoms(atom_site_labels, ref_labels, ref_fracs, debug=0):
+    """
+    Remove atoms with disorder from the Wyckoff positions.
+    Args:
+        atom_site_labels (list): List of atom site labels (e.g. ["O1", "H1", "H2"]).
+        ref_labels (list): List of reference labels (e.g. ["O", "H", "H"]).
+        ref_fracs (list): List of fractional coordinates.
+        debug (int, optional): Debug level (default is 0).
+    Returns:
+        tuple: Filtered lists of atom site labels, reference labels, and fractional coordinates.
+    """
+
+    substring_to_remove = "?"
+
+    # Build new filtered lists
+    new_atom_site_labels = []
+    new_ref_labels = []
+    new_ref_fracs = []
+
+    for atom_site_label, ref_label, ref_frac in zip(
+        atom_site_labels, ref_labels, ref_fracs
+    ):
+        if substring_to_remove not in atom_site_label:
+            new_atom_site_labels.append(atom_site_label)
+            new_ref_labels.append(ref_label)
+            new_ref_fracs.append(ref_frac)
+        else:
+            if debug >= 1:
+                print(f"Removing disorder atom: {atom_site_label}")
+
+    # Optionally overwrite originals
+    atom_site_labels = new_atom_site_labels
+    ref_labels = new_ref_labels
+    ref_fracs = new_ref_fracs
+
+    return atom_site_labels, ref_labels, ref_fracs
+
+
+################################
+def compare_reference_with_cif(input_path, refcell, debug=0):
+    """Extract chemical name, metal oxidation state, and moiety information from the CIF file."""
+
+    chemical_name = extract_chemical_name(input_path)
+    reported_metal_os = extract_metal_oxidation_state(chemical_name)
+    moiety_dicts = extract_moiety(input_path)
+
+    refcell.chemical_name = chemical_name
+    refcell.reported_metal_os = reported_metal_os
+    refcell.moiety_dicts = moiety_dicts
+
+    print(f"_chemical_name_systematic in CIF: {refcell.chemical_name}")
+    print(f"Reported oxidation states in CIF: {refcell.reported_metal_os}")
+    print(f"Moiety dictionaries: {refcell.moiety_dicts}")
+
+    formulas_from_refcell = [ref.formula for ref in refcell.refmoleclist]
+
+    if len(moiety_dicts) == 0:
+        print("No _chemical_formula_moiety information found in the CIF file.")
+        return
+
+    formulas_from_cif = [
+        labels2formula(cifformula_to_list(moiety["formula"])) for moiety in moiety_dicts
+    ]
+    ratios_from_cif = [moiety["ratio"] for moiety in moiety_dicts]
+    charges_from_cif = [moiety["charge"] for moiety in moiety_dicts]
+    matches = find_closest_matches(formulas_from_refcell, formulas_from_cif)
+
+    print(f"Formulas from CIF: {formulas_from_cif}")
+    print(f"Ratios from CIF: {ratios_from_cif}")
+    print(f"Charges from CIF: {charges_from_cif}")
+    print(f"Formulas from refcell: {formulas_from_refcell}")
+
+    disagree_with_cif = []
+    for ref_idx, info in matches.items():
+        ref = refcell.refmoleclist[ref_idx]
+
+        if len(info["diff_dict"]) == 0:
+            print(f"{ref_idx=} {info['ref']}: Exact match found. {info['match']}")
+
+            # Find the index of the matched formula in the CIF formulas list
+            try:
+                cif_idx = formulas_from_cif.index(info["match"])
+                ref.totcharge_cif = charges_from_cif[cif_idx]
+
+            except ValueError:
+                print(
+                    f"\tFailed to Assign charge to refcell molecule {info['ref']} matched with CIF {info['match']}"
+                )
+
+        else:
+            # If there are differences, print them
+            print(
+                f"{ref_idx=} {info['ref']}: Closest match found. {info['match']} with difference of {info['diff_dict']}"
+            )
+            if (
+                len(
+                    get_alkali_alkaline_earth_metal_idxs(list(info["diff_dict"].keys()))
+                )
+                > 0
+            ):
+                print(
+                    f"{ref_idx=} {info['ref']}: Discrepancy found due to covalent radius of alkali/alkaline earth metals."
+                )
+                print(
+                    "This will cause errors in unit cell reconstruction. Set --cif_bond_info as True and re-run."
+                )
+            disagree_with_cif.append(ref_idx)
+
+    if len(disagree_with_cif) > 0:
+        print("Discrepancies found between refcell and CIF")
+        refcell.disagree_with_cif_formula = True
+        try:
+            cif_totals = sum_formulas(formulas_from_cif, ratios_from_cif)
+            if cif_totals is not None:
+                print(f"Element totals from CIF: {cif_totals}")
+                ref_totals = sum_formulas(formulas_from_refcell)
+                df_compare, all_match = compare_totals(
+                    cif_totals, ref_totals, atol=1e-9
+                )
+                if not all_match:
+                    print(
+                        f"Element totals differ between refcell and CIF:\n{df_compare}"
+                    )
+                    print("Possible causes:")
+                    print(
+                        "- Missing atoms in the crystal structure (mismatch with CIF moiety)."
+                    )
+                    print(
+                        "- Different adjacency matrix in refcell changed connectivity."
+                    )
+        except:
+            print(
+                "Can not calculate element totals from CIF. This may be due to non-float ratios in moieties in CIF."
+            )
+
+        # if not all_match:
+        #     print(f"Element totals differ between refcell and CIF:\n{df_compare}")
+        #     print("Possible causes:")
+        #     print("- Missing atoms in the crystal structure (mismatch with CIF moiety).")
+        #     print("- Different adjacency matrix in refcell changed connectivity.")
+        #     refcell.disagree_with_cif_formula = True
+        # else:
+        #     print("Element totals in refcell and CIF match.")
+        #     refcell.disagree_with_cif_formula = False
+    else:
+        print("No discrepancies found between formulas from refcell and CIF.")
+        refcell.disagree_with_cif_formula = False
+
+    return
 
 
 ######################################################
@@ -872,6 +1099,181 @@ def get_cell_parameters(structure):
     cell_fracs = cell_fracs.tolist()
 
     return cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops
+
+
+######################################################
+def write_refmoleclist(cell, file):
+    """
+    Write reference molecule information to a file-like object.
+
+    Args:
+        cell: Reference Cell object.
+        file: File-like object opened for writing.
+    """
+
+    for i, ref in enumerate(cell.refmoleclist):
+        ref_info = f"Reference Molecule {i}: {ref.formula} "
+
+        if ref.iscomplex:
+            ref_info += "(TM Complex) "
+        if ref.has_IA_IIA:
+            ref_info += "(Complex with Alkali or Alkaline metals) "
+        if ref.has_post_transition_metal:
+            ref_info += "(Complex with Post-Transition metals) "
+        if (
+            not ref.iscomplex
+            and not ref.has_IA_IIA
+            and not ref.has_post_transition_metal
+        ):
+            ref_info += "(Non-complex)"
+
+        if ref.totcharge is not None:
+            ref_info += f" totcharge={ref.totcharge}"
+        if ref.totcharge_cif is not None:
+            ref_info += f" totcharge_cif={ref.totcharge_cif}"
+        if ref.smiles is not None:
+            ref_info += f" smiles={ref.smiles}"
+
+        print(ref_info, file=file)
+
+        # --------------------
+        # Metals
+        # --------------------
+        if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
+            for met in ref.metals:
+                met_info = (
+                    f"\t{met.formula} ({met.subtype}) "
+                    f"atom_site_label={met.atom_site_label}"
+                )
+
+                if met.charge is not None:
+                    met_info += f" metal_OS={met.charge}"
+                elif met.possible_cs is not None:
+                    met_info += f" metal_possible_OS={met.possible_cs}"
+
+                print(met_info, file=file)
+
+                if met.coord_sphere_formula is not None:
+                    print(
+                        f"\t|--coord_sphere_formula={met.coord_sphere_formula}",
+                        file=file,
+                    )
+
+                if all(
+                    hasattr(met, attr)
+                    for attr in ("coord_nr", "coord_geometry", "geom_deviation")
+                ):
+                    print(
+                        f"\t|--coord_nr={met.coord_nr} "
+                        f"coord_geometry={met.coord_geometry} "
+                        f"geom_deviation={met.geom_deviation}",
+                        file=file,
+                    )
+
+                if all(
+                    hasattr(met, attr)
+                    for attr in (
+                        "coord_nr_with_metal_bonds",
+                        "coord_geometry_with_metal_bonds",
+                        "geom_deviation_with_metal_bonds",
+                        "metals",
+                    )
+                ):
+                    bonded_metals = [m.label for m in met.metals]
+                    if bonded_metals:
+                        print(
+                            f"\t|--bonded metals={bonded_metals} "
+                            f"coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} "
+                            f"coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} "
+                            f"geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}",
+                            file=file,
+                        )
+
+        # --------------------
+        # Ligands
+        # --------------------
+        for lig in ref.ligands:
+            lig_info = f"\t{lig.formula} ({lig.subtype})"
+
+            for attr in ("smiles", "denticity", "totcharge"):
+                if hasattr(lig, attr):
+                    lig_info += f" {attr}={getattr(lig, attr)}"
+
+            if lig.possible_cs is not None and lig.totcharge is None:
+                lig_info += (
+                    " lig.possible_cs Exists"
+                    if lig.possible_cs
+                    else " lig.possible_cs Does not exist"
+                )
+
+            print(lig_info, file=file)
+
+            if lig.groups:
+                for group in lig.groups:
+                    group_info = f"\t|--(group) {group.labels}"
+
+                    if hasattr(group, "denticity"):
+                        group_info += f" denticity={group.denticity}"
+
+                    if getattr(group, "is_haptic", False):
+                        group_info += f" haptic_type={group.haptic_type}"
+
+                    if group.metals:
+                        group_info += (
+                            f" connected_metals="
+                            f"{[m.atom_site_label for m in group.metals]}"
+                        )
+
+                    print(group_info, file=file)
+
+
+######################################################
+def write_unique_species(cell, file):
+    """
+    Write unique species information to a file-like object.
+
+    Args:
+        cell: Cell object containing unique_species.
+        file: File-like object opened for writing.
+    """
+
+    unique_species = getattr(cell, "unique_species", None)
+    if not unique_species:
+        print("\nNo unique species found in the cell object.", file=file)
+        return
+
+    print(f"\nUnique Species in {cell.subtype}:", file=file)
+
+    for specie in unique_species:
+        parts = [
+            f"unique_index={specie.unique_index}",
+            f"{specie.formula}",
+            f"({specie.subtype})",
+        ]
+
+        if specie.subtype == "metal":
+            parts.append(f"coord_sphere_formula={specie.coord_sphere_formula}")
+            if getattr(specie, "charge", None) is not None:
+                parts.append(f"charge={specie.charge}")
+
+        elif specie.subtype == "ligand":
+            parts.append(f"denticity={specie.denticity}")
+            if specie.is_haptic:
+                parts.append(f"haptic_type={specie.haptic_type}")
+            if getattr(specie, "smiles", None) is not None:
+                parts.append(f"smiles={specie.smiles}")
+            if getattr(specie, "totcharge", None) is not None:
+                parts.append(f"totcharge={specie.totcharge}")
+            if getattr(specie, "groups", None) is not None:
+                parts.append(f"groups={[group.formula for group in specie.groups]}")
+
+        else:
+            if getattr(specie, "smiles", None) is not None:
+                parts.append(f"smiles={specie.smiles}")
+            if getattr(specie, "totcharge", None) is not None:
+                parts.append(f"totcharge={specie.totcharge}")
+
+        print("\t" + " ".join(parts), file=file)
 
 
 ######################################################
