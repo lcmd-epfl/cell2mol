@@ -17,20 +17,15 @@ JSON Format:
 All BaseModel instances are stored exactly once in the "objects" dict.
 References between objects use UUID strings.
 
-Reference Fields:
-    Fields marked with RefMarker (via Ref, RefList, etc.) are automatically
-    serialized as UUIDs and resolved back to objects on deserialization.
-    This allows clean typing like `metals: RefList[Metal]` instead of
-    polluted types like `metals: list[Metal | str]`.
+Serialization:
+    Uses model_dump() with a context containing the object store.
+    A @model_serializer collects objects into the store and returns UUIDs.
 
-Serialization Strategy:
-    Uses Pydantic's native model_dump() with a context containing the object store.
-    A @model_serializer handles collecting objects into the store and returning UUIDs.
-
-Deserialization Strategy:
-    Two-pass approach:
-    1. Create all objects using model_construct() (refs stay as UUID strings)
-    2. Resolve all Ref fields by replacing UUIDs with actual objects
+Deserialization:
+    Three-pass approach:
+    1. Create all objects (refs are UUID strings)
+    2. Resolve all refs by replacing UUIDs with actual objects
+    3. Call model_post_init on all objects
 """
 
 from __future__ import annotations
@@ -44,81 +39,51 @@ from typing import TYPE_CHECKING, Annotated, Any, Self, get_args, get_origin
 
 import numpy as np
 import pydantic
+import pydantic.fields
 from pydantic import SerializationInfo, model_serializer
-from pydantic.fields import FieldInfo
 from typing_extensions import deprecated
 
-from cell2mol.my_types import RefMarker
 from cell2mol.utils.object_store import ObjectStore
 from cell2mol.utils.ref import Ref
-from cell2mol.utils.type_registry import TypeRegistry, get_type, register_type
+from cell2mol.utils.type_registry import TypeRegistry, get_type
 
 if TYPE_CHECKING:
     pass
 
 
 # =============================================================================
-# Annotation Introspection Helpers
-# =============================================================================
-
-
-def _is_ref_field(annotation: Any) -> bool:
-    """Check if a field annotation is marked as a reference field.
-
-    A reference field is one annotated with RefMarker (via Ref, RefList, etc.).
-    These fields contain BaseModel objects that should be serialized as UUIDs.
-    """
-    if annotation is None:
-        return False
-    if get_origin(annotation) is Annotated:
-        for arg in get_args(annotation):
-            if isinstance(arg, RefMarker):
-                return True
-    return False
-
-
-def _has_ref_fields(cls: type) -> dict[str, FieldInfo]:
-    """Get all Ref fields for a class."""
-    return {
-        name: info
-        for name, info in cls.model_fields.items()
-        if _is_ref_field(info.annotation)
-    }
-
-
-# =============================================================================
-# Value Serialization Helper
+# Value Serialization
 # =============================================================================
 
 
 def _serialize_value(value: Any, context: dict[str, Any]) -> Any:
-    """Serialize a value, collecting BaseModels to the store.
+    """Recursively serialize a value to JSON-compatible format.
 
-    This handles all the types we need to serialize:
-    - BaseModel: trigger its serialization and return UUID
-    - list: recurse into each item
-    - numpy types: convert to Python native types
-    - RDKit Mol: use its JSON serializer
-    - primitives: pass through as-is
+    - BaseModel: add to store, return UUID
+    - Ref: serialize target, return UUID
+    - NDArray: convert to list
+    - RDKit Mol: convert to JSON string
+    - NumPy scalars: convert to Python natives
+    - Lists/dicts: recurse
     """
     if value is None:
         return None
 
-    # Ref wrapper -> serialize the target and return UUID
+    # Ref wrapper → serialize target, return UUID
     if isinstance(value, Ref):
-        target = value.get()
-        target.model_dump(mode="json", context=context)
+        value.get().model_dump(mode="json", context=context)
         return value.id
 
-    # BaseModel -> trigger serialization, return UUID
+    # BaseModel → trigger serialization, return UUID
     if isinstance(value, pydantic.BaseModel) and hasattr(value, "id"):
         value.model_dump(mode="json", context=context)
         return value.id
 
-    # NumPy types -> convert to Python native (check early to avoid issues)
+    # NumPy array → list
     if isinstance(value, np.ndarray):
-        # tolist() may produce numpy scalars, so recurse to ensure conversion
-        return [_serialize_value(item, context) for item in value.tolist()]
+        return [_serialize_value(v, context) for v in value.tolist()]
+
+    # NumPy scalars → Python natives
     if isinstance(value, np.integer):
         return int(value)
     if isinstance(value, np.floating):
@@ -126,25 +91,20 @@ def _serialize_value(value: Any, context: dict[str, Any]) -> Any:
     if isinstance(value, np.bool_):
         return bool(value)
 
-    # List -> recurse
-    if isinstance(value, list):
-        return [_serialize_value(item, context) for item in value]
-
-    # Tuple -> convert to list and recurse
-    if isinstance(value, tuple):
-        return [_serialize_value(item, context) for item in value]
-
-    # Dict -> recurse into values
-    if isinstance(value, dict):
-        return {k: _serialize_value(v, context) for k, v in value.items()}
-
-    # RDKit Mol -> use its JSON serializer
+    # RDKit Mol → JSON
     if hasattr(value, "__class__") and value.__class__.__name__ == "Mol":
         from rdkit import Chem
 
         return Chem.MolToJSON(value)
 
-    # Primitives and other JSON-serializable types pass through
+    # List/tuple → recurse
+    if isinstance(value, (list, tuple)):
+        return [_serialize_value(v, context) for v in value]
+
+    # Dict → recurse values
+    if isinstance(value, dict):
+        return {k: _serialize_value(v, context) for k, v in value.items()}
+
     return value
 
 
@@ -211,17 +171,14 @@ class BaseModel(pydantic.BaseModel, ABC):
             store = info.context.get("store")
 
         if store is None:
-            # No store context - use normal pydantic serialization
             return handler(self)
 
-        # Already in store - just return UUID
         if self.id in store:
             return self.id
 
-        # Reserve spot FIRST to break cycles
         store.reserve(self.id)
 
-        # Serialize fields ourselves (don't call handler to avoid caching issues)
+        # Serialize each field (can't use handler(self) due to Pydantic caching with cycles)
         data: dict[str, Any] = {"_type": type(self).__name__}
         for field_name in type(self).model_fields:
             value = getattr(self, field_name)
@@ -354,7 +311,7 @@ def _construct_without_post_init(
         if name in data:
             value = data[name]
             # Convert values to expected types (NDArray, RDKit Mol, etc.)
-            value = _convert_field_type(value, field.annotation)
+            value = _convert_field_value(value, field)
             fields_values[name] = value
             fields_set.add(name)
         elif not field.is_required():
@@ -373,127 +330,45 @@ def _construct_without_post_init(
     return obj
 
 
-def _is_ndarray_annotation(annotation: Any) -> bool:
-    """Check if annotation represents a numpy array type.
+def _convert_field_value(value: Any, field: pydantic.fields.FieldInfo) -> Any:
+    """Convert deserialized values to expected types using field metadata.
 
-    Handles:
-    - numpy.ndarray directly
-    - numpy.typing.NDArray[...]
-    - pydantic_numpy types (NpNDArray, etc.)
-    """
-    if annotation is None:
-        return False
-
-    # Direct numpy.ndarray
-    if annotation is np.ndarray:
-        return True
-
-    # Check origin for generic types like NDArray[np.float64]
-    origin = get_origin(annotation)
-    if origin is np.ndarray:
-        return True
-
-    # pydantic_numpy types have __origin__ = ndarray
-    if hasattr(annotation, "__origin__") and annotation.__origin__ is np.ndarray:
-        return True
-
-    return False
-
-
-def _is_rdkit_mol_annotation(annotation: Any) -> bool:
-    """Check if annotation represents an RDKit Mol type.
-
-    Handles:
-    - rdkit.Chem.Mol directly
-    - Annotated[Mol, ...] (like RDKitObject)
-    - Union types like RDKitObject | None
-    """
-    if annotation is None:
-        return False
-
-    origin = get_origin(annotation)
-
-    # Handle Union types (e.g., RDKitObject | None)
-    # types.UnionType for `X | Y` syntax, typing.Union for Optional/Union
-    if origin is types.UnionType or origin is typing.Union:
-        for arg in get_args(annotation):
-            if arg is not type(None) and _is_rdkit_mol_annotation(arg):
-                return True
-        return False
-
-    # Check if it's an Annotated type and extract the base type
-    if origin is Annotated:
-        args = get_args(annotation)
-        if args:
-            base_type = args[0]
-            # Check if base type is Mol
-            if hasattr(base_type, "__name__") and base_type.__name__ == "Mol":
-                return True
-
-    # Direct Mol type
-    if hasattr(annotation, "__name__") and annotation.__name__ == "Mol":
-        return True
-
-    return False
-
-
-def _is_ref_annotation(annotation: Any) -> bool:
-    """Check if annotation is a Ref[T] type from utils.ref."""
-    if annotation is None:
-        return False
-
-    origin = get_origin(annotation)
-
-    # Direct Ref class
-    if origin is Ref:
-        return True
-
-    # Check if it's the Ref class itself (not generic)
-    if annotation is Ref:
-        return True
-
-    # Check class name for Ref (handles edge cases)
-    if hasattr(annotation, "__origin__") and hasattr(annotation.__origin__, "__name__"):
-        if annotation.__origin__.__name__ == "Ref":
-            return True
-
-    return False
-
-
-def _convert_field_type(value: Any, annotation: Any) -> Any:
-    """Convert deserialized values to their expected types.
-
-    Handles:
-    - UUID strings to Ref wrappers for Ref[T] fields
-    - Lists to numpy arrays for NDArray fields
-    - JSON strings to RDKit Mol for RDKitObject fields
+    Pydantic stores Annotated types as: annotation=base_type, metadata=[markers].
+    For Union types (Optional), we need to extract the non-None type.
     """
     if value is None:
-        return None
-
-    if annotation is None:
         return value
 
-    # Wrap UUID strings in Ref for Ref[T] fields
-    if _is_ref_annotation(annotation):
+    # Check field metadata first (direct Annotated case)
+    for meta in field.metadata:
+        if hasattr(meta, "_validate"):
+            try:
+                return meta._validate(value)
+            except Exception:
+                pass
+
+    # Handle Union types (Optional[X] = Union[X, None])
+    annotation = field.annotation
+    origin = get_origin(annotation)
+    if origin is types.UnionType or origin is typing.Union:
+        for arg in get_args(annotation):
+            if arg is type(None):
+                continue
+            # Check if arg is Annotated with custom validator
+            if get_origin(arg) is Annotated:
+                for meta in get_args(arg)[1:]:
+                    if hasattr(meta, "_validate"):
+                        try:
+                            return meta._validate(value)
+                        except Exception:
+                            pass
+
+    # For Ref[T] fields, wrap UUID strings
+    if origin is Ref or annotation is Ref:
         if isinstance(value, str):
             return Ref(value)
         if isinstance(value, Ref):
             return value
-
-    # Convert lists to numpy arrays for NDArray fields
-    if _is_ndarray_annotation(annotation):
-        if isinstance(value, list):
-            return np.array(value)
-
-    # Convert JSON strings to RDKit Mol for RDKitObject fields
-    if _is_rdkit_mol_annotation(annotation):
-        if isinstance(value, str) and value.startswith("{"):
-            from rdkit import Chem
-
-            mols = Chem.JSONToMols(value)
-            if mols and len(mols) > 0:
-                return mols[0]
 
     return value
 
@@ -504,11 +379,7 @@ def _convert_field_type(value: Any, annotation: Any) -> Any:
 
 
 def _resolve_object_refs(obj: BaseModel, registry: dict[str, BaseModel]) -> None:
-    """Resolve all fields that contain UUIDs by replacing them with objects.
-
-    Since all BaseModel fields are serialized as UUIDs, we need to resolve
-    ALL fields, not just those marked with RefMarker.
-    """
+    """Resolve all fields that contain UUIDs by replacing them with objects."""
     for field_name in type(obj).model_fields:
         # Skip the id field - it's a UUID that identifies the object itself,
         # not a reference to another object

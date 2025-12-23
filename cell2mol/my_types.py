@@ -2,9 +2,14 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Literal, TypeVar
 
 import numpy as np
-import pydantic_numpy.typing as pnd
-from pydantic import BeforeValidator, PlainSerializer, SerializationInfo
+from pydantic import (
+    BeforeValidator,
+    GetCoreSchemaHandler,
+    PlainSerializer,
+    SerializationInfo,
+)
 from pydantic.functional_serializers import WrapSerializer
+from pydantic_core import CoreSchema, core_schema
 from rdkit import Chem
 from rdkit.Chem import Mol
 
@@ -147,27 +152,69 @@ SubType = Literal[
 ]
 NOType = Literal["Linear", "Bent"]
 
-NDArray = pnd.NpNDArray
+
+class _NDArrayType:
+    """Custom Pydantic type for numpy arrays with proper serialization."""
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_plain_validator_function(
+            cls._validate,
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                cls._serialize
+            ),
+        )
+
+    @staticmethod
+    def _validate(value: Any) -> np.ndarray:
+        if isinstance(value, np.ndarray):
+            return value
+        if isinstance(value, list):
+            return np.array(value)
+        raise ValueError(f"Cannot convert {type(value)} to ndarray")
+
+    @staticmethod
+    def _serialize(value: np.ndarray) -> list:
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+        return value
+
+
+NDArray = Annotated[np.ndarray, _NDArrayType()]
 
 Format = Literal["json", "pickle"]
 
 
-def serialize_mol(mol: Mol) -> str:
-    return Chem.MolToJSON(mol)
+class _RDKitMolType:
+    """Custom Pydantic type for RDKit Mol with proper serialization."""
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_plain_validator_function(
+            cls._validate,
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                cls._serialize
+            ),
+        )
+
+    @staticmethod
+    def _validate(value: Any) -> Mol:
+        if isinstance(value, Mol):
+            return value
+        if isinstance(value, str):
+            mols = Chem.JSONToMols(value)
+            if mols and len(mols) > 0:
+                return mols[0]
+            raise ValueError(f"Failed to deserialize RDKit Mol: {value[:100]}...")
+        raise ValueError(f"Cannot convert {type(value)} to RDKit Mol")
+
+    @staticmethod
+    def _serialize(value: Mol) -> str:
+        return Chem.MolToJSON(value)
 
 
-def deserialize_mol(value: Mol | str) -> Mol:
-    if isinstance(value, Mol):
-        return value
-    if isinstance(value, str):
-        # JSONToMols returns a list, we take the first element
-        mols = Chem.JSONToMols(value)
-        if mols and len(mols) > 0:
-            return mols[0]
-        raise ValueError(f"Failed to deserialize RDKit Mol from JSON: {value[:100]}...")
-    raise ValueError(f"Cannot deserialize {type(value)} to RDKit Mol")
-
-
-RDKitObject = Annotated[
-    Mol, BeforeValidator(deserialize_mol), PlainSerializer(serialize_mol)
-]
+RDKitObject = Annotated[Mol, _RDKitMolType()]
