@@ -182,16 +182,30 @@ class BaseModel(pydantic.BaseModel, ABC):
             object.__setattr__(obj, "__pydantic_private__", None)
             registry[obj_id] = obj
 
-        # Second pass: populate fields with resolved references
+        # Second pass: populate fields with resolved references and type conversion
         for obj_id, obj in registry.items():
+            obj_cls = type(obj)
             field_data = raw_data[obj_id]
+
+            # First, set defaults for missing fields
+            for field_name, field_info in obj_cls.model_fields.items():
+                if field_name not in field_data:
+                    if field_info.default is not pydantic.fields.PydanticUndefined:
+                        object.__setattr__(obj, field_name, field_info.default)
+                    elif field_info.default_factory is not None:
+                        object.__setattr__(
+                            obj, field_name, field_info.default_factory()
+                        )
+
+            # Then set actual values with resolution and type conversion
             for field_name, value in field_data.items():
-                # Don't resolve the 'id' field - it must stay as a string
                 if field_name == "id":
                     object.__setattr__(obj, field_name, value)
                 else:
                     resolved = _resolve_value_static(value, registry)
-                    object.__setattr__(obj, field_name, resolved)
+                    # Apply type conversions
+                    converted = _convert_type(resolved, obj_cls, field_name)
+                    object.__setattr__(obj, field_name, converted)
 
         return registry[root_id]
 
@@ -208,6 +222,36 @@ class BaseModel(pydantic.BaseModel, ABC):
         """Deserialize from JSON string with central object store."""
         data = json.loads(json_str)
         return cls.from_dict_store(data)
+
+
+def _convert_type(value: Any, obj_cls: type, field_name: str) -> Any:
+    """Convert value to the expected type based on field annotation."""
+    if value is None:
+        return None
+
+    # Get field info to check annotation
+    field_info = obj_cls.model_fields.get(field_name)
+    if field_info is None:
+        return value
+
+    annotation = field_info.annotation
+
+    # Handle numpy arrays - check if annotation mentions NDArray or ndarray
+    annotation_str = str(annotation)
+    if "NDArray" in annotation_str or "ndarray" in annotation_str:
+        if isinstance(value, list):
+            return np.array(value)
+
+    # Handle RDKit Mol - check if it's an RDKit JSON string
+    if "RDKitObject" in annotation_str or "Mol" in annotation_str:
+        if isinstance(value, str) and (
+            value.startswith('{"commonchem"') or value.startswith('{"rdkitjson"')
+        ):
+            mols = Chem.JSONToMols(value)
+            if mols and len(mols) > 0:
+                return mols[0]
+
+    return value
 
 
 def _resolve_value_static(value: Any, registry: dict[str, "BaseModel"]) -> Any:
