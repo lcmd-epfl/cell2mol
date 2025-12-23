@@ -1,23 +1,22 @@
 from __future__ import annotations
-from typing import Annotated, Literal
-from typing_extensions import deprecated
+
+from typing import TYPE_CHECKING, Literal
+
 import numpy as np
-from pydantic import Field, PlainSerializer
-from cell2mol.connectivity import (
-    labels2formula,
-    get_adjmatrix,
-)
+from pydantic import Field
+from typing_extensions import deprecated
+
 from cell2mol.charge_assignment import get_metal_poscharges
-from cell2mol.spin import assign_spin_metal, predict_ox_state
-from cell2mol.other import compute_centroid, get_dist
-from cell2mol.elementdata import ElementData
-from cell2mol.coordination_sphere import define_coordination_geometry
-from cell2mol.my_types import (
-    Spin,
-    SubType,
-)
 from cell2mol.classes.atom import Atom
-from cell2mol.utils.pydantic import serialize_circular_references
+from cell2mol.connectivity import get_adjmatrix, labels2formula
+from cell2mol.coordination_sphere import define_coordination_geometry
+from cell2mol.elementdata import ElementData
+from cell2mol.my_types import RefList, Spin, SubType
+from cell2mol.other import compute_centroid, get_dist
+from cell2mol.spin import assign_spin_metal, predict_ox_state
+
+if TYPE_CHECKING:
+    from cell2mol.classes.group import Group
 
 elemdatabase = ElementData()
 
@@ -27,13 +26,9 @@ elemdatabase = ElementData()
 ###############
 class Metal(Atom):
     # Cross-reference: points to other metals in parent Molecule
-    metals: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
-        Field(default_factory=list)
-    )
+    metals: RefList[Metal] = Field(default_factory=list)
     # Cross-reference: points to groups in ligands
-    groups: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
-        Field(default_factory=list)
-    )
+    groups: RefList["Group"] = Field(default_factory=list)
     coord_nr: int | None = None
     coord_geometry: str | Literal["Undefined"] | None = None
     geom_deviation: float | Literal["Undefined"] | None = None

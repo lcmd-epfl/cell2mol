@@ -1,28 +1,23 @@
 from __future__ import annotations
-from typing import Annotated
-from typing_extensions import deprecated
-import numpy as np
 
-from pydantic import Field, PlainSerializer
+import numpy as np
+from pydantic import Field
+from typing_extensions import deprecated
+
 from cell2mol.classes.atom import Atom
 from cell2mol.classes.group import Group
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
 from cell2mol.connectivity import (
+    check_blocklist,
     get_adjmatrix,
     get_adjmatrix_from_cif_bonds,
-    check_blocklist,
-    split_species,
     split_group,
+    split_species,
 )
-from cell2mol.other import extract_from_list, get_angle
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import (
-    HapticType,
-    SubType,
-    NOType,
-)
-from cell2mol.utils.pydantic import serialize_circular_references
+from cell2mol.my_types import HapticType, NOType, OptionalRefList, SubType
+from cell2mol.other import extract_from_list, get_angle
 
 elemdatabase = ElementData()
 
@@ -35,9 +30,7 @@ class Ligand(Specie):
 
     NO_type: NOType | None = None
     # Cross-reference: points to atoms already in self.atoms
-    connected_atoms: Annotated[
-        list[Atom | str] | None, PlainSerializer(serialize_circular_references)
-    ] = Field(default=None)
+    connected_atoms: OptionalRefList[Atom] = None
     connected_idx: list[int] | None = None
     denticity: int | None = None
     # Ownership: groups are children of this ligand
@@ -47,9 +40,7 @@ class Ligand(Specie):
     is_nitrosyl: bool | None = None
     is_silylyne: bool | None = None
     # Cross-reference: points to metals in parent Molecule
-    metals: Annotated[
-        list[Metal | str] | None, PlainSerializer(serialize_circular_references)
-    ] = Field(default=None)
+    metals: OptionalRefList[Metal] = None
     unique_index: int | None = None
 
     subtype: SubType = Field(default="ligand")

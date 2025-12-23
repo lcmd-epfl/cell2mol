@@ -1,17 +1,23 @@
 from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
-from typing import Annotated, Any
+from pydantic import Field, computed_field
 from typing_extensions import deprecated
-from pydantic import Field, PlainSerializer, computed_field
+
 from cell2mol.connectivity import (
-    get_radii,
     get_adjmatrix,
     get_adjmatrix_from_cif_bonds,
+    get_radii,
 )
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import NDArray
+from cell2mol.my_types import NDArray, OptionalInt, RefList
 from cell2mol.utils import BaseModel
-from cell2mol.utils.pydantic import serialize_circular_references
+
+if TYPE_CHECKING:
+    from cell2mol.classes.bond import Bond
+    from cell2mol.classes.specie import Specie
 
 elemdatabase = ElementData()
 
@@ -24,9 +30,9 @@ class Atom(BaseModel):
     coord: NDArray
     frac_coord: NDArray | None = None
     radii: float | None = None
-    parents: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
-        Field(default_factory=list)
-    )
+
+    # Cross-references to parent species (Molecule, Ligand, etc.)
+    parents: RefList["Specie"] = Field(default_factory=list)
     parents_index: list[int] = Field(default_factory=list)
 
     # Seem to be set in various places depending on the context, might need to check this
@@ -37,11 +43,10 @@ class Atom(BaseModel):
     mconnec: int | None = None
     adjacency: list[int] = Field(default_factory=list)
     metal_adjacency: list[int] = Field(default_factory=list)
-    metal_factor: float | None = None
-    charge: int | None = None
-    bonds: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
-        Field(default_factory=list)
-    )
+    charge: OptionalInt = None
+
+    # Cross-references to Bond objects
+    bonds: RefList["Bond"] = Field(default_factory=list)
 
     version: str = Field(default="2.0", frozen=True)
     type: str = Field(default="atom", frozen=True)
@@ -64,7 +69,9 @@ class Atom(BaseModel):
         return self.label
 
     def model_post_init(self, __context: Any) -> None:
-        self.radii = self.radii or get_radii(self.label)
+        if self.radii is None:
+            radii_array = get_radii([self.label])
+            self.radii = float(radii_array[0])
 
     @classmethod
     @deprecated("Use atom() with the keyword arguments instead.")

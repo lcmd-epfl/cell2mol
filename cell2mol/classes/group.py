@@ -1,28 +1,25 @@
 from __future__ import annotations
-from typing import Annotated, Optional
-from typing_extensions import deprecated
+
 import numpy as np
-from pydantic import Field, PlainSerializer
+from pydantic import Field
+from typing_extensions import deprecated
+
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
 from cell2mol.connectivity import (
+    get_adjmatrix,
+    get_adjmatrix_from_cif_bonds,
+    is_single_ring,
     labels2electrons,
     labels2formula,
-    get_adjmatrix,
-    is_single_ring,
-    get_adjmatrix_from_cif_bonds,
 )
-from cell2mol.other import compute_centroid
-from cell2mol.elementdata import ElementData
 from cell2mol.coordination_sphere import (
     coordination_correction_for_haptic,
     coordination_correction_for_nonhaptic,
 )
-from cell2mol.my_types import (
-    HapticType,
-    SubType,
-)
-from cell2mol.utils.pydantic import serialize_circular_references
+from cell2mol.elementdata import ElementData
+from cell2mol.my_types import HapticType, OptionalRef, OptionalRefList, SubType
+from cell2mol.other import compute_centroid
 
 elemdatabase = ElementData()
 
@@ -33,15 +30,11 @@ elemdatabase = ElementData()
 class Group(Specie):
     checked_coordination: bool | None = None
     # Cross-reference: points to a metal in parent Molecule
-    closest_metal: Annotated[
-        Optional[Metal | str], PlainSerializer(serialize_circular_references)
-    ] = None
+    closest_metal: OptionalRef[Metal] = None
     haptic_type: HapticType | None = None
     is_haptic: bool | None = None
     # Cross-reference: points to metals in parent Molecule
-    metals: Annotated[
-        list[Metal | str] | None, PlainSerializer(serialize_circular_references)
-    ] = None
+    metals: OptionalRefList[Metal] = None
     denticity: int | None = None
 
     subtype: SubType = Field(default="group")

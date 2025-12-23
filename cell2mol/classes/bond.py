@@ -1,13 +1,15 @@
 from __future__ import annotations
-from typing import Annotated, Any
-from typing_extensions import deprecated
+
+from typing import Any
+
 import numpy as np
-from pydantic import Field, PlainSerializer
+from pydantic import Field
+from typing_extensions import deprecated
+
 from cell2mol.classes.atom import Atom
 from cell2mol.elementdata import ElementData
+from cell2mol.my_types import Ref, Type
 from cell2mol.utils import BaseModel
-from cell2mol.my_types import Type
-from cell2mol.utils.pydantic import serialize_circular_references
 
 elemdatabase = ElementData()
 
@@ -19,12 +21,8 @@ class Bond(BaseModel):
     model_config = {"arbitrary_types_allowed": True, "populate_by_name": True}
 
     # Required constructor parameters - cross-references to atoms
-    atom1: Annotated[Atom | str, PlainSerializer(serialize_circular_references)] = (
-        Field(...)
-    )
-    atom2: Annotated[Atom | str, PlainSerializer(serialize_circular_references)] = (
-        Field(...)
-    )
+    atom1: Ref[Atom] = Field(...)
+    atom2: Ref[Atom] = Field(...)
     order: float = Field(
         default=1, alias="bond_order"
     )  # Using alias to match original parameter name
