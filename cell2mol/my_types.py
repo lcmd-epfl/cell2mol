@@ -1,14 +1,7 @@
-from dataclasses import dataclass
 from typing import Annotated, Any, Literal, TypeVar
 
 import numpy as np
-from pydantic import (
-    BeforeValidator,
-    GetCoreSchemaHandler,
-    PlainSerializer,
-    SerializationInfo,
-)
-from pydantic.functional_serializers import WrapSerializer
+from pydantic import BeforeValidator, GetCoreSchemaHandler, PlainSerializer
 from pydantic_core import CoreSchema, core_schema
 from rdkit import Chem
 from rdkit.Chem import Mol
@@ -75,69 +68,19 @@ OptionalFloat = Annotated[
 # =============================================================================
 # Reference Types for Cross-Object References
 # =============================================================================
-# These types mark fields that contain references to other BaseModel objects.
-# At runtime, the field holds the actual object (e.g., Metal).
-# During serialization, the object is stored in the central object store
-# and replaced with its UUID string.
+# These type aliases document fields that contain references to other BaseModel
+# objects. At runtime, the field holds the actual object (e.g., Metal).
+# Serialization is handled by _serialize_value in pydantic.py.
 # =============================================================================
 
 T = TypeVar("T")
 
-
-@dataclass(frozen=True)
-class RefMarker:
-    """Marker to identify cross-reference fields during serialization.
-
-    When a field is annotated with RefMarker (via Ref, RefList, etc.),
-    the serialization system knows to:
-    - Serialize: Replace the object with its UUID
-    - Deserialize: Resolve the UUID back to the object from the registry
-
-    This allows clean typing like `metals: RefList[Metal]` instead of
-    polluted types like `metals: list[Metal | str]`.
-    """
-
-    pass
-
-
-def _serialize_ref(value: Any, handler: Any, info: SerializationInfo) -> Any:
-    """Serialize a reference field to UUID strings.
-
-    For single refs: returns UUID string
-    For list refs: returns list of UUID strings
-
-    Note: The referenced objects must be serialized separately by the parent
-    object's serializer. This serializer only extracts IDs.
-    """
-    if value is None:
-        return None
-
-    # Handle list of references
-    if isinstance(value, list):
-        result = []
-        for item in value:
-            if hasattr(item, "id"):
-                result.append(item.id)
-            else:
-                # Keep as-is (might be UUID string already)
-                result.append(item)
-        return result
-
-    # Handle single reference
-    if hasattr(value, "id"):
-        return value.id
-
-    # Not a BaseModel, return as-is
-    return value
-
-
 # Type aliases for cross-reference fields
 # Usage: metals: RefList[Metal] = Field(default_factory=list)
-# The WrapSerializer ensures referenced objects are added to the store
-Ref = Annotated[T, RefMarker(), WrapSerializer(_serialize_ref)]
-RefList = Annotated[list[T], RefMarker(), WrapSerializer(_serialize_ref)]
-OptionalRef = Annotated[T | None, RefMarker(), WrapSerializer(_serialize_ref)]
-OptionalRefList = Annotated[list[T] | None, RefMarker(), WrapSerializer(_serialize_ref)]
+Ref = T
+RefList = list[T]
+OptionalRef = T | None
+OptionalRefList = list[T] | None
 
 
 # =============================================================================
