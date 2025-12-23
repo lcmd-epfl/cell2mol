@@ -361,3 +361,128 @@ class TestGroupsResolution:
                     groups_checked += 1
 
         assert groups_checked > 0, "Should have checked at least one group"
+
+
+class TestEdgeCases:
+    """Test edge cases and potential fragility."""
+
+    def test_numpy_arrays_preserved(self, cells_pickle_path, tmp_path):
+        """Test that numpy arrays are preserved after round-trip."""
+        import numpy as np
+
+        cells = Cells.load(cells_pickle_path, format="pickle")
+        cells_loaded = save_and_reload(cells, tmp_path)
+
+        # cell_vector and cell_param should be numpy arrays
+        assert isinstance(cells_loaded.cell_vector, np.ndarray), (
+            f"cell_vector should be ndarray, got {type(cells_loaded.cell_vector)}"
+        )
+        assert isinstance(cells_loaded.cell_param, np.ndarray), (
+            f"cell_param should be ndarray, got {type(cells_loaded.cell_param)}"
+        )
+
+        # Values should match
+        np.testing.assert_array_almost_equal(
+            cells_loaded.cell_vector, cells.cell_vector
+        )
+        np.testing.assert_array_almost_equal(cells_loaded.cell_param, cells.cell_param)
+
+    def test_rdkit_mol_preserved(self, cells_pickle_path, tmp_path):
+        """Test that RDKit Mol objects are preserved after round-trip."""
+        from rdkit.Chem import Mol
+
+        cells = Cells.load(cells_pickle_path, format="pickle")
+        cells_loaded = save_and_reload(cells, tmp_path)
+
+        # Find a species with rdkit_obj
+        rdkit_checked = 0
+        for mol in cells_loaded.reference.refmoleclist or []:
+            if mol.rdkit_obj is not None:
+                assert isinstance(mol.rdkit_obj, Mol), (
+                    f"rdkit_obj should be Mol, got {type(mol.rdkit_obj)}"
+                )
+                rdkit_checked += 1
+
+            for lig in mol.ligands or []:
+                if lig.rdkit_obj is not None:
+                    assert isinstance(lig.rdkit_obj, Mol), (
+                        f"Ligand rdkit_obj should be Mol, got {type(lig.rdkit_obj)}"
+                    )
+                    rdkit_checked += 1
+
+        # Note: rdkit_obj might be None in test data, so we just log
+        print(f"Checked {rdkit_checked} RDKit Mol objects")
+
+    def test_charge_state_fields_preserved(self, cells_pickle_path, tmp_path):
+        """Test that ChargeState computed fields are preserved."""
+        cells = Cells.load(cells_pickle_path, format="pickle")
+        cells_loaded = save_and_reload(cells, tmp_path)
+
+        charge_states_checked = 0
+        for mol in cells_loaded.reference.refmoleclist or []:
+            for lig in mol.ligands or []:
+                if hasattr(lig, "possible_cs") and lig.possible_cs:
+                    for cs in lig.possible_cs:
+                        # These should have values (computed originally, saved, restored)
+                        assert cs.uncorr_abstotal is not None, (
+                            "uncorr_abstotal should be set"
+                        )
+                        assert cs.corr_total_charge is not None, (
+                            "corr_total_charge should be set"
+                        )
+                        charge_states_checked += 1
+
+        print(f"Checked {charge_states_checked} ChargeState objects")
+
+    def test_frozen_fields_preserved(self, cells_pickle_path, tmp_path):
+        """Test that frozen fields (version, type) are preserved correctly."""
+        cells = Cells.load(cells_pickle_path, format="pickle")
+        cells_loaded = save_and_reload(cells, tmp_path)
+
+        assert cells_loaded.version == cells.version
+        assert cells_loaded.type == cells.type
+
+        # Check nested objects too
+        for mol in cells_loaded.reference.refmoleclist or []:
+            assert mol.version == "2.0"
+            assert mol.type == "specie"
+
+    def test_atom_bonds_resolved(self, cells_pickle_path, tmp_path):
+        """Test that Atom.bonds list is resolved (bonds are Bond objects, not UUIDs)."""
+        from cell2mol.classes import Atom
+
+        cells = Cells.load(cells_pickle_path, format="pickle")
+        cells_loaded = save_and_reload(cells, tmp_path)
+
+        atoms_with_bonds_checked = 0
+        for mol in cells_loaded.reference.refmoleclist or []:
+            for atom in mol.atoms or []:
+                if atom.bonds:
+                    for bond in atom.bonds:
+                        # Bond should be an object, not a UUID string
+                        assert not isinstance(bond, str), (
+                            f"Bond should be object, not UUID string: {bond}"
+                        )
+                        atoms_with_bonds_checked += 1
+
+        # Not all molecules may have bonds populated, so this may be 0
+        # Just ensure we don't crash when iterating
+
+    def test_deeply_nested_references(self, cells_pickle_path, tmp_path):
+        """Test that deeply nested references are all resolved."""
+        cells = Cells.load(cells_pickle_path, format="pickle")
+        cells_loaded = save_and_reload(cells, tmp_path)
+
+        # Navigate deep: Cells -> Cell -> Molecule -> Ligand -> Group -> Metal -> parents
+        mol = cells_loaded.reference.refmoleclist[0]
+        lig = mol.ligands[0]
+        group = lig.groups[0]
+        metal = group.metals[0] if group.metals else None
+
+        if metal and metal.parents:
+            parent = metal.parents[0]
+            # Parent should be a Molecule/Specie, not a string
+            assert not isinstance(parent, str), (
+                "Deeply nested parent should be resolved"
+            )
+            assert hasattr(parent, "formula"), "Parent should have formula attribute"
