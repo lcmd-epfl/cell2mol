@@ -470,6 +470,41 @@ class TestEdgeCases:
         # Not all molecules may have bonds populated, so this may be 0
         # Just ensure we don't crash when iterating
 
+    def test_bond_atom_refs_resolved(self, cells_pickle_path, tmp_path):
+        """Test that Bond.atom1 and Bond.atom2 return Atom objects directly."""
+        from cell2mol.classes import Atom, Bond
+        from cell2mol.utils.ref import Ref
+
+        cells = Cells.load(cells_pickle_path, format="pickle")
+        cells_loaded = save_and_reload(cells, tmp_path)
+
+        bonds_checked = 0
+        for mol in cells_loaded.reference.refmoleclist or []:
+            for atom in mol.atoms or []:
+                if atom.bonds:
+                    for bond in atom.bonds:
+                        # atom1 and atom2 properties should return Atom directly
+                        assert isinstance(bond.atom1, Atom), (
+                            f"atom1 should be Atom, got {type(bond.atom1)}"
+                        )
+                        assert isinstance(bond.atom2, Atom), (
+                            f"atom2 should be Atom, got {type(bond.atom2)}"
+                        )
+                        # Internal refs should be Ref wrappers
+                        assert isinstance(bond.atom1_ref, Ref), (
+                            f"atom1_ref should be Ref, got {type(bond.atom1_ref)}"
+                        )
+                        assert isinstance(bond.atom2_ref, Ref), (
+                            f"atom2_ref should be Ref, got {type(bond.atom2_ref)}"
+                        )
+                        # Can access atom properties directly
+                        assert hasattr(bond.atom1, "label")
+                        assert hasattr(bond.atom2, "coord")
+                        bonds_checked += 1
+
+        # Ensure we actually checked some bonds
+        assert bonds_checked > 0, "Should have checked at least one bond"
+
     def test_deeply_nested_references(self, cells_pickle_path, tmp_path):
         """Test that deeply nested references are all resolved."""
         cells = Cells.load(cells_pickle_path, format="pickle")

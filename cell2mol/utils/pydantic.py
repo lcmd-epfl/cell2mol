@@ -50,6 +50,7 @@ from typing_extensions import deprecated
 
 from cell2mol.my_types import RefMarker
 from cell2mol.utils.object_store import ObjectStore
+from cell2mol.utils.ref import Ref
 from cell2mol.utils.type_registry import TypeRegistry, get_type, register_type
 
 if TYPE_CHECKING:
@@ -102,6 +103,12 @@ def _serialize_value(value: Any, context: dict[str, Any]) -> Any:
     """
     if value is None:
         return None
+
+    # Ref wrapper -> serialize the target and return UUID
+    if isinstance(value, Ref):
+        target = value.get()
+        target.model_dump(mode="json", context=context)
+        return value.id
 
     # BaseModel -> trigger serialization, return UUID
     if isinstance(value, pydantic.BaseModel) and hasattr(value, "id"):
@@ -430,10 +437,34 @@ def _is_rdkit_mol_annotation(annotation: Any) -> bool:
     return False
 
 
+def _is_ref_annotation(annotation: Any) -> bool:
+    """Check if annotation is a Ref[T] type from utils.ref."""
+    if annotation is None:
+        return False
+
+    origin = get_origin(annotation)
+
+    # Direct Ref class
+    if origin is Ref:
+        return True
+
+    # Check if it's the Ref class itself (not generic)
+    if annotation is Ref:
+        return True
+
+    # Check class name for Ref (handles edge cases)
+    if hasattr(annotation, "__origin__") and hasattr(annotation.__origin__, "__name__"):
+        if annotation.__origin__.__name__ == "Ref":
+            return True
+
+    return False
+
+
 def _convert_field_type(value: Any, annotation: Any) -> Any:
     """Convert deserialized values to their expected types.
 
     Handles:
+    - UUID strings to Ref wrappers for Ref[T] fields
     - Lists to numpy arrays for NDArray fields
     - JSON strings to RDKit Mol for RDKitObject fields
     """
@@ -442,6 +473,13 @@ def _convert_field_type(value: Any, annotation: Any) -> Any:
 
     if annotation is None:
         return value
+
+    # Wrap UUID strings in Ref for Ref[T] fields
+    if _is_ref_annotation(annotation):
+        if isinstance(value, str):
+            return Ref(value)
+        if isinstance(value, Ref):
+            return value
 
     # Convert lists to numpy arrays for NDArray fields
     if _is_ndarray_annotation(annotation):
@@ -487,6 +525,12 @@ def _resolve_value(value: Any, registry: dict[str, BaseModel]) -> Any:
     """Resolve a value, replacing UUID strings with objects from registry."""
     if value is None:
         return None
+
+    # Ref wrapper -> resolve the internal reference
+    if isinstance(value, Ref):
+        if not value.is_resolved():
+            value.resolve(registry)
+        return value
 
     # Single UUID string -> resolve to object if in registry
     if isinstance(value, str):
