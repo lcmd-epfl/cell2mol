@@ -1,6 +1,6 @@
 import json
 import numpy as np
-from typing import Annotated, Any
+from typing import Any
 from cell2mol.my_types import Type
 from cell2mol.connectivity import (
     get_radii,
@@ -8,11 +8,11 @@ from cell2mol.connectivity import (
     get_adjmatrix_from_cif_bonds,
     labels2formula,
 )
-from cell2mol.utils.pydantic import BaseModel, serialize_circular_references
+from cell2mol.utils.pydantic import BaseModel
 from cell2mol.my_types import NDArray
 
 # Pydantic imports for the converted classes
-from pydantic import Field, PlainSerializer, computed_field
+from pydantic import Field, computed_field
 from typing_extensions import deprecated
 from cell2mol.elementdata import ElementData
 
@@ -35,9 +35,7 @@ class Protonation(BaseModel):
     tmpsmiles: str = Field(default=" ")
     o_s: int = Field(default=0)
     typ: str = Field(default="Local")
-    parent: Annotated[object | None, PlainSerializer(serialize_circular_references)] = (
-        Field(default=None)
-    )
+    parent: object | None = Field(default=None)
 
     # Computed attributes with proper defaults
     natoms: int | None = None

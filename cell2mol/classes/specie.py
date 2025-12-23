@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
 
 import numpy as np
-from pydantic import Field, PlainSerializer
+from pydantic import Field
 from typing_extensions import deprecated
 
 from cell2mol.charge_assignment import (
@@ -29,14 +29,9 @@ from cell2mol.connectivity import (
     labels2formula,
 )
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import (
-    NDArray,
-    RDKitObject,
-    SubType,
-)
+from cell2mol.my_types import NDArray, RDKitObject, RefList, SubType
 from cell2mol.other import compute_centroid, extract_from_list
 from cell2mol.utils import BaseModel
-from cell2mol.utils.pydantic import serialize_circular_references
 
 elemdatabase = ElementData()
 
@@ -53,10 +48,8 @@ class Specie(BaseModel):
     frac_coord: NDArray | None = None
     radii: NDArray | None = None
 
-    # Optional arguments
-    parents: Annotated[list[object], PlainSerializer(serialize_circular_references)] = (
-        Field(default_factory=list)
-    )
+    # Optional arguments - parents is a cross-reference to parent Species
+    parents: RefList[Specie] = Field(default_factory=list)
     parents_indices: list[list[int]] = Field(default_factory=list)
     cov_factor: float = Field(default=1.3)
     metal_factor: float = Field(default=1.0)

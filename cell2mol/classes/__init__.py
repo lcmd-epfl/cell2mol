@@ -23,3 +23,18 @@ __all__ = [
     "Protonation",
     "ChargeState",
 ]
+
+# Rebuild models to resolve forward references
+# This is needed because we use RefList["Specie"] and similar forward refs
+# that need to be resolved after all classes are imported
+Atom.model_rebuild()
+Specie.model_rebuild()
+Metal.model_rebuild()
+Molecule.model_rebuild()
+Ligand.model_rebuild()
+Group.model_rebuild()
+Cell.model_rebuild()
+Cells.model_rebuild()
+Bond.model_rebuild()
+Protonation.model_rebuild()
+ChargeState.model_rebuild()
