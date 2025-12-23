@@ -38,6 +38,8 @@ from __future__ import annotations
 import json
 import uuid
 from abc import ABC, abstractmethod
+import types
+import typing
 from typing import TYPE_CHECKING, Annotated, Any, Self, get_args, get_origin
 
 import numpy as np
@@ -47,32 +49,11 @@ from pydantic.fields import FieldInfo
 from typing_extensions import deprecated
 
 from cell2mol.my_types import RefMarker
+from cell2mol.utils.object_store import ObjectStore
+from cell2mol.utils.type_registry import TypeRegistry, get_type, register_type
 
 if TYPE_CHECKING:
     pass
-
-
-# =============================================================================
-# Type Registry for Deserialization
-# =============================================================================
-
-_type_registry: dict[str, type["BaseModel"]] = {}
-
-
-def register_type(cls: type["BaseModel"]) -> type["BaseModel"]:
-    """Register a class in the type registry for deserialization."""
-    _type_registry[cls.__name__] = cls
-    return cls
-
-
-def get_type(type_name: str) -> type["BaseModel"]:
-    """Get a class from the type registry by name."""
-    if type_name not in _type_registry:
-        raise ValueError(
-            f"Unknown type '{type_name}'. "
-            f"Available types: {list(_type_registry.keys())}"
-        )
-    return _type_registry[type_name]
 
 
 # =============================================================================
@@ -190,7 +171,7 @@ class BaseModel(pydantic.BaseModel, ABC):
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Automatically register subclasses in the type registry."""
         super().__init_subclass__(**kwargs)
-        _type_registry[cls.__name__] = cls
+        TypeRegistry.get_instance().register(cls)
 
     @classmethod
     @deprecated(
@@ -211,14 +192,14 @@ class BaseModel(pydantic.BaseModel, ABC):
     ) -> dict[str, Any] | str:
         """Serialize this object, collecting it into the store if context provided.
 
-        If context contains a 'store' dict:
+        If context contains a 'store' ObjectStore:
             - Add this object to the store (if not already there)
             - Return just the UUID (as a reference)
 
         If no context:
             - Return normal serialization (for debugging/inspection)
         """
-        store: dict[str, dict[str, Any]] | None = None
+        store: ObjectStore | None = None
         if info.context:
             store = info.context.get("store")
 
@@ -231,7 +212,7 @@ class BaseModel(pydantic.BaseModel, ABC):
             return self.id
 
         # Reserve spot FIRST to break cycles
-        store[self.id] = {}
+        store.reserve(self.id)
 
         # Serialize fields ourselves (don't call handler to avoid caching issues)
         data: dict[str, Any] = {"_type": type(self).__name__}
@@ -239,7 +220,7 @@ class BaseModel(pydantic.BaseModel, ABC):
             value = getattr(self, field_name)
             data[field_name] = _serialize_value(value, info.context)
 
-        store[self.id] = data
+        store.set(self.id, data)
         return self.id
 
     def to_dict_store(self) -> dict[str, Any]:
@@ -254,7 +235,7 @@ class BaseModel(pydantic.BaseModel, ABC):
         All BaseModel references are replaced with UUID strings.
         Each object appears exactly once in the store.
         """
-        store: dict[str, dict[str, Any]] = {}
+        store = ObjectStore()
 
         # Use model_dump with store context
         # The model_serializer will populate the store
@@ -263,7 +244,7 @@ class BaseModel(pydantic.BaseModel, ABC):
         return {
             "_format": "cell2mol-store",
             "_version": "3.0",
-            "objects": store,
+            "objects": store.to_dict(),
             "root": root_id,
         }
 
@@ -385,6 +366,70 @@ def _construct_without_post_init(
     return obj
 
 
+def _is_ndarray_annotation(annotation: Any) -> bool:
+    """Check if annotation represents a numpy array type.
+
+    Handles:
+    - numpy.ndarray directly
+    - numpy.typing.NDArray[...]
+    - pydantic_numpy types (NpNDArray, etc.)
+    """
+    if annotation is None:
+        return False
+
+    # Direct numpy.ndarray
+    if annotation is np.ndarray:
+        return True
+
+    # Check origin for generic types like NDArray[np.float64]
+    origin = get_origin(annotation)
+    if origin is np.ndarray:
+        return True
+
+    # pydantic_numpy types have __origin__ = ndarray
+    if hasattr(annotation, "__origin__") and annotation.__origin__ is np.ndarray:
+        return True
+
+    return False
+
+
+def _is_rdkit_mol_annotation(annotation: Any) -> bool:
+    """Check if annotation represents an RDKit Mol type.
+
+    Handles:
+    - rdkit.Chem.Mol directly
+    - Annotated[Mol, ...] (like RDKitObject)
+    - Union types like RDKitObject | None
+    """
+    if annotation is None:
+        return False
+
+    origin = get_origin(annotation)
+
+    # Handle Union types (e.g., RDKitObject | None)
+    # types.UnionType for `X | Y` syntax, typing.Union for Optional/Union
+    if origin is types.UnionType or origin is typing.Union:
+        for arg in get_args(annotation):
+            if arg is not type(None) and _is_rdkit_mol_annotation(arg):
+                return True
+        return False
+
+    # Check if it's an Annotated type and extract the base type
+    if origin is Annotated:
+        args = get_args(annotation)
+        if args:
+            base_type = args[0]
+            # Check if base type is Mol
+            if hasattr(base_type, "__name__") and base_type.__name__ == "Mol":
+                return True
+
+    # Direct Mol type
+    if hasattr(annotation, "__name__") and annotation.__name__ == "Mol":
+        return True
+
+    return False
+
+
 def _convert_field_type(value: Any, annotation: Any) -> Any:
     """Convert deserialized values to their expected types.
 
@@ -398,16 +443,13 @@ def _convert_field_type(value: Any, annotation: Any) -> Any:
     if annotation is None:
         return value
 
-    # Get the string representation of the annotation to check types
-    annotation_str = str(annotation)
-
     # Convert lists to numpy arrays for NDArray fields
-    if "NDArray" in annotation_str or "ndarray" in annotation_str.lower():
+    if _is_ndarray_annotation(annotation):
         if isinstance(value, list):
             return np.array(value)
 
     # Convert JSON strings to RDKit Mol for RDKitObject fields
-    if "RDKitObject" in annotation_str or "Mol" in annotation_str:
+    if _is_rdkit_mol_annotation(annotation):
         if isinstance(value, str) and value.startswith("{"):
             from rdkit import Chem
 

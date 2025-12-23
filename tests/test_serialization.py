@@ -11,7 +11,8 @@ from pathlib import Path
 import pytest
 
 from cell2mol.classes import Cells, Group, Metal
-from cell2mol.utils.pydantic import get_type, _type_registry
+from cell2mol.utils.pydantic import get_type
+from cell2mol.utils.type_registry import TypeRegistry
 
 
 @pytest.fixture
@@ -332,8 +333,9 @@ class TestTypeRegistry:
             "Specie",
         ]
 
+        registry = TypeRegistry.get_instance()
         for type_name in expected_types:
-            assert type_name in _type_registry, f"{type_name} should be registered"
+            assert type_name in registry, f"{type_name} should be registered"
             assert get_type(type_name) is not None
 
     def test_unknown_type_raises_error(self):
