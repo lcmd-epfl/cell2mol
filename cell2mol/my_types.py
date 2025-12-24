@@ -91,7 +91,7 @@ Spin = int
 HapticType = list[str]
 Type = Literal["cell", "cells", "specie", "protonation", "charge_state", "atom", "bond"]
 SubType = Literal[
-    "reference", "unitcell", "molecule", "ligand", "metal", "atom", "group"
+    "reference", "unitcell", "molecule", "ligand", "metal", "atom", "group", "fragment", "Rec. Molecule", "Rec. Fragment"
 ]
 NOType = Literal["Linear", "Bent"]
 
