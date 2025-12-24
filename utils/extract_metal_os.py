@@ -2,15 +2,12 @@ import pickle
 import sys
 import os
 
-from cell2mol.tmcharge_common import cell, atom, molecule, ligand, metal
-from cell2mol.readwrite import writexyz, print_molecule
 
 ########################################
 def get_cell_info(fil):
-
     list_of_metals = []
     list_of_charges = []
-    with open(fil, 'rb') as gmol:
+    with open(fil, "rb") as gmol:
         loaded_cell = pickle.load(gmol)
 
         donelist = []
@@ -31,6 +28,8 @@ def get_cell_info(fil):
             list_of_charges.append(met.totcharge)
 
     return list_of_metals, list_of_charges
+
+
 ########################################
 
 pwd = os.getcwd()
@@ -39,17 +38,17 @@ pwd = pwd.replace("\\", "/")
 cellfile = sys.argv[1]
 
 if cellfile.endswith(".gmol"):
-
-    splitname=cellfile.split(".")
-    splitname=splitname[0].split("_")
-    refcode=splitname[1]
+    splitname = cellfile.split(".")
+    splitname = splitname[0].split("_")
+    refcode = splitname[1]
 
     list_of_metals, list_of_charges = get_cell_info(cellfile)
- 
-    if len(list_of_charges) == 1: print(refcode, list_of_charges[0])
-    if len(list_of_charges) != 1: print(refcode, list_of_charges)
-    
+
+    if len(list_of_charges) == 1:
+        print(refcode, list_of_charges[0])
+    if len(list_of_charges) != 1:
+        print(refcode, list_of_charges)
+
 else:
     print("File does not have .gmol extension")
     exit()
-

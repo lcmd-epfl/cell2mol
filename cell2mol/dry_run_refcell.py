@@ -22,7 +22,6 @@ from cell2mol.read_write import (
     get_cell_parameters,
     prefilter_cif,
 )
-from ase import io
 
 elemdatabase = ElementData()
 
