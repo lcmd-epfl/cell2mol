@@ -32,5 +32,3 @@ RUN conda run -p /env python -m pip install --no-deps /pkg
 SHELL ["conda", "run", "-p", "/env", "/bin/bash", "-c" ]
 RUN python -m ipykernel install --name cell2mol --display-name "cell2mol env"
 USER ${NB_USER}
-
-

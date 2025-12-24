@@ -17,18 +17,18 @@ Program that interprets .cif files of molecular crystals and retrieves structura
 
 - Atomic coordinates, labels
 - Total molecular charge, and formal atomic charges, including metal oxidation states
-- Connectivity network as defined by either the adjacency matrix or the bond-order matrix 
+- Connectivity network as defined by either the adjacency matrix or the bond-order matrix
 
-The program generates a so-called "cell" object, with hierarchical information on the unit cell. "Cells" have "Molecules". Molecules that hold a transition metal are considered a "Complex". Complexes are made of "Ligands" and "Metals". "Ligands" are made of "Groups" of connected "Atoms". 
+The program generates a so-called "cell" object, with hierarchical information on the unit cell. "Cells" have "Molecules". Molecules that hold a transition metal are considered a "Complex". Complexes are made of "Ligands" and "Metals". "Ligands" are made of "Groups" of connected "Atoms".
 
-"Complexes", "Ligands", "Metals" and "Groups" host the information of their constituent "Atoms". That way, cell2mol provides a very in-depth interpretation of unit cells, which can be particularly useful to generate controlled databases for Quantum Chemistry and Machine Learning applications. 
+"Complexes", "Ligands", "Metals" and "Groups" host the information of their constituent "Atoms". That way, cell2mol provides a very in-depth interpretation of unit cells, which can be particularly useful to generate controlled databases for Quantum Chemistry and Machine Learning applications.
 
-The code runs on pure python with minimal dependencies: 
+The code runs on pure python with minimal dependencies:
 - `numpy`
 - `scipy`
 - `pandas`
 - `networkx`
-- `RDkit` 
+- `RDkit`
 
 For portability, we provide an exemplary conda environment in `environment.yml` which can be used to construct a conda environment with all necessary dependencies by running:
 
@@ -46,13 +46,13 @@ python c2m_driver.py [-h] -i FILENAME [-s STEP]
 
 You can also execute:
 
-```python 
+```python
 python setup.py install
 ```
 
 to install cell2mol as a python module. Afterwards, you can call cell2mol as:
 
-```python 
+```python
 python -m cell2mol [-h] -i FILENAME [-s STEP]
 ```
 
@@ -78,7 +78,7 @@ A flowchart of the entire process is given below:
 
 Few chemical patterns tend to be poorly interpreted by cell2mol, because of inconsistencies in either cell2mol itself, or in xyz2mol.
 
-cell2mol determines the bond order between atoms based on their connectivity, typical atomic valence electrons of the atoms involved, and the most plausible total charge of the molecule. cell2mol is inevitably incorrect if there is an extra electron or radical chemical species. Other known ligands with wrong interpretations are the triiodide (I<sub>3</sub><sup>-</sup>), and azide (N<sub>3</sub><sup>-</sup>) ions. Future development of cell2mol will aim a fixing those errors. If users identify other common misinterpretations, please contact the authors. 
+cell2mol determines the bond order between atoms based on their connectivity, typical atomic valence electrons of the atoms involved, and the most plausible total charge of the molecule. cell2mol is inevitably incorrect if there is an extra electron or radical chemical species. Other known ligands with wrong interpretations are the triiodide (I<sub>3</sub><sup>-</sup>), and azide (N<sub>3</sub><sup>-</sup>) ions. Future development of cell2mol will aim a fixing those errors. If users identify other common misinterpretations, please contact the authors.
 
 
 ---

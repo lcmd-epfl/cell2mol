@@ -2,7 +2,7 @@ import pickle
 import sys
 import os
 
-from cell2mol.tmcharge_common import cell, atom, molecule, ligand, metal
+from cell2mol.tmcharge_common import cell
 from cell2mol.readwrite import writexyz, print_molecule
 
 pwd = os.getcwd()
@@ -30,13 +30,12 @@ with open(pwd + "/" + gmolfile, "rb") as pickle_file:
     cell = pickle.load(pickle_file)
 
     for idx, mol in enumerate(cell.speclist):
-         
         if mol.type == "Other":
-            namexyz = mol.refcode+"_spec_"+str(idx)+".xyz"
-            if hasattr(mol, "totcharge") and hasattr(mol, "spin"): 
+            namexyz = mol.refcode + "_spec_" + str(idx) + ".xyz"
+            if hasattr(mol, "totcharge") and hasattr(mol, "spin"):
                 writexyz(pwd, namexyz, mol.labels, mol.coord, mol.totcharge, mol.spin)
-            else :
+            else:
                 writexyz(pwd, namexyz, mol.labels, mol.coord)
-    
-            namemol = mol.refcode+"_spec_"+str(idx)
+
+            namemol = mol.refcode + "_spec_" + str(idx)
             print_molecule(mol, namemol, "gmol", pwd)

@@ -2,8 +2,8 @@ import pickle
 import sys
 import os
 
-from cell2mol.tmcharge_common import cell, atom, molecule, ligand, metal
-from cell2mol.readwrite import writexyz, print_molecule
+from cell2mol.tmcharge_common import cell
+from cell2mol.readwrite import print_molecule
 
 pwd = os.getcwd()
 pwd = pwd.replace("\\", "/")
@@ -30,8 +30,6 @@ with open(pwd + "/" + gmolfile, "rb") as pickle_file:
     cell = pickle.load(pickle_file)
 
     for idx, mol in enumerate(cell.speclist):
-         
         if mol.type == "Ligand":
-    
-            namemol = mol.refcode+"_lig_"+str(idx)
+            namemol = mol.refcode + "_lig_" + str(idx)
             print_molecule(mol, namemol, "gmol", pwd)

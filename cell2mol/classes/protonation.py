@@ -1,4 +1,3 @@
-import json
 import numpy as np
 from typing import Any
 from cell2mol.my_types import Type

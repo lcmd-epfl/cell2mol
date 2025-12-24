@@ -4,7 +4,6 @@ import numpy as np
 import pickle
 import sys
 import re
-from collections import defaultdict
 import os
 import traceback
 from typing import Tuple

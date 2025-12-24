@@ -18,7 +18,7 @@ from cell2mol.utils.type_registry import TypeRegistry
 @pytest.fixture
 def cells_pickle_path():
     """Path to the test cells pickle file."""
-    path = Path(__file__).parent.parent / "Cells_YOXKUS.cell"
+    path = Path(__file__).parent / "fixtures" / "Cells_YOXKUS.cell"
     if not path.exists():
         pytest.skip(f"Test file not found: {path}")
     return path
@@ -204,7 +204,7 @@ class TestObjectIdentity:
                     if group_metal.id in mol_metals_by_id:
                         mol_metal = mol_metals_by_id[group_metal.id]
                         assert group_metal is mol_metal, (
-                            f"Group metal should be same instance as molecule metal"
+                            "Group metal should be same instance as molecule metal"
                         )
                         matches_found += 1
 
@@ -305,19 +305,6 @@ class TestTypeRegistry:
     def test_all_classes_registered(self):
         """Test that all cell2mol classes are in the type registry."""
         # Import to trigger registration
-        from cell2mol.classes import (
-            Atom,
-            Bond,
-            Cell,
-            Cells,
-            ChargeState,
-            Group,
-            Ligand,
-            Metal,
-            Molecule,
-            Protonation,
-            Specie,
-        )
 
         expected_types = [
             "Atom",
@@ -451,7 +438,6 @@ class TestEdgeCases:
 
     def test_atom_bonds_resolved(self, cells_pickle_path, tmp_path):
         """Test that Atom.bonds list is resolved (bonds are Bond objects, not UUIDs)."""
-        from cell2mol.classes import Atom
 
         cells = Cells.load(cells_pickle_path, format="pickle")
         cells_loaded = save_and_reload(cells, tmp_path)

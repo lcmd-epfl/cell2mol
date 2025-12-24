@@ -1,0 +1,36 @@
+name: Code quality checks
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint & Test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+
+      - name: Setup environment
+        uses: ./.github/actions/setup
+
+      # TODO: add ruff check
+      # - name: Ruff check
+      #   run: uv run --dev ruff check cell2mol --output-format=github
+
+      - name: Ruff format
+        run: uv run --dev ruff format --check
+
+      - name: Pre-commit hooks
+        if: ${{ !cancelled() }}
+        run: SKIP=ruff-format uv run --dev pre-commit run --all-files
+
+      - name: Run unit tests
+        if: ${{ !cancelled() }}
+        run: uv run --group test pytest

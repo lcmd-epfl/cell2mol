@@ -1,7 +1,7 @@
 [project]
 name = "cell2mol"
 version = "2.0.0"
-description = "Add your description here"
+description = "Encoding chemistry to interpret crystallographic data"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -18,11 +18,14 @@ dependencies = [
 ]
 
 [dependency-groups]
+test = [
+    "pytest>=7.0",
+]
 dev = [
     "ipython>=8.18.0,<9.0.0",
-    "pip>=25.3",
-    "pytest>=7.0",
+    "pre-commit>=4.0.0",
     "ruff>=0.14.0",
+    { include-group = "test" },
 ]
 
 [tool.ruff]
