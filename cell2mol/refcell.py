@@ -7,9 +7,8 @@ import argparse
 
 from ase.io import read
 
-from cell2mol.classes import Cell
-from cell2mol.classes.cells import Cells
-from cell2mol.cell_operations import frac2cart_fromparam
+from cell2mol.classes import Cell, Cells
+from cell2mol.operations import frac2cart_fromparam
 from cell2mol.elementdata import ElementData
 from cell2mol.read_write import (
     extract_refmoleclist_xyz,
@@ -22,14 +21,9 @@ from cell2mol.read_write import (
     write_unique_species,
 )
 
-# -----------------------------------------------------------------------------
-# Logging
-# -----------------------------------------------------------------------------
 logger = logging.getLogger("cell2mol")
 
-# -----------------------------------------------------------------------------
 # Constants
-# -----------------------------------------------------------------------------
 VERSION = "2.0"
 COV_FACTOR = 1.0
 METAL_FACTOR = 1.0
@@ -38,7 +32,7 @@ elemdatabase = ElementData()
 
 
 # -----------------------------------------------------------------------------
-# Core logic
+# Core function
 # -----------------------------------------------------------------------------
 def process_refcell(input_path, name, current_dir, cif_bond_info):
     """
@@ -53,7 +47,6 @@ def process_refcell(input_path, name, current_dir, cif_bond_info):
     """
 
     ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
-    cells_fname = os.path.join(current_dir, f"Cells_{name}.cell")
 
     logger.info("cell2mol version %s", VERSION)
     logger.info("Input CIF: %s", input_path)
@@ -68,6 +61,8 @@ def process_refcell(input_path, name, current_dir, cif_bond_info):
         cell_param,
         sym_ops,
     ) = get_cell_parameters(structure)
+
+    print(f"{sym_ops=}\n{type(sym_ops)=}")
 
     # Unit cell
     unitcell = Cell.from_positional(
@@ -111,8 +106,8 @@ def process_refcell(input_path, name, current_dir, cif_bond_info):
         cell_vector=cell_vector,
         cell_param=cell_param,
     )
-    cells.save(cells_fname, format="pickle")
-
+    cells.save(os.path.join(current_dir, f"Cells_{name}.json"), format="json")
+    cells.save(os.path.join(current_dir, f"Cells_{name}.cell"), format="pickle")
     # Summary
     summary_fname = os.path.join(current_dir, "reference_summary.out")
     with open(summary_fname, "w") as f:
@@ -130,7 +125,8 @@ def process_refcell(input_path, name, current_dir, cif_bond_info):
         error = get_error_case_message(refcell.error_case)
         print(f"Error case: {refcell.error_case} - {error}", file=f)
 
-    return refcell
+    # return refcell
+    return cells
 
 
 def create_reference(input_path, name, cell_vector, cell_param, cif_bond_info):
@@ -249,7 +245,7 @@ def _main():
         dest="filepath",
         type=str,
         required=True,
-        help="Path to the input file (.cif or .xyz)",
+        help="Path to the input file (.cif)",
     )
     parser.add_argument(
         "--cif-bond-info",
@@ -264,15 +260,11 @@ def _main():
 
     args = parser.parse_args()
 
-    # ----------------------------
-    # Validation logic
-    # ----------------------------
     ext = os.path.splitext(args.filepath)[1].lower()
 
-    if ext not in (".cif", ".xyz"):
-        parser.error(
-            "Invalid input file format. Only .cif and .xyz files are supported."
-        )
+    # Validation
+    if ext != ".cif":
+        parser.error("Invalid input file format. Only .cif files are supported.")
 
     logging.basicConfig(
         level=getattr(logging, args.log_level),

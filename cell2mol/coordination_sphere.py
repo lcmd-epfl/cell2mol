@@ -1,8 +1,34 @@
+#!/usr/bin/env python
+########################################################
+# Third-party data and code included in this file:
+#
+# 1) Reference data (MIT License)
+#    Reference shape data adapted from work by
+#    Pere Alemany, Efrem Bernuz, Abel Carreras, and Miquel Llunell
+#    Copyright (c) 2021 Pere Alemany, Efrem Bernuz,
+#    Abel Carreras and Miquel Llunell
+#      https://github.com/GrupEstructuraElectronicaSimetria/cosymlib
+#
+# 2) Code (BSD 3-Clause License)
+#    Portions of code to calculate CShM adapted from:
+#      https://github.com/radi0sus/cshm-cc/blob/main/cshm-cc.py
+#    Original author:
+#      Sebastian Dechert
+#    Copyright (c) 2025, Sebastian Dechert
+#
+# Licenses:
+#   - MIT License
+#   - BSD 3-Clause License
+#
+# Modifications:
+#   - integrated into cell2mol
+########################################################
+
 import numpy as np
 import os
 from cell2mol import __file__
 import yaml
-from cell2mol.other import compute_centroid, get_dist
+from cell2mol.operations import compute_centroid, get_dist
 from cell2mol.connectivity import (
     add_atom,
     get_adjmatrix,
@@ -18,7 +44,7 @@ from collections import defaultdict
 elemdatabase = ElementData()
 
 #######################################################
-# Load YAML file
+# Load YAML filem
 path = os.path.join(
     os.path.abspath(os.path.dirname(__file__)), "ideal_structures_center.yaml"
 )
@@ -256,7 +282,6 @@ shape_structure_references_simplified = {
 
 
 ########################################################
-# From https://github.com/radi0sus/cshm-cc/blob/main/cshm-cc.py
 def normalize_structure(coordinates):
     # center and normalize the structure for CShM calculations
     centered_coords = coordinates - np.mean(coordinates, axis=0)
@@ -265,7 +290,6 @@ def normalize_structure(coordinates):
 
 
 ########################################################
-# From https://github.com/radi0sus/cshm-cc/blob/main/cshm-cc.py
 def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
     # faster Hungarian algorithm optimization
     # check number of trials, if it is to low, it calculates the
@@ -478,27 +502,6 @@ def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
         final_ligand_indices_by_metal,
         group_metals_indices,
     )
-
-    # grouped_metals = defaultdict(list)
-    # for m_idx, idx in conn_idx_by_metal.items():
-    #     grouped_metals[m_idx].append(group.metals[m_idx])
-    # atoms_grouped = [grouped_metals[i] for i in sorted(grouped_metals)]
-    # print(atoms_grouped)
-    # conn_idx = sorted(list(set(conn_idx)))
-    # split_groups = []
-    # for jdx, indices in conn_idx_by_metal.items():
-    #     metal = group.metals[jdx]
-    #     if indices:
-    #         print(f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}")
-    #         new_group = [i for i in indices]
-    #         split_groups.append(new_group)
-    # print(f"conn_idx: {conn_idx=}")
-    # print(f"split_groups: {split_groups=}")
-    # final_group_indices = extract_final_indices(original_indices, split_groups)
-    # print("original_indices:", original_indices)
-    # print(f"final_group_indices: {final_group_indices=}")
-
-    # return group, final_group_indices, final_ligand_indices
 
 
 #######################################################

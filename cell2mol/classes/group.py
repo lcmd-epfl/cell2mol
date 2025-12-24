@@ -13,13 +13,13 @@ from cell2mol.connectivity import (
     labels2electrons,
     labels2formula,
 )
+from cell2mol.operations import compute_centroid
+from cell2mol.elementdata import ElementData
 from cell2mol.coordination_sphere import (
     coordination_correction_for_haptic,
     coordination_correction_for_nonhaptic,
 )
-from cell2mol.elementdata import ElementData
 from cell2mol.my_types import HapticType, OptionalRef, OptionalRefList, SubType
-from cell2mol.other import compute_centroid
 
 elemdatabase = ElementData()
 

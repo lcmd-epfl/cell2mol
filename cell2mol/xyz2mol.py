@@ -1,8 +1,12 @@
 #!/usr/bin/env python
-
-#################
-#### XYZ2MOL ####
-#################
+# This file includes code from xyz2mol.py
+# Original work:
+#   Jensen Group (2018)
+#   Licensed under the MIT License
+#   https://github.com/jensengroup/xyz2mol
+#
+# Modifications:
+#   - Adapted for use in cell2mol
 
 import copy
 import itertools

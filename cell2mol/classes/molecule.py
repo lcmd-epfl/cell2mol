@@ -31,7 +31,7 @@ from cell2mol.new_charge_assignment import (
 )
 
 from cell2mol.spin import assign_spin_complexes
-from cell2mol.other import extract_from_list
+from cell2mol.operations import extract_from_list
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import (
     Spin,

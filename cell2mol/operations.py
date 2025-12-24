@@ -3,10 +3,9 @@
 import numpy as np
 
 
-#######################################################
 def frac2cart_fromcellvec(frac_coord, cellvec):
     """Convert fractional coordinates to cartesian coordinates
-    Parameters:
+    Args:
         frac_coord (list): list of fractional coordinates
         cellvec (list): list of cell vectors
     Returns:
@@ -27,10 +26,9 @@ def frac2cart_fromcellvec(frac_coord, cellvec):
     return cartesian
 
 
-#######################################################
 def frac2cart_fromparam(frac_coord, cellparam):
     """Convert fractional coordinates to cartesian coordinates
-    Parameters:
+    Args:
         frac_coord (list): list of fractional coordinates
         cellparam (list): list of cell parameters
     Returns:
@@ -77,11 +75,9 @@ def frac2cart_fromparam(frac_coord, cellparam):
     return cartesian
 
 
-#######################################################
 def cart2frac(cartCoords, cellvec):
     """Convert cartesian coordinates to fractional coordinates
-
-    Parameters:
+    Args:
         cartCoords (list): list of cartesian coordinates
         cellvec (list): list of cell vectors
     Returns:
@@ -128,10 +124,8 @@ def cart2frac(cartCoords, cellvec):
     return fracCoords
 
 
-#######################################################
 def det3(mat):
     """Calculate the determinant of a 3x3 matrix
-
     Args:
         mat (list): list of 3x3 matrix
     Returns:
@@ -147,10 +141,9 @@ def det3(mat):
     )
 
 
-#######################################################
 def translate(vector, coords, cellvec):
     """Translate coordinates by a vector
-    Parameters:
+    Args:
         vector (list): list of vector components
         coords (list): list of coordinates
         cellvec (list): list of cell vectors
@@ -181,3 +174,131 @@ def translate(vector, coords, cellvec):
         newcoord.append([float(newx), float(newy), float(newz)])
 
     return newcoord
+
+
+def extract_from_list(entrylist: list, old_array: list, dimension: int = 2) -> list:
+    """Extract a 1D or 2D sub-array using a list of indices.
+
+    Args:
+        entrylist (list): indices to extract
+        old_array (list): source list
+        dimension (int): 2 for 2D extraction, 1 for 1D extraction
+        debug (int): debug verbosity level
+
+    Returns:
+        list: extracted sub list
+    """
+    length = len(entrylist)
+    if dimension == 2:
+        new_array = np.empty((length, length), dtype=object)
+        for idx, row in enumerate(entrylist):
+            for jdx, col in enumerate(entrylist):
+                new_array[idx, jdx] = old_array[row][col]
+    elif dimension == 1:
+        new_array = np.empty((length), dtype=object)
+        for idx, val in enumerate(entrylist):
+            new_array[idx] = old_array[val]
+    return list(new_array)
+
+
+def additem(item, vector):
+    """Append an item to a list if not already present.
+
+    Args:
+        item: item to add
+        vector (list): target list
+
+    Returns:
+        list: updated list
+    """
+    if item not in vector:
+        vector.append(item)
+    return vector
+
+
+def absolute_value(num):
+    """Calculate the absolute value of the sum of the absolute values of elements in a list."""
+    sum = 0
+    for i in num:
+        sum += np.abs(i)
+    return abs(sum)
+
+
+def inv(perm: list) -> list:
+    """Compute the inverse of a permutation.
+
+    Args:
+        perm (list): permutation mapping
+
+    Returns:
+        list: inverse permutation
+    """
+    inverse = [0] * len(perm)
+    for i, p in enumerate(perm):
+        inverse[p] = i
+    return inverse
+
+
+def compute_centroid(arr: np.array) -> list:
+    """Compute the centroid of a set of 3D coordinates.
+
+    Args:
+        arr (np.array): array of shape (N, 3)
+
+    Returns:
+        np.array: centroid coordinates
+    """
+    length = arr.shape[0]
+    sum_x = np.sum(arr[:, 0])
+    sum_y = np.sum(arr[:, 1])
+    sum_z = np.sum(arr[:, 2])
+    centroid = np.around(np.array([sum_x / length, sum_y / length, sum_z / length]), 7)
+    return np.array(centroid)
+
+
+def get_dist(atom1_pos: list, atom2_pos: list) -> float:
+    """Compute the Euclidean distance between two points.
+
+    Args:
+        atom1_pos (list): first point coordinates
+        atom2_pos (list): second point coordinates
+
+    Returns:
+        float: distance between points
+    """
+    dist = np.linalg.norm(np.array(atom1_pos) - np.array(atom2_pos))
+    dist = round(float(dist), 3)
+    return dist
+
+
+def get_angle(vec1, vec2) -> float:
+    """Compute the angle between two vectors in radians.
+
+    Args:
+        vec1: first vector
+        vec2: second vector
+
+    Returns:
+        float: angle in radians
+    """
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+    dotprod = np.dot(vec1, vec2)
+    factor = dotprod / (norm1 * norm2)
+    angle = np.arccos(factor)
+    if np.isnan(angle):
+        print("GET_ANGLE nan Problem", norm1, norm2, dotprod, factor, angle)
+        print("GET_ANGLE nan Problem, vecs:", vec1, vec2)
+    return float(angle)
+
+
+def get_unit_vector(v):
+    """Normalize a vector to unit length.
+
+    Args:
+        v : input vector
+
+    Returns:
+        np.array: unit vector in the same direction
+    """
+    return v / np.linalg.norm(v)

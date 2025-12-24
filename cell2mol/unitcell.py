@@ -1,138 +1,168 @@
-import os
-import sys
-import logging
-from cell2mol.refcell import process_refcell
-from contextlib import redirect_stdout
-from ase.io import read
-from cell2mol.classes import Cell
-from cell2mol.classes.cells import Cells
+#!/usr/bin/env python
 
+import os
+import logging
+import argparse
+from ase.io import read
+from cell2mol.refcell import process_refcell, get_error_case_message
 from cell2mol.final_c2m_module import cell2mol_mode
-from cell2mol.other import handle_error
 from cell2mol.read_write import (
-    print_refmoleclist,
-    print_possible_charges,
+    write_refmoleclist,
+    write_unique_species,
     get_cell_parameters,
 )
 import copy
 
+logger = logging.getLogger("cell2mol")
+
+# Constants
 VERSION = "2.0"
 COV_FACTOR = 1.0
 METAL_FACTOR = 1.0
 
 
-def process_unitcell(input_path, name, current_dir, cif_bond_info, debug=0):
+# -----------------------------------------------------------------------------
+# Core function
+# -----------------------------------------------------------------------------
+def process_unitcell(input_path, name, current_dir, cif_bond_info):
+    """
+    Process the molecules from a CIF file and generate a unit cell object.
+    Args:
+        input_path (str): Path to the CIF file (downloaded from CSD).
+        name (str): CSD refcode.
+        current_dir (str): Current working directory.
+        cif_bond_info (bool): Whether to use bond information reported in the CIF (_geom_bond block)
+    Returns:
+        newcell (object): Unit cell object containing the molecules and their information.
+    """
+
     # Set up file paths
-    cell_fname = os.path.join(current_dir, f"Cell_{name}.cell")
     ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
-    cells_fname = os.path.join(current_dir, f"Cells_{name}.cell")
-    output_fname = os.path.join(current_dir, "cell2mol.out")
+    cell_fname = os.path.join(current_dir, f"Cell_{name}.cell")
+
+    structure = read(input_path)
+    (
+        cell_labels,
+        cell_pos,
+        cell_fracs,
+        cell_vector,
+        cell_param,
+        sym_ops,
+    ) = get_cell_parameters(structure)
 
     # Process reference cell
-    logging.info("Starting the cell2mol process for the reference cell")
-    refcell = process_refcell(input_path, name, current_dir, cif_bond_info, debug=debug)
+    logger.info("Starting the cell2mol process for reference (Wyckoff sites)")
+    cells = process_refcell(input_path, name, current_dir, cif_bond_info)
+    refcell = cells.reference
 
     if refcell.error_case != 0:
         logging.error("Error encountered while processing the reference cell")
-        return refcell
-    else:
-        # Redirect stdout to file for logging
-        if (
-            refcell.disagree_with_cif_formula is not None
-            and refcell.disagree_with_cif_formula
-        ):
-            logging.info(
-                "Discrepancies found between refcell and CIF. This will cause errors in the charge prediction!"
-            )
+        return cells
+    if (
+        refcell.disagree_with_cif_formula is not None
+        and refcell.disagree_with_cif_formula
+    ):
+        logging.info(
+            "Discrepancies found between refcell and CIF. This will cause errors in the charge prediction!"
+        )
 
-        with open(output_fname, "a") as output, redirect_stdout(output):
-            logging.info(f"cell2mol version {VERSION}")
-            logging.info(f"Initializing cell object from input path: {input_path}")
-            logging.info(f"Debug level: {debug}")
-
-            # Read CIF file and initialize unit cell parameters
-            structure = read(input_path)
-            cell_labels, cell_pos, cell_fracs, cell_vector, cell_param, sym_ops = (
-                get_cell_parameters(structure)
-            )
-
-            # Create and process unit cell
-            newcell = Cell.from_positional(
-                name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param
-            )
-            newcell.set_subtype("unitcell")
-            perform_cell2mol(newcell, refcell, sym_ops, debug)
-            refcell.save(ref_cell_fname)
-            newcell.save(cell_fname)
-            cells = Cells(
-                name=name,
-                reference=refcell,
-                unitcell=newcell,
-                cell_vector=cell_vector,
-                cell_param=cell_param,
-            )
-            cells.save(cells_fname, format="pickle")
-            cells.save(f"Cells_{name}.json", format="json")
-
-            summary_fname_ref = os.path.join(current_dir, "reference_summary.out")
-            with open(summary_fname_ref, "a") as summary_ref:
-                with redirect_stdout(summary_ref):
-                    # print_unique_species(refcell)
-                    print_possible_charges(refcell)
-                    print(
-                        "\n************ After charge assignment of unit cell ************"
-                    )
-                    print_refmoleclist(refcell)
-
-            # Handle error cases for the unit cell
-            if hasattr(newcell, "error_case") and newcell.error_case is not None:
-                error_fname = os.path.join(
-                    current_dir, f"unitcell_error_{newcell.error_case}.out"
-                )
-                with open(error_fname, "w") as error_output:
-                    with redirect_stdout(error_output):
-                        handle_error(newcell.error_case)
-
-            if hasattr(refcell, "error_case") and refcell.error_case != 0:
-                error_fname_ref = os.path.join(
-                    current_dir, f"reference_error_{refcell.error_case}.out"
-                )
-                with open(error_fname_ref, "w") as error_output_ref:
-                    with redirect_stdout(error_output_ref):
-                        handle_error(refcell.error_case)
-
-            return newcell
-
-
-def perform_cell2mol(newcell, refcell, sym_ops, debug):
-    """Handles the reconstruction, charge assignment, and spin assignment for molecules."""
-
-    newcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
-
-    newcell.has_isolated_H = refcell.has_isolated_H
-    newcell.has_missing_H = refcell.has_missing_H
-    newcell.error_get_poscharges = refcell.error_get_poscharges
+    unitcell = cells.unitcell
+    unitcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
+    unitcell.has_isolated_H = refcell.has_isolated_H
+    unitcell.has_missing_H = refcell.has_missing_H
+    unitcell.error_get_poscharges = refcell.error_get_poscharges
     logging.info("Starting the cell2mol process for the unit cell")
 
+    debug = 1
     if refcell.error_case == 0:
         # Step-by-step molecule reconstruction and error assessment
         mode = "reconstruction"
-        cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
-        newcell.assess_errors(mode=mode)
+        cell2mol_mode(unitcell, refcell, sym_ops, mode, debug)
+        unitcell.assess_errors(mode=mode)
 
-        if newcell.error_case == 0:
+        if unitcell.error_case == 0:
             mode = "charge_assignment"
-            cell2mol_mode(newcell, refcell, sym_ops, mode, debug)
-            newcell.assess_errors(mode=mode)
+            cell2mol_mode(unitcell, refcell, sym_ops, mode, debug)
+            unitcell.assess_errors(mode=mode)
     else:
-        print(f"Error occurred in processing refcell: error case {refcell.error_case}")
+        logger.info(
+            f"Error occurred in processing refcell: error case {refcell.error_case}"
+        )
+
+    refcell.save(ref_cell_fname)
+    unitcell.save(cell_fname)
+    cells.reference = refcell
+    cells.unitcell = unitcell
+
+    cells.save(os.path.join(current_dir, f"Cells_{name}.json"), format="json")
+    cells.save(os.path.join(current_dir, f"Cells_{name}.cell"), format="pickle")
+
+    # Summary
+    summary_fname = os.path.join(current_dir, "reference_summary.out")
+    with open(summary_fname, "w") as f:
+        print(name, file=f)
+        write_refmoleclist(refcell, file=f)
+        write_unique_species(refcell, file=f)
+
+        if refcell.refmoleclist == []:
+            refcell.error_case = "X"
+        elif (
+            refcell.disagree_with_cif_formula is not None
+            and refcell.disagree_with_cif_formula
+        ):
+            refcell.error_case = 9
+        error = get_error_case_message(refcell.error_case)
+        print(f"Error case: {refcell.error_case} - {error}", file=f)
+
+    return cells
+
+
+def _main():
+    parser = argparse.ArgumentParser(
+        description="Process reference object from a CIF file"
+    )
+    parser.add_argument(
+        "-i",
+        "--input",
+        dest="filepath",
+        type=str,
+        required=True,
+        help="Path to the input file (.cif)",
+    )
+    parser.add_argument(
+        "--cif-bond-info",
+        action="store_true",
+        help="Use CIF _geom_bond information to generate adjacency matrix",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+    )
+
+    args = parser.parse_args()
+
+    ext = os.path.splitext(args.filepath)[1].lower()
+
+    # Validation
+    if ext != ".cif":
+        parser.error("Invalid input file format. Only .cif files are supported.")
+
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format="%(levelname)s | %(message)s",
+    )
+
+    input_path = os.path.normpath(args.filepath)
+    name = os.path.splitext(os.path.basename(input_path))[0]
+
+    process_unitcell(
+        input_path=input_path,
+        name=name,
+        current_dir=os.getcwd(),
+        cif_bond_info=args.cif_bond_info,
+    )
 
 
 if __name__ == "__main__":
-    input = sys.argv[1]
-    current_dir = os.getcwd()
-    input_path = os.path.normpath(input)
-    dir, file = os.path.split(input_path)
-    name, extension = os.path.splitext(file)
-
-    process_unitcell(input_path, name, current_dir, debug=1)
+    _main()

@@ -5,15 +5,14 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
-
-from cell2mol.charge_assignment import get_metal_poscharges
 from cell2mol.classes.atom import Atom
-from cell2mol.connectivity import get_adjmatrix, labels2formula
-from cell2mol.coordination_sphere import define_coordination_geometry
-from cell2mol.elementdata import ElementData
-from cell2mol.my_types import RefList, Spin, SubType
-from cell2mol.other import compute_centroid, get_dist
+from cell2mol.charge_assignment import get_metal_poscharges
 from cell2mol.spin import assign_spin_metal, predict_ox_state
+from cell2mol.operations import compute_centroid, get_dist
+from cell2mol.elementdata import ElementData
+from cell2mol.coordination_sphere import define_coordination_geometry
+from cell2mol.my_types import RefList, Spin, SubType
+from cell2mol.connectivity import labels2formula, get_adjmatrix
 
 if TYPE_CHECKING:
     from cell2mol.classes.group import Group
