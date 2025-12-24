@@ -44,7 +44,6 @@ from pydantic import SerializationInfo, model_serializer
 from typing_extensions import deprecated
 
 from cell2mol.utils.object_store import ObjectStore
-from cell2mol.utils.ref import Ref
 from cell2mol.utils.type_registry import TypeRegistry, get_type
 
 if TYPE_CHECKING:
@@ -60,7 +59,6 @@ def _serialize_value(value: Any, context: dict[str, Any]) -> Any:
     """Recursively serialize a value to JSON-compatible format.
 
     - BaseModel: add to store, return UUID
-    - Ref: serialize target, return UUID
     - NDArray: convert to list
     - RDKit Mol: convert to JSON string
     - NumPy scalars: convert to Python natives
@@ -68,11 +66,6 @@ def _serialize_value(value: Any, context: dict[str, Any]) -> Any:
     """
     if value is None:
         return None
-
-    # Ref wrapper → serialize target, return UUID
-    if isinstance(value, Ref):
-        value.get().model_dump(mode="json", context=context)
-        return value.id
 
     # BaseModel → trigger serialization, return UUID
     if isinstance(value, pydantic.BaseModel) and hasattr(value, "id"):
@@ -363,13 +356,6 @@ def _convert_field_value(value: Any, field: pydantic.fields.FieldInfo) -> Any:
                         except Exception:
                             pass
 
-    # For Ref[T] fields, wrap UUID strings
-    if origin is Ref or annotation is Ref:
-        if isinstance(value, str):
-            return Ref(value)
-        if isinstance(value, Ref):
-            return value
-
     return value
 
 
@@ -397,13 +383,7 @@ def _resolve_value(value: Any, registry: dict[str, BaseModel]) -> Any:
     if value is None:
         return None
 
-    # Ref wrapper -> resolve the internal reference
-    if isinstance(value, Ref):
-        if not value.is_resolved():
-            value.resolve(registry)
-        return value
-
-    # Single UUID string -> resolve to object if in registry
+    # Single UUID string → resolve to object if in registry
     if isinstance(value, str):
         return registry.get(value, value)
 
