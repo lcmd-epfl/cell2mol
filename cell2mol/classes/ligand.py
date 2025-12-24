@@ -15,9 +15,10 @@ from cell2mol.connectivity import (
     split_group,
     split_species,
 )
+
+from cell2mol.operations import extract_from_list, get_angle
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import HapticType, NOType, OptionalRefList, SubType
-from cell2mol.other import extract_from_list, get_angle
 
 elemdatabase = ElementData()
 
@@ -292,10 +293,10 @@ class Ligand(Specie):
         for b in blocklist:
             if debug >= 2:
                 print(f"\tLIGAND.SPLIT_LIGAND: block={b}")
-            gr_indices = extract_from_list(b, connected_idx, dimension=1, debug=debug)
+            gr_indices = extract_from_list(b, connected_idx, dimension=1)
             if debug > 1:
                 print(f"\tLIGAND.SPLIT_LIGAND: {gr_indices=}")
-            gr_labels = extract_from_list(b, conn_labels, dimension=1, debug=debug)
+            gr_labels = extract_from_list(b, conn_labels, dimension=1)
             gr_coord = extract_from_list(b, conn_coord, dimension=1)
             if self.frac_coord is not None:
                 gr_frac_coord = extract_from_list(b, conn_frac_coord, dimension=1)

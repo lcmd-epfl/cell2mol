@@ -1,18 +1,19 @@
+#!/usr/bin/env python
+
 import warnings
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
 from typing import Tuple
-from cell2mol.other import inv, extract_from_list
+from cell2mol.operations import inv, extract_from_list
 from cell2mol.elementdata import ElementData
 import os
 import networkx as nx
-from cell2mol.missingH import get_missingH_from_adjacency
+from cell2mol.hydrogen import detect_missing_hydrogens
 
 elemdatabase = ElementData()
 
 
-#######################################################
 def add_atom(
     labels: list,
     coords: list,
@@ -196,7 +197,7 @@ def check_blocklist(conn_labels, conn_coord, blocklist, debug: int = 2):
     for b in blocklist:
         if debug >= 2:
             print(f"\t\tCHECK_blocklist: block={b}")
-        gr_labels = extract_from_list(b, conn_labels, dimension=1, debug=debug)
+        gr_labels = extract_from_list(b, conn_labels, dimension=1)
         gr_coord = extract_from_list(b, conn_coord, dimension=1)
         isgood, adjmat, adjnum, warning = get_adjmatrix(gr_labels, gr_coord)
         G = nx.from_numpy_array(np.array(adjmat))
@@ -217,9 +218,7 @@ def check_blocklist(conn_labels, conn_coord, blocklist, debug: int = 2):
                     remaining = [n for n in G.nodes if n not in cycle_basis[0]]
                     print(f"\t\tCHECK_blocklist: Remaining nodes in block: {remaining}")
 
-                    rem_labels = extract_from_list(
-                        remaining, conn_labels, dimension=1, debug=debug
-                    )
+                    rem_labels = extract_from_list(remaining, conn_labels, dimension=1)
                     rem_coord = extract_from_list(remaining, conn_coord, dimension=1)
                     isgood, adjmat_rem, adjnum, warning = get_adjmatrix(
                         rem_labels, rem_coord
@@ -282,7 +281,7 @@ def add_hydrogens(
                 )
 
             if a.label == "C":
-                ismissingH, report, num_missingH = get_missingH_from_adjacency(
+                ismissingH, report, num_missingH = detect_missing_hydrogens(
                     a.atnum, a.coord, bonded_atom_coord, bonded_atom_labels
                 )
                 if debug >= 2:

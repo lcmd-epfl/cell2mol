@@ -13,10 +13,10 @@ from pathlib import Path
 from typing import Dict
 import pandas as pd
 import networkx as nx
-from cell2mol.other import handle_error
 from cell2mol.connectivity import labels2formula, get_alkali_alkaline_earth_metal_idxs
 from contextlib import redirect_stdout
 from cell2mol.elementdata import ElementData
+import logging
 
 elemdatabase = ElementData()
 
@@ -1634,3 +1634,58 @@ def print_molecule(mol):
                         print(group_info)
     else:
         print("\nNo molecule object.")
+
+
+def handle_error(case: int):
+    print(f"Cell2mol terminated with error number {case}. Message:")
+    if case == 1:
+        print(
+            "The cell object has isolated H atoms in the reference molecules list. This typically indicates an error. STOPPING"
+        )
+    if case == 2:
+        print(
+            "We detected that H atoms are likely missing. This will cause errors in the charge prediction, so STOPPING pre-emptively."
+        )
+    if case == 3:
+        print("We failed to get fragments. STOPPING pre-emptively.")
+    if case == 4:
+        print(
+            "After reconstruction of the unit cell, we still detected some fragments. STOPPING pre-emptively."
+        )
+    if case == 5:
+        print("Error in list of possible charges received for molecule or ligand")
+    if case == 6:
+        print("More than one valid possible charge distribution found")
+    if case == 7:
+        print("No valid possible charge distribution found")
+    # if case == 8: print("Error while preparing molecules")
+    if case == 8:
+        print("Error while creating bonds for molecule or ligand")
+    # if case == 9: print("The charge neutralization failed.")
+    if case == 9:
+        print(
+            "Discrepancies found between refcell and CIF. This will cause errors in the charge prediction, so STOPPING pre-emptively."
+        )
+
+    if case == 0:
+        print("No errors Found")
+    # sys.exit(1)
+
+
+def setup_logger(log_file: str | None = None):
+    logger = logging.getLogger("cell2mol")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+    formatter = logging.Formatter("[%(levelname)s] %(name)s: %(message)s")
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+    if log_file is not None:
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+    return logger

@@ -30,7 +30,7 @@ from cell2mol.connectivity import (
 )
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import NDArray, RDKitObject, RefList, SubType
-from cell2mol.other import compute_centroid, extract_from_list
+from cell2mol.operations import compute_centroid, extract_from_list
 from cell2mol.utils import BaseModel
 
 elemdatabase = ElementData()

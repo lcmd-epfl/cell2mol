@@ -13,15 +13,13 @@ from cell2mol.connectivity import (
     compare_reference_indices,
     split_species,
 )
-from cell2mol.cell_operations import frac2cart_fromparam
+from cell2mol.operations import frac2cart_fromparam, extract_from_list
 from cell2mol.new_charge_assignment import (
     set_charge_state,
     prepare_mol,
 )
-
-from cell2mol.other import extract_from_list, handle_error
 from cell2mol.elementdata import ElementData
-from cell2mol.read_write import get_moiety_indices_from_labels
+from cell2mol.read_write import get_moiety_indices_from_labels, handle_error
 from cell2mol.utils import BaseModel
 from cell2mol.my_types import (
     NDArray,
@@ -282,7 +280,7 @@ class Cell(BaseModel):
 
     #######################################################
     def check_missing_H(self, debug: int = 0):
-        from cell2mol.missingH import check_missingH
+        from cell2mol.hydrogen import check_missing_hydrogens
 
         (
             Warning,
@@ -290,7 +288,7 @@ class Cell(BaseModel):
             Missing_H_in_C,
             Missing_H_in_CoordWater,
             Missing_H_in_Water,
-        ) = check_missingH(self.refmoleclist, debug=debug)
+        ) = check_missing_hydrogens(self.refmoleclist)
         if debug >= 2:
             print(
                 f"CELL.Check_missing_H: {Missing_H_in_C=} {Missing_H_in_CoordWater=} {Missing_H_in_Water=}"

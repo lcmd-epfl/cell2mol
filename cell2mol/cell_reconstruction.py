@@ -2,13 +2,18 @@ import itertools
 import numpy as np
 from ase import Atoms
 from cell2mol.classes import Molecule
-from cell2mol.other import additem, get_dist, extract_from_list, absolute_value
 from cell2mol.connectivity import (
     split_species,
     count_species,
     compare_reference_indices,
 )
-from cell2mol.cell_operations import translate
+from cell2mol.operations import (
+    translate,
+    additem,
+    get_dist,
+    extract_from_list,
+    absolute_value,
+)
 from itertools import combinations
 from cell2mol.elementdata import ElementData
 

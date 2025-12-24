@@ -17,8 +17,7 @@ def parsing_arguments():
     parser = argparse.ArgumentParser(
         prog="cell2mol",
         description=(
-            "Interprets a crystallography file (.cif) and "
-            "stores the information in a Python cell object"
+            "Interprets a crystallography file and extracts molecular information"
         ),
     )
 

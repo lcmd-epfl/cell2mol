@@ -2,7 +2,7 @@ import copy
 import logging
 import time
 
-from cell2mol.new_cell_reconstruction import (
+from cell2mol.cell_reconstruction import (
     get_moleclist,
     get_unique_indices,
     reconstruct,

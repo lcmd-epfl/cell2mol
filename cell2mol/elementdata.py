@@ -1,5 +1,5 @@
 # Copyright 2010 Torbjorn Bjorkman
-# This file is part of cif2cell
+# This file is part of cif2cell https://github.com/torbjornbjorkman/cif2cell
 #
 # cif2cell is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
