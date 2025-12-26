@@ -187,42 +187,6 @@ def apply_symmetry_operations_reference(
 
 
 ######################################################
-def find_row_indices(source, target):
-    # cell_pos, new.positions
-    # List to store the indices of found rows
-    found_indices = []
-    found_rows = []
-    remaining_indices = []
-    remaining_rows = []
-
-    # Iterate over each row in the source array with enumeration to track the index
-    for index, row in enumerate(source):
-        # Check if any row in the target array matches the current row
-        if any(
-            np.allclose(row, target_row, atol=1e-4, rtol=1e-2) for target_row in target
-        ):
-            found_indices.append(index)
-            found_rows.append(row)
-        else:
-            remaining_indices.append(index)
-            remaining_rows.append(row)
-    return found_indices, found_rows
-
-
-######################################################
-def find_row_index_from_matrix(matrix, query_row):
-    # Convert the inputs to NumPy arrays if they aren't already
-    matrix = np.array(matrix)
-    query_row = np.array(query_row)
-
-    # Check each row for equality with the query_row
-    for index, row in enumerate(matrix):
-        if np.allclose(row, query_row, atol=1e-4, rtol=1e-2):
-            return index
-    return -1
-
-
-######################################################
 def get_fragments_from_moiety(
     newcell,
     updated,
@@ -257,10 +221,7 @@ def get_fragments_from_moiety(
                 new_sublist_indices.append(i)
         updated_moieties_list.append(new_sublist)
         updated_moieties_indices_in_ref_list.append(new_sublist_indices)
-    # updated_moieties_list = [[updated[indices_in_ref.index(i)] for i in sublist if i in indices_in_ref] for sublist in moiety_indices]
-    # updated_moieties_indices_in_ref = [[indices_in_ref.index(i) for i in sublist if i in indices_in_ref] for sublist in moiety_indices]
-    # updated_moieties_list = [[updated[idx] for idx in sublist] for sublist in updated_moieties_indices_in_ref]
-    # if debug >= 2 : print(f"get_fragments: updated_moieties_indices_in_ref", updated_moieties_indices_in_ref)
+
     if debug > 2:
         print(
             "get_fragments: updated_moieties_list",
@@ -330,9 +291,6 @@ def get_fragments_from_moiety(
         cell_indices = extract_from_list(b, updated, dimension=1)
         ref_indices = extract_from_list(b, indices_in_ref, dimension=1)
         mol_atom_site_labels = [atom_site_labels[idx] for idx in ref_indices]
-        # print(f"get_fragments: {cell_indices=}")
-        # print(f"get_fragments: {ref_indices=}")
-        # print(f"get_fragments: {mol_atom_site_labels=}")
 
         # Creates Molecule Object
         newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
@@ -361,7 +319,7 @@ def get_fragments_from_moiety(
 
 
 ######################################################
-def get_fragments_new(
+def get_fragments(
     newcell,
     updated,
     indices_in_ref,
@@ -436,9 +394,6 @@ def get_fragments_new(
         cell_indices = extract_from_list(b, updated, dimension=1)
         ref_indices = extract_from_list(b, indices_in_ref, dimension=1)
         mol_atom_site_labels = [atom_site_labels[idx] for idx in ref_indices]
-        # print(f"get_fragments: {cell_indices=}")
-        # print(f"get_fragments: {ref_indices=}")
-        # print(f"get_fragments: {mol_atom_site_labels=}")
 
         # Creates Molecule Object
         newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
@@ -877,8 +832,7 @@ def get_updated_indices(
 ######################################################
 def reconstruct(refcell, newcell, sym_ops, debug: int = 0):
     cell_labels = newcell.labels
-    # print(f"{refcell.geom_bond_cif=}")
-    # print(f"{cell_labels=}")
+
     if "D" in cell_labels:
         print("Deuterium is in the cell")
     cell_pos = newcell.coord
@@ -886,10 +840,6 @@ def reconstruct(refcell, newcell, sym_ops, debug: int = 0):
     cell_vector = newcell.cell_vector
 
     ref_labels = refcell.labels
-    atom_site_labels = refcell.atom_site_labels
-
-    # print(f"{ref_labels=}")
-    # print(f"{atom_site_labels=}")
 
     if "D" in ref_labels:
         print("Deuterium is in the reference")
@@ -910,7 +860,7 @@ def reconstruct(refcell, newcell, sym_ops, debug: int = 0):
         indices_lists = get_updated_indices(
             idx, ref_labels, new, cell_labels, cell_pos, cell_fracs, debug=debug
         )
-        if debug >= 2:
+        if debug > 2:
             print(f"{len(indices_lists)=}")
 
         updated_lists = [i for i in indices_lists if i[1] not in all_found]
@@ -940,7 +890,7 @@ def reconstruct(refcell, newcell, sym_ops, debug: int = 0):
                     debug=2,
                 )
             else:
-                initial_fragments = get_fragments_new(
+                initial_fragments = get_fragments(
                     newcell,
                     updated_cell,
                     updated_ref_indices,
@@ -1149,6 +1099,9 @@ def final_remaining_reconstruction(
 
 ######################################################
 def get_moleclist(newcell, refcell, all_molecules, debug: int = 0):
+    """
+    Build the molecular list of a reconstructed unit cell
+    """
     cov_factor = refcell.refmoleclist[0].cov_factor
     metal_factor = refcell.refmoleclist[0].metal_factor
 
@@ -1239,8 +1192,10 @@ def get_moleclist(newcell, refcell, all_molecules, debug: int = 0):
     return newcell
 
 
-######################################################
 def get_unique_indices(newcell, reference_species_list, debug: int = 0):
+    """
+    Match reconstructed species to reference species and assign unique indices
+    """
     newcell.unique_indices = []
     newcell.species_list = []
     for mol in newcell.moleclist:
@@ -1292,6 +1247,3 @@ def get_unique_indices(newcell, reference_species_list, debug: int = 0):
                             newcell.species_list.append(met)
 
     return newcell
-
-
-######################################################

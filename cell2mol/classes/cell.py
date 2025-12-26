@@ -273,12 +273,6 @@ class Cell(BaseModel):
                     self.species_list.append(met)
         return self.unique_species
 
-    #######################################################
-    # def get_fractional_coord(self):
-    #     self.frac_coord = cart2frac(self.coord, self.cellvec)
-    #     return self.frac_coord
-
-    #######################################################
     def check_missing_H(self, debug: int = 0):
         from cell2mol.hydrogen import check_missing_hydrogens
 

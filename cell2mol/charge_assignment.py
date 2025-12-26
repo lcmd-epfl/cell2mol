@@ -2569,15 +2569,6 @@ def correct_smiles_ligand(ligand: object, debug: int = 0) -> Tuple[str, object]:
             ]
             ligand.set_charges(atomic_charges=corr_atom_charges)
 
-        ## visulize a corrected rdkit object
-        # if debug >=2:
-        #     from IPython.display import display
-        #     from rdkit.Chem.Draw import IPythonConsole
-        #     IPythonConsole.drawOptions.addAtomIndices = True
-        #     IPythonConsole.molSize = 300,300
-
-        #     print(f"{ligand.formula=} {smiles=}")
-        #     display(mol_with_atom_index(obj))
         return True, fix_zwitterions
 
     except rdkit.Chem.rdchem.AtomValenceException as e:

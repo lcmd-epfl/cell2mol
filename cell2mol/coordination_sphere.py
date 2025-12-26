@@ -37,13 +37,12 @@ from cell2mol.connectivity import (
 )
 from cell2mol.elementdata import ElementData
 from scipy.optimize import linear_sum_assignment  # Hungarian algorithm
-from scipy.stats import special_ortho_group  # more evenly distributed
+from scipy.stats import special_ortho_group
 from scipy.linalg import svd
 from collections import defaultdict
 
 elemdatabase = ElementData()
 
-#######################################################
 # Load YAML filem
 path = os.path.join(
     os.path.abspath(os.path.dirname(__file__)), "ideal_structures_center.yaml"
@@ -53,129 +52,6 @@ with open(path, "r") as file:
 ideal_shapes_from_cosymlib = {key: np.array(value) for key, value in data.items()}
 
 
-#######################################################
-###     Define coordination geometry from groups    ###
-#######################################################
-def define_coordination_geometry(
-    metal: object, coord_group: list, debug: int = 0
-) -> object:
-    symbols = []
-    positions = []
-    coord_haptic_type = []
-
-    symbols.append(metal.label)
-    positions.append(metal.coord)
-    if debug >= 2:
-        print(f"METAL.DEFINE_coordination_geometry: {metal.label} {metal.coord}")
-    if debug >= 1:
-        print(
-            f"METAL.DEFINE_coordination_geometry: coord_group formula {[group.formula for group in coord_group]}"
-        )
-    if debug >= 1:
-        print(
-            f"METAL.DEFINE_coordination_geometry: coord_group hapticity {[group.is_haptic if group.subtype != 'metal' else False for group in coord_group]}"
-        )
-    if debug >= 1:
-        print(
-            f"METAL.DEFINE_coordination_geometry: coord_group atoms{[[a.label for a in group.atoms] if group.subtype != 'metal' else [group.label] for group in coord_group]}"
-        )
-
-    count = 0
-    for group in coord_group:
-        if group.subtype == "metal":
-            symbols.append(group.label)
-            positions.append(group.coord)
-            count += 1
-        elif not group.is_haptic:
-            for atom in group.atoms:
-                symbols.append(atom.label)
-                positions.append(atom.coord)
-                count += 1
-                if debug >= 2:
-                    print("METAL.DEFINE_coordination_geometry:", atom.label, atom.coord)
-        else:
-            if debug >= 2:
-                print(f"METAL.DEFINE_coordination_geometry: {group.haptic_type=}")
-            # if debug >= 2 : print(f"METAL.DEFINE_coordination_geometry: {[atom.coord for atom in group.atoms]}")
-            haptic_center_coord = compute_centroid(
-                np.array([atom.coord for atom in group.atoms])
-            )
-            symbols.append(str(group.haptic_type))
-            positions.append(haptic_center_coord.tolist())
-            count += 1
-            if debug >= 2:
-                print(f"mid point of {group.haptic_type=}", haptic_center_coord)
-            coord_haptic_type.append(group.haptic_type)
-
-    posgeom_dev = shape_measure(symbols, positions, debug=debug)
-    coord_nr = count
-    if len(posgeom_dev) > 0:
-        coordination_geometry = min(posgeom_dev, key=posgeom_dev.get)
-        geom_deviation = min(posgeom_dev.values())
-    else:
-        coordination_geometry = "Undefined"
-        geom_deviation = "Undefined"
-
-    if debug >= 1:
-        # for haptic ligands, it's the mid point of haptic ligands
-        print(
-            f"METAL.DEFINE_coordination_geometry: The number of coordinating points: {coord_nr}"
-        )
-        print(f"METAL.DEFINE_coordination_geometry: {posgeom_dev}")
-        print(
-            f"METAL.DEFINE_coordination_geometry: The type of hapticity : {coord_haptic_type}"
-        )
-
-    if debug >= 1:
-        print(
-            f"METAL.DEFINE_coordination_geometry: The most likely geometry is '{coordination_geometry}' with deviation value {geom_deviation}"
-        )
-
-    # return coordination_geometry
-    return coord_nr, coordination_geometry, geom_deviation
-
-
-#######################################################
-def shape_measure(symbols: list, positions: list, debug: int = 0) -> dict:
-    # Get shape measure of a set of coordinates
-
-    if debug >= 2:
-        print(f"SHAPE_MEASURE: {symbols=}")
-    if debug >= 2:
-        print(f"SHAPE_MEASURE: {positions=}")
-
-    cn = len(symbols) - 1  # coordination number of metal center
-    if debug >= 2:
-        print(f"SHAPE_MEASURE: coordination number of metal center {cn}")
-
-    if cn == 0:
-        posgeom_dev = {}
-    elif cn == 1:
-        posgeom_dev = {"Linear": 0.0}
-    else:
-        posgeom_dev = {}
-        try:
-            ref_geom = np.array(
-                shape_structure_references_simplified["{} Vertices".format(cn)],
-                dtype=object,
-            )
-            ideal_shapes = {}
-            for idx, rg in enumerate(ref_geom[:, 0]):
-                geom = ref_geom[:, 3][idx]
-                ideal_shapes[geom] = ideal_shapes_from_cosymlib[rg]
-            print(f"SHAPE_MEASURE: Ideal_shapes: {ideal_shapes.keys()}")
-            for geom, ideal_shape in ideal_shapes.items():
-                chsm = calc_cshm_fast(positions, ideal_shape)
-                posgeom_dev[geom] = round(float(chsm), 3)
-        except:
-            print(
-                f"SHAPE_MEASURE: {cn} Vertices not found in shape_structure_references"
-            )
-
-    return posgeom_dev
-
-
-#######################################################
 shape_structure_references_simplified = {
     "2 Vertices": [
         ["L-2", 1, "Dinfh", "Linear"],
@@ -281,7 +157,126 @@ shape_structure_references_simplified = {
 }
 
 
-########################################################
+def define_coordination_geometry(
+    metal: object, coord_group: list, debug: int = 0
+) -> object:
+    """Define the coordination geometry of a metal center based on its coordinating groups"""
+
+    symbols = []
+    positions = []
+    coord_haptic_type = []
+    symbols.append(metal.label)
+    positions.append(metal.coord)
+
+    if debug >= 2:
+        print(f"METAL.DEFINE_coordination_geometry: {metal.label} {metal.coord}")
+    if debug >= 1:
+        print(
+            f"METAL.DEFINE_coordination_geometry: coord_group formula {[group.formula for group in coord_group]}"
+        )
+    if debug >= 1:
+        print(
+            f"METAL.DEFINE_coordination_geometry: coord_group hapticity {[group.is_haptic if group.subtype != 'metal' else False for group in coord_group]}"
+        )
+    if debug >= 1:
+        print(
+            f"METAL.DEFINE_coordination_geometry: coord_group atoms{[[a.label for a in group.atoms] if group.subtype != 'metal' else [group.label] for group in coord_group]}"
+        )
+
+    count = 0
+    for group in coord_group:
+        if group.subtype == "metal":
+            symbols.append(group.label)
+            positions.append(group.coord)
+            count += 1
+        elif not group.is_haptic:
+            for atom in group.atoms:
+                symbols.append(atom.label)
+                positions.append(atom.coord)
+                count += 1
+                if debug >= 1:
+                    print("METAL.DEFINE_coordination_geometry:", atom.label, atom.coord)
+        else:
+            if debug >= 1:
+                print(f"METAL.DEFINE_coordination_geometry: {group.haptic_type=}")
+
+            haptic_center_coord = compute_centroid(
+                np.array([atom.coord for atom in group.atoms])
+            )
+            symbols.append(str(group.haptic_type))
+            positions.append(haptic_center_coord.tolist())
+            count += 1
+            if debug >= 2:
+                print(f"mid point of {group.haptic_type=}", haptic_center_coord)
+            coord_haptic_type.append(group.haptic_type)
+
+    posgeom_dev = shape_measure(symbols, positions, debug=debug)
+    coord_nr = count
+    if len(posgeom_dev) > 0:
+        coordination_geometry = min(posgeom_dev, key=posgeom_dev.get)
+        geom_deviation = min(posgeom_dev.values())
+    else:
+        coordination_geometry = "Undefined"
+        geom_deviation = "Undefined"
+
+    if debug >= 0:
+        # for haptic ligands, it's the mid point of haptic ligands
+        print(
+            f"METAL.DEFINE_coordination_geometry: The number of coordinating points: {coord_nr}"
+        )
+        print(f"METAL.DEFINE_coordination_geometry: {posgeom_dev}")
+        print(
+            f"METAL.DEFINE_coordination_geometry: The type of hapticity : {coord_haptic_type}"
+        )
+
+    if debug >= 0:
+        print(
+            f"METAL.DEFINE_coordination_geometry: The most likely geometry is '{coordination_geometry}' with deviation value {geom_deviation}"
+        )
+
+    # return coordination_geometry
+    return coord_nr, coordination_geometry, geom_deviation
+
+
+def shape_measure(symbols: list, positions: list, debug: int = 0) -> dict:
+    """Shape measure calculation adapted from a set of coordinates"""
+    if debug >= 2:
+        print(f"SHAPE_MEASURE: {symbols=}")
+    if debug >= 2:
+        print(f"SHAPE_MEASURE: {positions=}")
+
+    cn = len(symbols) - 1  # coordination number of metal center
+    if debug >= 2:
+        print(f"SHAPE_MEASURE: coordination number of metal center {cn}")
+
+    if cn == 0:
+        posgeom_dev = {}
+    elif cn == 1:
+        posgeom_dev = {"Linear": 0.0}
+    else:
+        posgeom_dev = {}
+        try:
+            ref_geom = np.array(
+                shape_structure_references_simplified["{} Vertices".format(cn)],
+                dtype=object,
+            )
+            ideal_shapes = {}
+            for idx, rg in enumerate(ref_geom[:, 0]):
+                geom = ref_geom[:, 3][idx]
+                ideal_shapes[geom] = ideal_shapes_from_cosymlib[rg]
+            if debug >= 2:
+                print(f"SHAPE_MEASURE: Ideal_shapes: {ideal_shapes.keys()}")
+            for geom, ideal_shape in ideal_shapes.items():
+                chsm = calc_cshm_fast(positions, ideal_shape)
+                posgeom_dev[geom] = round(float(chsm), 3)
+        except:
+            print(
+                f"SHAPE_MEASURE: {cn} Vertices not found in shape_structure_references"
+            )
+
+    return posgeom_dev
+
+
 def normalize_structure(coordinates):
     # center and normalize the structure for CShM calculations
     centered_coords = coordinates - np.mean(coordinates, axis=0)
@@ -289,7 +284,6 @@ def normalize_structure(coordinates):
     return centered_coords / norm
 
 
-########################################################
 def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
     # faster Hungarian algorithm optimization
     # check number of trials, if it is to low, it calculates the
@@ -342,7 +336,6 @@ def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
     return min_cshm * 100
 
 
-#######################################################
 def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
     if debug > 0:
         print("Entering COORD_CORR_NONHAPTIC:")
@@ -365,7 +358,6 @@ def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
 
     ## First Correction (former verify_connectivity)
     conn_idx = []
-    # conn_idx_by_metal = {met.atom_site_label : [] for met in group.metals}
     conn_idx_by_metal = {jdx: [] for jdx, met in enumerate(group.metals)}
     final_ligand_indices = []
     good_atoms = []
@@ -376,8 +368,8 @@ def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
                 f"\tCoordinating atom label={atom.label} with mconnec={atom.mconnec}, original group index {idx}"
             )
         isremoved = False
-        ## Now there is an extra loop for each metal of the group. For bridging ligands
-        # print(f"\t{[met in for met in group.metals]=}")
+
+        ## Now there is an extra loop for each metal of the group.
         for jdx, met in enumerate(group.metals):
             if isremoved:
                 continue
@@ -463,17 +455,19 @@ def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
                         f"\tAtom {atom.label} (atom {ligand_idx=}) is not connected to metal {met.label} ({met.atom_site_label},{jdx=})"
                     )  # (metal group.metals index {jdx=})")
 
-    print(f"conn_idx before set: {conn_idx=}")
-    print(f"conn_idx_by_metal: {conn_idx_by_metal=}")
+    if debug > 2:
+        print(f"conn_idx before set: {conn_idx=}")
+        print(f"conn_idx_by_metal: {conn_idx_by_metal=}")
     conn_idx = sorted(list(set(conn_idx)))
     split_groups = []
     final_ligand_indices_by_metal = {jdx: [] for jdx, met in enumerate(group.metals)}
     for jdx, indices in conn_idx_by_metal.items():
         metal = group.metals[jdx]
         if indices:
-            print(
-                f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}"
-            )
+            if debug > 2:
+                print(
+                    f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}"
+                )
             new_group = [i for i in indices]
             split_groups.append(new_group)
 
@@ -485,17 +479,19 @@ def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
                     atom.get_parent_index("ligand")
                 )
 
-    print(f"conn_idx: {conn_idx=}")
-    print(f"split_groups: {split_groups=}")
     final_group_indices = split_groups
-    print(f"final_group_indices: {final_group_indices=}")
-    print(f"final_ligand_indices_by_metal: {final_ligand_indices_by_metal=}")
+    if debug > 2:
+        print(f"conn_idx: {conn_idx=}")
+        print(f"split_groups: {split_groups=}")
+
+        print(f"final_group_indices: {final_group_indices=}")
+        print(f"final_ligand_indices_by_metal: {final_ligand_indices_by_metal=}")
     grouped = defaultdict(list)
     for k, v in final_ligand_indices_by_metal.items():
         grouped[tuple(v)].append(k)
-    # turn values into a list of lists
     group_metals_indices = [v for v in grouped.values()]
-    print(f"group_metals_indices: {group_metals_indices=}")
+    if debug > 2:
+        print(f"group_metals_indices: {group_metals_indices=}")
     return (
         group,
         final_group_indices,
@@ -505,31 +501,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
 
 
 #######################################################
-def extract_final_indices(initial_list, intermediate_list):
-    result = []
-    seen = set()
-
-    # Normalize flat list to nested list
-    if intermediate_list and isinstance(intermediate_list[0], int):
-        intermediate_list = [[i] for i in intermediate_list]
-
-    for jdx, sublist in enumerate(intermediate_list):
-        group = []
-        for idx in sublist:
-            if idx not in seen:
-                group.append(idx)
-                # group.append(initial_list[idx])
-                seen.add(idx)
-
-        if group:
-            result.append(group)
-
-    return result
-
-
-#######################################################
 def coordination_correction_for_haptic(group: object, debug: int = 0):
-    add_factor = 0.45
     if debug > 0:
         print("Entering COORD_CORR_HAPTIC:")
     single_ring = is_single_ring(group.labels, group.coord)
@@ -581,7 +553,8 @@ def coordination_correction_for_haptic(group: object, debug: int = 0):
                     print(
                         f"\tAtom {atom.label} ({ligand_idx=}) is not connected to metal {met.label} ({met.atom_site_label},{jdx=})"
                     )  # , group.metals index {jdx=})")
-    print(f"conn_idx before set: {conn_idx=}")
+    if debug > 2:
+        print(f"conn_idx before set: {conn_idx=}")
     conn_idx = sorted(list(set(conn_idx)))
     split_groups = []
     final_ligand_indices_by_metal = {jdx: [] for jdx, met in enumerate(group.metals)}
@@ -601,25 +574,27 @@ def coordination_correction_for_haptic(group: object, debug: int = 0):
                 )
                 if single_ring:
                     # For single ring, we need to check distances
-                    print("Checking distances for a single ring")
+                    if debug > 2:
+                        print("Checking distances for a single ring")
                     distances = [
                         get_dist(metal.coord, group.atoms[i].coord) for i in indices
                     ]
                     mean = round(np.mean(distances), 3)
                     std_dev = round(float(np.std(distances)), 3)
                     z_scores = (distances - mean) / std_dev
-
-                    print(
-                        f"Distances: {distances}, Mean: {mean}, Std Dev: {std_dev}, Z-scores: {z_scores}"
-                    )
+                    if debug > 2:
+                        print(
+                            f"Distances: {distances}, Mean: {mean}, Std Dev: {std_dev}, Z-scores: {z_scores}"
+                        )
                     std_thresh = 0.1
                     z_hi = 2.0  # too far (large positive z)
                     z_lo = 1.2  # very close (large negative z)
                     too_far_idx = [i for i, z in enumerate(z_scores) if z > z_hi]
                     very_close_idx = [i for i, z in enumerate(z_scores) if z < -z_lo]
-                    print(
-                        f"Too far indices: {too_far_idx}, Very close indices: {very_close_idx}"
-                    )
+                    if debug > 2:
+                        print(
+                            f"Too far indices: {too_far_idx}, Very close indices: {very_close_idx}"
+                        )
                     new_group = []
                     if std_dev > std_thresh:
                         if len(too_far_idx) > 0 and len(very_close_idx) == 0:
@@ -652,11 +627,13 @@ def coordination_correction_for_haptic(group: object, debug: int = 0):
                                     print(
                                         f"Distance {distances[idx]} has a z-score {z_scores[idx]}, resetting mconnec for atom {group.atoms[idx].label}"
                                     )
-                        print(f"New group after distance check: {new_group}")
+                        if debug > 2:
+                            print(f"New group after distance check: {new_group}")
                     else:
-                        print(
-                            f"std_dev is too low ({std_dev}), adding all indices to conn_idx"
-                        )
+                        if debug > 2:
+                            print(
+                                f"std_dev is too low ({std_dev}), adding all indices to conn_idx"
+                            )
                         new_group = [i for i in indices]
                 else:
                     new_group = [i for i in indices]
@@ -670,16 +647,19 @@ def coordination_correction_for_haptic(group: object, debug: int = 0):
                     atom.get_parent_index("ligand")
                 )
 
-    print(f"conn_idx: {conn_idx=}")
-    print(f"split_groups: {split_groups=}")
     final_group_indices = split_groups
-    print(f"final_group_indices: {final_group_indices=}")
-    print(f"final_ligand_indices_by_metal: {final_ligand_indices_by_metal=}")
+    if debug > 2:
+        print(f"conn_idx: {conn_idx=}")
+        print(f"split_groups: {split_groups=}")
+
+        print(f"final_group_indices: {final_group_indices=}")
+        print(f"final_ligand_indices_by_metal: {final_ligand_indices_by_metal=}")
     grouped = defaultdict(list)
     for k, v in final_ligand_indices_by_metal.items():
         grouped[tuple(v)].append(k)
     group_metals_indices = [v for v in grouped.values()]
-    print(f"group_metals_indices: {group_metals_indices=}")
+    if debug > 2:
+        print(f"group_metals_indices: {group_metals_indices=}")
     return (
         group,
         final_group_indices,

@@ -12,6 +12,13 @@ from cell2mol.read_write import (
     exit_with_error_input,
     exit_with_error_exception,
 )
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message="crystal system .* is not interpreted for space group",
+    category=UserWarning,
+)
 
 logger = logging.getLogger("cell2mol")
 VERSION = "2.0"
@@ -56,7 +63,7 @@ def handle_cif_file(
     current_dir,
     cif_bond_info,
 ):
-    logger.info("Processing CIF file: %s", input_path)
+    logger.info("Processing CIF file")
 
     cif_okay, error_message = prefilter_cif(input_path)
     if not cif_okay:

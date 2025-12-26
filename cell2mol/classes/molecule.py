@@ -480,22 +480,18 @@ class Molecule(Specie):
             self.ligands = []
             self.metals = []
             # Identify Metals and the rest
-            metal_idx = list(
-                [self.indices[idx] for idx in get_metal_idxs(self.labels, debug=debug)]
-            )
+            metal_idx = list([self.indices[idx] for idx in get_metal_idxs(self.labels)])
             ia_iia_metal_idx = list(
                 [
                     self.indices[idx]
-                    for idx in get_alkali_alkaline_earth_metal_idxs(
-                        self.labels, debug=debug
-                    )
+                    for idx in get_alkali_alkaline_earth_metal_idxs(self.labels)
                 ]
             )
 
             non_transition_metals_idx = list(
                 [
                     self.indices[idx]
-                    for idx in get_non_transition_metal_idxs(self.labels, debug=debug)
+                    for idx in get_non_transition_metal_idxs(self.labels)
                 ]
             )
             if len(non_transition_metals_idx) > 0:
