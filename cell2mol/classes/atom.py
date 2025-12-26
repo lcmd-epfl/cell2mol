@@ -243,14 +243,12 @@ class Atom(BaseModel):
             to_print += f" Sub-Type                     = {self.subtype}\n"
         to_print += f" Label                        = {self.label}\n"
         to_print += f" Atomic Number                = {self.atnum}\n"
-        # idx = self.get_parent_index("molecule")
-        # if idx is not None:
-        #     to_print += f" Index in Molecule            = {idx}\n"
-        # idx = self.get_parent_index("ligand")
-        # if idx is not None:
-        #     to_print += f" Index in Ligand              = {idx}\n"
-        # if self.occurrence is not None:
-        #     to_print += f" Occurrence in Parent         = {self.occurrence}\n"
+        idx = self.get_parent_index("molecule")
+        if idx is not None:
+            to_print += f" Index in Molecule            = {idx}\n"
+        idx = self.get_parent_index("ligand")
+        if idx is not None:
+            to_print += f" Index in Ligand              = {idx}\n"
         if self.mconnec is not None:
             to_print += f" Metal Adjacency (mconnec)    = {self.mconnec}\n"
         if self.connec is not None:

@@ -62,8 +62,6 @@ def process_refcell(input_path, name, current_dir, cif_bond_info):
         sym_ops,
     ) = get_cell_parameters(structure)
 
-    print(f"{sym_ops=}\n{type(sym_ops)=}")
-
     # Unit cell
     unitcell = Cell.from_positional(
         name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param
@@ -107,7 +105,8 @@ def process_refcell(input_path, name, current_dir, cif_bond_info):
         cell_param=cell_param,
     )
     cells.save(os.path.join(current_dir, f"Cells_{name}.json"), format="json")
-    cells.save(os.path.join(current_dir, f"Cells_{name}.cell"), format="pickle")
+    # cells.save(os.path.join(current_dir, f"Cells_{name}.cell"), format="pickle")
+
     # Summary
     summary_fname = os.path.join(current_dir, "reference_summary.out")
     with open(summary_fname, "w") as f:
@@ -169,11 +168,6 @@ def create_reference(input_path, name, cell_vector, cell_param, cif_bond_info):
         cif_bond_info,
         geom_bond_cif,
         moiety_list_cif,
-    )
-
-    logger.debug(
-        "exist_cif_bond_moiety: %s",
-        refcell.exist_cif_bond_moiety,
     )
 
     if cif_bond_info:

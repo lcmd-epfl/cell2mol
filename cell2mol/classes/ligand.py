@@ -286,7 +286,7 @@ class Ligand(Specie):
         if debug >= 2:
             print(f"\tLIGAND.SPLIT_LIGAND: {blocklist=}")
 
-        blocklist = check_blocklist(conn_labels, conn_coord, blocklist)
+        blocklist = check_blocklist(conn_labels, conn_coord, blocklist, debug=debug)
         if debug >= 2:
             print(f"\tLIGAND.SPLIT_LIGAND: After Checking {blocklist=}")
         ## Arranges Groups
@@ -345,10 +345,11 @@ class Ligand(Specie):
                 final_ligand_indices,
                 group_metals_indices,
             ) = newgroup.check_coordination(debug=debug)
-            print(f"\tLIGAND.SPLIT_LIGAND: {newgroup.formula} {newgroup.labels}")
-            print(f"\tLIGAND.SPLIT_LIGAND: {final_group_indices=}")
-            print(f"\tLIGAND.SPLIT_LIGAND: {final_ligand_indices=}")
-            print(f"\tLIGAND.SPLIT_LIGAND: {group_metals_indices=}")
+            if debug >= 2:
+                print(f"\tLIGAND.SPLIT_LIGAND: {newgroup.formula} {newgroup.labels}")
+                print(f"\tLIGAND.SPLIT_LIGAND: {final_group_indices=}")
+                print(f"\tLIGAND.SPLIT_LIGAND: {final_ligand_indices=}")
+                print(f"\tLIGAND.SPLIT_LIGAND: {group_metals_indices=}")
             # print(f"\tLIGAND.SPLIT_LIGAND: connected to {[newgroup.metals[kdx].atom_site_label for kdx in group_metals_indices]}")
             if not is_single_sublist(
                 final_group_indices
