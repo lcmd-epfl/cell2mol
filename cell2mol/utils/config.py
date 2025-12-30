@@ -13,6 +13,7 @@ METAL_FACTOR = DEFAULT_METAL_FACTOR
 
 USE_BOND_INFO = False
 
+
 def dump():
     """Return runtime configuration as a formatted string."""
     lines = [
