@@ -2,16 +2,14 @@
 
 import os
 import logging
+from cell2mol.utils import config
 
 from cell2mol.args import parsing_arguments
 from cell2mol.refcell import process_refcell
 from cell2mol.unitcell import process_unitcell
 from cell2mol.molecule import process_molecule
-from cell2mol.read_write import (
-    prefilter_cif,
-    exit_with_error_input,
-    exit_with_error_exception,
-)
+from cell2mol.read_cif import prefilter_cif
+from cell2mol.write_results import exit_with_error_input, exit_with_error_exception
 import warnings
 
 warnings.filterwarnings(
@@ -20,12 +18,20 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 
-logger = logging.getLogger("cell2mol")
+logger = logging.getLogger(__name__)
 VERSION = "2.0"
 
 
 def main():
     args = parsing_arguments()
+
+    # --- set global runtime config ---
+    if args.cif_bond_info:
+        config.USE_BOND_INFO = True
+
+    if args.print_config:
+        print(config.dump())
+        return
 
     current_dir = os.getcwd()
     input_path = os.path.normpath(args.filepath)
@@ -40,7 +46,6 @@ def main():
             system_type=args.system_type,
             name=name,
             current_dir=current_dir,
-            cif_bond_info=args.cif_bond_info,
         )
 
     elif extension == ".xyz":
@@ -61,7 +66,6 @@ def handle_cif_file(
     system_type,
     name,
     current_dir,
-    cif_bond_info,
 ):
     logger.info("Processing CIF file")
 
@@ -78,7 +82,6 @@ def handle_cif_file(
                 input_path=input_path,
                 name=name,
                 current_dir=current_dir,
-                cif_bond_info=cif_bond_info,
             )
 
         elif system_type == "unitcell":
@@ -87,7 +90,6 @@ def handle_cif_file(
                 input_path=input_path,
                 name=name,
                 current_dir=current_dir,
-                cif_bond_info=cif_bond_info,
             )
 
         else:
