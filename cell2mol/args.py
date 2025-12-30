@@ -69,6 +69,11 @@ def parsing_arguments():
         help="Logging verbosity level",
     )
 
+    parser.add_argument(
+        "--print-config",
+        action="store_true",
+        help="Print runtime configuration and exit",
+    )
     args = parser.parse_args()
 
     # ----------------------------
@@ -92,9 +97,13 @@ def parsing_arguments():
     # ----------------------------
     # Logging configuration
     # ----------------------------
+
+    # FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-30s:%(funcName)-30s | %(message)s"
+    # FORMAT = "%(levelname)-8s | %(name)-30s:%(funcName)-30s | %(message)s"
+    FORMAT = "%(funcName)-30s | %(message)s"
     logging.basicConfig(
         level=getattr(logging, args.log_level),
-        format="%(levelname)s | %(message)s",
+        format=FORMAT,
     )
 
     return args
