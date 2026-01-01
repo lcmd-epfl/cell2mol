@@ -141,8 +141,12 @@ def extract_refmoleclist_xyz(fdir, refmoleclist, name: str):
                     charge=ref.totcharge_cif,
                     spin=spin,
                 )
-                print(
-                    f"Ref molecule {i} {ref.formula} total charge {ref.totcharge_cif} lowest spin multiplicity {spin}"
+                logger.debug(
+                    "Ref molecule %s %s total charge %s lowest spin multiplicity %s",
+                    i,
+                    ref.formula,
+                    ref.totcharge_cif,
+                    spin,
                 )
             else:
                 writexyz(
@@ -153,8 +157,10 @@ def extract_refmoleclist_xyz(fdir, refmoleclist, name: str):
                     charge="",
                     spin="",
                 )
-                print(
-                    f"Ref molecule {i} {ref.formula} without charge and spin information"
+                logger.debug(
+                    "Ref molecule %s %s without charge and spin information",
+                    i,
+                    ref.formula,
                 )
 
 
@@ -749,38 +755,32 @@ def print_molecule(mol):
 
 
 def handle_error(case: int):
-    print(f"Cell2mol terminated with error number {case}. Message:")
+    logger.info("cell2mol terminated with error case %d", case)
     if case == 1:
-        print(
+        logger.info(
             "The cell object has isolated H atoms in the reference molecules list. This typically indicates an error. STOPPING"
         )
     if case == 2:
-        print(
+        logger.info(
             "We detected that H atoms are likely missing. This will cause errors in the charge prediction, so STOPPING pre-emptively."
         )
     if case == 3:
-        print("We failed to get fragments. STOPPING pre-emptively.")
+        logger.info("We failed to get fragments. STOPPING pre-emptively.")
     if case == 4:
-        print(
+        logger.info(
             "After reconstruction of the unit cell, we still detected some fragments. STOPPING pre-emptively."
         )
     if case == 5:
-        print("Error in list of possible charges received for molecule or ligand")
+        logger.info("Error in list of possible charges received for molecule or ligand")
     if case == 6:
-        print("More than one valid possible charge distribution found")
+        logger.info("More than one valid possible charge distribution found")
     if case == 7:
-        print("No valid possible charge distribution found")
-    # if case == 8: print("Error while preparing molecules")
+        logger.info("No valid possible charge distribution found")
     if case == 8:
-        print("Error while creating bonds for molecule or ligand")
-    # if case == 9: print("The charge neutralization failed.")
-    if case == 9:
-        print(
-            "Discrepancies found between refcell and CIF. This will cause errors in the charge prediction, so STOPPING pre-emptively."
-        )
+        logger.info("Error while creating bonds for molecule or ligand")
 
     if case == 0:
-        print("No errors Found")
+        logger.info("No errors Found")
     # sys.exit(1)
 
 
