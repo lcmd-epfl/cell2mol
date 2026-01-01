@@ -1,12 +1,8 @@
 import numpy as np
 from typing import Any
 from cell2mol.my_types import Type
-from cell2mol.connectivity import (
-    get_radii,
-    get_adjmatrix,
-    get_adjmatrix_from_cif_bonds,
-    labels2formula,
-)
+from cell2mol.connectivity import get_adjmatrix, get_adjmatrix_from_cif_bonds
+from cell2mol.element_utils import labels2formula, get_radii
 from cell2mol.utils.pydantic import BaseModel
 from cell2mol.my_types import NDArray
 
@@ -14,11 +10,13 @@ from cell2mol.my_types import NDArray
 from pydantic import Field, computed_field
 from typing_extensions import deprecated
 from cell2mol.elementdata import ElementData
+import logging
+from cell2mol.utils import config
 
+logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 
-#######################################################
 class Protonation(BaseModel):
     # Required constructor parameters
     labels: list[str]
@@ -87,7 +85,7 @@ class Protonation(BaseModel):
         # Note: parent may be a string UUID during deserialization, skip in that case
         if self.parent is not None and not isinstance(self.parent, str):
             refcell = self.parent.get_parent("reference")
-            geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+            bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
 
             if refcell is not None:
                 self.atom_site_labels_indices = [
@@ -97,25 +95,23 @@ class Protonation(BaseModel):
                     refcell.atom_site_labels[idx]
                     for idx in self.atom_site_labels_indices
                 ]
-                # print("PROTONATION.atom_site_labels_indices", self.atom_site_labels_indices)
-                # print("PROTONATION.atom_site_labels", self.atom_site_labels)
-
-            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
-                self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(
-                    self.labels, self.coords, self.atom_site_labels, geom_bond_cif
+            use_bond_info = config.USE_BOND_INFO
+            if use_bond_info:
+                self.status = True
+                adjmat = get_adjmatrix_from_cif_bonds(
+                    self.labels,
+                    self.coords,
+                    atom_site_labels=self.atom_site_labels,
+                    bond_data=bond_data,
                 )
-                print(
-                    "PROTONATION.get_adjmatrix_from_cif_bonds",
-                    adjmat.shape,
-                    adjnum.shape,
-                )
+                adjnum = adjmat.sum(axis=1)
                 count = 0
                 if len(self.addedlist) > 0:
                     for idx, add in enumerate(self.addedlist):
                         if add != 0:
                             count += 1
                             added_idx = len(self.addedlist) - 1 + count
-                            print("PROTONATION.added_idx", f"{idx=} {added_idx=}")
+                            logger.debug("PROTONATION.added_idx %s %s", idx, added_idx)
                             adjmat[idx, added_idx] += 1
                             adjmat[added_idx, idx] += 1
                             adjnum[idx] += 1
@@ -124,30 +120,23 @@ class Protonation(BaseModel):
                 self.adjmat = adjmat
                 self.adjnum = adjnum
             else:
-                self.status, self.adjmat, self.adjnum, warning = get_adjmatrix(
-                    self.labels, self.coords, self.cov_factor, self.radii
+                self.status, self.adjmat, warning = get_adjmatrix(
+                    self.labels,
+                    self.coords,
+                    radii=self.radii,
+                    cov_factor=self.cov_factor,
                 )
+                self.adjnum = self.adjmat.sum(axis=1)
                 if warning:
-                    print("PROTONATION.get_adjmatrix warning:", warning)
                     self.status = False
 
     def reorder(self, map, debug: int = 0):
-        if debug > 0:
-            print("PROTONATION.REORDER. labels:", self.labels)
-        if debug > 0:
-            print("PROTONATION.REORDER. received map:", map)
-
         ## for protonation states with added atoms, the reorder map will have fewer items. Correct it here
         mapext = np.copy(map)
         if self.added_atoms > 0 and len(map) < len(self.labels):
             for ldx in range(0, self.added_atoms):
                 mapext = np.append(mapext, len(map) + ldx)
-            if debug > 0:
-                print("PROTONATION.REORDER. extended map:", mapext)
-        print("PROTONATION.REORDER. extended map:", mapext, len(mapext))
-        print("PROTONATION.REORDER. map:", map, len(map))
-        print("PROTONATION.REORDER. labels:", self.labels, len(self.labels))
-        print("PROTONATION.REORDER. addedlist:", self.addedlist, len(self.addedlist))
+
         assert len(mapext) == len(self.labels)
         assert len(map) == len(self.addedlist)
         if len(map) > 0:
@@ -165,16 +154,17 @@ class Protonation(BaseModel):
 
             self.typ = "Reordered"
             refcell = self.parent.get_parent("reference")
-            geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
-            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
-                self.status, adjmat, adjnum = get_adjmatrix_from_cif_bonds(
-                    self.labels, self.coords, self.atom_site_labels, geom_bond_cif
+            bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+            use_bond_info = config.USE_BOND_INFO
+            if use_bond_info:
+                self.status = True
+                adjmat = get_adjmatrix_from_cif_bonds(
+                    self.labels,
+                    self.coords,
+                    atom_site_labels=self.atom_site_labels,
+                    bond_data=bond_data,
                 )
-                print(
-                    "PROTONATION.get_adjmatrix_from_cif_bonds",
-                    adjmat.shape,
-                    adjnum.shape,
-                )
+                adjnum = adjmat.sum(axis=1)
                 count = 0
                 if len(self.addedlist) > 0:
                     for idx, add in enumerate(self.addedlist):
@@ -190,9 +180,13 @@ class Protonation(BaseModel):
                 self.adjmat = adjmat
                 self.adjnum = adjnum
             else:
-                self.status, self.adjmat, self.adjnum, warning = get_adjmatrix(
-                    self.labels, self.coords, self.cov_factor, self.radii
+                self.status, self.adjmat, warning = get_adjmatrix(
+                    self.labels,
+                    self.coords,
+                    radii=self.radii,
+                    cov_factor=self.cov_factor,
                 )
+                self.adjnum = self.adjmat.sum(axis=1)
         return self
 
     def __str__(self):
