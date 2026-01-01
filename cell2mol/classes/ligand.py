@@ -3,29 +3,21 @@ from __future__ import annotations
 import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
-
 from cell2mol.classes.atom import Atom
 from cell2mol.classes.group import Group
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
-from cell2mol.connectivity import (
-    check_blocklist,
-    get_adjmatrix,
-    get_adjmatrix_from_cif_bonds,
-    split_group,
-    split_species,
-)
-
+from cell2mol.connectivity import build_adjacency, split_species, split_group
+from cell2mol.utils import config
 from cell2mol.operations import extract_from_list, get_angle
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import HapticType, NOType, OptionalRefList, SubType
+import logging
 
 elemdatabase = ElementData()
+logger = logging.getLogger(__name__)
 
 
-################
-#### LIGAND ####
-################
 class Ligand(Specie):
     model_config = {"arbitrary_types_allowed": True}
 
@@ -54,7 +46,6 @@ class Ligand(Specie):
         return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
         # self.evaluate_as_nitrosyl() ### move to the split_complexes function
 
-    #######################################################
     def __repr__(self):
         to_print = ""
         to_print += "------------- Cell2mol LIGAND Object --------------\n"
@@ -64,62 +55,55 @@ class Ligand(Specie):
         to_print += "---------------------------------------------------\n"
         return to_print
 
-    #######################################################
-    def get_connected_metals(self, debug: int = 0):
+    def get_connected_metals(self, use_bond_info: bool | None = None):
         self.metals = []
         refcell = self.get_parent("reference")
-        geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+        bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
+        metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
         mol = self.get_parent("molecule")
 
-        if refcell is not None and refcell.exist_cif_bond_moiety:
-            for met in mol.metals:
-                tmplabels = list(self.labels.copy())
-                tmpcoord = list(self.coord.copy())
-                atom_site_labels = [atom.atom_site_label for atom in self.atoms]
-                tmplabels.append(met.label)
-                tmpcoord.append(met.coord)
-                atom_site_labels.append(met.atom_site_label)
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
+        canonical = "bond_info" if use_bond_info else "distance"
 
-                isgood, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(
-                    tmplabels,
-                    tmpcoord,
-                    atom_site_labels,
-                    geom_bond_cif,
-                    metal_only=True,
-                )
-                if isgood and any(tmpadjnum) > 0:
+        for met in mol.metals:
+            tmplabels = list(self.labels.copy())
+            tmpcoord = list(self.coord.copy())
+            atom_site_labels = [atom.atom_site_label for atom in self.atoms]
+            tmplabels.append(met.label)
+            tmpcoord.append(met.coord)
+            atom_site_labels.append(met.atom_site_label)
+            tmp_adjmat = build_adjacency(
+                labels=tmplabels,
+                positions=tmpcoord,
+                atom_site_labels=atom_site_labels,
+                bond_data=bond_data,
+                cov_factor=cov_factor,
+                metal_factor=metal_factor,
+                metal_only=True,
+                canonical=canonical,
+            )
+            if tmp_adjmat is None:
+                continue
+            else:
+                tmp_adjnum = tmp_adjmat.sum(axis=1)
+                if any(tmp_adjnum) > 0:
                     self.metals.append(met)
-                    if debug >= 0:
-                        print(
-                            f"LIGAND.Get_connected_metals: {self.formula} is connected to {met.label}"
-                        )
-        else:
-            for met in mol.metals:
-                tmplabels = list(self.labels.copy())
-                tmpcoord = list(self.coord.copy())
-                tmplabels.append(met.label)
-                tmpcoord.append(met.coord)
-                isgood, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
-                    tmplabels, tmpcoord, metal_only=True
-                )
-                if isgood and any(tmpadjnum) > 0:
-                    self.metals.append(met)
+                    logger.debug("%s is is connected to %s", self.formula, met.label)
 
-        return self.metals
-
-    #######################################################
-    def evaluate_as_nitrosyl(self, debug: int = 0):
+    def evaluate_as_nitrosyl(self):
         self.is_nitrosyl = False
         if self.natoms == 2 and "N" in self.labels and "O" in self.labels:
             self.is_nitrosyl = True
-            self.get_nitrosyl_geom(debug=debug)
+            self.get_nitrosyl_geom()
         return self.is_nitrosyl
 
-    #######################################################
-    def get_nitrosyl_geom(self: object, thres: float = 160, debug: int = 0) -> str:
-        # Function that determines whether the M-N-O angle of a Nitrosyl "ligand" is "Bent" or "Linear"
+    def get_nitrosyl_geom(self: object, thres: float = 160) -> str:
+        """Get the geometry of a Nitrosyl ligand."""
+        # Determines whether the M-N-O angle of a Nitrosyl "ligand" is "Bent" or "Linear"
         # Each case is treated differently
-        #:return NO_type: "Linear" or "Bent"
+        # return NO_type: "Linear" or "Bent"
         if self.atoms is None:
             self.set_atoms()
         if self.metals is None:
@@ -137,18 +121,10 @@ class Ligand(Specie):
             dist.append(np.linalg.norm(central - metal))
         tgt = np.argmin(dist)
         metal = self.metals[tgt].coord.copy()
-        if debug >= 2:
-            print("LIGAND.GET_NITRO_GEOM: coords:", central, extreme, metal)
-
         vector1 = np.subtract(np.array(central), np.array(extreme))
         vector2 = np.subtract(np.array(central), np.array(metal))
-        if debug >= 2:
-            print("LIGAND.GET_NITRO_GEOM: NITRO Vectors:", vector1, vector2)
 
         angle = get_angle(vector1, vector2)
-        if debug >= 2:
-            print("NITRO ANGLE:", angle, np.degrees(angle))
-
         if np.degrees(angle) > float(thres):
             self.NO_type = "Linear"
         else:
@@ -156,24 +132,20 @@ class Ligand(Specie):
 
         return self.NO_type
 
-    #######################################################
     def get_connected_idx(self, debug: int = 0):
-        ## Remember madjmat should not be computed at the ligand level. Since the metal is not there.
-        ## Now we operate at the molecular level. We get the parent molecule, and the indices of the ligand atoms in the molecule
+        # Remember madjmat should not be computed at the ligand level.
+        # Since the metal is not there.
+        # Operate at the molecular level.
+        # We get the parent molecule, and the indices of the ligand atoms in the molecule
         self.connected_idx = []
         if self.madjnum is None:
-            self.inherit_adjmatrix("molecule")
-        if debug > 2:
-            print(
-                f"LIGAND.GET_CONNECTED_IDX: {self.formula} {self.madjmat=} {self.madjnum=}"
-            )
+            self.set_inherit_adjmatrix("molecule")
         for idx, con in enumerate(self.madjnum):
             if con > 0:
                 self.connected_idx.append(idx)
         return self.connected_idx
 
-    #######################################################
-    def get_connected_atoms(self, debug: int = 0):
+    def get_connected_atoms(self):
         if self.atoms is None:
             self.set_atoms()
         if self.connected_idx is None:
@@ -183,60 +155,35 @@ class Ligand(Specie):
             if idx in self.connected_idx and at.mconnec > 0:
                 self.connected_atoms.append(at)
             elif idx in self.connected_idx and at.mconnec == 0:
-                print("WARNING: Atom appears in connected_idx, but has mconnec=0")
+                logger.warning("Atom appears in connected_idx, but has mconnec=0")
         return self.connected_atoms
 
-    #######################################################
-    def check_coordination(self, debug: int = 0):
+    def get_denticity(self):
         if self.groups is None:
-            self.split_ligand(debug=debug)
-        for g in self.groups:
-            if g.checked_coordination is None:
-                g.check_coordination(debug=debug)
-
-    #######################################################
-    def get_denticity(self, debug: int = 0):
-        if self.groups is None:
-            self.split_ligand(debug=debug)
-        if debug > 1:
-            print(
-                f"LIGAND.Get_denticity: checking connectivity of ligand {self.formula}"
-            )
-        if debug > 1:
-            print(
-                f"LIGAND.Get_denticity: initial connectivity is {len(self.connected_idx)}"
-            )
+            self.split_ligand()
         self.denticity = 0
         for g in self.groups:
-            # if debug > 0: print(f"LIGAND.Get_denticity: checking denticity of group \n{g}\n{g.madjnum=}\n{g.madjmat=}")
-            self.denticity += g.get_denticity(
-                debug=debug
-            )  ## A check is also performed at the group level
-        if debug > 0:
-            print(
-                f"LIGAND.Get_denticity: final connectivity of ligand {self.formula} is {self.denticity}"
-            )
+            self.denticity += g.get_denticity()
         return self.denticity
 
-    #######################################################
-    def split_ligand(self, debug: int = 0):
-        def is_single_sublist(intermediate_list):
-            return (
-                isinstance(intermediate_list, list)
-                and len(intermediate_list) == 1
-                and isinstance(intermediate_list[0], list)
-            )
+    def split_ligand(self, use_bond_info: bool | None = None):
+        """
+        Split a ligand into coordination groups.
+        """
 
-        if hasattr(self, "cov_factor"):
-            cov_factor = self.cov_factor
+        def _is_single_sublist(lst):
+            return isinstance(lst, list) and len(lst) == 1 and isinstance(lst[0], list)
 
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
+
+        # Reference / bond information
         refcell = self.get_parent("reference")
-        geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+        bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
 
-        if debug > 0:
-            print(f"\nLIGAND.SPLIT_LIGAND: splitting {self.formula} into groups")
-
-        # Split the "ligand to obtain the groups
+        # Coordination groups
+        logger.info("Splitting Ligand %s into groups", self.formula)
         self.groups = []
 
         # Identify Connected and Unconnected atoms (to the metal)
@@ -244,9 +191,9 @@ class Ligand(Specie):
             self.get_connected_idx()
         connected_idx = self.connected_idx
 
-        if debug >= 2:
-            print(f"\tLIGAND.SPLIT_LIGAND: {self.indices=}")
-            print(f"\tLIGAND.SPLIT_LIGAND: {connected_idx=}")
+        logger.debug(f"Ligand indices: {self.indices=}")
+        logger.debug(f"{connected_idx=}")
+
         conn_labels = extract_from_list(connected_idx, self.labels, dimension=1)
         conn_coord = extract_from_list(connected_idx, self.coord, dimension=1)
         if self.frac_coord is not None:
@@ -261,41 +208,25 @@ class Ligand(Specie):
             )
         else:
             conn_atom_site_labels = None
-        if debug >= 2:
-            print(f"\tLIGAND.SPLIT_LIGAND: {conn_labels=}")
-        if debug >= 2:
-            print(f"\tLIGAND.SPLIT_LIGAND: {conn_atom_site_labels=}")
-        if (
-            refcell is not None
-            and refcell.exist_cif_bond_moiety
-            and refcell.geom_bond_cif is not None
-        ):
-            blocklist = split_species(
-                conn_labels,
-                conn_coord,
-                radii=conn_radii,
-                atom_site_labels=conn_atom_site_labels,
-                geom_bond_cif=refcell.geom_bond_cif,
-                cov_factor=self.cov_factor,
-                debug=debug,
-            )
-        else:
-            blocklist = split_species(
-                conn_labels, conn_coord, radii=conn_radii, debug=debug
-            )
-        if debug >= 2:
-            print(f"\tLIGAND.SPLIT_LIGAND: {blocklist=}")
 
-        blocklist = check_blocklist(conn_labels, conn_coord, blocklist, debug=debug)
-        if debug >= 2:
-            print(f"\tLIGAND.SPLIT_LIGAND: After Checking {blocklist=}")
+        logger.debug(f"{conn_labels=}")
+        logger.debug(f"{conn_atom_site_labels=}")
+
+        blocklist = split_species(
+            labels=conn_labels,
+            pos=conn_coord,
+            radii=conn_radii,
+            indices=None,  # rest_indices
+            atom_site_labels=conn_atom_site_labels,
+            bond_data=bond_data,
+            cov_factor=cov_factor,
+            use_bond_info=use_bond_info,
+            apply_graph=True,
+        )
+
         ## Arranges Groups
         for b in blocklist:
-            if debug >= 2:
-                print(f"\tLIGAND.SPLIT_LIGAND: block={b}")
             gr_indices = extract_from_list(b, connected_idx, dimension=1)
-            if debug > 1:
-                print(f"\tLIGAND.SPLIT_LIGAND: {gr_indices=}")
             gr_labels = extract_from_list(b, conn_labels, dimension=1)
             gr_coord = extract_from_list(b, conn_coord, dimension=1)
             if self.frac_coord is not None:
@@ -323,115 +254,95 @@ class Ligand(Specie):
             # Pass the ligand atoms to the groud
             newgroup.set_atoms(
                 atomlist=gr_atoms,
+                create_adjacencies=False,
                 atom_site_labels=gr_atom_site_labels,
-                geom_bond_cif=geom_bond_cif,
+                use_bond_info=use_bond_info,
             )
             # Inherit the adjacencies from molecule
-            newgroup.inherit_adjmatrix("ligand")
+            newgroup.set_inherit_adjmatrix("ligand")
             # Associate the Groups with the Metals
-            newgroup.get_connected_metals(debug=debug)
-            newgroup.get_closest_metal(debug=debug)
-            newgroup.get_hapticity(debug=debug)
-            # if refcell.exist_cif_bond_moiety:
-            #     print(f"\tSPLIT_LIGAND: skipping check_coordination for group {newgroup.formula} because it is based on CIF bond information")
-            #     newgroup.checked_coordination = True
-            #     newgroup.get_denticity(debug=debug)
-            #     self.groups.append(newgroup)
-            # else:
+            newgroup.get_connected_metals()
+            newgroup.get_closest_metal()
+            newgroup.get_hapticity()
 
             (
                 newgroup,
                 final_group_indices,
                 final_ligand_indices,
                 group_metals_indices,
-            ) = newgroup.check_coordination(debug=debug)
-            if debug >= 2:
-                print(f"\tLIGAND.SPLIT_LIGAND: {newgroup.formula} {newgroup.labels}")
-                print(f"\tLIGAND.SPLIT_LIGAND: {final_group_indices=}")
-                print(f"\tLIGAND.SPLIT_LIGAND: {final_ligand_indices=}")
-                print(f"\tLIGAND.SPLIT_LIGAND: {group_metals_indices=}")
-            # print(f"\tLIGAND.SPLIT_LIGAND: connected to {[newgroup.metals[kdx].atom_site_label for kdx in group_metals_indices]}")
-            if not is_single_sublist(
-                final_group_indices
-            ):  # atoms in new group are connected to different metals
-                if debug > 1:
-                    print(
-                        f"\tenterting SPLIT_GROUP for the GROUP {newgroup.formula} with {final_group_indices=} {[met.label for met in newgroup.metals]}"
-                    )
+            ) = newgroup.check_coordination(use_bond_info=use_bond_info)
+
+            # atoms in new group are connected to different metals
+            if not _is_single_sublist(final_group_indices):
+                logger.debug(
+                    "Enterting SPLIT_GROUP for the GROUP  %s with %s %s",
+                    newgroup.formula,
+                    final_group_indices,
+                    [met.label for met in newgroup.metals],
+                )
                 for kdx, (conn_idx, metal_idx) in enumerate(
                     zip(final_group_indices, group_metals_indices)
                 ):
                     group_metals = [newgroup.metals[midx] for midx in metal_idx]
-                    if debug > 1:
-                        print(
-                            f"\tenterting SPLIT_GROUP for the GROUP {newgroup.labels} with {conn_idx=} {[met.atom_site_label for met in group_metals]=}"
-                        )
+                    logger.debug(
+                        "Enterting SPLIT_GROUP for the GROUP  %s with %s %s",
+                        newgroup.formula,
+                        final_group_indices,
+                        [met.label for met in newgroup.metals],
+                    )
                     splitted_groups = split_group(
                         newgroup,
                         conn_idx,
                         final_ligand_indices[kdx],
                         group_metals,
-                        debug=debug,
                     )
                     for g in splitted_groups:
                         self.groups.append(g)
             else:
-                if debug > 1:
-                    print(
-                        f"\tGROUP {newgroup.formula} with {final_group_indices=} connected to {[met.label for met in newgroup.metals]}"
-                    )
+                logger.debug(
+                    "GROUP %s with %s connected to %s",
+                    newgroup.formula,
+                    final_group_indices,
+                    [met.label for met in newgroup.metals],
+                )
                 conn_idx = final_group_indices[0]
                 group_metals = [newgroup.metals[kdx] for kdx in group_metals_indices[0]]
                 if len(conn_idx) == len(newgroup.atoms):
-                    if debug > 1:
-                        print("\tLIGAND.SPLIT_LIGAND: new group is found")
-                    newgroup.get_denticity(debug=debug)
+                    logger.debug("\tLIGAND.SPLIT_LIGAND: new group is found")
+                    newgroup.get_denticity()
                     # Top-down hierarchy
                     self.groups.append(newgroup)
                 elif len(conn_idx) == 0:
-                    if debug > 1:
-                        print("\tLIGAND.SPLIT_LIGAND: no group is found")
+                    logger.debug("\tLIGAND.SPLIT_LIGAND: no group is found")
                     continue
                 else:
-                    if debug > 1:
-                        print(
-                            f"\tenterting SPLIT_GROUP for the GROUP {newgroup.formula} with {conn_idx=}"
-                        )
+                    logger.debug(
+                        "Enterting SPLIT_GROUP for the GROUP %s with %s",
+                        newgroup.formula,
+                        conn_idx,
+                    )
                     splitted_groups = split_group(
                         newgroup,
                         conn_idx,
                         final_ligand_indices[0],
                         group_metals,
-                        debug=debug,
                     )
                     for g in splitted_groups:
                         self.groups.append(g)
-        if debug > 0:
-            print(
-                f"\tLIGAND.SPLIT_LIGAND: found groups {[group.formula for group in self.groups]}"
-            )
-        if debug > 3:
-            print(f"{self.groups}")
+        logger.info("Found groups %s", [group.formula for group in self.groups])
 
         return self.groups
 
-    #######################################################
-    def get_hapticity(self, debug: int = 0):
+    def get_hapticity(self):
         if self.groups is None:
-            self.split_ligand(debug=debug)
+            self.split_ligand()
         self.is_haptic = False
         self.haptic_type = []
         for gr in self.groups:
             if gr.is_haptic is None:
-                gr.get_hapticity(debug=debug)
+                gr.get_hapticity()
             for entry in gr.haptic_type:
                 self.haptic_type.append(entry)
-            # if gr.is_haptic:
-            #     self.is_haptic = True
-            #     self.haptic_type = gr.haptic_type
-            # for entry in gr.haptic_type:
-            #     if entry not in self.haptic_type:
-            #         self.haptic_type.append(entry)
         if len(self.haptic_type) > 0:
             self.is_haptic = True
 
