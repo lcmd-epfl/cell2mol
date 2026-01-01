@@ -14,31 +14,27 @@ from cell2mol.classes.atom import Atom
 from cell2mol.classes.charge_state import ChargeState
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.protonation import Protonation
-from cell2mol.connectivity import (
-    compare_atoms,
-    compare_species,
-    get_adjacency_types,
-    get_adjmatrix,
-    get_adjmatrix_from_cif_bonds,
-    get_alkali_alkaline_earth_metal_idxs,
-    get_element_count,
+from cell2mol.element_utils import (
     get_metal_idxs,
+    get_alkali_alkaline_earth_metal_idxs,
     get_post_transition_metal_idxs,
+    get_element_count,
     get_radii,
     labels2electrons,
     labels2formula,
 )
+from cell2mol.compare import compare_atoms, compare_species
+from cell2mol.connectivity import build_adjacency, get_adjacency_types
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import NDArray, RDKitObject, RefList, SubType
 from cell2mol.operations import compute_centroid, extract_from_list
-from cell2mol.utils import BaseModel
+from cell2mol.utils import BaseModel, config
+import logging
 
 elemdatabase = ElementData()
+logger = logging.getLogger(__name__)
 
 
-##################################
-####  CLASSES FOR CELL2MOL 2  ####
-##################################
 class Specie(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
@@ -75,9 +71,6 @@ class Specie(BaseModel):
 
     charge_state: ChargeState | None = None
     possible_cs: list[ChargeState] | list[int] | None = Field(default=None)
-
-    # TODO romaingrx: need clarification where we need this, it seems to be used
-    # for molecules and ligands
     origin: str | None = None
 
     # Frozen fields
@@ -99,32 +92,27 @@ class Specie(BaseModel):
 
     @property
     def iscomplex(self) -> bool:
-        return any(
-            (elemdatabase.elementblock[label] == "d")
-            or (elemdatabase.elementblock[label] == "f")
-            for label in self.labels
-        )
+        """True if the structure contains d- or f-block metals."""
+        return bool(get_metal_idxs(self.labels))
 
     @property
     def has_IA_IIA(self) -> bool:
-        return any(
-            (elemdatabase.elementgroup[label] == 1 and label != "H" and label != "D")
-            or (elemdatabase.elementgroup[label] == 2)
-            for label in self.labels
-        )
+        """True if the structure contains Group 1 or Group 2 metals (excluding H/D)."""
+        return bool(get_alkali_alkaline_earth_metal_idxs(self.labels))
 
     @property
     def has_post_transition_metal(self) -> bool:
-        post_transition_metals = {"Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"}
+        """True if the structure contains post-transition metals only."""
         return (
             not self.iscomplex
             and not self.has_IA_IIA
-            and any(label in post_transition_metals for label in self.labels)
+            and bool(get_post_transition_metal_idxs(self.labels))
         )
 
     @property
     def indices(self) -> list[int]:
-        ## Indices might be the atom ordering within a given specie. e.g. 1st, 2nd, 3rd atom of a specie.
+        # Indices might be the atom ordering within a given specie.
+        # e.g. 1st, 2nd, 3rd atom of a specie.
         return list(range(self.natoms))
 
     def model_post_init(self, context: Any) -> None:
@@ -149,7 +137,12 @@ class Specie(BaseModel):
     ) -> None:
         return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
 
-    ############
+    def set_subtype(self, subtype: SubType):
+        self.subtype = subtype
+
+    def set_origin(self, origin: str):
+        self.origin = origin
+
     def add_parent(self, parent: object, indices: list, overwrite: bool = True):
         ## associates a parent specie to self. The atom indices of self in parent are given in "indices"
         ## if parent of the same subtype already in self.parent then it is overwritten
@@ -183,7 +176,6 @@ class Specie(BaseModel):
                     self.parents.append(p2)
                     self.parents_indices.append(parent.get_parent_indices(p2.subtype))
 
-    ############
     def check_parent(self, subtype: str):
         ## checks if parent of a given subtype exists
         for p in self.parents:
@@ -191,7 +183,6 @@ class Specie(BaseModel):
                 return True
         return False
 
-    ############
     def get_parent(self, subtype: str):
         ## retrieves parent of a given subtype
         for p in self.parents:
@@ -199,7 +190,6 @@ class Specie(BaseModel):
                 return p
         return None
 
-    ############
     def get_parent_indices(self, subtype: str):
         ## retrieves parent of a given subtype
         for idx, p in enumerate(self.parents):
@@ -207,31 +197,17 @@ class Specie(BaseModel):
                 return self.parents_indices[idx]
         return None
 
-    ############
     def get_centroid(self):
         self.centroid = compute_centroid(np.array(self.coord))
+        # If fractional coordinates exists, then also computes their centroid
         if self.frac_coord is not None:
             self.frac_centroid = compute_centroid(np.array(self.frac_coord))
-            # If fractional coordinates exists, then also computes their centroid
         return self.centroid
 
-    ############
     def set_fractional_coord(self, frac_coord: list, debug: int = 0) -> None:
         assert len(frac_coord) == len(self.coord)
         self.frac_coord = frac_coord
 
-    ############
-    # def get_fractional_coord(self, cell_vector=None, debug: int=0) -> None:
-    #     if cell_vector is None:
-    #         if self.check_parent("cell"):
-    #             cell = self.get_parent("cell")
-    #             if hasattr(cell,"cellvec"): cell_vector = cell.cell_vector.copy()
-    #         else:     print("SPECIE.GET_FRACTIONAL_COORD: get_fractional coordinates. Missing cell vector. Please provide it"); return None
-    #     if debug > 1: print(f"SPECIE.GET_FRACTIONAL_COORD: Using cell_vector:{cell_vector}")
-    #     self.frac_coord = cart2frac(self.coord, cell_vector)
-    #     return self.frac_coord
-
-    ############
     def get_atomic_numbers(self):
         if self.atoms is None:
             self.set_atoms()
@@ -240,25 +216,23 @@ class Specie(BaseModel):
             self.atnums.append(at.atnum)
         return self.atnums
 
-    ############
     def set_element_count(self, heavy_only: bool = False):
         self.element_count = get_element_count(self.labels, heavy_only=heavy_only)
         return self.element_count
 
-    ############
-    def set_adj_types(self):
+    def set_adj_types(self, use_bond_info: bool | None = None):
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
         if self.adjmat is None:
-            self.get_adjmatrix()
+            self.self.build_adjmatrix(use_bond_info=use_bond_info, metal_only=False)
         self.adj_types = get_adjacency_types(self.labels, self.adjmat)
         return self.adj_types
 
-    ############
     def set_adjacency_parameters(self, cov_factor: float, metal_factor: float) -> None:
         # Stores the covalentradii factor and metal factor that were used to generate the molecule
         self.cov_factor = cov_factor
         self.metal_factor = metal_factor
 
-    ############
     def reset_charge(self):
         self.totcharge = None
         self.atomic_charges = None
@@ -269,7 +243,6 @@ class Specie(BaseModel):
         for a in self.atoms:
             a.reset_charge()
 
-    ############
     def set_charges(
         self,
         totcharge: int = None,
@@ -296,24 +269,19 @@ class Specie(BaseModel):
         if rdkit_obj is not None:
             self.rdkit_obj = rdkit_obj
 
-    ############
     def set_atoms(
         self,
         atomlist: list | None = None,
         create_adjacencies: bool = False,
-        atom_site_labels: list = None,
-        geom_bond_cif: list = None,
-        debug: int = 0,
+        atom_site_labels: list | None = None,
+        use_bond_info: bool | None = None,
     ):
-        debug = 0
-        ## If the atom objects already exist, and you want to set them in self from a different specie
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
         if atomlist is not None:
-            if debug >= 2:
-                print(f"SPECIE.SET_ATOMS: received {atomlist=}")
             self.atoms = atomlist.copy()
             for idx, at in enumerate(self.atoms):
                 at.add_parent(self, index=idx)
-        ## If not, that is, if the atom objects must be created from scratch....
         else:
             self.atoms = []
 
@@ -323,26 +291,17 @@ class Specie(BaseModel):
             )
 
             for idx, label in enumerate(self.labels):
-                if debug >= 2:
-                    print(f"SPECIE.SET_ATOMS: creating atom for label {label}")
                 ## For each label in labels, create an atom class object.
                 ismetal = (
                     elemdatabase.elementblock[label] == "d"
                     or elemdatabase.elementblock[label] == "f"
                 )
-                # non transition metals
-                # if len(get_non_transition_metal_idxs([label])) > 0: ismetal = True
                 if len(get_alkali_alkaline_earth_metal_idxs([label])) > 0:
                     ismetal = True
                 if len(metal_idxs) == 0 and len(alkali_alkaline_earth_metal_idxs) == 0:
                     if len(get_post_transition_metal_idxs([label])) > 0:
                         ismetal = True
 
-                if ismetal:
-                    if debug >= 2:
-                        print(f"SPECIE.SET_ATOMS: {label} identified as metal")
-                if debug >= 2:
-                    print(f"SPECIE.SET_ATOMS: {ismetal=}")
                 if self.frac_coord is not None:
                     if ismetal:
                         newatom = Metal.from_positional(
@@ -367,23 +326,21 @@ class Specie(BaseModel):
                         newatom = Atom.from_positional(
                             label, self.coord[idx], radii=self.radii[idx]
                         )
-                if debug >= 2:
-                    print(f"SPECIE.SET_ATOMS: added atom to specie: {self.formula}")
                 newatom.add_parent(self, index=idx)
                 self.atoms.append(newatom)
 
         if atom_site_labels is not None:
-            if debug >= 2:
-                print(f"SPECIE.SET_ATOMS: received {atom_site_labels=}")
             self.atom_site_labels = atom_site_labels.copy()
             for idx, at in enumerate(self.atoms):
                 at.set_atom_site_label(atom_site_labels[idx])
 
         if create_adjacencies:
             if self.adjmat is None:
-                self.get_adjmatrix(geom_bond_cif)
+                self.build_adjmatrix(use_bond_info=use_bond_info, metal_only=False)
+
             if self.madjmat is None:
-                self.get_metal_adjmatrix(geom_bond_cif)
+                self.build_adjmatrix(use_bond_info=use_bond_info, metal_only=True)
+
             if self.adjmat is not None and self.madjmat is not None:
                 for idx, at in enumerate(self.atoms):
                     at.set_adjacencies(
@@ -393,20 +350,17 @@ class Specie(BaseModel):
                         self.madjnum[idx],
                     )
 
-    #######################################################
-    def inherit_adjmatrix(self, parent_subtype: str, debug: int = 0):
+    def set_inherit_adjmatrix(self, parent_subtype: str):
         exists = self.check_parent(parent_subtype)
         if not exists:
-            print(f"SPECIE.INHERIT. {parent_subtype=} does not exist")
+            logger.debug(f"{parent_subtype=} does not exist")
             return None
         parent = self.get_parent(parent_subtype)
         indices = self.get_parent_indices(parent_subtype)
         if parent.madjnum is None:
-            print(f"SPECIE.INHERIT. {parent_subtype=} does not have madjnum")
+            logger.debug(f"{parent_subtype=} does not have madjnum")
             return None
-        # print(f"SPECIE.INHERIT. found self in parent ({parent_subtype}) with {indices=}")
-        # print(f"SPECIE.INHERIT: parent data:\n{parent.labels=}\n{parent.madjmat=}\n{parent.madjnum=}\n{parent.adjmat=}\n{parent.adjnum=}")
-        # print(f"SPECIE.INHERIT: {parent.madjmat.shape=} {parent.madjnum.shape=} {parent.adjmat.shape=} {parent.adjnum.shape=}")
+
         self.madjmat = np.stack(
             extract_from_list(indices, parent.madjmat, dimension=2), axis=0
         )
@@ -419,72 +373,56 @@ class Specie(BaseModel):
         self.adjnum = np.stack(
             extract_from_list(indices, parent.adjnum, dimension=1), axis=0
         )
-        # print(f"SPECIE.INHERIT: self data:\n{self.labels=}\n{self.madjmat=}\n{self.madjnum=}\n{self.adjmat=}\n{self.adjnum=}")
-        # print(f"SPECIE.INHERIT: {self.madjmat.shape=} {self.madjnum.shape=} {self.adjmat.shape=} {self.adjnum.shape=}")
 
-    ############
-    def get_adjmatrix(self, geom_bond_cif: list = None, debug: int = 0):
+    def build_adjmatrix(
+        self,
+        use_bond_info: bool | None = None,
+        metal_only: bool = False,
+    ):
         refcell = self.get_parent("reference")
-        if (
-            refcell is not None
-            and getattr(refcell, "exist_cif_bond_moiety", False)
-            and geom_bond_cif is not None
-            and self.atom_site_labels is not None
-        ):
-            print("SPECIE.GET_ADJMATRIX: Based on bond information from CIF")
-            isgood, adjmat, adjnum = get_adjmatrix_from_cif_bonds(
-                self.labels,
-                self.coord,
-                self.atom_site_labels,
-                geom_bond_cif,
-                metal_only=False,
-            )
-        else:
-            print("SPECIE.GET_ADJMATRIX: Based on interatomic distances")
-            isgood, adjmat, adjnum, warning = get_adjmatrix(
-                self.labels, self.coord, self.cov_factor, self.radii
-            )
+        bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
+        metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
 
-        if isgood:
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
+        canonical = "bond_info" if use_bond_info else "distance"
+
+        adjmat = build_adjacency(
+            labels=self.labels,
+            positions=self.coord,
+            atom_site_labels=self.atom_site_labels,
+            bond_data=bond_data,
+            cov_factor=cov_factor,
+            metal_factor=metal_factor,
+            metal_only=metal_only,
+            canonical=canonical,
+            warn_on_mismatch=True,
+            detail=False,
+        )
+
+        if adjmat is None:
+            if metal_only:
+                self.madjmat = None
+                self.madjnum = None
+                return self.madjmat, self.madjnum
+            else:
+                self.adjmat = None
+                self.adjnum = None
+                return self.adjmat, self.adjnum
+
+        adjnum = adjmat.sum(axis=1)
+
+        if metal_only:
+            self.madjmat = adjmat
+            self.madjnum = adjnum
+            return self.madjmat, self.madjnum
+        else:
             self.adjmat = adjmat
             self.adjnum = adjnum
-        else:
-            self.adjmat = None
-            self.adjnum = None
-        return self.adjmat, self.adjnum
+            return self.adjmat, self.adjnum
 
-    ############
-    def get_metal_adjmatrix(self, geom_bond_cif: list = None, debug: int = 0):
-        refcell = self.get_parent("reference")
-        if (
-            refcell is not None
-            and getattr(refcell, "exist_cif_bond_moiety", False)
-            and geom_bond_cif is not None
-            and self.atom_site_labels is not None
-        ):
-            print("SPECIE.GET_METAL_ADJMATRIX: Based on bond information from CIF")
-            isgood, madjmat, madjnum = get_adjmatrix_from_cif_bonds(
-                self.labels,
-                self.coord,
-                self.atom_site_labels,
-                geom_bond_cif,
-                metal_only=True,
-            )
-        else:
-            print("SPECIE.GET_METAL_ADJMATRIX: Based on interatomic distances")
-            isgood, madjmat, madjnum, warning = get_adjmatrix(
-                self.labels, self.coord, self.cov_factor, self.radii, metal_only=True
-            )
-
-        if isgood:
-            self.madjmat = madjmat
-            self.madjnum = madjnum
-        else:
-            self.madjmat = None
-            self.madjnum = None
-        return self.madjmat, self.madjnum
-
-    ############
+    # TODO : Implement get_occurrence for specie
     def get_occurrence(self, substructure: object) -> int:
         occurrence = 0
         ## Ligands in Complexes or Groups in Ligands
@@ -496,7 +434,7 @@ class Specie(BaseModel):
                     self.split_complex()
                 if self.ligands is not None:
                     for lig in self.ligands:
-                        issame = compare_species(substructure, lig, debug=1)
+                        issame = compare_species(substructure, lig)
                         if issame:
                             occurrence += 1
                     done = True
@@ -508,7 +446,7 @@ class Specie(BaseModel):
                         if lig.groups is None:
                             self.split_ligand()
                         for g in lig.groups:
-                            issame = compare_species(substructure, g, debug=1)
+                            issame = compare_species(substructure, g)
                             if issame:
                                 occurrence += 1
                 done = True
@@ -524,8 +462,9 @@ class Specie(BaseModel):
         return occurrence
 
     ############
-    def get_protonation_states(self, debug: int = 0):
-        # !!! WARNING. FUNCTION defined at the "specie" level, but will only do something for ligands and organic (iscomplex == False) molecules
+    def get_protonation_states(self):
+        # !!! WARNING. FUNCTION defined at the "specie" level
+        # but will only do something for ligands and non-complex molecules
         if self.subtype == "group":
             if self.denticity is None:
                 self.get_denticity()
@@ -540,36 +479,38 @@ class Specie(BaseModel):
                 self.get_denticity()
             if self.is_nitrosyl is None:
                 self.evaluate_as_nitrosyl()
-            self.protonation_states = get_protonation_states_specie(self, debug=debug)
+            self.protonation_states = get_protonation_states_specie(self)
         else:
             if self.is_haptic is None:
                 self.get_hapticity()
-            self.protonation_states = get_protonation_states_specie(self, debug=debug)
+            self.protonation_states = get_protonation_states_specie(self)
         return self.protonation_states
 
-    ############
-    def get_possible_cs(self, debug: int = 0):
-        ## Arranges a list of possible charge_states associated with this species,
-        ## which is later managed at the cell level to determine the good one
+    def get_possible_cs(self):
+        # Arranges a list of possible charge_states associated with this species,
+        # which is later managed at the cell level to determine the good one
         if self.possible_cs is None:
             if self.subtype == "ligand" or (
                 self.subtype == "molecule"
                 and not self.iscomplex
                 and not self.has_IA_IIA
             ):
-                print(
-                    f"SPECIE.GET_POSSIBLE_CS: {self.formula} {self.protonation_states=}"
+                logger.debug(
+                    "Formula: %s Pronation states %s",
+                    self.formula,
+                    self.protonation_states,
                 )
                 if self.protonation_states is None:
-                    self.get_protonation_states(debug=debug)
-                    print(
-                        f"SPECIE.GET_POSSIBLE_CS: Obtained {self.formula} {self.protonation_states=}"
+                    self.get_protonation_states()
+                    logger.debug(
+                        "SPECIE.GET_POSSIBLE_CS: Obtained %s %s",
+                        self.formula,
+                        self.protonation_states,
                     )
 
-                self.possible_cs = get_possible_charge_state(self, debug=debug)
+                self.possible_cs = get_possible_charge_state(self)
         return self.possible_cs
 
-    ############
     def print_xyz(self):
         print(self.natoms)
         print("")
@@ -579,14 +520,12 @@ class Specie(BaseModel):
                 % (label, self.coord[idx][0], self.coord[idx][1], self.coord[idx][2])
             )
 
-    ############
     ## This defines the sum operation between two species. To be implemented
     def __add__(self, other):
         if not isinstance(other, type(self)):
             return self
         return self
 
-    ############
     def __str__(self):
         # This will make print(object) behave like before
         return self.__repr__()
