@@ -7,8 +7,7 @@ from pydantic import Field
 from typing_extensions import deprecated
 
 
-#######################################################
-def eval_chargelist(atom_charges: list, debug: int = 0) -> Tuple[int, int, bool]:
+def eval_chargelist(atom_charges: list[int]) -> Tuple[int, int, bool]:
     abstotal = int(np.abs(np.sum(atom_charges)))
     abs_atlist = []
     for a in atom_charges:
@@ -21,7 +20,6 @@ def eval_chargelist(atom_charges: list, debug: int = 0) -> Tuple[int, int, bool]
     return abstotal, abs_atcharge, zwitt
 
 
-#######################################################
 class ChargeState(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
