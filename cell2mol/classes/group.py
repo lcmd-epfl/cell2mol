@@ -3,30 +3,24 @@ from __future__ import annotations
 import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
-
+from cell2mol.utils import config
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
-from cell2mol.connectivity import (
-    get_adjmatrix,
-    get_adjmatrix_from_cif_bonds,
-    is_single_ring,
-    labels2electrons,
-    labels2formula,
-)
+from cell2mol.connectivity import build_adjacency, is_single_ring
+from cell2mol.element_utils import labels2electrons, labels2formula
 from cell2mol.operations import compute_centroid
 from cell2mol.elementdata import ElementData
 from cell2mol.coordination_sphere import (
-    coordination_correction_for_haptic,
-    coordination_correction_for_nonhaptic,
+    handle_haptic_coordination,
+    handle_nonhaptic_coordination,
 )
 from cell2mol.my_types import HapticType, OptionalRef, OptionalRefList, SubType
+import logging
 
 elemdatabase = ElementData()
+logger = logging.getLogger(__name__)
 
 
-###############
-#### GROUP ####
-###############
 class Group(Specie):
     checked_coordination: bool | None = None
     # Cross-reference: points to a metal in parent Molecule
@@ -46,12 +40,10 @@ class Group(Specie):
     ) -> None:
         return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
 
-    #######################################################
     def __str__(self):
         # This will make print(object) behave like before
         return self.__repr__()
 
-    #######################################################
     def __repr__(self):
         to_print = ""
         to_print += "------------- Cell2mol GROUP Object --------------\n"
@@ -61,12 +53,10 @@ class Group(Specie):
         to_print += "---------------------------------------------------\n"
         return to_print
 
-    #######################################################
-    def remove_atom(self, index: int, debug: int = 0):
-        if debug > 0:
-            print(
-                f"GROUP.REMOVE_ATOM: deleting atom {index=} from group with {self.natoms} atoms"
-            )
+    def remove_atom(self, index: int):
+        logger.info(
+            "Deleting atom (index=%d) from group with %d atoms", index, self.natoms
+        )
         if index > self.natoms:
             return None
         if self.atoms is None:
@@ -76,19 +66,11 @@ class Group(Specie):
         self.coord.pop(index)
         self.radii.pop(index)
         self.formula = labels2formula(self.labels)
-        self.eleccount = labels2electrons(
-            self.labels
-        )  ### Assuming neutral specie (so basically this is the sum of atomic numbers)
+        ### Assuming neutral specie (so basically this is the sum of atomic numbers)
+        self.eleccount = labels2electrons(self.labels)
         self.natoms = len(self.labels)
-        self.iscomplex = any(
-            (elemdatabase.elementblock[label] == "d")
-            or (elemdatabase.elementblock[label] == "f")
-            for label in self.labels
-        )
-        if debug > 0:
-            print("GROUP.REMOVE_ATOM. Group after removing atom:")
-        if debug > 0:
-            print(self)
+        logger.info("Group after removing atom: %s", self)
+
         if self.natoms > 0:
             if self.closest_metal is not None:
                 self.get_closest_metal()
@@ -99,12 +81,11 @@ class Group(Specie):
             if self.frac_coord is not None:
                 self.frac_coord.pop(index)
             if self.adjmat is not None:
-                self.get_adjmatrix()
+                self.build_adjmatrix(metal_only=False)
             if self.madjmat is not None:
-                self.get_metal_adjmatrix()
+                self.build_adjmatrix(metal_only=True)
 
-    #######################################################
-    def get_closest_metal(self, debug: int = 0):
+    def get_closest_metal(self):
         apos = compute_centroid(np.array(self.coord))
         dist = []
         mol = self.get_parent("molecule")
@@ -115,70 +96,65 @@ class Group(Specie):
         self.closest_metal = mol.metals[np.argmin(dist)]
         return self.closest_metal
 
-    #######################################################
-    def get_connected_metals(self, debug: int = 0):
+    def get_connected_metals(self, use_bond_info: bool | None = None):
         # metal.groups will be used for the calculation of the relative metal radius
         # and define the coordination geometry of the metal /hapicitiy/ hapttype
         self.metals = []
 
         refcell = self.get_parent("reference")
-        geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
+        bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
+        metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
 
         lig = self.get_parent("ligand")
 
         if lig.metals is None:
             lig.get_connected_metals()
 
-        if refcell is not None and refcell.exist_cif_bond_moiety:
-            for met in lig.metals:
-                tmplabels = list(self.labels.copy())
-                tmpcoord = list(self.coord.copy())
-                atom_site_labels = [atom.atom_site_label for atom in self.atoms]
-                tmplabels.append(met.label)
-                tmpcoord.append(met.coord)
-                atom_site_labels.append(met.atom_site_label)
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
+        canonical = "bond_info" if use_bond_info else "distance"
 
-                isgood, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(
-                    tmplabels,
-                    tmpcoord,
-                    atom_site_labels,
-                    geom_bond_cif,
-                    metal_only=True,
-                )
-                if isgood and any(tmpadjnum) > 0:
+        for met in lig.metals:
+            tmplabels = list(self.labels.copy())
+            tmpcoord = list(self.coord.copy())
+            atom_site_labels = [atom.atom_site_label for atom in self.atoms]
+            tmplabels.append(met.label)
+            tmpcoord.append(met.coord)
+            atom_site_labels.append(met.atom_site_label)
+            tmp_adjmat = build_adjacency(
+                labels=tmplabels,
+                positions=tmpcoord,
+                atom_site_labels=atom_site_labels,
+                bond_data=bond_data,
+                cov_factor=cov_factor,
+                metal_factor=metal_factor,
+                metal_only=True,
+                canonical=canonical,
+            )
+            if tmp_adjmat is None:
+                continue
+            else:
+                tmp_adjnum = tmp_adjmat.sum(axis=1)
+                if any(tmp_adjnum) > 0:
                     self.metals.append(met)
-                    if debug >= 0:
-                        print(
-                            f"GROUP.Get_connected_metals: {self.formula} is connected to {met.label}"
-                        )
-        else:
-            for met in lig.metals:
-                tmplabels = list(self.labels.copy())
-                tmpcoord = list(self.coord.copy())
-                tmplabels.append(met.label)
-                tmpcoord.append(met.coord)
-                isgood, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
-                    tmplabels, tmpcoord, metal_only=True
-                )
-                if isgood and any(tmpadjnum) > 0:
-                    self.metals.append(met)
+                    logger.debug("%s is is connected to %s", self.formula, met.label)
+
         return self.metals
 
-    #######################################################
-    def get_hapticity(self, debug: int = 0):
+    def get_hapticity(self):
         if self.atoms is None:
             self.set_atoms()
         self.is_haptic = False  ## old self.hapticity
         self.haptic_type = []  ## old self.hapttype
         totnum = len(self.labels)
-        numC = self.labels.count(
-            "C"
-        )  # Carbon is the most common connected atom in ligands with hapticity
-        numAs = self.labels.count(
-            "As"
-        )  # I've seen one case of a Cp but with As instead of C (VENNEH, Fe dataset)
+        # Carbon is the most common connected atom in ligands with hapticity
+        numC = self.labels.count("C")
+        # a Cp with As instead of C (VENNEH, Fe dataset)
+        numAs = self.labels.count("As")
         numP = self.labels.count("P")
-        numO = self.labels.count("O")  # For h4-Enone
+        # For h4-Enone
+        numO = self.labels.count("O")
         # numN = self.labels.count("N")
 
         ## Carbon-based Haptic Ligands
@@ -222,27 +198,27 @@ class Group(Specie):
 
         return self.haptic_type
 
-    #######################################################
-    def check_coordination(self, debug: int = 0):
+    def check_coordination(self, use_bond_info: bool | None = None):
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
         if self.is_haptic is None:
             self.get_hapticity()
         if self.atoms is None:
             self.set_atoms()
         if self.is_haptic:
             self, conn_idx, final_ligand_indices, group_metals_indices = (
-                coordination_correction_for_haptic(self, debug=debug)
+                handle_haptic_coordination(self, use_bond_info=use_bond_info)
             )
         if self.is_haptic is False:
             self, conn_idx, final_ligand_indices, group_metals_indices = (
-                coordination_correction_for_nonhaptic(self, debug=debug)
+                handle_nonhaptic_coordination(self, use_bond_info=use_bond_info)
             )
         self.checked_coordination = True
         return self, conn_idx, final_ligand_indices, group_metals_indices
 
-    #######################################################
-    def get_denticity(self, debug: int = 0):
+    def get_denticity(self):
         if self.checked_coordination is None:
-            self.check_coordination(debug=debug)
+            self.check_coordination()
         self.denticity = 0
         for a in self.atoms:
             self.denticity += a.mconnec
