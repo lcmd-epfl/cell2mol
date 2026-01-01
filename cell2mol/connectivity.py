@@ -915,7 +915,7 @@ def is_single_ring(labels, coord):
     return False  # Otherwise, not a ring compound
 
 
-def add_atom_old(
+def add_atom(
     labels: list,
     coords: list,
     site: int,

@@ -32,7 +32,7 @@ from cell2mol.operations import compute_centroid
 from cell2mol.connectivity import (
     build_adjacency,
     is_single_ring,
-    add_atom_old,
+    add_atom,
 )
 from cell2mol.elementdata import ElementData
 from scipy.optimize import linear_sum_assignment  # Hungarian algorithm
@@ -400,7 +400,7 @@ def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = No
                             ligand_idx,
                         )
                     else:
-                        isadded, newlab, newcoord = add_atom_old(
+                        isadded, newlab, newcoord = add_atom(
                             lig.labels,
                             lig.coord,
                             ligand_idx,
