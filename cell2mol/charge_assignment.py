@@ -6,18 +6,16 @@ import time
 import networkx as nx
 from collections import defaultdict
 from typing import Tuple
-
 from cell2mol.elementdata import ElementData
-from cell2mol.connectivity import (
+from cell2mol.element_utils import (
     get_metal_idxs,
     get_alkali_alkaline_earth_metal_idxs,
-    add_atom,
-    add_hydrogens,
     get_non_transition_metal_idxs,
-    get_radii,
-    get_adjmatrix,
     get_post_transition_metal_idxs,
+    get_radii,
 )
+from cell2mol.hydrogen import add_hydrogens
+from cell2mol.connectivity import get_adjmatrix, add_atom
 from cell2mol.xyz2mol import xyz2mol, chiral_stereo_check
 from cell2mol.classes.protonation import Protonation
 from cell2mol.classes.charge_state import ChargeState
@@ -1540,7 +1538,6 @@ def get_protonation_states_specie(specie: object, debug: int = 0) -> list:
                         newcoord,
                         idx,
                         ligand,
-                        mol.metals,
                         elemlist[idx],
                         unconditional=True,
                         debug=debug,
@@ -1761,7 +1758,6 @@ def get_protonation_states_specie(specie: object, debug: int = 0) -> list:
                                 newcoord,
                                 jdx,
                                 ligand,
-                                mol.metals,
                                 elemlist[jdx],
                                 unconditional=True,
                                 debug=3,
@@ -1788,7 +1784,6 @@ def get_protonation_states_specie(specie: object, debug: int = 0) -> list:
                                 newcoord,
                                 jdx,
                                 ligand,
-                                mol.metals,
                                 elemlist[jdx],
                                 unconditional=True,
                                 debug=3,
