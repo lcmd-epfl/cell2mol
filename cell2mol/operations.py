@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 
 import numpy as np
+import itertools
+import logging
+from cell2mol.elementdata import ElementData
+
+logger = logging.getLogger(__name__)
+elemdatabase = ElementData()
 
 
 def frac2cart_fromcellvec(frac_coord, cellvec):
@@ -239,14 +245,14 @@ def inv(perm: list) -> list:
     return inverse
 
 
-def compute_centroid(arr: np.array) -> list:
+def compute_centroid(arr: np.ndarray) -> list:
     """Compute the centroid of a set of 3D coordinates.
 
     Args:
-        arr (np.array): array of shape (N, 3)
+        arr (np.ndarray): array of shape (N, 3)
 
     Returns:
-        np.array: centroid coordinates
+        np.ndarray: centroid coordinates
     """
     length = arr.shape[0]
     sum_x = np.sum(arr[:, 0])
@@ -292,13 +298,223 @@ def get_angle(vec1, vec2) -> float:
     return float(angle)
 
 
-def get_unit_vector(v):
-    """Normalize a vector to unit length.
+def unit_vector(v: np.ndarray) -> np.ndarray:
+    """Return the unit vector of v.
+
+    For zero vectors, returns the original vector.
+    """
+    norm = np.linalg.norm(v)
+    if norm == 0:
+        return v
+    return v / norm
+
+
+def tmatgenerator(centroid, thres=0.40, full=False):
+    """Generates a list of translation vectors for fragment reconstruction.
+
+    This function determines the necessary translations for a molecular fragment
+    based on the position of its centroid within the unit cell's fractional
+    coordinates. The goal is to generate translation vectors that will help in
+    reconstructing a whole molecule that is split across unit cell boundaries.
+
+    If a fragment's centroid is near a cell boundary (e.g., close to 0.0 or 1.0
+    along an axis), translations along that axis are suggested. Fragments near
+    the center of the cell are less likely to need translation.
 
     Args:
-        v : input vector
+        centroid (np.ndarray): The fractional coordinates (x, y, z) of the
+            fragment's centroid.
+        thres (float, optional): The threshold defining the boundary region.
+            Translations are suggested if a centroid coordinate is less than
+            `thres` or greater than `1 - thres`. Defaults to 0.40.
+        full (bool, optional): If True, generates all 27 possible translation
+            vectors (from -1 to 1 in each dimension), ignoring the centroid
+            position. Defaults to False.
 
     Returns:
-        np.array: unit vector in the same direction
+        list: A sorted list of translation vectors as tuples (e.g., [(0, 0, 0),
+              (1, 0, 0), ...]). The list is sorted by the magnitude of the
+              translation.
     """
-    return v / np.linalg.norm(v)
+
+    tmax = 1 - thres
+    tmin = thres
+
+    if not full:
+        tmatrix = []
+        tmatrix = additem((0, 0, 0), tmatrix)
+
+        # X positive
+        if centroid[0] >= tmax:
+            tmatrix = additem((-1, 0, 0), tmatrix)
+            if centroid[1] >= tmax:
+                tmatrix = additem((-1, -1, 0), tmatrix)
+                tmatrix = additem((0, -1, 0), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((-1, -1, -1), tmatrix)
+                    tmatrix = additem((0, -1, -1), tmatrix)
+                    tmatrix = additem((0, 0, -1), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((-1, -1, 1), tmatrix)
+                    tmatrix = additem((0, -1, 1), tmatrix)
+                    tmatrix = additem((0, 0, 1), tmatrix)
+            if centroid[1] <= tmin:
+                tmatrix = additem((-1, 1, 0), tmatrix)
+                tmatrix = additem((0, 1, 0), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((-1, 1, -1), tmatrix)
+                    tmatrix = additem((0, 1, -1), tmatrix)
+                    tmatrix = additem((0, 0, -1), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((-1, 1, 1), tmatrix)
+                    tmatrix = additem((0, 1, 1), tmatrix)
+                    tmatrix = additem((0, 0, 1), tmatrix)
+            if centroid[2] >= tmax:
+                tmatrix = additem((-1, 0, -1), tmatrix)
+                tmatrix = additem((0, 0, -1), tmatrix)
+            if centroid[2] <= tmin:
+                tmatrix = additem((-1, 0, 1), tmatrix)
+                tmatrix = additem((0, 0, 1), tmatrix)
+
+        if centroid[1] >= tmax:
+            tmatrix = additem((0, -1, 0), tmatrix)
+            if centroid[2] >= tmax:
+                tmatrix = additem((0, -1, -1), tmatrix)
+                tmatrix = additem((0, 0, -1), tmatrix)
+            if centroid[2] <= tmin:
+                tmatrix = additem((0, -1, 1), tmatrix)
+                tmatrix = additem((0, 0, 1), tmatrix)
+
+        if centroid[2] >= tmax:
+            tmatrix = additem((0, 0, -1), tmatrix)
+
+        if centroid[0] <= tmin:
+            tmatrix = additem((1, 0, 0), tmatrix)
+            if centroid[1] <= tmin:
+                tmatrix = additem((1, 1, 0), tmatrix)
+                tmatrix = additem((0, 1, 0), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((1, 1, 1), tmatrix)
+                    tmatrix = additem((0, 1, 1), tmatrix)
+                    tmatrix = additem((0, 0, 1), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((1, 1, -1), tmatrix)
+                    tmatrix = additem((0, 1, -1), tmatrix)
+                    tmatrix = additem((0, 0, -1), tmatrix)
+            if centroid[1] >= tmax:
+                tmatrix = additem((1, -1, 0), tmatrix)
+                tmatrix = additem((0, -1, 0), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((1, -1, -1), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((1, -1, 1), tmatrix)
+            if centroid[2] <= tmin:
+                tmatrix = additem((1, 0, 1), tmatrix)
+                tmatrix = additem((0, 0, 1), tmatrix)
+            if centroid[2] >= tmax:
+                tmatrix = additem((1, 0, -1), tmatrix)
+                tmatrix = additem((0, 0, -1), tmatrix)
+
+        if centroid[1] <= tmin:
+            tmatrix = additem((0, 1, 0), tmatrix)
+            if centroid[2] <= tmin:
+                tmatrix = additem((0, 1, 1), tmatrix)
+                tmatrix = additem((0, 0, 1), tmatrix)
+            if centroid[2] >= tmax:
+                tmatrix = additem((0, 1, -1), tmatrix)
+                tmatrix = additem((0, 0, -1), tmatrix)
+        if centroid[2] <= tmin:
+            tmatrix = additem((0, 0, 1), tmatrix)
+
+        if (centroid[0] > tmin) and (centroid[0] < tmax):
+            if centroid[1] <= tmin:
+                tmatrix = additem((0, 1, 0), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((0, 1, -1), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((0, 1, 1), tmatrix)
+            if centroid[1] >= tmax:
+                tmatrix = additem((0, -1, 0), tmatrix)
+                if centroid[2] >= tmax:
+                    tmatrix = additem((0, -1, -1), tmatrix)
+                if centroid[2] <= tmin:
+                    tmatrix = additem((0, -1, 1), tmatrix)
+            if centroid[2] <= tmin:
+                tmatrix = additem((0, 0, 1), tmatrix)
+                if centroid[1] >= tmax:
+                    tmatrix = additem((0, -1, 1), tmatrix)
+                if centroid[1] <= tmin:
+                    tmatrix = additem((0, 1, 1), tmatrix)
+            if centroid[2] >= tmax:
+                tmatrix = additem((0, 0, -1), tmatrix)
+                if centroid[1] >= tmax:
+                    tmatrix = additem((0, -1, -1), tmatrix)
+                if centroid[1] <= tmin:
+                    tmatrix = additem((0, 1, -1), tmatrix)
+    elif full:
+        x = [-1, 0, 1]
+        tmatrix = [p for p in itertools.product(x, repeat=3)]
+
+    tmatrix.sort(key=absolute_value)
+
+    return tmatrix
+
+
+def point_along_vector(point1, point2, distance):
+    """
+    Calculate the coordinates of a point along the vector between two points
+    with a specified distance from the first point.
+
+    Args:
+    - point1: Coordinates of the first point (numpy array or list)
+    - point2: Coordinates of the second point (numpy array or list)
+    - distance: Distance from the first point to the new point (float)
+
+    Returns:
+    - Coordinates of the new point (numpy array)
+    """
+    # Convert input to numpy arrays
+    point1 = np.array(point1)
+    point2 = np.array(point2)
+
+    # Calculate the vector between the two points
+    vector = point2 - point1
+
+    # Normalize the vector
+    normalized_vector = vector / np.linalg.norm(vector)
+
+    # Calculate the coordinates of the new point
+    new_point = point1 + normalized_vector * distance
+
+    return new_point
+
+
+def kabsch_rotation(P, Q):
+    """
+    Find rotation R that best aligns P to Q (both 3xN).
+    Returns 3x3 rotation matrix.
+    """
+    H = P @ Q.T
+    U, S, Vt = np.linalg.svd(H)
+    R = Vt.T @ U.T
+    # Right-handed fix
+    if np.linalg.det(R) < 0:
+        Vt[-1, :] *= -1
+        R = Vt.T @ U.T
+    return R
+
+
+def perp_unit(u):
+    """Deterministic unit vector perpendicular to u."""
+    u = unit_vector(u)
+    # choose a global axis least aligned with u
+    g = np.array([1.0, 0.0, 0.0]) if abs(u[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+    v = g - (g @ u) * u
+    nv = np.linalg.norm(v)
+    if nv < 1e-12:
+        g = np.array([0.0, 0.0, 1.0])
+        v = g - (g @ u) * u
+        nv = np.linalg.norm(v)
+        if nv < 1e-12:
+            raise ValueError("Cannot construct a perpendicular direction.")
+    return v / nv
