@@ -6,10 +6,11 @@ import logging
 from ase.io import read
 
 from cell2mol.classes import Molecule
-from cell2mol.connectivity import labels2formula, split_species
-from cell2mol.read_write import print_molecule, setup_logger
+from cell2mol.element_utils import labels2formula
+from cell2mol.connectivity import split_species
+from cell2mol.write_results import print_molecule, setup_logger
 
-logger = logging.getLogger("cell2mol")
+logger = logging.getLogger(__name__)
 
 # Constants
 VERSION = "2.0"
@@ -43,7 +44,7 @@ def process_molecule(input_path, name, input_charge, current_dir):
                 f"({len(block_labels)} atoms)"
             )
             # if needed, uncomment to generate separate xyz files for each block
-            # from cell2mol.read_write import writexyz
+            # from cell2mol.write_results import writexyz
             # block_coords = [coords[j] for j in block]
             # writexyz(
             #     os.getcwd(),
