@@ -12,17 +12,18 @@ from cell2mol.operations import compute_centroid, get_dist
 from cell2mol.elementdata import ElementData
 from cell2mol.coordination_sphere import define_coordination_geometry
 from cell2mol.my_types import RefList, Spin, SubType
-from cell2mol.connectivity import labels2formula, get_adjmatrix
+from cell2mol.connectivity import build_adjacency
+from cell2mol.element_utils import labels2formula
+from cell2mol.utils import config
 
 if TYPE_CHECKING:
     from cell2mol.classes.group import Group
+import logging
 
+logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 
-###############
-#### METAL ####
-###############
 class Metal(Atom):
     # Cross-reference: points to other metals in parent Molecule
     metals: RefList[Metal] = Field(default_factory=list)
@@ -65,14 +66,11 @@ class Metal(Atom):
 
         return self.valence_elec
 
-    #######################################################
     def get_coord_sphere(self):
         if not self.check_parent("molecule"):
             return None
         mol = self.get_parent("molecule")
         pidx = self.get_parent_index("molecule")
-        # if mol.adjmat is None: mol.get_adjmatrix()
-        # adjmat = mol.adjmat.copy()
 
         ## Cordination sphere defined as a collection of atoms
         self.coord_sphere = []
@@ -81,52 +79,40 @@ class Metal(Atom):
                 self.coord_sphere.append(mol.atoms[idx])
         return self.coord_sphere
 
-    #######################################################
-    def get_coord_sphere_formula(self, debug: int = 1):
+    def get_coord_sphere_formula(self):
         if self.coord_sphere is None:
             self.get_coord_sphere()
         self.coord_sphere_formula = labels2formula(
             list([at.label for at in self.coord_sphere])
         )
-        if debug >= 2:
-            print(
-                f"METAL.Get_coord_sphere_formula: molecule parent_index={self.get_parent_index('molecule')} metal={self.label} coord_sphere_formula={self.coord_sphere_formula}"
-            )
         return self.coord_sphere_formula
 
-    #######################################################
-    def get_connected_groups(self, debug: int = 0):
+    def get_connected_groups(self):
         # metal.groups will be used for the calculation of the relative metal radius
         # and define the coordination geometry of the metal /hapicitiy/ hapttype
         if not self.check_parent("molecule"):
             return None
 
-        refcell = self.get_parent("reference")
-        geom_bond_cif = getattr(refcell, "geom_bond_cif", None)
         mol = self.get_parent("molecule")
         connected_groups = []
         for lig in mol.ligands:
             for group in lig.groups:
-                if debug > 2:
-                    print(group.formula, [m.atom_site_label for m in group.metals])
                 for met in group.metals:
                     if self == met:
                         connected_groups.append(group)
-                        if debug >= 1:
-                            if self.atom_site_label is not None:
-                                print(
-                                    f"METAL.Get_connected_groups: Metal {self.label} ({self.atom_site_label}) is connected to group {group.formula}"
-                                )
-                            else:
-                                print(
-                                    f"METAL.Get_connected_groups: Metal {self.label} is connected to group {group.formula}"
-                                )
+                        logger.debug(
+                            "Metal %s%s connected to group %s",
+                            self.label,
+                            f" ({self.atom_site_label})"
+                            if self.atom_site_label
+                            else "",
+                            group.formula,
+                        )
         final_connected_groups = []
         groups_atom_site_labels = [
             [a.atom_site_label for a in g.atoms] for g in connected_groups
         ]
         # Remove duplicate groups based on atom_site_labels
-
         for g_labels, group in zip(groups_atom_site_labels, connected_groups):
             if not any(
                 set(g_labels).issubset(set(other)) and set(g_labels) != set(other)
@@ -134,50 +120,43 @@ class Metal(Atom):
             ):
                 final_connected_groups.append(group)
         self.groups = final_connected_groups
-        if debug >= 1:
-            if self.atom_site_label is not None:
-                print(
-                    f"METAL.Get_connected_groups: {self.label} ({self.atom_site_label}) connected groups: {[g.formula for g in self.groups]}"
-                )
-            else:
-                print(
-                    f"METAL.Get_connected_groups: {self.label} connected groups: {[g.formula for g in self.groups]}"
-                )
+
+        logger.info(
+            "Metal %s%s connected to group %s",
+            self.label,
+            f" ({self.atom_site_label})" if self.atom_site_label else "",
+            [g.formula for g in self.groups],
+        )
         return self.groups
 
-    def get_relative_metal_radius(self, debug: int = 0):
+    def get_relative_metal_radius(self):
         if self.groups is None:
-            self.get_connected_groups(debug=debug)
+            self.get_connected_groups()
         diff_list = []
         for group in self.groups:
             if not group.is_haptic:
                 for atom in group.atoms:
-                    diff = round(
-                        float(
-                            get_dist(self.coord, atom.coord)
-                            - elemdatabase.CovalentRadius3[atom.label]
-                        ),
-                        3,
+                    diff = (
+                        get_dist(self.coord, atom.coord)
+                        - elemdatabase.CovalentRadius3[atom.label]
                     )
+                    diff = round(float(diff), 3)
                     diff_list.append(diff)
             else:
                 haptic_center_label = "C"
                 haptic_center_coord = compute_centroid(
                     np.array([atom.coord for atom in group.atoms])
                 )
-                diff = round(
-                    float(
-                        get_dist(self.coord, haptic_center_coord)
-                        - elemdatabase.CovalentRadius3[haptic_center_label]
-                    ),
-                    3,
+                diff = (
+                    get_dist(self.coord, haptic_center_coord)
+                    - elemdatabase.CovalentRadius3[haptic_center_label]
                 )
+                diff = round(float(diff), 3)
                 diff_list.append(diff)
         average = round(float(np.average(diff_list)), 3)
 
-        if debug > 1:
-            print(f"METAL.Get_relative_metal_radius: {diff_list=}")
-            print(f"METAL.Get_relative_metal_radius: {average=}")
+        logger.debug(f"{diff_list=}")
+        logger.debug(f"{average=}")
 
         self.rel_metal_radius = round(
             average / elemdatabase.CovalentRadius3[self.label], 3
@@ -185,137 +164,104 @@ class Metal(Atom):
 
         return self.rel_metal_radius
 
-    #######################################################
-    def get_connected_metals(self, debug: int = 2):
+    def get_connected_metals(self, use_bond_info: bool | None = None):
         self.metals = []
-        mol = self.get_parent("molecule")
         refcell = self.get_parent("reference")
-        if refcell is not None and refcell.exist_cif_bond_moiety:
-            pidx = self.get_parent_index("molecule")
-            # print(f"METAL.Get_connected_metals: {self.label} {pidx=} {mol.metals=}")
-            for met in mol.metals:
-                if met == self:
-                    continue
-                met_idx = met.get_parent_index("molecule")
-                if mol.adjmat[pidx, met_idx] == 1:
-                    if debug > 1:
-                        print(
-                            f"METAL.Get_connected_metals: {self.label} ({self.atom_site_label}) is connected to {met.label} ({met.atom_site_label})"
-                        )
+        bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
+        metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
+        mol = self.get_parent("molecule")
+
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
+        canonical = "bond_info" if use_bond_info else "distance"
+
+        for met in mol.metals:
+            if met == self:
+                continue
+
+            tmplabels = list(self.labels.copy())
+            tmpcoord = list(self.coord.copy())
+            atom_site_labels = list(self.atom_site_label.copy())
+
+            tmplabels.append(met.label)
+            tmpcoord.append(met.coord)
+            atom_site_labels.append(met.atom_site_label)
+
+            tmp_adjmat = build_adjacency(
+                labels=tmplabels,
+                positions=tmpcoord,
+                atom_site_labels=atom_site_labels,
+                bond_data=bond_data,
+                cov_factor=cov_factor,
+                metal_factor=metal_factor,
+                metal_only=True,
+                canonical=canonical,
+            )
+            if tmp_adjmat is None:
+                continue
+            else:
+                tmp_adjnum = tmp_adjmat.sum(axis=1)
+                if all(tmp_adjnum[1:]):
                     self.metals.append(met)
-                else:
-                    if debug > 1:
-                        print(
-                            f"METAL.Get_connected_metals: {self.label} ({self.atom_site_label}) is NOT connected to {met.label} ({met.atom_site_label})"
-                        )
-        else:
-            for met in mol.metals:
-                if met == self:
-                    continue
-                tmplabels = []
-                tmpcoord = []
-                tmplabels.append(self.label)
-                tmpcoord.append(self.coord)
-                tmplabels.append(met.label)
-                tmpcoord.append(met.coord)
-
-                if debug > 2:
-                    print(tmplabels, tmpcoord)
-
-                isgood, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
-                    tmplabels, tmpcoord, metal_only=True
-                )
-                if isgood:
-                    if debug > 2:
-                        print(met.label, tmpadjmat, tmpadjnum)
-                    if all(tmpadjnum[1:]):
-                        self.metals.append(met)
-                    if debug > 1:
-                        print(
-                            f"METAL.Get_connected_metals: {self.label} ({self.atom_site_label}) is connected to {met.label} ({met.atom_site_label})"
-                        )
-                else:
-                    if debug > 1:
-                        print(
-                            f"METAL.Get_connected_metals: {self.label} ({self.atom_site_label}) is NOT connected to {met.label} ({met.atom_site_label})"
-                        )
+                    logger.debug(
+                        "%s (%s) is is connected to %s (%s)",
+                        self.label,
+                        self.atom_site_label,
+                        met.label,
+                        met.atom_site_label,
+                    )
         return self.metals
 
-    #######################################################
-    def get_coordination_geometry(self: object, debug: int = 0):
-        if debug >= 1:
-            if self.atom_site_label is not None:
-                print(
-                    f"\nMETAL.Get_coord_geometry: {self.label} ({self.atom_site_label})"
-                )
-            else:
-                print(f"\nMETAL.Get_coord_geometry: {self.label} (No atom site label)")
-
-        coord_group = self.get_connected_groups(debug=debug)
-
-        self.coord_nr, self.coord_geometry, self.geom_deviation = (
-            define_coordination_geometry(self, coord_group, debug=debug)
+    def get_coordination_geometry(self: object):
+        logger.debug(
+            "Metal %s%s",
+            self.label,
+            f" ({self.atom_site_label})"
+            if self.atom_site_label
+            else " (no site label)",
         )
 
-        if debug >= 3:
-            print(f"METAL.Get_coord_geometry:\n{coord_group=}")
-        if debug >= 1:
-            print(f"METAL.Get_coord_geometry: coord_nr={self.coord_nr}")
-        if debug >= 2:
-            print(
-                f"METAL.Get_coord_geometry: {self.coord_geometry=} {self.geom_deviation=}"
-            )
+        coord_group = self.get_connected_groups()
 
-        self.rel_metal_radius = self.get_relative_metal_radius(debug=debug)
-        if debug >= 2:
-            print(f"METAL.Get_coord_geometry: {self.rel_metal_radius=}")
+        (self.coord_nr, self.coord_geometry, self.geom_deviation) = (
+            define_coordination_geometry(self, coord_group)
+        )
+
+        self.rel_metal_radius = self.get_relative_metal_radius()
+        logger.debug(f"{self.rel_metal_radius=}")
 
         if self.metals is None:
-            self.get_connected_metals(debug=debug)
+            self.get_connected_metals()
 
         if len(self.metals) > 0:
             bonded_metals = self.metals
             whole_coord = coord_group + bonded_metals
 
-            if debug >= 1:
-                print(
-                    f"\nMETAL.Get_coord_geometry Including metal-metal bonds for: {self.label}"
-                )
+            logger.debug("Including metal-metal bonds for: %s", self.label)
 
             (
                 self.coord_nr_with_metal_bonds,
                 self.coord_geometry_with_metal_bonds,
                 self.geom_deviation_with_metal_bonds,
-            ) = define_coordination_geometry(self, whole_coord, debug=debug)
-            if debug >= 1:
-                print(
-                    f"METAL.Get_coord_geometry Including metal-metal bonds {self.coord_nr_with_metal_bonds=}"
-                )
-            if debug >= 2:
-                print(
-                    f"METAL.Get_coord_geometry Including metal-metal bonds: {self.coord_geometry_with_metal_bonds=} {self.geom_deviation_with_metal_bonds=}"
-                )
+            ) = define_coordination_geometry(self, whole_coord)
 
         return self.coord_geometry
 
-    #######################################################
-    def get_possible_cs(self, debug: int = 0):
+    def get_possible_cs(self):
         self.possible_cs = get_metal_poscharges(self)
         return self.possible_cs
 
-    #######################################################
-    def get_spin(self, debug: int = 0):
-        self.spin = assign_spin_metal(self, debug=debug)
-        if debug >= 1:
-            print(
-                f"GET_SPIN: Spin multiplicity of the metal {self.label} is assigned as {self.spin}"
-            )
+    def get_spin(self):
+        self.spin = assign_spin_metal(self)
+        logger.info(
+            "Spin multiplicity of the metal %s is assigned as %d", self.label, self.spin
+        )
 
-    #######################################################
-    def predict_charge(self, debug: int = 0):
-        self.charge_by_ML = predict_ox_state(self, debug=debug)
+    def predict_charge(self):
+        # TODO: integrate metal OS prediction model here
+        self.charge_by_ML = predict_ox_state(self)
 
-    #######################################################
     def reset_charge(self):
         Atom.reset_charge(
             self
