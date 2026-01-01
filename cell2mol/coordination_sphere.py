@@ -28,19 +28,22 @@ import numpy as np
 import os
 from cell2mol import __file__
 import yaml
-from cell2mol.operations import compute_centroid, get_dist
+from cell2mol.operations import compute_centroid
 from cell2mol.connectivity import (
-    add_atom,
-    get_adjmatrix,
-    get_adjmatrix_from_cif_bonds,
+    build_adjacency,
     is_single_ring,
+    add_atom_old,
 )
 from cell2mol.elementdata import ElementData
 from scipy.optimize import linear_sum_assignment  # Hungarian algorithm
 from scipy.stats import special_ortho_group
 from scipy.linalg import svd
 from collections import defaultdict
+from cell2mol.utils import config
 
+import logging
+
+logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 # Load YAML filem
@@ -157,9 +160,7 @@ shape_structure_references_simplified = {
 }
 
 
-def define_coordination_geometry(
-    metal: object, coord_group: list, debug: int = 0
-) -> object:
+def define_coordination_geometry(metal: object, coord_group: list) -> object:
     """Define the coordination geometry of a metal center based on its coordinating groups"""
 
     symbols = []
@@ -168,20 +169,24 @@ def define_coordination_geometry(
     symbols.append(metal.label)
     positions.append(metal.coord)
 
-    if debug >= 2:
-        print(f"METAL.DEFINE_coordination_geometry: {metal.label} {metal.coord}")
-    if debug >= 1:
-        print(
-            f"METAL.DEFINE_coordination_geometry: coord_group formula {[group.formula for group in coord_group]}"
-        )
-    if debug >= 1:
-        print(
-            f"METAL.DEFINE_coordination_geometry: coord_group hapticity {[group.is_haptic if group.subtype != 'metal' else False for group in coord_group]}"
-        )
-    if debug >= 1:
-        print(
-            f"METAL.DEFINE_coordination_geometry: coord_group atoms{[[a.label for a in group.atoms] if group.subtype != 'metal' else [group.label] for group in coord_group]}"
-        )
+    logger.info("Define the coordination geometry %s %s", metal.label, metal.coord)
+    logger.debug("coord_group formula %s", [group.formula for group in coord_group])
+    logger.debug(
+        "coord_group hapticity %s",
+        [
+            group.is_haptic if group.subtype != "metal" else False
+            for group in coord_group
+        ],
+    )
+    logger.debug(
+        "coord_group atoms %s",
+        [
+            [a.label for a in group.atoms]
+            if group.subtype != "metal"
+            else [group.label]
+            for group in coord_group
+        ],
+    )
 
     count = 0
     for group in coord_group:
@@ -194,23 +199,18 @@ def define_coordination_geometry(
                 symbols.append(atom.label)
                 positions.append(atom.coord)
                 count += 1
-                if debug >= 1:
-                    print("METAL.DEFINE_coordination_geometry:", atom.label, atom.coord)
-        else:
-            if debug >= 1:
-                print(f"METAL.DEFINE_coordination_geometry: {group.haptic_type=}")
 
+        else:
+            # haptic ligand
             haptic_center_coord = compute_centroid(
                 np.array([atom.coord for atom in group.atoms])
             )
             symbols.append(str(group.haptic_type))
             positions.append(haptic_center_coord.tolist())
             count += 1
-            if debug >= 2:
-                print(f"mid point of {group.haptic_type=}", haptic_center_coord)
             coord_haptic_type.append(group.haptic_type)
 
-    posgeom_dev = shape_measure(symbols, positions, debug=debug)
+    posgeom_dev = shape_measure(symbols, positions)
     coord_nr = count
     if len(posgeom_dev) > 0:
         coordination_geometry = min(posgeom_dev, key=posgeom_dev.get)
@@ -219,36 +219,24 @@ def define_coordination_geometry(
         coordination_geometry = "Undefined"
         geom_deviation = "Undefined"
 
-    if debug >= 0:
-        # for haptic ligands, it's the mid point of haptic ligands
-        print(
-            f"METAL.DEFINE_coordination_geometry: The number of coordinating points: {coord_nr}"
-        )
-        print(f"METAL.DEFINE_coordination_geometry: {posgeom_dev}")
-        print(
-            f"METAL.DEFINE_coordination_geometry: The type of hapticity : {coord_haptic_type}"
-        )
-
-    if debug >= 0:
-        print(
-            f"METAL.DEFINE_coordination_geometry: The most likely geometry is '{coordination_geometry}' with deviation value {geom_deviation}"
-        )
+    # for haptic ligands, it's the mid point of haptic ligands
+    logger.info("The number of coordinating points: %s", coord_nr)
+    logger.info("Possible coordination geometries: %s", posgeom_dev)
+    logger.info("The type of hapticity : %s", coord_haptic_type)
+    logger.info(
+        "The most likely geometry is '%s' with deviation value %s",
+        coordination_geometry,
+        geom_deviation,
+    )
 
     # return coordination_geometry
     return coord_nr, coordination_geometry, geom_deviation
 
 
-def shape_measure(symbols: list, positions: list, debug: int = 0) -> dict:
+def shape_measure(symbols: list, positions: list) -> dict:
     """Shape measure calculation adapted from a set of coordinates"""
-    if debug >= 2:
-        print(f"SHAPE_MEASURE: {symbols=}")
-    if debug >= 2:
-        print(f"SHAPE_MEASURE: {positions=}")
-
-    cn = len(symbols) - 1  # coordination number of metal center
-    if debug >= 2:
-        print(f"SHAPE_MEASURE: coordination number of metal center {cn}")
-
+    # coordination number of metal center
+    cn = len(symbols) - 1
     if cn == 0:
         posgeom_dev = {}
     elif cn == 1:
@@ -264,15 +252,12 @@ def shape_measure(symbols: list, positions: list, debug: int = 0) -> dict:
             for idx, rg in enumerate(ref_geom[:, 0]):
                 geom = ref_geom[:, 3][idx]
                 ideal_shapes[geom] = ideal_shapes_from_cosymlib[rg]
-            if debug >= 2:
-                print(f"SHAPE_MEASURE: Ideal_shapes: {ideal_shapes.keys()}")
+
             for geom, ideal_shape in ideal_shapes.items():
                 chsm = calc_cshm_fast(positions, ideal_shape)
                 posgeom_dev[geom] = round(float(chsm), 3)
         except:
-            print(
-                f"SHAPE_MEASURE: {cn} Vertices not found in shape_structure_references"
-            )
+            logger.warning("%s Vertices not found in shape_structure_references", cn)
 
     return posgeom_dev
 
@@ -336,13 +321,14 @@ def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
     return min_cshm * 100
 
 
-def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
-    if debug > 0:
-        print("Entering COORD_CORR_NONHAPTIC:")
+def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = None):
+    if use_bond_info is None:
+        use_bond_info = config.USE_BOND_INFO
+    canonical = "bond_info" if use_bond_info else "distance"
+
     if group.metals is None:
         group.get_connected_metals()
-    if debug > 1:
-        print(f"group: {[atom.label for atom in group.atoms]}")
+
     # Pair each atom with its index in the original list
     indexed_atoms = list(enumerate(group.atoms))
 
@@ -350,8 +336,7 @@ def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
     sorted_indexed_atoms = sorted(
         indexed_atoms, key=lambda x: (x[1].label != "H", x[1].label)
     )
-    if debug > 2:
-        print("sorted_indexed_atoms:", sorted_indexed_atoms)
+
     # Extract the sorted atoms and their original indices into separate lists
     sorted_atoms = [atom[1] for atom in sorted_indexed_atoms]
     original_indices = [atom[0] for atom in sorted_indexed_atoms]
@@ -363,10 +348,6 @@ def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
     good_atoms = []
     removed_idx = []
     for idx, atom in zip(original_indices, sorted_atoms):
-        if debug > 0:
-            print(
-                f"\tCoordinating atom label={atom.label} with mconnec={atom.mconnec}, original group index {idx}"
-            )
         isremoved = False
 
         ## Now there is an extra loop for each metal of the group.
@@ -375,99 +356,95 @@ def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
                 continue
             lig = group.get_parent("ligand")
             ligand_idx = atom.get_parent_index("ligand")
-            if debug > 0:
-                print(f"\tevaluating coordination with metal {met.label}")
-            if debug > 2:
-                print(f"\n{met}")
 
             tmplabels = [atom.label, met.label]
             tmpcoord = [atom.coord, met.coord]
-
-            refcell = atom.get_parent("reference")
             if atom.atom_site_label is not None and met.atom_site_label is not None:
                 atom_site_labels = [atom.atom_site_label, met.atom_site_label]
             else:
                 atom_site_labels = None
-            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
-                isconnected, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(
-                    tmplabels,
-                    tmpcoord,
-                    atom_site_labels,
-                    refcell.geom_bond_cif,
-                    metal_only=True,
-                )
+
+            refcell = atom.get_parent("reference")
+            bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+            cov_factor = getattr(lig, "cov_factor", config.COV_FACTOR)
+            metal_factor = getattr(lig, "metal_factor", config.METAL_FACTOR)
+
+            tmp_adjmat = build_adjacency(
+                labels=tmplabels,
+                positions=tmpcoord,
+                atom_site_labels=atom_site_labels,
+                bond_data=bond_data,
+                cov_factor=cov_factor,
+                metal_factor=metal_factor,
+                metal_only=True,
+                canonical=canonical,
+            )
+            if tmp_adjmat is None:
+                continue
             else:
-                isconnected, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
-                    tmplabels, tmpcoord, metal_only=True, add_atoms=True
-                )
-
-            if isconnected and any(tmpadjnum) > 0:
-                if debug > 0:
-                    print(
-                        f"\tAtom {atom.label} (atom {ligand_idx=}) is connected to metal {met.label} ({met.atom_site_label},{jdx=})"
-                    )  # (metal group.metals index {jdx=})")
-
-                if refcell is not None and getattr(
-                    refcell, "exist_cif_bond_moiety", False
-                ):
-                    isadded = True
-                    if debug > 0:
-                        print(
-                            f"\tConnectivity verified for atom {atom.label} with ligand index {ligand_idx} based on CIF bonds"
-                        )
-                else:
-                    isadded, newlab, newcoord = add_atom(
-                        lig.labels,
-                        lig.coord,
+                tmp_adjnum = tmp_adjmat.sum(axis=1)
+                if any(tmp_adjnum) > 0:
+                    logger.debug(
+                        "Atom %s (ligand index %s) is connected to metal %s (%s, metal index %s)",
+                        atom.label,
                         ligand_idx,
-                        lig,
-                        list([met]),
-                        "H",
-                        removed_idx,
-                        debug=debug,
+                        met.label,
+                        met.atom_site_label,
+                        jdx,
                     )
-                    if debug >= 2:
-                        print(f"{removed_idx=}")
-
-                if isadded:
-                    if debug > 0:
-                        print(
-                            f"\tConnectivity verified for atom {atom.label} with ligand index {ligand_idx}"
+                    if use_bond_info:
+                        isadded = True
+                        logger.debug(
+                            "Connectivity verified for atom %s with ligand index %s based on CIF bonds",
+                            atom.label,
+                            ligand_idx,
                         )
-                    conn_idx.append(idx)
-                    final_ligand_indices.append(atom.get_parent_index("ligand"))
-                    good_atoms.append(atom)
-                    conn_idx_by_metal[jdx].append(idx)
-                else:
-                    if debug > 0:
-                        print(
-                            f"\tCORRECT mconnec of atom {atom.label} with ligand index {ligand_idx}"
+                    else:
+                        isadded, newlab, newcoord = add_atom_old(
+                            lig.labels,
+                            lig.coord,
+                            ligand_idx,
+                            lig,
+                            "H",
+                            removed_idx,
                         )
-                    isremoved = True
-                    removed_idx.append(ligand_idx)
-                    ### Reset Connectivity of the atom and the parents
-                    atom.reset_mconnec(met, debug=1)
-                    met.get_coord_sphere()
-                    met.get_coord_sphere_formula()
-            else:
-                if debug > 0:
-                    print(
-                        f"\tAtom {atom.label} (atom {ligand_idx=}) is not connected to metal {met.label} ({met.atom_site_label},{jdx=})"
-                    )  # (metal group.metals index {jdx=})")
+                        if isadded:
+                            logger.debug(
+                                "Connectivity verified for atom %s with ligand index %s",
+                                atom.label,
+                                ligand_idx,
+                            )
+                            conn_idx.append(idx)
+                            final_ligand_indices.append(atom.get_parent_index("ligand"))
+                            good_atoms.append(atom)
+                            conn_idx_by_metal[jdx].append(idx)
+                        else:
+                            logger.debug(
+                                "Correct mconnec of atom %s with ligand index %s",
+                                atom.label,
+                                ligand_idx,
+                            )
+                            isremoved = True
+                            removed_idx.append(ligand_idx)
+                            ### Reset Connectivity of the atom and the parents
+                            atom.reset_mconnec(met)
+                            met.get_coord_sphere()
+                            met.get_coord_sphere_formula()
 
-    if debug > 2:
-        print(f"conn_idx before set: {conn_idx=}")
-        print(f"conn_idx_by_metal: {conn_idx_by_metal=}")
     conn_idx = sorted(list(set(conn_idx)))
     split_groups = []
     final_ligand_indices_by_metal = {jdx: [] for jdx, met in enumerate(group.metals)}
+
     for jdx, indices in conn_idx_by_metal.items():
         metal = group.metals[jdx]
         if indices:
-            if debug > 2:
-                print(
-                    f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}"
-                )
+            logger.debug(
+                "metal %s %s (%s) connected to %s",
+                metal.label,
+                metal.atom_site_label,
+                jdx,
+                [group.atoms[i].atom_site_label for i in indices],
+            )
             new_group = [i for i in indices]
             split_groups.append(new_group)
 
@@ -480,18 +457,12 @@ def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
                 )
 
     final_group_indices = split_groups
-    if debug > 2:
-        print(f"conn_idx: {conn_idx=}")
-        print(f"split_groups: {split_groups=}")
 
-        print(f"final_group_indices: {final_group_indices=}")
-        print(f"final_ligand_indices_by_metal: {final_ligand_indices_by_metal=}")
     grouped = defaultdict(list)
     for k, v in final_ligand_indices_by_metal.items():
         grouped[tuple(v)].append(k)
     group_metals_indices = [v for v in grouped.values()]
-    if debug > 2:
-        print(f"group_metals_indices: {group_metals_indices=}")
+
     return (
         group,
         final_group_indices,
@@ -500,144 +471,73 @@ def coordination_correction_for_nonhaptic(group: object, debug: int = 0):
     )
 
 
-#######################################################
-def coordination_correction_for_haptic(group: object, debug: int = 0):
-    if debug > 0:
-        print("Entering COORD_CORR_HAPTIC:")
+def handle_haptic_coordination(group: object, use_bond_info: bool | None = None):
+    if use_bond_info is None:
+        use_bond_info = config.USE_BOND_INFO
+
+    canonical = "bond_info" if use_bond_info else "distance"
+
     single_ring = is_single_ring(group.labels, group.coord)
-    if debug > 0:
-        print(f"Is single ring: {single_ring}")
+    logger.debug("Is single ring: %s", single_ring)
+
     conn_idx = []
     conn_idx_by_metal = {jdx: [] for jdx, met in enumerate(group.metals)}
     for idx, atom in enumerate(group.atoms):
         for jdx, met in enumerate(group.metals):
             lig = group.get_parent("ligand")
             ligand_idx = atom.get_parent_index("ligand")
-            if debug > 2:
-                print(
-                    f"\tevaluating coordination with metal {met.label} ({met.atom_site_label})"
-                )
-            if debug > 2:
-                print(f"\n{met}")
-
             tmplabels = [atom.label, met.label]
             tmpcoord = [atom.coord, met.coord]
-
-            refcell = atom.get_parent("reference")
             if atom.atom_site_label is not None and met.atom_site_label is not None:
                 atom_site_labels = [atom.atom_site_label, met.atom_site_label]
             else:
                 atom_site_labels = None
-            if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
-                isconnected, tmpadjmat, tmpadjnum = get_adjmatrix_from_cif_bonds(
-                    tmplabels,
-                    tmpcoord,
-                    atom_site_labels,
-                    refcell.geom_bond_cif,
-                    metal_only=True,
-                )
-            else:
-                isconnected, tmpadjmat, tmpadjnum, warning = get_adjmatrix(
-                    tmplabels, tmpcoord, metal_only=True, add_atoms=True
-                )
 
-            if isconnected and any(tmpadjnum) > 0:
-                if debug > 0:
-                    print(
-                        f"\tAtom {atom.label} ({ligand_idx=}) is connected to metal {met.label} ({met.atom_site_label},{jdx=})"
-                    )  # , group.metals index {jdx=})")
-                conn_idx.append(idx)
-                conn_idx_by_metal[jdx].append(idx)
+            refcell = atom.get_parent("reference")
+            bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+            cov_factor = getattr(lig, "cov_factor", config.COV_FACTOR)
+            metal_factor = getattr(lig, "metal_factor", config.METAL_FACTOR)
+
+            tmp_adjmat = build_adjacency(
+                labels=tmplabels,
+                positions=tmpcoord,
+                atom_site_labels=atom_site_labels,
+                bond_data=bond_data,
+                cov_factor=cov_factor,
+                metal_factor=metal_factor,
+                metal_only=True,
+                canonical=canonical,
+            )
+            if tmp_adjmat is None:
+                continue
             else:
-                if debug > 0:
-                    print(
-                        f"\tAtom {atom.label} ({ligand_idx=}) is not connected to metal {met.label} ({met.atom_site_label},{jdx=})"
-                    )  # , group.metals index {jdx=})")
-    if debug > 2:
-        print(f"conn_idx before set: {conn_idx=}")
+                tmp_adjnum = tmp_adjmat.sum(axis=1)
+                if any(tmp_adjnum) > 0:
+                    logger.debug(
+                        "Atom %s (ligand index %s) is connected to metal %s (%s, metal index %s)",
+                        atom.label,
+                        ligand_idx,
+                        met.label,
+                        met.atom_site_label,
+                        jdx,
+                    )
+
     conn_idx = sorted(list(set(conn_idx)))
     split_groups = []
     final_ligand_indices_by_metal = {jdx: [] for jdx, met in enumerate(group.metals)}
 
-    if refcell is not None and getattr(refcell, "exist_cif_bond_moiety", False):
-        for jdx, indices in conn_idx_by_metal.items():
-            metal = group.metals[jdx]
-            if indices:
-                new_group = [i for i in indices]
-                split_groups.append(new_group)
-    else:
-        for jdx, indices in conn_idx_by_metal.items():
-            metal = group.metals[jdx]
-            if indices:
-                print(
-                    f"metal {metal.label} ({metal.atom_site_label}) connected to {[group.atoms[i].atom_site_label for i in indices]}"
-                )
-                if single_ring:
-                    # For single ring, we need to check distances
-                    if debug > 2:
-                        print("Checking distances for a single ring")
-                    distances = [
-                        get_dist(metal.coord, group.atoms[i].coord) for i in indices
-                    ]
-                    mean = round(np.mean(distances), 3)
-                    std_dev = round(float(np.std(distances)), 3)
-                    z_scores = (distances - mean) / std_dev
-                    if debug > 2:
-                        print(
-                            f"Distances: {distances}, Mean: {mean}, Std Dev: {std_dev}, Z-scores: {z_scores}"
-                        )
-                    std_thresh = 0.1
-                    z_hi = 2.0  # too far (large positive z)
-                    z_lo = 1.2  # very close (large negative z)
-                    too_far_idx = [i for i, z in enumerate(z_scores) if z > z_hi]
-                    very_close_idx = [i for i, z in enumerate(z_scores) if z < -z_lo]
-                    if debug > 2:
-                        print(
-                            f"Too far indices: {too_far_idx}, Very close indices: {very_close_idx}"
-                        )
-                    new_group = []
-                    if std_dev > std_thresh:
-                        if len(too_far_idx) > 0 and len(very_close_idx) == 0:
-                            print(f"Found too far indices: {too_far_idx}")
-                            for idx, z in zip(indices, z_scores):
-                                if idx in too_far_idx:
-                                    print(
-                                        f"Distance {distances[idx]} has a z-score {z_scores[idx]} > {z_hi}, resetting mconnec for atom {group.atoms[idx].label}"
-                                    )
-                                    group.atoms[idx].reset_mconnec(metal, debug=1)
-                                else:
-                                    new_group.append(idx)
-                        elif len(very_close_idx) > 0 and len(too_far_idx) == 0:
-                            print(f"Found very close indices: {very_close_idx}")
-                            for idx, z in zip(indices, z_scores):
-                                if idx in very_close_idx:
-                                    new_group.append(idx)
-                                else:
-                                    print(
-                                        f"Distance {distances[idx]} has a z-score {z_scores[idx]} > {-z_lo}, resetting mconnec for atom {group.atoms[idx].label}"
-                                    )
-                                    group.atoms[idx].reset_mconnec(metal, debug=1)
-                        else:
-                            print("Figure out why std_dev is high")  # e.g. EBUFOW
-                            for idx, z in zip(indices, z_scores):
-                                if z < 0:
-                                    new_group.append(idx)
-                                else:
-                                    group.atoms[idx].reset_mconnec(metal, debug=1)
-                                    print(
-                                        f"Distance {distances[idx]} has a z-score {z_scores[idx]}, resetting mconnec for atom {group.atoms[idx].label}"
-                                    )
-                        if debug > 2:
-                            print(f"New group after distance check: {new_group}")
-                    else:
-                        if debug > 2:
-                            print(
-                                f"std_dev is too low ({std_dev}), adding all indices to conn_idx"
-                            )
-                        new_group = [i for i in indices]
-                else:
-                    new_group = [i for i in indices]
-                split_groups.append(new_group)
+    for jdx, indices in conn_idx_by_metal.items():
+        metal = group.metals[jdx]
+        if indices:
+            logger.debug(
+                "metal %s %s (%s) connected to %s",
+                metal.label,
+                metal.atom_site_label,
+                jdx,
+                [group.atoms[i].atom_site_label for i in indices],
+            )
+            new_group = [i for i in indices]
+            split_groups.append(new_group)
 
     for jdx, indices in enumerate(split_groups):
         for idx in indices:
@@ -648,18 +548,11 @@ def coordination_correction_for_haptic(group: object, debug: int = 0):
                 )
 
     final_group_indices = split_groups
-    if debug > 2:
-        print(f"conn_idx: {conn_idx=}")
-        print(f"split_groups: {split_groups=}")
-
-        print(f"final_group_indices: {final_group_indices=}")
-        print(f"final_ligand_indices_by_metal: {final_ligand_indices_by_metal=}")
     grouped = defaultdict(list)
     for k, v in final_ligand_indices_by_metal.items():
         grouped[tuple(v)].append(k)
     group_metals_indices = [v for v in grouped.values()]
-    if debug > 2:
-        print(f"group_metals_indices: {group_metals_indices=}")
+
     return (
         group,
         final_group_indices,
