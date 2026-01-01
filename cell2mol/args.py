@@ -100,12 +100,17 @@ def parsing_arguments():
 
     # FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-30s:%(funcName)-30s | %(message)s"
     # FORMAT = "%(levelname)-8s | %(name)-30s:%(funcName)-30s | %(message)s"
-    FORMAT = "%(funcName)-30s | %(message)s"
+    # FORMAT = "%(funcName)-30s | %(message)s"
+    # logging.basicConfig(
+    #     level=getattr(logging, args.log_level),
+    #     format=FORMAT,
+    # )
     logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format=FORMAT,
+        level=logging.DEBUG,
+        format="%(levelname)-7s %(funcName)-30s | %(message)s",
+        filename="cell2mol.out",
+        filemode="w",
     )
-
     return args
 
 
