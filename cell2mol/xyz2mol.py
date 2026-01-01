@@ -25,7 +25,7 @@ import networkx as nx
 
 from rdkit import Chem
 from cell2mol.elementdata import ElementData
-from cell2mol.connectivity import labels2formula
+from cell2mol.element_utils import labels2formula
 
 logger = logging.getLogger(__name__)
 
