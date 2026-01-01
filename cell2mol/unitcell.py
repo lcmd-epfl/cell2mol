@@ -2,18 +2,20 @@
 
 import os
 import logging
-import argparse
 from ase.io import read
-from cell2mol.refcell import process_refcell, get_error_case_message
+from cell2mol.args import parsing_arguments
+from cell2mol.refcell import process_refcell
 from cell2mol.final_c2m_module import cell2mol_mode
-from cell2mol.read_write import (
+from cell2mol.read_cif import get_cell_parameters
+from cell2mol.write_results import (
     write_refmoleclist,
     write_unique_species,
-    get_cell_parameters,
+    get_reference_error_message,
 )
 import copy
+from cell2mol.utils import config
 
-logger = logging.getLogger("cell2mol")
+logger = logging.getLogger(__name__)
 
 # Constants
 VERSION = "2.0"
@@ -24,16 +26,15 @@ METAL_FACTOR = 1.0
 # -----------------------------------------------------------------------------
 # Core function
 # -----------------------------------------------------------------------------
-def process_unitcell(input_path, name, current_dir, cif_bond_info):
+def process_unitcell(input_path, name, current_dir):
     """
     Process the molecules from a CIF file and generate a unit cell object.
     Args:
         input_path (str): Path to the CIF file (downloaded from CSD).
         name (str): CSD refcode.
         current_dir (str): Current working directory.
-        cif_bond_info (bool): Whether to use bond information reported in the CIF (_geom_bond block)
     Returns:
-        newcell (object): Unit cell object containing the molecules and their information.
+        cells (object): Cells object containing reference and unit cell information.
     """
 
     # Set up file paths
@@ -41,18 +42,11 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info):
     cell_fname = os.path.join(current_dir, f"Cell_{name}.cell")
 
     structure = read(input_path)
-    (
-        cell_labels,
-        cell_pos,
-        cell_fracs,
-        cell_vector,
-        cell_param,
-        sym_ops,
-    ) = get_cell_parameters(structure)
+    cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
 
     # Process reference cell
     logger.info("Starting the cell2mol process for reference (Wyckoff sites)")
-    cells = process_refcell(input_path, name, current_dir, cif_bond_info)
+    cells = process_refcell(input_path, name, current_dir)
     refcell = cells.reference
 
     if refcell.error_case != 0:
@@ -62,16 +56,15 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info):
         refcell.disagree_with_cif_formula is not None
         and refcell.disagree_with_cif_formula
     ):
-        logging.info(
-            "Discrepancies found between refcell and CIF. This will cause errors in the charge prediction!"
-        )
+        logger.info("Discrepancies found between refcell and CIF.")
+        logger.info("This will cause errors in the charge prediction!")
 
     unitcell = cells.unitcell
     unitcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
     unitcell.has_isolated_H = refcell.has_isolated_H
     unitcell.has_missing_H = refcell.has_missing_H
     unitcell.error_get_poscharges = refcell.error_get_poscharges
-    logging.info("Starting the cell2mol process for the unit cell")
+    logger.info("Starting the cell2mol process for the unit cell")
 
     debug = 1
     if refcell.error_case == 0:
@@ -103,64 +96,31 @@ def process_unitcell(input_path, name, current_dir, cif_bond_info):
         print(name, file=f)
         write_refmoleclist(refcell, file=f)
         write_unique_species(refcell, file=f)
-
-        if refcell.refmoleclist == []:
-            refcell.error_case = "X"
-        elif (
-            refcell.disagree_with_cif_formula is not None
-            and refcell.disagree_with_cif_formula
-        ):
-            refcell.error_case = 9
-        error = get_error_case_message(refcell.error_case)
-        print(f"Error case: {refcell.error_case} - {error}", file=f)
+        print(get_reference_error_message(refcell.error_case), file=f)
 
     return cells
 
 
 def _main():
-    parser = argparse.ArgumentParser(
-        description="Process reference object from a CIF file"
-    )
-    parser.add_argument(
-        "-i",
-        "--input",
-        dest="filepath",
-        type=str,
-        required=True,
-        help="Path to the input file (.cif)",
-    )
-    parser.add_argument(
-        "--cif-bond-info",
-        action="store_true",
-        help="Use CIF _geom_bond information to generate adjacency matrix",
-    )
-    parser.add_argument(
-        "--log-level",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-    )
+    args = parsing_arguments()
+    if args.cif_bond_info:
+        config.USE_BOND_INFO = True
 
-    args = parser.parse_args()
-
-    ext = os.path.splitext(args.filepath)[1].lower()
-
-    # Validation
-    if ext != ".cif":
-        parser.error("Invalid input file format. Only .cif files are supported.")
-
-    logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(levelname)s | %(message)s",
-    )
+    if args.print_config:
+        print(config.dump())
+        return
 
     input_path = os.path.normpath(args.filepath)
     name = os.path.splitext(os.path.basename(input_path))[0]
+    ext = os.path.splitext(args.filepath)[1].lower()
+
+    if ext != ".cif":
+        raise ValueError("Invalid input file format. Only .cif files are supported.")
 
     process_unitcell(
         input_path=input_path,
         name=name,
         current_dir=os.getcwd(),
-        cif_bond_info=args.cif_bond_info,
     )
 
 
