@@ -1,167 +1,46 @@
-import itertools
 import numpy as np
+import logging
 from ase import Atoms
 from cell2mol.classes import Molecule
-from cell2mol.connectivity import (
-    split_species,
-    count_species,
-    compare_reference_indices,
-)
-from cell2mol.operations import (
-    translate,
-    additem,
-    get_dist,
-    extract_from_list,
-    absolute_value,
-)
+from cell2mol.compare import compare_reference_indices
+from cell2mol.connectivity import split_species
+from cell2mol.operations import translate, tmatgenerator, extract_from_list
 from itertools import combinations
 from cell2mol.elementdata import ElementData
 
+logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 
-def tmatgenerator(centroid, thres=0.40, full=False, debug: int = 0):
-    # This function generates a list of the translations that a fragment should undergo depending on the centroid of its fractional coordinates
-    # For instance, if the centroid of a fragment is at 0.9 in any given axis, it is unlikely that a one-cell-length translation along such axis (resulting in 1.9) would help.
-    # Also, a fragment right at the center of the unit cell (centroid=(0.5, 0.5, 0.5) is unlikely to require reconstruction
-    # The threshold defines the window. If thres=0.4, the function will suggest positive translation for any fragment between 0 and 0.4, and negative translation between 0.6 and 1.0.
-    # If full is asked, then all translations are applied
+def apply_symmetry_operations(refcell, cell_vector, sym_ops, normalize: bool = True):
+    """Applies symmetry operations to a reference cell.
 
-    tmax = 1 - thres
-    tmin = thres
+    This function generates a set of new atomic structures by applying a list of
+    symmetry operations (rotations and translations) to the fractional coordinates
+    of a reference structure.
 
-    if not full:
-        tmatrix = []
-        tmatrix = additem((0, 0, 0), tmatrix)
+    Args:
+        refcell (object): An object representing the reference cell, which must
+            have `labels` and `frac_coord` attributes.
+        cell_vector (np.ndarray): The cell vectors for the new `ase.Atoms`
+            objects.
+        sym_ops (tuple): A tuple containing two lists: a list of rotation
+            matrices and a list of translation vectors.
+        normalize (bool, optional): If True, the transformed fractional
+            coordinates are wrapped back into the unit cell (0 to 1).
+            Defaults to True.
 
-        # X positive
-        if centroid[0] >= tmax:
-            tmatrix = additem((-1, 0, 0), tmatrix)
-            if centroid[1] >= tmax:
-                tmatrix = additem((-1, -1, 0), tmatrix)
-                tmatrix = additem((0, -1, 0), tmatrix)
-                if centroid[2] >= tmax:
-                    tmatrix = additem((-1, -1, -1), tmatrix)
-                    tmatrix = additem((0, -1, -1), tmatrix)
-                    tmatrix = additem((0, 0, -1), tmatrix)
-                if centroid[2] <= tmin:
-                    tmatrix = additem((-1, -1, 1), tmatrix)
-                    tmatrix = additem((0, -1, 1), tmatrix)
-                    tmatrix = additem((0, 0, 1), tmatrix)
-            if centroid[1] <= tmin:
-                tmatrix = additem((-1, 1, 0), tmatrix)
-                tmatrix = additem((0, 1, 0), tmatrix)
-                if centroid[2] >= tmax:
-                    tmatrix = additem((-1, 1, -1), tmatrix)
-                    tmatrix = additem((0, 1, -1), tmatrix)
-                    tmatrix = additem((0, 0, -1), tmatrix)
-                if centroid[2] <= tmin:
-                    tmatrix = additem((-1, 1, 1), tmatrix)
-                    tmatrix = additem((0, 1, 1), tmatrix)
-                    tmatrix = additem((0, 0, 1), tmatrix)
-            if centroid[2] >= tmax:
-                tmatrix = additem((-1, 0, -1), tmatrix)
-                tmatrix = additem((0, 0, -1), tmatrix)
-            if centroid[2] <= tmin:
-                tmatrix = additem((-1, 0, 1), tmatrix)
-                tmatrix = additem((0, 0, 1), tmatrix)
-
-        if centroid[1] >= tmax:
-            tmatrix = additem((0, -1, 0), tmatrix)
-            if centroid[2] >= tmax:
-                tmatrix = additem((0, -1, -1), tmatrix)
-                tmatrix = additem((0, 0, -1), tmatrix)
-            if centroid[2] <= tmin:
-                tmatrix = additem((0, -1, 1), tmatrix)
-                tmatrix = additem((0, 0, 1), tmatrix)
-
-        if centroid[2] >= tmax:
-            tmatrix = additem((0, 0, -1), tmatrix)
-
-        if centroid[0] <= tmin:
-            tmatrix = additem((1, 0, 0), tmatrix)
-            if centroid[1] <= tmin:
-                tmatrix = additem((1, 1, 0), tmatrix)
-                tmatrix = additem((0, 1, 0), tmatrix)
-                if centroid[2] <= tmin:
-                    tmatrix = additem((1, 1, 1), tmatrix)
-                    tmatrix = additem((0, 1, 1), tmatrix)
-                    tmatrix = additem((0, 0, 1), tmatrix)
-                if centroid[2] >= tmax:
-                    tmatrix = additem((1, 1, -1), tmatrix)
-                    tmatrix = additem((0, 1, -1), tmatrix)
-                    tmatrix = additem((0, 0, -1), tmatrix)
-            if centroid[1] >= tmax:
-                tmatrix = additem((1, -1, 0), tmatrix)
-                tmatrix = additem((0, -1, 0), tmatrix)
-                if centroid[2] >= tmax:
-                    tmatrix = additem((1, -1, -1), tmatrix)
-                if centroid[2] <= tmin:
-                    tmatrix = additem((1, -1, 1), tmatrix)
-            if centroid[2] <= tmin:
-                tmatrix = additem((1, 0, 1), tmatrix)
-                tmatrix = additem((0, 0, 1), tmatrix)
-            if centroid[2] >= tmax:
-                tmatrix = additem((1, 0, -1), tmatrix)
-                tmatrix = additem((0, 0, -1), tmatrix)
-
-        if centroid[1] <= tmin:
-            tmatrix = additem((0, 1, 0), tmatrix)
-            if centroid[2] <= tmin:
-                tmatrix = additem((0, 1, 1), tmatrix)
-                tmatrix = additem((0, 0, 1), tmatrix)
-            if centroid[2] >= tmax:
-                tmatrix = additem((0, 1, -1), tmatrix)
-                tmatrix = additem((0, 0, -1), tmatrix)
-        if centroid[2] <= tmin:
-            tmatrix = additem((0, 0, 1), tmatrix)
-
-        if (centroid[0] > tmin) and (centroid[0] < tmax):
-            if centroid[1] <= tmin:
-                tmatrix = additem((0, 1, 0), tmatrix)
-                if centroid[2] >= tmax:
-                    tmatrix = additem((0, 1, -1), tmatrix)
-                if centroid[2] <= tmin:
-                    tmatrix = additem((0, 1, 1), tmatrix)
-            if centroid[1] >= tmax:
-                tmatrix = additem((0, -1, 0), tmatrix)
-                if centroid[2] >= tmax:
-                    tmatrix = additem((0, -1, -1), tmatrix)
-                if centroid[2] <= tmin:
-                    tmatrix = additem((0, -1, 1), tmatrix)
-            if centroid[2] <= tmin:
-                tmatrix = additem((0, 0, 1), tmatrix)
-                if centroid[1] >= tmax:
-                    tmatrix = additem((0, -1, 1), tmatrix)
-                if centroid[1] <= tmin:
-                    tmatrix = additem((0, 1, 1), tmatrix)
-            if centroid[2] >= tmax:
-                tmatrix = additem((0, 0, -1), tmatrix)
-                if centroid[1] >= tmax:
-                    tmatrix = additem((0, -1, -1), tmatrix)
-                if centroid[1] <= tmin:
-                    tmatrix = additem((0, 1, -1), tmatrix)
-    elif full:
-        x = [-1, 0, 1]
-        tmatrix = [p for p in itertools.product(x, repeat=3)]
-
-    tmatrix.sort(key=absolute_value)
-
-    return tmatrix
-
-
-######################################################
-def apply_symmetry_operations_reference(
-    refcell, cell_vector, sym_ops, normalize: bool = True, pbc: bool = True
-):
+    Returns:
+        list: A list of `ase.Atoms` objects, where each object represents the
+              reference structure after one symmetry operation has been applied.
+    """
     new_structures = []
     ref_labels = refcell.labels
     fractional_coords = np.array(refcell.frac_coord)
 
     if "D" in ref_labels:
-        numbers = [
-            elemdatabase.elementnr[elem] for elem in ref_labels
-        ]  # Atoms object cannot handle Deuterium in the symbols
+        # Atoms object cannot handle Deuterium in the symbols
+        numbers = [elemdatabase.elementnr[elem] for elem in ref_labels]
 
     for rot, trans in zip(sym_ops[0], sym_ops[1]):
         transformed_positions = np.dot(fractional_coords, rot.T)
@@ -186,26 +65,33 @@ def apply_symmetry_operations_reference(
     return new_structures
 
 
-######################################################
 def get_fragments_from_moiety(
     newcell,
     updated,
     indices_in_ref,
     refcell,
-    cov_factor: float = 1.3,
+    cov_factor: float = 1.0,
     metal_factor: float = 1.0,
-    debug: int = 0,
 ):
+    """
+    Get molecular fragments from a moiety in the new cell.
+    Args:
+        newcell (object): The new cell object containing reference molecules.
+        updated (list): List of updated atom indices in the new cell.
+        indices_in_ref (list): List of atom indices in the reference cell.
+        refcell (object): The reference cell object containing reference molecules.
+        cov_factor (float): Covalent factor for adjacency determination.
+        metal_factor (float): Metal factor for adjacency determination.
+    Returns:
+        fragments (list): List of molecular fragments
+    """
     atom_site_labels = refcell.atom_site_labels
     geom_bond_cif = refcell.geom_bond_cif
     moiety_indices = refcell.moiety_indices
 
-    if debug > 2:
-        print(f"get_fragments: {updated=}")
-    if debug > 2:
-        print(f"get_fragments: {indices_in_ref=}")
-    if debug > 2:
-        print(f"get_fragments: {moiety_indices=}")
+    # logger.debug(f"{updated=}")
+    # logger.debug(f"{indices_in_ref=}")
+    # logger.debug(f"{moiety_indices=}")
 
     updated_labels = extract_from_list(updated, newcell.labels, dimension=1)
     updated_coord = extract_from_list(updated, newcell.coord, dimension=1)
@@ -222,27 +108,24 @@ def get_fragments_from_moiety(
         updated_moieties_list.append(new_sublist)
         updated_moieties_indices_in_ref_list.append(new_sublist_indices)
 
-    if debug > 2:
-        print(
-            "get_fragments: updated_moieties_list",
-            len(updated_moieties_list),
-            updated_moieties_list,
-        )
-    if debug > 2:
-        print(
-            "get_fragments: updated_moieties_indices_in_ref_list",
-            len(updated_moieties_indices_in_ref_list),
-            updated_moieties_indices_in_ref_list,
-        )
+    # logger.debug(
+    #     "updated_moieties_list %d %s",
+    #     len(updated_moieties_list),
+    #     updated_moieties_list,
+    # )
 
+    # logger.debug(
+    #     "updated_moieties_indices_in_ref_list %d %s",
+    #     len(updated_moieties_indices_in_ref_list),
+    #     updated_moieties_indices_in_ref_list,
+    # )
     tmp_blocklist = []
     for updated_moieties, updated_moieties_indices_in_ref in zip(
         updated_moieties_list, updated_moieties_indices_in_ref_list
     ):
         if len(updated_moieties) == 0:
             continue
-        if debug > 2:
-            print("get_fragments: updated_moieties", updated_moieties)
+        # logger.debug("updated_moieties %s", updated_moieties)
         updated_moieties_labels = extract_from_list(
             updated_moieties, newcell.labels, dimension=1
         )
@@ -252,38 +135,32 @@ def get_fragments_from_moiety(
         updated_moieties_atom_site_labels = [
             atom_site_labels[i] for i in updated_moieties_indices_in_ref
         ]
-        if debug > 2:
-            print("get_fragments: updated_moieties_labels", updated_moieties_labels)
-        if debug > 2:
-            print(
-                "get_fragments: updated_moieties_atom_site_labels",
-                updated_moieties_atom_site_labels,
-            )
+        # logger.debug("updated_moieties_labels %s", updated_moieties_labels)
+        # logger.debug(
+        #     "updated_moieties_atom_site_labels %s",
+        #     updated_moieties_atom_site_labels,
+        # )
         block = split_species(
             updated_moieties_labels,
             updated_moieties_coord,
             indices=updated_moieties,
             atom_site_labels=updated_moieties_atom_site_labels,
             geom_bond_cif=geom_bond_cif,
-            debug=debug,
         )
         tmp_blocklist.extend(block)
 
-    if debug > 2:
-        print("get_fragments: tmp_blocklist", tmp_blocklist)
+    # logger.debug("tmp_blocklist %s", tmp_blocklist)
 
     value_to_index = {val: idx for idx, val in enumerate(updated)}
     blocklist = [
         [value_to_index[val] for val in sublist if val in value_to_index]
         for sublist in tmp_blocklist
     ]
-    if debug > 2:
-        print("get_fragments: blocklist", blocklist)
+    # logger.debug("blocklist %s", blocklist)
 
     fragments = []
     for b in blocklist:
-        if debug > 2:
-            print(f"get_fragments: doing block={b}")
+        # logger.debug("doing block=%s", b)
         mol_labels = extract_from_list(b, updated_labels, dimension=1)
         mol_coord = extract_from_list(b, updated_coord, dimension=1)
         mol_frac_coord = extract_from_list(b, updated_fracs, dimension=1)
@@ -296,7 +173,7 @@ def get_fragments_from_moiety(
         newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
 
         # For debugging
-        newmolec.origin = "cell.get_fragments"
+        newmolec.set_origin("cell.get_fragments")
 
         # Adds cell as parent of the molecule, with indices
         newmolec.add_parent(newcell, indices=cell_indices)
@@ -309,7 +186,6 @@ def get_fragments_from_moiety(
             create_adjacencies=True,
             atom_site_labels=mol_atom_site_labels,
             geom_bond_cif=geom_bond_cif,
-            debug=debug,
         )
         newmolec.ref_indices = ref_indices
         newmolec.cell_indices = cell_indices
@@ -318,39 +194,45 @@ def get_fragments_from_moiety(
     return fragments
 
 
-######################################################
 def get_fragments(
     newcell,
     updated,
     indices_in_ref,
     refcell,
-    cov_factor: float = 1.3,
+    cov_factor: float = 1.0,
     metal_factor: float = 1.0,
-    debug: int = 0,
 ):
+    """
+    Get molecular fragments from the new cell structure.
+    Args:
+        newcell (object): New cell object containing the updated structure.
+        updated (list): List of updated atom indices in the new structure.
+        indices_in_ref (list): List of atom indices in the reference structure.
+        refcell (object): Reference cell object containing reference information.
+        cov_factor (float): Covalent factor for adjacency determination.
+        metal_factor (float): Metal factor for adjacency determination.
+    Returns:
+        fragments (list): List of molecular fragment objects.
+    """
     atom_site_labels = refcell.atom_site_labels
     geom_bond_cif = refcell.geom_bond_cif
     moiety_indices = refcell.moiety_indices
 
-    if debug > 2:
-        print(f"get_fragments: {updated=}")
-    if debug > 2:
-        print(f"get_fragments: {indices_in_ref=}")
-    if debug > 2:
-        print(f"get_fragments: {moiety_indices=}")
+    # logger.debug(f"{updated=}")
+    # logger.debug(f"{indices_in_ref=}")
+    # logger.debug(f"{moiety_indices=}")
 
     updated_labels = extract_from_list(updated, newcell.labels, dimension=1)
     updated_coord = extract_from_list(updated, newcell.coord, dimension=1)
     updated_fracs = extract_from_list(updated, newcell.frac_coord, dimension=1)
-    if not refcell.exist_cif_bond_moiety:
-        blocklist = split_species(updated_labels, updated_coord, debug=debug)
+    if not refcell.has_cif_bond_moiety:
+        blocklist = split_species(updated_labels, updated_coord)
     else:
         updated_moieties_list = [
             [updated[indices_in_ref.index(i)] for i in sublist if i in indices_in_ref]
             for sublist in moiety_indices
         ]
-        if debug > 2:
-            print("get_fragments: updated_moieties_list", updated_moieties_list)
+        # logger.debug("updated_moieties_list %s", updated_moieties_list)
         tmp_blocklist = []
         for updated_moieties in updated_moieties_list:
             if len(updated_moieties) == 0:
@@ -365,28 +247,23 @@ def get_fragments(
                 updated_moieties_labels,
                 updated_moieties_coord,
                 indices=updated_moieties,
-                debug=debug,
             )
             tmp_blocklist.extend(block)
-            if debug > 2:
-                print("get_fragments: updated_moieties", updated_moieties)
-        if debug > 2:
-            print("get_fragments: tmp_blocklist", tmp_blocklist)
+            # logger.debug("updated_moieties %s", updated_moieties)
+        # logger.debug("tmp_blocklist %s", tmp_blocklist)
 
         value_to_index = {val: idx for idx, val in enumerate(updated)}
         blocklist = [
             [value_to_index[val] for val in sublist if val in value_to_index]
             for sublist in tmp_blocklist
         ]
-    if debug > 2:
-        print("get_fragments: blocklist", blocklist)
+    # logger.debug("blocklist %s", blocklist)
     if blocklist is None:
         return []
 
     fragments = []
     for b in blocklist:
-        if debug > 2:
-            print(f"get_fragments: doing block={b}")
+        # logger.debug("doing block=%s", b)
         mol_labels = extract_from_list(b, updated_labels, dimension=1)
         mol_coord = extract_from_list(b, updated_coord, dimension=1)
         mol_frac_coord = extract_from_list(b, updated_fracs, dimension=1)
@@ -399,7 +276,7 @@ def get_fragments(
         newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
 
         # For debugging
-        newmolec.origin = "cell.get_fragments"
+        newmolec.set_origin("cell.get_fragments")
 
         # Adds cell as parent of the molecule, with indices
         newmolec.add_parent(newcell, indices=cell_indices)
@@ -412,7 +289,6 @@ def get_fragments(
             create_adjacencies=True,
             atom_site_labels=mol_atom_site_labels,
             geom_bond_cif=geom_bond_cif,
-            debug=debug,
         )
         newmolec.ref_indices = ref_indices
         newmolec.cell_indices = cell_indices
@@ -421,37 +297,43 @@ def get_fragments(
     return fragments
 
 
-######################################################
-def classify_fragments(fragments, newcell, debug: int = 0):
+def classify_fragments(fragments, refmoleclist):
+    """
+    Classify fragments into complete molecules and remaining fragments.
+
+    Args:
+        fragments (list): List of molecular fragments to classify.
+        refmoleclist (list): List of reference molecules.
+    Returns:
+        molecules (list): List of complete molecules matched to reference molecules.
+        remaining_fragments (list): List of remaining fragments and hydrogens.
+    """
     molecules = []
     remaining_fragments = []
     hydrogens = []
     for frag in fragments:
         found = False
-        for idx, ref in enumerate(newcell.refmoleclist):
+        for idx, ref in enumerate(refmoleclist):
             if (ref.natoms == frag.natoms) & (ref.formula == frag.formula):
                 if sorted(ref.get_parent_indices("reference")) == sorted(
                     frag.ref_indices
                 ):
-                    if debug > 2:
-                        print(
-                            frag.formula,
-                            frag.ref_indices,
-                            frag.frac_coord,
-                            f"equivalent to Ref {idx} {ref.formula}",
-                        )
-                    frag.subtype = "molecule"
-                    frag.origin = "cell.classify_fragments"
+                    logger.debug(
+                        f"Fragment {frag.formula} matched to reference molecule {idx} {ref.formula}"
+                    )
+                    frag.set_subtype("molecule")
+                    frag.set_origin("cell.classify_fragments")
                     molecules.append(frag)
                     found = True
 
         if not found:
-            frag.subtype = "fragment"
-            frag.origin = "cell.classify_fragments"
+            frag.set_subtype("fragment")
+            frag.set_origin("cell.classify_fragments")
+            # Check if the fragment is a single hydrogen or deuterium atom
             if (frag.natoms == 1) and (
                 frag.set_element_count()[4] + frag.set_element_count()[3] == 1
             ):
-                hydrogens.append(frag)  # # Hydrogen or Deuterium
+                hydrogens.append(frag)
             else:
                 remaining_fragments.append(frag)
 
@@ -462,69 +344,31 @@ def classify_fragments(fragments, newcell, debug: int = 0):
     for rem in remaining_fragments + hydrogens:
         rem.get_centroid()
 
-    if debug >= 2:
-        print("Remaining_fragments:", [rem.formula for rem in remaining_fragments])
-        print("Remaining_fragments:", [rem.natoms for rem in remaining_fragments])
-        print(
-            "Remaining_fragments:",
-            [
-                get_dist(rem.frac_centroid, [0.5, 0.5, 0.5])
-                for rem in remaining_fragments
-            ],
-        )
-        print("Hydrogens:", [h.formula for h in hydrogens])
-    # return molecules, remaining_fragments, hydrogens
+    logger.debug(
+        "Remaining_fragments: %s", [rem.formula for rem in remaining_fragments]
+    )
+    logger.debug("Hydrogens: %s", [h.formula for h in hydrogens])
     return molecules, remaining_fragments + hydrogens
 
 
-######################################################
-def grouping_smaller_lists_for_target_sets(target_sets, smaller_lists, debug: int = 0):
-    # target_sets : Define the larger target lists as sets for fast lookup
-    # List of smaller lists to be grouped
-
-    # Group smaller lists into their respective larger list
-    grouped_lists = [[] for _ in range(len(target_sets))]
-    grouped_lists_idx = [[] for _ in range(len(target_sets))]
-    target_idx_lists = [[] for _ in range(len(target_sets))]
-    for j, small_list in enumerate(smaller_lists):
-        small_set = set(small_list)
-        for i, target_set in enumerate(target_sets):
-            if small_set.issubset(target_set):
-                if debug >= 2:
-                    print(f"grouped_lists {i} add {small_set}")
-                grouped_lists[i].extend(small_list)
-                grouped_lists_idx[i].append(j)
-                target_idx_lists[i].append(i)
-
-                if set(grouped_lists[i]) == target_set:
-                    if debug >= 2:
-                        print(
-                            f"grouped_lists {i} is same with {target_set} {grouped_lists_idx[i]}"
-                        )
-                else:
-                    if debug >= 2:
-                        print(f"continue for {i} {grouped_lists_idx[i]}")
-                break
-
-    if debug >= 2:
-        # Print the grouped lists
-        for i, group in enumerate(grouped_lists):
-            print(f"Group {i}: {group}")
-
-    return grouped_lists, grouped_lists_idx, target_idx_lists
-
-
-######################################################
-def merge_fragments(
+def merge_fragment_pair(
     frags: list,
     cell_vector: list,
     refcell: object,
-    cov_factor: float = 1.3,
+    cov_factor: float = 1.0,
     metal_factor: float = 1.0,
     full: bool = False,
     final_merge: bool = False,
-    debug: int = 0,
 ):
+    """
+    Attempt to merge two fragments by translating one fragment across the unit cell.
+
+    Returns
+    -------
+    Molecule or None
+        A merged structure, which may be an intermediate fragment or a complete
+        molecule. Returns None if no valid merge is found.
+    """
     # finds biggest fragment and keeps it in the original cell
     sizes = []
     for f in frags:
@@ -537,13 +381,9 @@ def merge_fragments(
         move_idx = 0
     keep_frag = frags[keep_idx]
     move_frag = frags[move_idx]
-    if debug > 2:
-        print("MERGE_FRAGMENTS: keep_idx", keep_idx)
-    if debug > 2:
-        print("MERGE_FRAGMENTS: move_idx", move_idx)
-
     move_frag.get_centroid()
 
+    # Check if the moving fragment is a single hydrogen or deuterium atom
     if move_frag.natoms == 1 and (
         move_frag.set_element_count()[4] + move_frag.set_element_count()[3] == 1
     ):
@@ -555,8 +395,6 @@ def merge_fragments(
         return None
 
     for t in tmatrix:
-        if debug > 2:
-            print("MERGE_FRAGMENTS: translation", t)
         ## Applies Translations and each time, it checks if a bigger molecule is formed
         ## meaning that the translation was successful
         reclabels = []
@@ -585,46 +423,35 @@ def merge_fragments(
             refcell.atom_site_labels[idx] for idx in rec_ref_indices
         ]
         if final_merge:
-            numspecs = count_species(
-                reclabels, reccoord, cov_factor=cov_factor, debug=debug
-            )
+            blocklist = split_species(reclabels, reccoord, cov_factor=cov_factor)
+            numspecs = len(blocklist)
+            # numspecs = count_species(reclabels, reccoord, cov_factor=cov_factor)
         else:
-            numspecs = count_species(
+            # numspecs = count_species(
+            blocklist = split_species(
                 reclabels,
                 reccoord,
                 atom_site_labels=rec_ref_atom_site_labels,
                 geom_bond_cif=refcell.geom_bond_cif,
                 cov_factor=cov_factor,
-                debug=debug,
             )
-
-        if debug > 2:
-            print("MERGE_FRAGMENTS: count_species found", numspecs)
+            numspecs = len(blocklist)
         if numspecs != 1:
             continue
 
         if final_merge:
-            blocklist = split_species(
-                reclabels, reccoord, cov_factor=cov_factor, debug=debug
-            )
+            blocklist = split_species(reclabels, reccoord, cov_factor=cov_factor)
         else:
-            if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
+            if refcell.has_cif_bond_moiety and refcell.geom_bond_cif is not None:
                 blocklist = split_species(
                     reclabels,
                     reccoord,
                     atom_site_labels=rec_ref_atom_site_labels,
                     geom_bond_cif=refcell.geom_bond_cif,
                     cov_factor=cov_factor,
-                    debug=debug,
                 )
             else:
-                blocklist = split_species(
-                    reclabels, reccoord, cov_factor=cov_factor, debug=debug
-                )
-        if debug > 2:
-            print(
-                "MERGE_FRAGMENTS: split_species found", len(blocklist), f"{blocklist=}"
-            )
+                blocklist = split_species(reclabels, reccoord, cov_factor=cov_factor)
 
         if blocklist is None:
             continue
@@ -633,7 +460,7 @@ def merge_fragments(
                 continue
             if len(blocklist) == 1:
                 newmolec = Molecule.from_positional(reclabels, reccoord, recfracs)
-                newmolec.origin = "cell.reconstruct"
+                newmolec.set_origin("cell.reconstruct")
                 newmolec.add_parent(refcell, indices=rec_ref_indices)
                 newmolec.ref_indices = rec_ref_indices
                 newmolec.cell_indices = rec_cell_indices
@@ -648,18 +475,30 @@ def merge_fragments(
     return None
 
 
-######################################################
-def merge_elements(
+def merge_fragments_iterative(
     fragments,
     target_ref,
     cell_vector,
     refcell,
-    cov_factor: float = 1.3,
+    cov_factor: float = 1.0,
     metal_factor: float = 1.0,
     full: bool = False,
     final_merge: bool = False,
-    debug: int = 0,
 ):
+    """
+    Iteratively merges fragments until no further merges are possible.
+    Args:
+        fragments (list): List of molecular fragments to merge.
+        target_ref (list): List of target reference atom indices.
+        cell_vector (np.ndarray): Cell vectors for the new structure.
+        refcell (object): Reference cell object.
+        cov_factor (float): Covalent factor for adjacency determination.
+        metal_factor (float): Metal factor for adjacency determination.
+        full (bool): If True, generates all translation vectors for merging.
+        final_merge (bool): If True, performs a final merge without adjacency checks.
+    Returns:
+        list: List of merged molecular fragments.
+    """
     while True:
         # Create an index list for the current state of fragments
         idx_list = list(range(len(fragments)))
@@ -670,7 +509,6 @@ def merge_elements(
         for comb, idx_comb in zip(
             combinations(fragments, 2), combinations(idx_list, 2)
         ):
-            # print(comb, idx_comb)  # Optional: for debugging to see the pairs being processed
             if comb[0].formula == "H" and comb[1].formula == "H":
                 pass
             elif comb[0].natoms + comb[1].natoms > len(target_ref):
@@ -684,15 +522,14 @@ def merge_elements(
                 # print(comb[1].ref_indices)
                 pass
             else:
-                if debug >= 2:
-                    print(
-                        "Fragments TO BE MERGED",
-                        [k.formula for k in comb],
-                        [k.subtype for k in comb],
-                        idx_comb,
-                    )
+                logger.debug(
+                    "Fragments TO BE MERGED %s %s %s",
+                    [k.formula for k in comb],
+                    [k.subtype for k in comb],
+                    idx_comb,
+                )
 
-                newmolec = merge_fragments(
+                newmolec = merge_fragment_pair(
                     comb,
                     cell_vector,
                     refcell,
@@ -700,33 +537,20 @@ def merge_elements(
                     metal_factor=metal_factor,
                     full=full,
                     final_merge=final_merge,
-                    debug=debug,
                 )
 
                 if newmolec is None:
-                    if debug >= 2:
-                        print(f"\tNOT MERGED {[k.formula for k in comb]}")
+                    logger.debug("NOT MERGED %s", [k.formula for k in comb])
                 else:
-                    # print(comb[0].ref_indices)
-                    # print(comb[1].ref_indices)
-                    if debug >= 2:
-                        print(
-                            f"\tMERGED {newmolec.formula} from {[k.formula for k in comb]} at indices {idx_comb}"
-                        )
                     small_set = set(newmolec.ref_indices)
-                    if debug >= 2:
-                        print(
-                            f"{newmolec.formula} {newmolec.natoms=} {len(small_set)=} {small_set=}"
-                        )
+
                     if small_set.issubset(target_ref):
                         if sorted(small_set) == target_ref:
-                            newmolec.subtype = "Rec. Molecule"
-                            if debug >= 2:
-                                print("Molecule found", newmolec.formula)
+                            newmolec.set_subtype("Rec. Molecule")
+                            logger.debug("Molecule found %s", newmolec.formula)
                         else:
-                            newmolec.subtype = "Rec. Fragment"
-                            if debug >= 2:
-                                print("Bigger fragment found", newmolec.formula)
+                            newmolec.set_subtype("Rec. Fragment")
+                            logger.debug("Bigger fragment found %s", newmolec.formula)
                     fragments[idx_comb[0]] = newmolec
                     fragments.pop(idx_comb[1])
                     merged = True
@@ -739,22 +563,21 @@ def merge_elements(
 
 
 ######################################################
-def fragments_reconstruct(
+def reconstruct_fragments(
     subset_remaining_fragments,
     target_ref,
     cell_vector,
     refcell,
-    cov_factor: float = 1.3,
+    cov_factor: float = 1.0,
     metal_factor: float = 1.0,
     full: bool = False,
     final_merge: bool = False,
-    debug: int = 0,
 ):
     list_of_found_molecules = []
     list_of_bigger_fragments = []
     remaining_frag = subset_remaining_fragments.copy()
 
-    fragments = merge_elements(
+    fragments = merge_fragments_iterative(
         remaining_frag,
         target_ref,
         cell_vector,
@@ -763,7 +586,6 @@ def fragments_reconstruct(
         metal_factor=metal_factor,
         full=full,
         final_merge=final_merge,
-        debug=debug,
     )
 
     for newmolec in fragments:
@@ -774,80 +596,71 @@ def fragments_reconstruct(
             elif newmolec.natoms == 1 and (
                 newmolec.set_element_count()[4] + newmolec.set_element_count()[3] == 1
             ):
-                newmolec.subtype = "fragment"
-                if debug > 2:
-                    print("Hydrogen found", newmolec.formula)
+                newmolec.set_subtype("fragment")
+                logger.debug("Hydrogen found", newmolec.formula)
                 list_of_bigger_fragments.append(newmolec)
             else:
                 list_of_bigger_fragments.append(newmolec)
 
-    if debug > 2:
-        print(f"{len(list_of_found_molecules)=}")
-    if debug > 2:
-        print(f"{len(list_of_bigger_fragments)=}")
-
     return list_of_found_molecules, list_of_bigger_fragments
 
 
-######################################################
-def get_updated_indices(
-    sp_idx, ref_labels, new, cell_labels, cell_pos, cell_fracs, debug: int = 0
-):
+def get_updated_indices(sp_idx, ref_labels, new, cell_labels, cell_pos, cell_fracs):
     """
-    sp_idx : index of the symmetry operation
-    new : ase atoms object by applying symmetry operations to the reference structure
-    cell_labels : list of chemical symbols of the atoms in the unit cell
-    cell_pos : list of cartesian coordinates of the atoms in the unit cell
-    cell_fracs : list of fractional coordinates of the atoms in the unit cell
+    Get the updated indices of atoms in the new structure that match those in the unit cell.
+    Args:
+        sp_idx : index of the symmetry operation
+        ref_labels : list of chemical symbols of the atoms in the reference structure
+        new : ase atoms object by applying symmetry operations to the reference structure
+        cell_labels : list of chemical symbols of the atoms in the unit cell
+        cell_pos : list of cartesian coordinates of the atoms in the unit cell
+        cell_fracs : list of fractional coordinates of the atoms in the unit cell
+    Returns:
+        indices_lists : list of tuples, where each tuple contains the index of the atom
+                        in the new structure and the index of the atom in the unit cell
     """
     indices_lists = []
-    # new_labels =  new.get_chemical_symbols()
     new_pos = new.get_positions()
     new_fracs = new.get_scaled_positions()
 
     for jdx, (n_l, n_p, n_f) in enumerate(zip(ref_labels, new_pos, new_fracs)):
         for kdx, (label, p, f) in enumerate(zip(cell_labels, cell_pos, cell_fracs)):
             if n_l == label and np.allclose(n_p, p, atol=1e-4, rtol=1e-2):
-                if np.allclose(
-                    np.remainder(n_f, 1), np.remainder(f, 1), atol=1e-4, rtol=1e-2
-                ):
-                    if debug > 2:
-                        print(
-                            f"symmtry operation {sp_idx}:",
-                            f"atom of new (index: {jdx})",
-                            n_l,
-                            n_p,
-                            n_f,
-                            f"is the same as the atom of the unit cell (index: {kdx})",
-                            label,
-                            p,
-                            f,
-                        )
-                indices_lists.append(
-                    (jdx, kdx)
-                )  # jdx is the index of the atom in the new structure, kdx is the index of the atom in the unit cell
+                # jdx is the index of the atom in the new structure
+                # kdx is the index of the atom in the unit cell
+                indices_lists.append((jdx, kdx))
     return indices_lists
 
 
-######################################################
-def reconstruct(refcell, newcell, sym_ops, debug: int = 0):
-    cell_labels = newcell.labels
+def reconstruct(refcell, newcell, sym_ops):
+    """
+    Reconstructs a unit cell based on a reference cell and symmetry operations.
+    Args:
+        refcell (object): The reference cell object containing reference molecules.
+        newcell (object): The new cell object to be reconstructed.
+        sym_ops (tuple): A tuple containing two lists: a list of rotation
+                            matrices and a list of translation vectors.
+    Returns:
+        molecules (list): List of found molecules.
+        reconstructed_molecules (list): List of molecules reconstructed from fragments.
+    """
 
-    if "D" in cell_labels:
-        print("Deuterium is in the cell")
+    ref_labels = refcell.labels
+    cov_factor = refcell.refmoleclist[0].cov_factor
+    metal_factor = refcell.refmoleclist[0].metal_factor
+
+    cell_labels = newcell.labels
     cell_pos = newcell.coord
     cell_fracs = newcell.frac_coord
     cell_vector = newcell.cell_vector
 
-    ref_labels = refcell.labels
-
     if "D" in ref_labels:
-        print("Deuterium is in the reference")
-    cov_factor = refcell.refmoleclist[0].cov_factor
-    metal_factor = refcell.refmoleclist[0].metal_factor
+        logger.debug("Deuterium is in the reference")
+    if "D" in cell_labels:
+        logger.debug("Deuterium is in the cell")
 
-    new_structures = apply_symmetry_operations_reference(refcell, cell_vector, sym_ops)
-    print(f"Number of symmetry operations: {len(new_structures)}")
+    new_structures = apply_symmetry_operations(refcell, cell_vector, sym_ops)
+    logger.debug("Number of symmetry operations: %d", len(new_structures))
 
     all_found = []
     all_molecules = []
@@ -855,31 +668,25 @@ def reconstruct(refcell, newcell, sym_ops, debug: int = 0):
     remaining_fragments = [[] for _ in range(len(newcell.refmoleclist))]
 
     for idx, new in enumerate(new_structures):
-        if debug >= 2:
-            print(f"\nApplying symmetry operations to reference {idx}")
+        logger.debug("Applying symmetry operations %d", idx)
         indices_lists = get_updated_indices(
-            idx, ref_labels, new, cell_labels, cell_pos, cell_fracs, debug=debug
+            idx, ref_labels, new, cell_labels, cell_pos, cell_fracs
         )
-        if debug > 2:
-            print(f"{len(indices_lists)=}")
 
         updated_lists = [i for i in indices_lists if i[1] not in all_found]
         updated_ref_indices = [i[0] for i in updated_lists]
         updated_cell = [i[1] for i in updated_lists]
-        if debug > 2:
-            print(f"{len(updated_cell)=} {updated_cell=}")
-        if debug > 2:
-            print(f"{len(updated_ref_indices)=} {updated_ref_indices=}")
 
         all_found.extend(updated_cell)
-        if debug >= 2:
-            print(len(all_found))
-        if debug >= 2:
-            print(len(all_found) == len(cell_pos))
+
+        logger.debug("Number of atoms found so far: %d", len(all_found))
+        logger.debug(
+            "All atoms found matches cell atoms: %s", len(all_found) == len(cell_pos)
+        )
 
         if len(updated_cell) > 0:
-            # #### make blocks and get fragments ####
-            if refcell.exist_cif_bond_moiety:
+            # make blocks and get fragments
+            if refcell.has_cif_bond_moiety:
                 initial_fragments = get_fragments_from_moiety(
                     newcell,
                     updated_cell,
@@ -887,7 +694,6 @@ def reconstruct(refcell, newcell, sym_ops, debug: int = 0):
                     refcell,
                     cov_factor=cov_factor,
                     metal_factor=metal_factor,
-                    debug=2,
                 )
             else:
                 initial_fragments = get_fragments(
@@ -897,11 +703,10 @@ def reconstruct(refcell, newcell, sym_ops, debug: int = 0):
                     refcell,
                     cov_factor=cov_factor,
                     metal_factor=metal_factor,
-                    debug=2,
                 )
 
             molecules, fragments = classify_fragments(
-                initial_fragments, newcell, debug=2
+                initial_fragments, newcell.refmoleclist
             )
             all_molecules.extend(molecules)
 
@@ -912,87 +717,61 @@ def reconstruct(refcell, newcell, sym_ops, debug: int = 0):
                 target_set = set(ref.get_parent_indices("reference"))
                 for j, frag in enumerate(fragments):
                     small_set = set(frag.ref_indices)
+                    fragments_of_new[i].append(frag)
                     if small_set.issubset(target_set):
-                        if debug >= 2:
-                            print(
-                                f"{j} {frag.formula} is a subset of target_set {i} {ref.formula}"
-                            )
-                        fragments_of_new[i].append(frag)
+                        logger.debug(
+                            "%d %s is a subset of target_set %d %s",
+                            j,
+                            frag.formula,
+                            i,
+                            ref.formula,
+                        )
 
-            if debug >= 2:
-                print(f"symmetry operations: {idx}")
             for i, (ref, frag_list) in enumerate(
                 zip(newcell.refmoleclist, fragments_of_new)
             ):
-                if debug >= 2:
-                    print(
-                        f"Reference {i}: {ref.formula} target : {ref.get_parent_indices('reference')}"
-                    )
-                if debug >= 2:
-                    print(
-                        f"\tFragments formula    : {[frag.formula for frag in frag_list]}"
-                    )
-                if debug >= 2:
-                    print(
-                        f"\tFragments ref_indices: {[frag.ref_indices for frag in frag_list]}"
-                    )
+                logger.debug("Reference %d: %s", i, ref.formula)
+                logger.debug(
+                    "Fragments formula : %s",
+                    [frag.formula for frag in frag_list],
+                )
 
             # Reconstructing fragments within one new structure
             for i, frag_list in enumerate(fragments_of_new):
                 if len(frag_list) > 1:
-                    if debug >= 2:
-                        print(f"target_ref: {newcell.refmoleclist[i].formula}")
-                    if debug >= 2:
-                        print(
-                            f"Fragments formula {i}: {[frag.formula for frag in frag_list]}"
-                        )
+                    logger.debug("Multiple fragments found for reference %d", i)
+                    logger.debug("target_ref: %s", newcell.refmoleclist[i].formula)
+                    logger.debug("fragments: %s", [frag.formula for frag in frag_list])
                     target_ref = newcell.refmoleclist[i].get_parent_indices("reference")
-                    list_of_found_molecules, remaining_frag = fragments_reconstruct(
+                    list_of_found_molecules, remaining_frag = reconstruct_fragments(
                         frag_list,
                         target_ref,
                         cell_vector,
                         refcell,
                         cov_factor=cov_factor,
                         metal_factor=metal_factor,
-                        debug=0,
                     )
-                    if debug >= 2:
-                        print(
-                            f"symmetry operations: {idx} {[mol.formula for mol in list_of_found_molecules]=}"
-                        )
-                    if debug >= 2:
-                        print(
-                            f"symmetry operations: {idx} {[frag.formula for frag in remaining_frag]=}"
-                        )
+
                     if len(list_of_found_molecules) > 0:
                         reconstructed_molecules.extend(list_of_found_molecules)
                     if len(remaining_frag) > 0:
                         remaining_fragments[i].extend(remaining_frag)
-                        if debug >= 2:
-                            print(
-                                f"symmetry operations: {idx} with ref{i} {[frag.formula for frag in remaining_fragments[i]]=}"
-                            )
-                elif len(frag_list) == 1:
-                    if debug >= 2:
-                        print("only one fragment", frag_list[0].formula, "is found")
-                    remaining_fragments[i].extend(frag_list)
-                    if debug >= 2:
-                        print(
-                            f"symmetry operations: {idx} with ref{i} {[frag.formula for frag in remaining_fragments[i]]=}"
-                        )
 
-    if debug >= 1:
-        print(
-            "complete molecules :",
-            f"counts={len(all_molecules)}",
-            [mol.formula for mol in all_molecules],
-        )
-    if debug >= 1:
-        print(
-            "reconstructed molecules :",
-            f"counts={len(reconstructed_molecules)}",
-            [mol.formula for mol in reconstructed_molecules],
-        )
+                elif len(frag_list) == 1:
+                    logger.debug("only one fragment %s is found", frag_list[0].formula)
+                    remaining_fragments[i].extend(frag_list)
+
+    logger.debug(
+        "%d Complete molecules: molecules=%s",
+        len(all_molecules),
+        [mol.formula for mol in all_molecules],
+    )
+
+    logger.debug(
+        "%d Reconstructed molecules: molecules=%s",
+        len(reconstructed_molecules),
+        [mol.formula for mol in reconstructed_molecules],
+    )
 
     if len(all_found) == len(cell_pos):
         newcell.error_get_fragments = False
@@ -1001,81 +780,63 @@ def reconstruct(refcell, newcell, sym_ops, debug: int = 0):
             num_rem_frags += len(rem_frag_list)
 
         if num_rem_frags == 0:
-            print("All fragments are reconstructed successfully.")
+            logger.info("All fragments are reconstructed successfully.")
             newcell.error_reconstruction = False
         else:
-            print(f"There are {num_rem_frags} remaining fragments.")
-            final_remaining_fragments, reconstructed_molecules = (
-                final_remaining_reconstruction(
-                    remaining_fragments,
-                    newcell,
-                    cell_vector,
-                    reconstructed_molecules,
-                    refcell,
-                    cov_factor=cov_factor,
-                    metal_factor=metal_factor,
-                    debug=0,
-                )
+            logger.info(f"There are {num_rem_frags} remaining fragments.")
+            final_remaining_fragments, reconstructed_molecules = final_reconstruct(
+                remaining_fragments,
+                newcell,
+                cell_vector,
+                reconstructed_molecules,
+                refcell,
+                cov_factor=cov_factor,
+                metal_factor=metal_factor,
             )
             if len(final_remaining_fragments) == 0:
-                print("All fragments are reconstructed successfully.")
+                logger.info("All fragments are reconstructed successfully.")
                 newcell.error_reconstruction = False
             else:
-                print("Error in reconstruction!!")
+                logger.error("Error in reconstruction!!")
                 newcell.error_reconstruction = True
-                print(
+                logger.info(
                     "final remaining fragments",
                     len(final_remaining_fragments),
                     [mol.formula for mol in final_remaining_fragments],
                 )
-                # for j, rem in enumerate(final_remaining_fragments):
-                #     writexyz(os.getcwd(), f"{newcell.name}_Frag_{i}_{rem.formula}_{j}.xyz", rem.labels, rem.coord)
-                # final_remaining_fragments_v2, reconstructed_molecules = final_remaining_reconstruction_v2(remaining_fragments, newcell, cell_vector, reconstructed_molecules, refcell, cov_factor=cov_factor, metal_factor=metal_factor, debug=0)
-                # if len(final_remaining_fragments_v2) == 0:
-                #     print("GOOD!! All fragments are reconstructed successfully.")
-                #     newcell.error_reconstruction = False
-                # else :
-                #     print("AGAIN Error in reconstruction!!")
-                #     newcell.error_reconstruction = True
-                #     print("final remaining fragments", len(final_remaining_fragments_v2), [mol.formula for mol in final_remaining_fragments_v2])
-                #     for j, rem in enumerate(final_remaining_fragments_v2):
-                #         writexyz(os.getcwd(), f"{newcell.name}_Frag_{i}_{rem.formula}_{j}.xyz", rem.labels, rem.coord)
-
     else:
-        print("Error in getting fragments and reconstruction!!")
+        logger.error("Error in getting fragments and reconstruction!!")
         newcell.error_get_fragments = True
         newcell.error_reconstruction = True
         for i, pos in enumerate(cell_pos):
             if i not in all_found:
-                print(
+                logger.error(
                     f"Cannot find the {i}th atom of the unit cell based on cartesian coordinates from the new structure."
                 )
-                print(f"{i} {cell_labels[i]=} {cell_pos[i]=} {cell_fracs[i]=}")
 
     return all_molecules, reconstructed_molecules
 
 
 ######################################################
-def final_remaining_reconstruction(
+def final_reconstruct(
     remaining_fragments,
     newcell,
     cell_vector,
     reconstructed_molecules,
     refcell,
-    cov_factor: float = 1.3,
+    cov_factor: float = 1.0,
     metal_factor: float = 1.0,
-    debug: int = 0,
 ):
     # Reconstructing remaining fragments within the whole new cell
     final_remaining_fragments = []
     for i, rem_frag_list in enumerate(remaining_fragments):
         if len(rem_frag_list) > 1:
-            # for j, rem in enumerate(rem_frag_list):
-            #     writexyz(os.getcwd(), f"{newcell.name}_Ref_{i}_{rem.formula}_{j}.xyz", rem.labels, rem.coord)
-            print(f"target_ref: {newcell.refmoleclist[i].formula}")
-            print(f"Fragments formula {i}: {[rem.formula for rem in rem_frag_list]}")
+            logger.debug("target_ref: %s", newcell.refmoleclist[i].formula)
+            logger.debug(
+                "Fragments formula %d: %s", i, [rem.formula for rem in rem_frag_list]
+            )
             target_ref = newcell.refmoleclist[i].get_parent_indices("reference")
-            list_of_found_molecules, final_remaining = fragments_reconstruct(
+            list_of_found_molecules, final_remaining = reconstruct_fragments(
                 rem_frag_list,
                 target_ref,
                 cell_vector,
@@ -1083,10 +844,14 @@ def final_remaining_reconstruction(
                 cov_factor=cov_factor,
                 metal_factor=metal_factor,
                 full=True,
-                debug=debug,
             )
-            print(f"{[mol.formula for mol in list_of_found_molecules]=}")
-            print(f"{[frag.formula for frag in final_remaining]=}")
+            logger.debug(
+                "list_of_found_molecules: %s",
+                [mol.formula for mol in list_of_found_molecules],
+            )
+            logger.debug(
+                "final_remaining: %s", [frag.formula for frag in final_remaining]
+            )
             if len(list_of_found_molecules) > 0:
                 reconstructed_molecules.extend(list_of_found_molecules)
             if len(final_remaining) > 0:
@@ -1098,7 +863,7 @@ def final_remaining_reconstruction(
 
 
 ######################################################
-def get_moleclist(newcell, refcell, all_molecules, debug: int = 0):
+def get_moleclist(newcell, refcell, all_molecules):
     """
     Build the molecular list of a reconstructed unit cell
     """
@@ -1113,13 +878,8 @@ def get_moleclist(newcell, refcell, all_molecules, debug: int = 0):
         mol_atom_site_labels = [
             refcell.atom_site_labels[idx] for idx in mol.ref_indices
         ]
-        if debug > 2:
-            print("GET_MOLECLIST: ", mol.formula)
-            print("GET_MOLECLIST: ", mol.ref_indices)
-            print("GET_MOLECLIST: ", mol.labels)
-            print("GET_MOLECLIST: ", mol_atom_site_labels)
 
-        newmolec.origin = "cell.reconstruct"
+        newmolec.set_origin("cell.reconstruct")
         newmolec.add_parent(newcell, mol.cell_indices)
         newmolec.add_parent(refcell, mol.ref_indices)
         newmolec.set_adjacency_parameters(cov_factor, metal_factor)
@@ -1127,7 +887,6 @@ def get_moleclist(newcell, refcell, all_molecules, debug: int = 0):
             create_adjacencies=True,
             atom_site_labels=mol_atom_site_labels,
             geom_bond_cif=refcell.geom_bond_cif,
-            debug=debug,
         )
         for atom, idx in zip(newmolec.atoms, mol.cell_indices):
             atom.add_parent(newcell, index=idx)
@@ -1145,56 +904,52 @@ def get_moleclist(newcell, refcell, all_molecules, debug: int = 0):
 
     for mol in newcell.moleclist:
         if mol.iscomplex:
-            if debug >= 1:
-                print(
-                    f"GET_MOLECLIST: working with {mol.formula} with transition metals"
-                )
-            mol.get_hapticity(debug=debug)
+            logger.debug("Working with transition metals: %s", mol.formula)
+            mol.get_hapticity()
             if len(mol.ligands) == 0:
-                if debug >= 1:
-                    print(f"GET_MOLECLIST: {mol.formula} is a metal cluster")
+                logger.debug("%s is a metal cluster", mol.formula)
             else:
                 for lig in mol.ligands:
-                    lig.get_denticity(debug=debug)
+                    lig.get_denticity()
             for met in mol.metals:
-                met.get_connected_metals(debug=debug)
-                met.get_coordination_geometry(debug=debug)
-                met.get_coord_sphere_formula(debug=debug)
+                met.get_connected_metals()
+                met.get_coordination_geometry()
+                met.get_coord_sphere_formula()
         elif mol.has_IA_IIA:
-            if debug >= 1:
-                print(
-                    f"GET_MOLECLIST: working with {mol.formula} with alkali or alkali earth metals"
-                )
+            logger.debug("Working with alkali or alkali earth metals: %s", mol.formula)
             if len(mol.ligands) == 0:
                 pass
             else:
                 for lig in mol.ligands:
-                    lig.get_denticity(debug=debug)
+                    lig.get_denticity()
             for met in mol.metals:
-                met.get_connected_metals(debug=debug)
-                met.get_coordination_geometry(debug=debug)
-                met.get_coord_sphere_formula(debug=debug)
+                met.get_connected_metals()
+                met.get_coordination_geometry()
+                met.get_coord_sphere_formula()
         elif mol.has_post_transition_metal:
-            if debug >= 1:
-                print(
-                    f"GET_MOLECLIST: working with {mol.formula} with post transition metals"
-                )
+            logger.debug("Working with post transition metals: %s", mol.formula)
             if len(mol.ligands) == 0:
                 pass
             else:
                 for lig in mol.ligands:
-                    lig.get_denticity(debug=debug)
+                    lig.get_denticity()
             for met in mol.metals:
-                met.get_connected_metals(debug=debug)
-                met.get_coordination_geometry(debug=debug)
-                met.get_coord_sphere_formula(debug=debug)
+                met.get_connected_metals()
+                met.get_coordination_geometry()
+                met.get_coord_sphere_formula()
 
     return newcell
 
 
-def get_unique_indices(newcell, reference_species_list, debug: int = 0):
+def get_unique_indices(newcell, reference_species_list):
     """
     Match reconstructed species to reference species and assign unique indices
+    from the reference species list.
+    Args:
+        newcell : The reconstructed unit cell containing the molecular list.
+        reference_species_list : List of reference species to match against.
+    Returns:
+        newcell : Updated unit cell with unique indices and species list.
     """
     newcell.unique_indices = []
     newcell.species_list = []
@@ -1211,38 +966,25 @@ def get_unique_indices(newcell, reference_species_list, debug: int = 0):
                     and not ref.has_IA_IIA
                     and not ref.has_post_transition_metal
                 ):
-                    issame = compare_reference_indices(ref, mol, debug=debug)
+                    issame = compare_reference_indices(ref, mol)
                     if issame:
                         mol.unique_index = ref.unique_index
-                        if debug >= 2:
-                            print(
-                                f"Matched {mol.formula} {ref.formula} {mol.unique_index} {ref.unique_index}"
-                            )
                         newcell.unique_indices.append(mol.unique_index)
                         newcell.species_list.append(mol)
         else:
             for ref in reference_species_list:
                 if ref.subtype == "ligand":
                     for lig in mol.ligands:
-                        issame = compare_reference_indices(ref, lig, debug=debug)
+                        issame = compare_reference_indices(ref, lig)
                         if issame:
                             lig.unique_index = ref.unique_index
-                            if debug >= 2:
-                                print(
-                                    f"Matched {lig.formula} {ref.formula} {lig.unique_index} {ref.unique_index}"
-                                )
                             newcell.unique_indices.append(lig.unique_index)
                             newcell.species_list.append(lig)
                 if ref.subtype == "metal":
+                    ref_parent_index = ref.get_parent_index("reference")
                     for met in mol.metals:
-                        if ref.get_parent_index("reference") == met.get_parent_index(
-                            "reference"
-                        ):
+                        if ref_parent_index == met.get_parent_index("reference"):
                             met.unique_index = ref.unique_index
-                            if debug >= 2:
-                                print(
-                                    f"Matched {met.formula} {ref.formula} {met.unique_index} {ref.unique_index}"
-                                )
                             newcell.unique_indices.append(met.unique_index)
                             newcell.species_list.append(met)
 
