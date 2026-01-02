@@ -225,7 +225,7 @@ def get_fragments(
     updated_labels = extract_from_list(updated, newcell.labels, dimension=1)
     updated_coord = extract_from_list(updated, newcell.coord, dimension=1)
     updated_fracs = extract_from_list(updated, newcell.frac_coord, dimension=1)
-    if not refcell.has_cif_bond_moiety:
+    if not refcell.exist_cif_bond_moiety:
         blocklist = split_species(updated_labels, updated_coord)
     else:
         updated_moieties_list = [
@@ -442,7 +442,7 @@ def merge_fragment_pair(
         if final_merge:
             blocklist = split_species(reclabels, reccoord, cov_factor=cov_factor)
         else:
-            if refcell.has_cif_bond_moiety and refcell.geom_bond_cif is not None:
+            if refcell.exist_cif_bond_moiety and refcell.geom_bond_cif is not None:
                 blocklist = split_species(
                     reclabels,
                     reccoord,
@@ -686,7 +686,7 @@ def reconstruct(refcell, newcell, sym_ops):
 
         if len(updated_cell) > 0:
             # make blocks and get fragments
-            if refcell.has_cif_bond_moiety:
+            if refcell.exist_cif_bond_moiety:
                 initial_fragments = get_fragments_from_moiety(
                     newcell,
                     updated_cell,

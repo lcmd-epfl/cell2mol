@@ -53,7 +53,7 @@ class Cell(BaseModel):
     # CIF bond/moiety related attributes
     geom_bond_cif: list[tuple] | None = None
     moiety_list_cif: list[list[str]] | None = None
-    has_cif_bond_moiety: bool | None = None
+    exist_cif_bond_moiety: bool | None = None
     moiety_indices: list[list[int]] | None = None
 
     # Unique species related attributes (Specie for molecules/ligands, Metal for metals)
@@ -122,13 +122,13 @@ class Cell(BaseModel):
         self.geom_bond_cif = geom_bond_cif
         self.moiety_list_cif = moiety_list_cif
 
-        self.has_cif_bond_moiety = False
+        self.exist_cif_bond_moiety = False
         self.moiety_indices = None
 
         if geom_bond_cif is None:
             return
 
-        self.has_cif_bond_moiety = True
+        self.exist_cif_bond_moiety = True
         self.moiety_indices = get_moiety_indices_from_labels(
             self.atom_site_labels, moiety_list_cif
         )
