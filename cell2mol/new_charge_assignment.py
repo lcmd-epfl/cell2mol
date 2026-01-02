@@ -874,22 +874,6 @@ def generate_tmc_rdkit_obj_smiles(mol: object, debug: int = 0) -> object:
             "Number of atoms in cell2mol and rkdit molecule object disagrees"
         )
 
-    #     if getattr(mol, "atom_site_labels", None) is not None:
-    #         new_order = []
-    #         for l in mol.atom_site_labels:
-    #             mol_idx = [
-    #                 a.GetIdx() for a in new_mol.GetAtoms() if a.GetProp("__atom_site_label") == l
-    #             ][0]
-    #             new_order.append(mol_idx)
-
-    #     new_order_by_idx = []
-    #     for idx in range(mol.natoms):
-    #         mol_idx = [
-    #             a.GetIdx() for a in new_mol.GetAtoms() if a.GetIntProp("__mol_idx") == idx
-    #         ][0]
-    #         new_order_by_idx.append(mol_idx)
-    #     print(f"{(new_order==new_order_by_idx)=}")
-
     new_order = []
     for idx in range(mol.natoms):
         mol_idx = [
