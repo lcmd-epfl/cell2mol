@@ -401,39 +401,30 @@ class Cell(BaseModel):
         # Post-processing: coordination analysis
         for ref in self.refmoleclist:
             if ref.iscomplex:
-                logger.info("Working with transition metals %s", ref.formula)
+                logger.info("Has transition metals %s", ref.formula)
                 ref.get_hapticity()
-                if len(ref.ligands) == 0:
+                if not ref.ligands:
                     logger.debug("A metal cluster found")
-                else:
-                    for lig in ref.ligands:
-                        lig.get_denticity()
-                for met in ref.metals:
-                    met.get_connected_metals()
-                    met.get_coordination_geometry()
-                    met.get_coord_sphere_formula()
 
             elif ref.has_IA_IIA:
-                logger.info(
-                    "Working with alkali or alkali earth metals: %s", ref.formula
-                )
-                for lig in ref.ligands:
-                    lig.get_denticity()
-                for met in ref.metals:
-                    met.get_connected_metals()
-                    met.get_coordination_geometry()
-                    met.get_coord_sphere_formula()
+                logger.info("Has alkali or alkaline earth metals: %s", ref.formula)
 
             elif ref.has_post_transition_metal:
-                logger.info("Working with post transition metals: %s", ref.formula)
+                logger.info("Has post transition metals: %s", ref.formula)
                 logger.debug("metals=%s", [met.label for met in ref.metals])
                 logger.debug("ligands=%s", [lig.formula for lig in ref.ligands])
-                for lig in ref.ligands:
-                    lig.get_denticity()
-                for met in ref.metals:
-                    met.get_connected_metals()
-                    met.get_coordination_geometry()
-                    met.get_coord_sphere_formula()
+
+            else:
+                continue
+
+            # Common ligand analysis
+            for lig in ref.ligands:
+                lig.get_denticity()
+            # Common metal analysis
+            for met in ref.metals:
+                met.get_connected_metals()
+                met.get_coordination_geometry()
+                met.get_coord_sphere_formula()
 
         return self.refmoleclist
 
@@ -769,7 +760,7 @@ class Cell(BaseModel):
                 handle_error(case)
         else:
             handle_error(case)
-        print("")
+
         self.error_case = case
 
     def save(self, path):
