@@ -233,6 +233,9 @@ class Specie(BaseModel):
         self.cov_factor = cov_factor
         self.metal_factor = metal_factor
 
+    def get_adjacency_parameters(self) -> tuple[float, float]:
+        return self.cov_factor, self.metal_factor
+
     def reset_charge(self):
         self.totcharge = None
         self.atomic_charges = None
@@ -386,17 +389,16 @@ class Specie(BaseModel):
 
         if use_bond_info is None:
             use_bond_info = config.USE_BOND_INFO
-        canonical = "bond_info" if use_bond_info else "distance"
 
         adjmat = build_adjacency(
             labels=self.labels,
             positions=self.coord,
             atom_site_labels=self.atom_site_labels,
             bond_data=bond_data,
+            use_bond_info=use_bond_info,
             cov_factor=cov_factor,
             metal_factor=metal_factor,
             metal_only=metal_only,
-            canonical=canonical,
             warn_on_mismatch=True,
             detail=False,
         )
