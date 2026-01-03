@@ -227,13 +227,13 @@ class Molecule(Specie):
 
         blocklist = split_species(
             labels=rest_labels,
-            pos=rest_coord,
+            positions=rest_coord,
             radii=rest_radii,
             indices=None,  # rest_indices
             atom_site_labels=rest_atom_site_labels,
             bond_data=bond_data,
-            cov_factor=cov_factor,
             use_bond_info=use_bond_info,
+            cov_factor=cov_factor,
         )
 
         logger.info("Received %d ligand blocks", len(blocklist))

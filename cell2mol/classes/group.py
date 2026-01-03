@@ -113,7 +113,6 @@ class Group(Specie):
 
         if use_bond_info is None:
             use_bond_info = config.USE_BOND_INFO
-        canonical = "bond_info" if use_bond_info else "distance"
 
         for met in lig.metals:
             tmplabels = list(self.labels.copy())
@@ -127,10 +126,10 @@ class Group(Specie):
                 positions=tmpcoord,
                 atom_site_labels=atom_site_labels,
                 bond_data=bond_data,
+                use_bond_info=use_bond_info,
                 cov_factor=cov_factor,
                 metal_factor=metal_factor,
                 metal_only=True,
-                canonical=canonical,
             )
             if tmp_adjmat is None:
                 continue
