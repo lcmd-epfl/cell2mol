@@ -2,11 +2,6 @@ import copy
 import logging
 import time
 
-from cell2mol.cell_reconstruction import (
-    get_moleclist,
-    get_unique_indices,
-    reconstruct,
-)
 from cell2mol.new_charge_assignment import (
     assign_charge_to_specie,
     balance_charge,
@@ -14,54 +9,6 @@ from cell2mol.new_charge_assignment import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def cell2mol_mode(newcell, refcell, sym_ops, mode, debug):
-    """
-    Wrapper to run cell2mol with a specific mode.
-
-    Args:
-    newcell : object
-        The unit cell object to be processed.
-    refcell : object
-        The reference unit cell.
-    sym_ops : object
-        Symmetry operations used for reconstruction.
-    mode : str
-        Mode of operation: 'reconstruction' or 'charge_assignment'.
-    debug : int
-        Debug level for verbosity.
-    """
-    if mode == "reconstruction":
-        newcell = unitcell_reconstruction(newcell, refcell, sym_ops)
-    elif mode == "charge_assignment":
-        newcell, refcell = charge_assignment(newcell, refcell, debug=debug)
-
-    logger.info("Completed '%s' mode", mode)
-
-
-def unitcell_reconstruction(newcell, refcell, sym_ops):
-    """Reconstruct the unit cell based on the reference cell and identify all molecules."""
-    start_time = time.time()
-
-    logger.info("#### Unit Cell Reconstruction ####")
-
-    if newcell.has_isolated_H or newcell.has_missing_H:
-        return newcell
-
-    all_molecules, reconstructed_molecules = reconstruct(refcell, newcell, sym_ops)
-    all_molecules.extend(reconstructed_molecules)
-
-    if newcell.error_get_fragments or newcell.error_reconstruction:
-        get_elapsed_time("Unit Cell Reconstruction Failed.", start_time)
-        return newcell
-
-    get_elapsed_time("Unit Cell Reconstruction Finished Normally.", start_time)
-
-    newcell = get_moleclist(newcell, refcell, all_molecules)
-    newcell = get_unique_indices(newcell, refcell.species_list)
-
-    return newcell
 
 
 def charge_assignment(newcell, refcell, debug):
