@@ -5,7 +5,9 @@ import logging
 from ase.io import read
 from cell2mol.args import parsing_arguments
 from cell2mol.refcell import process_refcell
-from cell2mol.final_c2m_module import cell2mol_mode
+from cell2mol.cell_reconstruction import reconstruct_unitcell
+
+# from cell2mol.final_c2m_module import cell2mol_mode
 from cell2mol.read_cif import get_cell_parameters
 from cell2mol.write_results import (
     write_refmoleclist,
@@ -66,17 +68,16 @@ def process_unitcell(input_path, name, current_dir):
     unitcell.error_get_poscharges = refcell.error_get_poscharges
     logger.info("Starting the cell2mol process for the unit cell")
 
-    debug = 1
     if refcell.error_case == 0:
         # Step-by-step molecule reconstruction and error assessment
-        mode = "reconstruction"
-        cell2mol_mode(unitcell, refcell, sym_ops, mode, debug)
-        unitcell.assess_errors(mode=mode)
+        unitcell = reconstruct_unitcell(refcell, unitcell, sym_ops)
+        unitcell.assess_errors(mode="reconstruction")
+        logger.info(f"Unitcell error case: {unitcell.error_case}")
 
-        if unitcell.error_case == 0:
-            mode = "charge_assignment"
-            cell2mol_mode(unitcell, refcell, sym_ops, mode, debug)
-            unitcell.assess_errors(mode=mode)
+        # if unitcell.error_case == 0:
+        #     mode = "charge_assignment"
+        #     cell2mol_mode(unitcell, refcell, sym_ops, mode, debug)
+        #     unitcell.assess_errors(mode=mode)
     else:
         logger.info(
             f"Error occurred in processing refcell: error case {refcell.error_case}"
