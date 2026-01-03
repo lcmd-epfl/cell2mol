@@ -1,4 +1,4 @@
-from typing import Literal, Tuple
+from typing import Tuple
 import numpy as np
 import warnings
 import logging
@@ -38,11 +38,11 @@ def build_adjacency(
     positions: np.ndarray,
     atom_site_labels: list[str] | None = None,
     bond_data: list[tuple[str, str, float]] | None = None,
+    use_bond_info: bool | None = None,
     cutoff: float | None = None,
     cov_factor: float | None = None,
     metal_factor: float | None = None,
     metal_only: bool = False,
-    canonical: Literal["distance", "bond_info"] = "distance",
     warn_on_mismatch: bool = True,
     detail: bool = False,
 ) -> np.ndarray:
@@ -59,6 +59,10 @@ def build_adjacency(
         cov_factor = config.COV_FACTOR
     if metal_factor is None:
         metal_factor = config.METAL_FACTOR
+    if use_bond_info is None:
+        use_bond_info = config.USE_BOND_INFO
+
+    canonical = "bond_info" if use_bond_info else "distance"
 
     # --- distance-based adjacency (always built) ---
     isgood, adj_dist, warning = get_adjmatrix(
@@ -577,14 +581,15 @@ def get_blocks(matrix: np.ndarray):
 
 def split_species(
     labels: list[str],
-    pos: np.ndarray,
+    positions: np.ndarray,
     *,
     radii: list[float] | None = None,
     indices: list[int] | None = None,
     atom_site_labels: list[str] | None = None,
     bond_data: list[tuple[str, str, float]] | None = None,
-    cov_factor: float | None = None,
     use_bond_info: bool | None = None,
+    cov_factor: float | None = None,
+    metal_factor: float | None = None,
     count_species_only: bool = False,
     apply_graph: bool = False,
 ):
@@ -599,15 +604,14 @@ def split_species(
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
 
-    canonical = "bond_info" if use_bond_info else "distance"
-
     adjmat = build_adjacency(
-        labels,
-        pos,
+        labels=labels,
+        positions=positions,
         atom_site_labels=atom_site_labels,
         bond_data=bond_data,
+        use_bond_info=use_bond_info,
         cov_factor=cov_factor,
-        canonical=canonical,
+        metal_factor=metal_factor,
     )
     adjnum = adjmat.sum(axis=1)
 
@@ -651,11 +655,12 @@ def split_species(
         new_blocklist = apply_graph_to_blocklist(
             blocklist,
             labels,
-            pos,
+            positions,
             conn_atom_site_labels=atom_site_labels,
             bond_data=bond_data,
+            use_bond_info=use_bond_info,
             cov_factor=cov_factor,
-            canonical=canonical,
+            metal_factor=metal_factor,
         )
         log_blocklist_diff(blocklist, new_blocklist)
         return new_blocklist
@@ -700,7 +705,7 @@ def split_group(
         else None
     )
 
-    logger.debug("     GROUP.SPLIT_GROUP: %s", connected_metal)
+    logger.debug("     GROUP.SPLIT_GROUP: %s", [met.label for met in connected_metal])
     logger.debug("     GROUP.SPLIT_GROUP: %s", conn_labels)
 
     cov_factor = original_group.get_parent("ligand").cov_factor
@@ -709,7 +714,7 @@ def split_group(
 
     blocklist = split_species(
         labels=conn_labels,
-        pos=conn_coord,
+        positions=conn_coord,
         radii=conn_radii,
         indices=None,  # rest_indices
         atom_site_labels=conn_atom_site_labels,
@@ -774,8 +779,9 @@ def apply_graph_to_blocklist(
     *,
     conn_atom_site_labels,
     bond_data,
-    cov_factor,
-    canonical,
+    use_bond_info: bool | None = None,
+    cov_factor: float | None = None,
+    metal_factor: float | None = None,
 ):
     """Split a list of atoms into blocks of connected atoms."""
 
@@ -798,8 +804,9 @@ def apply_graph_to_blocklist(
             positions=gr_coord,
             atom_site_labels=gr_atom_site_labels,
             bond_data=bond_data,
+            use_bond_info=use_bond_info,
             cov_factor=cov_factor,
-            canonical=canonical,
+            metal_factor=metal_factor,
             warn_on_mismatch=True,
             detail=False,
         )
@@ -848,8 +855,9 @@ def apply_graph_to_blocklist(
             positions=rem_coord,
             atom_site_labels=rem_atom_site_labels,
             bond_data=bond_data,
+            use_bond_info=use_bond_info,
             cov_factor=cov_factor,
-            canonical=canonical,
+            metal_factor=metal_factor,
             warn_on_mismatch=True,
             detail=False,
         )
@@ -929,9 +937,6 @@ def add_atom(
 
     The atom is placed along the vector pointing toward the closest metal atom.
     """
-    import os
-    from cell2mol.write_results import writexyz
-
     isadded = False
     posadded = len(labels)
 
@@ -1024,7 +1029,8 @@ def add_atom(
                     site,
                     tmpconnec[posadded],
                 )
-
+                # import os
+                # from cell2mol.write_results import writexyz
                 # writexyz(
                 #     os.getcwd(),
                 #     f"target_atom_{atom.label}_{apos[0]}_newcoord_with_{element}.xyz",
