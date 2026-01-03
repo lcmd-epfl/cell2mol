@@ -107,7 +107,7 @@ def parsing_arguments():
     # )
     logging.basicConfig(
         level=logging.DEBUG,
-        format="%(levelname)-7s %(funcName)-30s | %(message)s",
+        format="%(levelname)-7s %(name)-30s %(funcName)-30s | %(message)s",
         filename="cell2mol.out",
         filemode="w",
     )
