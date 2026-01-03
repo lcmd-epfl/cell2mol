@@ -5,13 +5,10 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from pydantic import Field, computed_field
 from typing_extensions import deprecated
-
-from cell2mol.connectivity import get_adjmatrix, get_adjmatrix_from_cif_bonds
 from cell2mol.element_utils import get_radii
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import NDArray, OptionalInt, RefList
 from cell2mol.utils import BaseModel
-from cell2mol.utils import config
 
 if TYPE_CHECKING:
     from cell2mol.classes.bond import Bond
@@ -213,117 +210,116 @@ class Atom(BaseModel):
             to_print += "----------------------------------------------------\n"
         return to_print
 
-
-def reset_mconnec(self, met, diff: int = -1):
-    logger.info("Reset mconnec: atom=%s diff=%d", self.label, diff)
-
-    logger.debug(
-        "Initial atom: connec=%d mconnec=%d adj=%s madj=%s",
-        self.connec,
-        self.mconnec,
-        self.adjacency,
-        self.metal_adjacency,
-    )
-
-    # Update atom
-    self.mconnec += diff
-    self.connec += diff
-
-    logger.debug(
-        "Initial metal: connec=%d mconnec=%d adj=%s madj=%s",
-        met.connec,
-        met.mconnec,
-        met.adjacency,
-        met.metal_adjacency,
-    )
-
-    # Update metal
-    met.mconnec += diff
-    met.connec += diff
-
-    # ---------- Ligand ----------
-    if self.check_parent("ligand"):
-        lig = self.get_parent("ligand")
-        lig_idx = self.get_parent_index("ligand")
-
-        logger.info("Updating ligand: atom=%s ligand_idx=%d", self.label, lig_idx)
-        logger.info("Ligand before: adjnum=%s madjnum=%s", lig.adjnum, lig.madjnum)
-
-        lig.madjnum[lig_idx] += diff
-        lig.adjnum[lig_idx] += diff
-
-        lig.atoms[lig_idx].set_adjacencies(
-            lig.adjmat[lig_idx],
-            lig.madjmat[lig_idx],
-            lig.adjnum[lig_idx],
-            lig.madjnum[lig_idx],
-        )
-
-        logger.info(
-            "Ligand after: atom connec=%d mconnec=%d adj=%s madj=%s",
-            lig.atoms[lig_idx].connec,
-            lig.atoms[lig_idx].mconnec,
-            lig.atoms[lig_idx].adjacency,
-            lig.atoms[lig_idx].metal_adjacency,
-        )
-
-        lig.get_connected_idx()
-        lig.get_connected_atoms()
-
-    # ---------- Molecule ----------
-    if self.check_parent("molecule"):
-        mol = self.get_parent("molecule")
-        mol_idx = self.get_parent_index("molecule")
-        met_idx = met.get_parent_index("molecule")
-
-        logger.info("Updating molecule: atom_idx=%d metal_idx=%d", mol_idx, met_idx)
+    def reset_mconnec(self, met, diff: int = -1):
+        logger.info("Reset mconnec: atom=%s diff=%d", self.label, diff)
 
         logger.debug(
-            "Molecule before: atom(connec=%d,mconnec=%d) metal(connec=%d,mconnec=%d)",
-            mol.atoms[mol_idx].connec,
-            mol.atoms[mol_idx].mconnec,
-            met.connec,
-            met.mconnec,
+            "Initial atom: connec=%d mconnec=%d adj=%s madj=%s",
+            self.connec,
+            self.mconnec,
+            self.adjacency,
+            self.metal_adjacency,
         )
 
-        # Update numbers
-        mol.madjnum[mol_idx] += diff
-        mol.madjnum[met_idx] += diff
-        mol.adjnum[mol_idx] += diff
-        mol.adjnum[met_idx] += diff
-
-        # Update matrices
-        mol.madjmat[mol_idx, met_idx] += diff
-        mol.madjmat[met_idx, mol_idx] += diff
-        mol.adjmat[mol_idx, met_idx] += diff
-        mol.adjmat[met_idx, mol_idx] += diff
-
-        self.set_adjacencies(
-            mol.adjmat[mol_idx],
-            mol.madjmat[mol_idx],
-            mol.adjnum[mol_idx],
-            mol.madjnum[mol_idx],
-        )
-
-        met.set_adjacencies(
-            mol.adjmat[met_idx],
-            mol.madjmat[met_idx],
-            mol.adjnum[met_idx],
-            mol.madjnum[met_idx],
-        )
-
-        logger.info(
-            "Molecule after: atom(connec=%d,mconnec=%d adj=%s madj=%s)",
-            mol.atoms[mol_idx].connec,
-            mol.atoms[mol_idx].mconnec,
-            mol.atoms[mol_idx].adjacency,
-            mol.atoms[mol_idx].metal_adjacency,
-        )
+        # Update atom
+        self.mconnec += diff
+        self.connec += diff
 
         logger.debug(
-            "Metal after: connec=%d mconnec=%d adj=%s madj=%s",
+            "Initial metal: connec=%d mconnec=%d adj=%s madj=%s",
             met.connec,
             met.mconnec,
             met.adjacency,
             met.metal_adjacency,
         )
+
+        # Update metal
+        met.mconnec += diff
+        met.connec += diff
+
+        # ---------- Ligand ----------
+        if self.check_parent("ligand"):
+            lig = self.get_parent("ligand")
+            lig_idx = self.get_parent_index("ligand")
+
+            logger.info("Updating ligand: atom=%s ligand_idx=%d", self.label, lig_idx)
+            logger.info("Ligand before: adjnum=%s madjnum=%s", lig.adjnum, lig.madjnum)
+
+            lig.madjnum[lig_idx] += diff
+            lig.adjnum[lig_idx] += diff
+
+            lig.atoms[lig_idx].set_adjacencies(
+                lig.adjmat[lig_idx],
+                lig.madjmat[lig_idx],
+                lig.adjnum[lig_idx],
+                lig.madjnum[lig_idx],
+            )
+
+            logger.info(
+                "Ligand after: atom connec=%d mconnec=%d adj=%s madj=%s",
+                lig.atoms[lig_idx].connec,
+                lig.atoms[lig_idx].mconnec,
+                lig.atoms[lig_idx].adjacency,
+                lig.atoms[lig_idx].metal_adjacency,
+            )
+
+            lig.get_connected_idx()
+            lig.get_connected_atoms()
+
+        # ---------- Molecule ----------
+        if self.check_parent("molecule"):
+            mol = self.get_parent("molecule")
+            mol_idx = self.get_parent_index("molecule")
+            met_idx = met.get_parent_index("molecule")
+
+            logger.info("Updating molecule: atom_idx=%d metal_idx=%d", mol_idx, met_idx)
+
+            logger.debug(
+                "Molecule before: atom(connec=%d,mconnec=%d) metal(connec=%d,mconnec=%d)",
+                mol.atoms[mol_idx].connec,
+                mol.atoms[mol_idx].mconnec,
+                met.connec,
+                met.mconnec,
+            )
+
+            # Update numbers
+            mol.madjnum[mol_idx] += diff
+            mol.madjnum[met_idx] += diff
+            mol.adjnum[mol_idx] += diff
+            mol.adjnum[met_idx] += diff
+
+            # Update matrices
+            mol.madjmat[mol_idx, met_idx] += diff
+            mol.madjmat[met_idx, mol_idx] += diff
+            mol.adjmat[mol_idx, met_idx] += diff
+            mol.adjmat[met_idx, mol_idx] += diff
+
+            self.set_adjacencies(
+                mol.adjmat[mol_idx],
+                mol.madjmat[mol_idx],
+                mol.adjnum[mol_idx],
+                mol.madjnum[mol_idx],
+            )
+
+            met.set_adjacencies(
+                mol.adjmat[met_idx],
+                mol.madjmat[met_idx],
+                mol.adjnum[met_idx],
+                mol.madjnum[met_idx],
+            )
+
+            logger.info(
+                "Molecule after: atom(connec=%d,mconnec=%d adj=%s madj=%s)",
+                mol.atoms[mol_idx].connec,
+                mol.atoms[mol_idx].mconnec,
+                mol.atoms[mol_idx].adjacency,
+                mol.atoms[mol_idx].metal_adjacency,
+            )
+
+            logger.debug(
+                "Metal after: connec=%d mconnec=%d adj=%s madj=%s",
+                met.connec,
+                met.mconnec,
+                met.adjacency,
+                met.metal_adjacency,
+            )
