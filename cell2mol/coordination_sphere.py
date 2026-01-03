@@ -234,32 +234,75 @@ def define_coordination_geometry(metal: object, coord_group: list) -> object:
 
 
 def shape_measure(symbols: list, positions: list) -> dict:
-    """Shape measure calculation adapted from a set of coordinates"""
-    # coordination number of metal center
+    """
+    Calculate shape measures for a coordination environment.
+
+    Args:
+        symbols (list):
+            Atomic symbols including the metal atom (used to determine CN).
+        positions (list):
+            Cartesian coordinates of atoms.
+
+    Returns:
+        dict:
+            Mapping of ideal geometry name to continuous shape measure (CSM).
+    """
+    # Coordination number (excluding metal atom)
     cn = len(symbols) - 1
-    if cn == 0:
-        posgeom_dev = {}
-    elif cn == 1:
-        posgeom_dev = {"Linear": 0.0}
-    else:
-        posgeom_dev = {}
-        try:
-            ref_geom = np.array(
-                shape_structure_references_simplified["{} Vertices".format(cn)],
-                dtype=object,
-            )
-            ideal_shapes = {}
-            for idx, rg in enumerate(ref_geom[:, 0]):
-                geom = ref_geom[:, 3][idx]
-                ideal_shapes[geom] = ideal_shapes_from_cosymlib[rg]
 
-            for geom, ideal_shape in ideal_shapes.items():
-                chsm = calc_cshm_fast(positions, ideal_shape)
-                posgeom_dev[geom] = round(float(chsm), 3)
-        except:
-            logger.warning("%s Vertices not found in shape_structure_references", cn)
+    if cn <= 0:
+        return {}
+    if cn == 1:
+        return {"Linear": 0.0}
+    try:
+        ref_geom = np.array(
+            shape_structure_references_simplified[f"{cn} Vertices"],
+            dtype=object,
+        )
+    except KeyError:
+        logger.warning(
+            "%d-vertex reference geometry not found in shape_structure_references",
+            cn,
+        )
+        return {}
 
+    posgeom_dev = {}
+    for rg, _, _, geom in ref_geom:
+        ideal_shape = ideal_shapes_from_cosymlib.get(rg)
+        if ideal_shape is None:
+            continue
+
+        cshm = calc_cshm_fast(positions, ideal_shape)
+        posgeom_dev[geom] = round(float(cshm), 3)
     return posgeom_dev
+
+
+# def shape_measure(symbols: list, positions: list) -> dict:
+#     """Shape measure calculation adapted from a set of coordinates"""
+#     # coordination number of metal center
+#     cn = len(symbols) - 1
+#     if cn == 0:
+#         posgeom_dev = {}
+#     elif cn == 1:
+#         posgeom_dev = {"Linear": 0.0}
+#     else:
+#         try:
+#             ref_geom = np.array(
+#                 shape_structure_references_simplified["{} Vertices".format(cn)],
+#                 dtype=object,
+#             )
+#             ideal_shapes = {}
+#             for idx, rg in enumerate(ref_geom[:, 0]):
+#                 geom = ref_geom[:, 3][idx]
+#                 ideal_shapes[geom] = ideal_shapes_from_cosymlib[rg]
+
+#             for geom, ideal_shape in ideal_shapes.items():
+#                 chsm = calc_cshm_fast(positions, ideal_shape)
+#                 posgeom_dev[geom] = round(float(chsm), 3)
+#             return posgeom_dev
+#         except:
+#             logger.warning("%s Vertices not found in shape_structure_references", cn)
+#             return {}
 
 
 def normalize_structure(coordinates):
@@ -324,7 +367,6 @@ def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
 def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = None):
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
-    canonical = "bond_info" if use_bond_info else "distance"
 
     if group.metals is None:
         group.get_connected_metals()
@@ -374,10 +416,10 @@ def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = No
                 positions=tmpcoord,
                 atom_site_labels=atom_site_labels,
                 bond_data=bond_data,
+                use_bond_info=use_bond_info,
                 cov_factor=cov_factor,
                 metal_factor=metal_factor,
                 metal_only=True,
-                canonical=canonical,
             )
             if tmp_adjmat is None:
                 continue
@@ -475,8 +517,6 @@ def handle_haptic_coordination(group: object, use_bond_info: bool | None = None)
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
 
-    canonical = "bond_info" if use_bond_info else "distance"
-
     single_ring = is_single_ring(group.labels, group.coord)
     logger.debug("Is single ring: %s", single_ring)
 
@@ -503,10 +543,10 @@ def handle_haptic_coordination(group: object, use_bond_info: bool | None = None)
                 positions=tmpcoord,
                 atom_site_labels=atom_site_labels,
                 bond_data=bond_data,
+                use_bond_info=use_bond_info,
                 cov_factor=cov_factor,
                 metal_factor=metal_factor,
                 metal_only=True,
-                canonical=canonical,
             )
             if tmp_adjmat is None:
                 continue
