@@ -101,12 +101,15 @@ class Metal(Atom):
                     if self == met:
                         connected_groups.append(group)
                         logger.debug(
-                            "Metal %s%s connected to group %s",
+                            "Metal %s%s connected to group %s%s",
                             self.label,
                             f" ({self.atom_site_label})"
                             if self.atom_site_label
                             else "",
                             group.formula,
+                            f" ({[a.atom_site_label for a in group.atoms]})"
+                            if any(a.atom_site_label for a in group.atoms)
+                            else "",
                         )
         final_connected_groups = []
         groups_atom_site_labels = [
@@ -122,7 +125,7 @@ class Metal(Atom):
         self.groups = final_connected_groups
 
         logger.info(
-            "Metal %s%s connected to group %s",
+            "Metal %s%s connected to groups %s",
             self.label,
             f" ({self.atom_site_label})" if self.atom_site_label else "",
             [g.formula for g in self.groups],
@@ -174,15 +177,18 @@ class Metal(Atom):
 
         if use_bond_info is None:
             use_bond_info = config.USE_BOND_INFO
-        canonical = "bond_info" if use_bond_info else "distance"
 
         for met in mol.metals:
             if met == self:
                 continue
 
-            tmplabels = list(self.labels.copy())
-            tmpcoord = list(self.coord.copy())
-            atom_site_labels = list(self.atom_site_label.copy())
+            tmplabels = []
+            tmpcoord = []
+            atom_site_labels = []
+
+            tmplabels.append(self.label)
+            tmpcoord.append(self.coord)
+            atom_site_labels.append(self.atom_site_label)
 
             tmplabels.append(met.label)
             tmpcoord.append(met.coord)
@@ -193,10 +199,10 @@ class Metal(Atom):
                 positions=tmpcoord,
                 atom_site_labels=atom_site_labels,
                 bond_data=bond_data,
+                use_bond_info=use_bond_info,
                 cov_factor=cov_factor,
                 metal_factor=metal_factor,
                 metal_only=True,
-                canonical=canonical,
             )
             if tmp_adjmat is None:
                 continue

@@ -65,7 +65,6 @@ class Ligand(Specie):
 
         if use_bond_info is None:
             use_bond_info = config.USE_BOND_INFO
-        canonical = "bond_info" if use_bond_info else "distance"
 
         for met in mol.metals:
             tmplabels = list(self.labels.copy())
@@ -79,10 +78,10 @@ class Ligand(Specie):
                 positions=tmpcoord,
                 atom_site_labels=atom_site_labels,
                 bond_data=bond_data,
+                use_bond_info=use_bond_info,
                 cov_factor=cov_factor,
                 metal_factor=metal_factor,
                 metal_only=True,
-                canonical=canonical,
             )
             if tmp_adjmat is None:
                 continue
@@ -214,13 +213,13 @@ class Ligand(Specie):
 
         blocklist = split_species(
             labels=conn_labels,
-            pos=conn_coord,
+            positions=conn_coord,
             radii=conn_radii,
             indices=None,  # rest_indices
             atom_site_labels=conn_atom_site_labels,
             bond_data=bond_data,
-            cov_factor=cov_factor,
             use_bond_info=use_bond_info,
+            cov_factor=cov_factor,
             apply_graph=True,
         )
 
