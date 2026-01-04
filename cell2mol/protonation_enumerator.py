@@ -12,7 +12,6 @@ from typing import Dict, List
 
 from cell2mol.hydrogen import add_hydrogens
 from cell2mol.classes.protonation import Protonation
-from cell2mol.classes.specie import Specie
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,7 +31,7 @@ class ProtonationGroupResult:
     non_local_indices: List[int]
 
 
-def enumerate_protonation_states(specie: Specie, debug: int = 0) -> list[Protonation]:
+def enumerate_protonation_states(specie: object, debug: int = 0) -> list[Protonation]:
     """Enumerate possible protonation states for the specie.
 
     Protonation states are only generated for:
@@ -241,7 +240,7 @@ def enumerate_protonation_states(specie: Specie, debug: int = 0) -> list[Protona
     return protonation_states
 
 
-def get_empty_protonation_state(specie: Specie) -> list[Protonation]:
+def get_empty_protonation_state(specie: object) -> list[Protonation]:
     """
     Create a placeholder protonation state with no added hydrogens.
 
