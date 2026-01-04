@@ -6,10 +6,8 @@ import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
 
-from cell2mol.charge_assignment import (
-    get_possible_charge_state,
-    get_protonation_states_specie,
-)
+from cell2mol.protonation_enumerator import enumerate_protonation_states
+from cell2mol.charge_state_resolver import enumerate_charge_states
 from cell2mol.classes.atom import Atom
 from cell2mol.classes.charge_state import ChargeState
 from cell2mol.classes.metal import Metal
@@ -23,7 +21,6 @@ from cell2mol.element_utils import (
     labels2electrons,
     labels2formula,
 )
-from cell2mol.compare import compare_atoms, compare_species
 from cell2mol.connectivity import build_adjacency, get_adjacency_types
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import NDArray, RDKitObject, RefList, SubType
@@ -94,6 +91,19 @@ class Specie(BaseModel):
     def iscomplex(self) -> bool:
         """True if the structure contains d- or f-block metals."""
         return bool(get_metal_idxs(self.labels))
+
+    @property
+    def is_non_complex_molecule(self):
+        """
+        Return True if the specie is a non-complex molecule,
+        meaning it contains no metals or metal-like elements.
+        """
+        return (
+            self.subtype == "molecule"
+            and not self.iscomplex
+            and not self.has_IA_IIA
+            and not self.has_post_transition_metal
+        )
 
     @property
     def has_IA_IIA(self) -> bool:
@@ -220,11 +230,58 @@ class Specie(BaseModel):
         self.element_count = get_element_count(self.labels, heavy_only=heavy_only)
         return self.element_count
 
+    def build_adjmatrix(
+        self,
+        use_bond_info: bool | None = None,
+        metal_only: bool = False,
+    ):
+        refcell = self.get_parent("reference")
+        bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
+        metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
+
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
+
+        adjmat = build_adjacency(
+            labels=self.labels,
+            positions=self.coord,
+            atom_site_labels=self.atom_site_labels,
+            bond_data=bond_data,
+            use_bond_info=use_bond_info,
+            cov_factor=cov_factor,
+            metal_factor=metal_factor,
+            metal_only=metal_only,
+            warn_on_mismatch=True,
+            detail=False,
+        )
+
+        if adjmat is None:
+            if metal_only:
+                self.madjmat = None
+                self.madjnum = None
+                return self.madjmat, self.madjnum
+            else:
+                self.adjmat = None
+                self.adjnum = None
+                return self.adjmat, self.adjnum
+
+        adjnum = adjmat.sum(axis=1)
+
+        if metal_only:
+            self.madjmat = adjmat
+            self.madjnum = adjnum
+            return self.madjmat, self.madjnum
+        else:
+            self.adjmat = adjmat
+            self.adjnum = adjnum
+            return self.adjmat, self.adjnum
+
     def set_adj_types(self, use_bond_info: bool | None = None):
         if use_bond_info is None:
             use_bond_info = config.USE_BOND_INFO
         if self.adjmat is None:
-            self.self.build_adjmatrix(use_bond_info=use_bond_info, metal_only=False)
+            self.build_adjmatrix(use_bond_info=use_bond_info, metal_only=False)
         self.adj_types = get_adjacency_types(self.labels, self.adjmat)
         return self.adj_types
 
@@ -235,42 +292,6 @@ class Specie(BaseModel):
 
     def get_adjacency_parameters(self) -> tuple[float, float]:
         return self.cov_factor, self.metal_factor
-
-    def reset_charge(self):
-        self.totcharge = None
-        self.atomic_charges = None
-        self.smiles = None
-        self.rdkit_obj = None
-        self.possible_cs = None
-
-        for a in self.atoms:
-            a.reset_charge()
-
-    def set_charges(
-        self,
-        totcharge: int = None,
-        atomic_charges: list[int] | NDArray | None = None,
-        smiles: str | None = None,
-        rdkit_obj: object = None,
-    ) -> None:
-        ## Sets total charge
-        if totcharge is not None:
-            self.totcharge = totcharge
-        elif totcharge is None and atomic_charges is not None:
-            self.totcharge = np.sum(atomic_charges)
-        elif totcharge is None and atomic_charges is None:
-            self.totcharge = "Unknown"
-        ## Sets atomic charges
-        if atomic_charges is not None:
-            self.atomic_charges = atomic_charges
-            if self.atoms is None:
-                self.set_atoms()
-            for idx, a in enumerate(self.atoms):
-                a.set_charge(self.atomic_charges[idx])
-        if smiles is not None:
-            self.smiles = smiles
-        if rdkit_obj is not None:
-            self.rdkit_obj = rdkit_obj
 
     def set_atoms(
         self,
@@ -377,141 +398,94 @@ class Specie(BaseModel):
             extract_from_list(indices, parent.adjnum, dimension=1), axis=0
         )
 
-    def build_adjmatrix(
-        self,
-        use_bond_info: bool | None = None,
-        metal_only: bool = False,
-    ):
-        refcell = self.get_parent("reference")
-        bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
-        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
-        metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
-
-        if use_bond_info is None:
-            use_bond_info = config.USE_BOND_INFO
-
-        adjmat = build_adjacency(
-            labels=self.labels,
-            positions=self.coord,
-            atom_site_labels=self.atom_site_labels,
-            bond_data=bond_data,
-            use_bond_info=use_bond_info,
-            cov_factor=cov_factor,
-            metal_factor=metal_factor,
-            metal_only=metal_only,
-            warn_on_mismatch=True,
-            detail=False,
-        )
-
-        if adjmat is None:
-            if metal_only:
-                self.madjmat = None
-                self.madjnum = None
-                return self.madjmat, self.madjnum
-            else:
-                self.adjmat = None
-                self.adjnum = None
-                return self.adjmat, self.adjnum
-
-        adjnum = adjmat.sum(axis=1)
-
-        if metal_only:
-            self.madjmat = adjmat
-            self.madjnum = adjnum
-            return self.madjmat, self.madjnum
-        else:
-            self.adjmat = adjmat
-            self.adjnum = adjnum
-            return self.adjmat, self.adjnum
-
-    # TODO : Implement get_occurrence for specie
-    def get_occurrence(self, substructure: object) -> int:
-        occurrence = 0
-        ## Ligands in Complexes or Groups in Ligands
-        done = False
-        # TOFIX @romaingrx: check if we can't pass the actual class as type
-        if "subtype" in substructure and "subtype" in self:
-            if substructure.subtype == "ligand" and self.subtype == "molecule":
-                if self.ligands is None:
-                    self.split_complex()
-                if self.ligands is not None:
-                    for lig in self.ligands:
-                        issame = compare_species(substructure, lig)
-                        if issame:
-                            occurrence += 1
-                    done = True
-            elif substructure.subtype == "group" and self.subtype == "ligand":
-                if self.ligands is None:
-                    self.split_complex()
-                if self.ligands is not None:
-                    for lig in self.ligands:
-                        if lig.groups is None:
-                            self.split_ligand()
-                        for g in lig.groups:
-                            issame = compare_species(substructure, g)
-                            if issame:
-                                occurrence += 1
-                done = True
-        ## Atoms in Species
-        if not done:
-            if substructure.type == "atom" and self.type == "specie":
-                if self.atoms is None:
-                    self.set_atoms()
-                for at in self.atoms:
-                    issame = compare_atoms(substructure, at)
-                    if issame:
-                        occurrence += 1
-        return occurrence
-
-    ############
     def get_protonation_states(self):
-        # !!! WARNING. FUNCTION defined at the "specie" level
-        # but will only do something for ligands and non-complex molecules
-        if self.subtype == "group":
-            if self.denticity is None:
-                self.get_denticity()
-            if self.is_haptic is None:
-                self.get_hapticity()
-            self.protonation_states = None
-        elif self.subtype == "ligand":
-            # if self.groups is None: self.split_ligand()
+        """
+        Enumerate protonation states for this Specie.
+
+        Protonation states are only defined for ligands and
+        non-complex molecules. For all other species,
+        protonation_states is None.
+        """
+        self.protonation_states = None
+
+        if not (self.subtype == "ligand" or self.is_non_complex_molecule):
+            return self.protonation_states
+
+        if self.subtype == "ligand":
             if self.is_haptic is None:
                 self.get_hapticity()
             if self.denticity is None:
                 self.get_denticity()
             if self.is_nitrosyl is None:
                 self.evaluate_as_nitrosyl()
-            self.protonation_states = get_protonation_states_specie(self)
-        else:
-            if self.is_haptic is None:
-                self.get_hapticity()
-            self.protonation_states = get_protonation_states_specie(self)
+
+        self.protonation_states = enumerate_protonation_states(self)
         return self.protonation_states
 
     def get_possible_cs(self):
-        # Arranges a list of possible charge_states associated with this species,
-        # which is later managed at the cell level to determine the good one
-        if self.possible_cs is None:
-            if self.subtype == "ligand" or (
-                self.subtype == "molecule"
-                and not self.iscomplex
-                and not self.has_IA_IIA
-            ):
-                logger.debug(
-                    "Formula: %s Pronation states %s",
-                    self.formula,
-                    self.protonation_states,
-                )
-                if self.protonation_states is None:
-                    self.get_protonation_states()
-                    logger.debug(
-                        "SPECIE.GET_POSSIBLE_CS: Obtained %s %s",
-                        self.formula,
-                        self.protonation_states,
-                    )
+        """
+        Enumerate possible charge states for this Specie.
 
-                self.possible_cs = get_possible_charge_state(self)
+        Possible charge states are only defined for ligands and
+        non-complex molecules. Final charge selection is handled
+        later at the cell level.
+        """
+        if self.possible_cs is not None:
+            return self.possible_cs
+
+        # Default behavior
+        self.possible_cs = None
+
+        if not (self.subtype == "ligand" or self.is_non_complex_molecule):
+            return self.possible_cs
+
+        if self.protonation_states is None:
+            self.get_protonation_states()
+            logger.debug(
+                "Obtained protonation states for %s: %s",
+                self.formula,
+                self.protonation_states,
+            )
+        logger.debug("Enumerating charge states for %s", self.formula)
+
+        self.possible_cs = enumerate_charge_states(self)
         return self.possible_cs
+
+    def set_charges(
+        self,
+        totcharge: int = None,
+        atomic_charges: list[int] | NDArray | None = None,
+        smiles: str | None = None,
+        rdkit_obj: object = None,
+    ) -> None:
+        ## Sets total charge
+        if totcharge is not None:
+            self.totcharge = totcharge
+        elif totcharge is None and atomic_charges is not None:
+            self.totcharge = np.sum(atomic_charges)
+        elif totcharge is None and atomic_charges is None:
+            self.totcharge = "Unknown"
+        ## Sets atomic charges
+        if atomic_charges is not None:
+            self.atomic_charges = atomic_charges
+            if self.atoms is None:
+                self.set_atoms()
+            for idx, a in enumerate(self.atoms):
+                a.set_charge(self.atomic_charges[idx])
+        if smiles is not None:
+            self.smiles = smiles
+        if rdkit_obj is not None:
+            self.rdkit_obj = rdkit_obj
+
+    def reset_charge(self):
+        self.totcharge = None
+        self.atomic_charges = None
+        self.smiles = None
+        self.rdkit_obj = None
+        self.possible_cs = None
+
+        for a in self.atoms:
+            a.reset_charge()
 
     def print_xyz(self):
         print(self.natoms)
