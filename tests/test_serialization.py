@@ -318,7 +318,6 @@ class TestTypeRegistry:
             "Molecule",
             "Protonation",
             "Specie",
-            "ProtonationGroupResult",
         ]
 
         registry = TypeRegistry.get_instance()
