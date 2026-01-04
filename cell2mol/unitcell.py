@@ -5,7 +5,7 @@ import logging
 from ase.io import read
 from cell2mol.args import parsing_arguments
 from cell2mol.refcell import process_refcell
-from cell2mol.cell_reconstruction import reconstruct_unitcell
+from cell2mol.unitcell_reconstruction import reconstruct_unitcell
 
 # from cell2mol.final_c2m_module import cell2mol_mode
 from cell2mol.read_cif import get_cell_parameters
