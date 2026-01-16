@@ -1,0 +1,2261 @@
+refcode	metal	total_charge	multiplicity	elem_nr	m_ox	d_elec	hapticity	CN	geometry	geom_nr	rel_m	splitting
+AACANI11	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.046	-11.63
+ABAJIX	Co	2	2	27	2	7	False	5	Square pyramidal	14	1.038	15.57
+ABATED	Co	0	3	27	1	8	True	3	Trigonal planar	3	1.156	-17.54
+ABATUT	Co	0	1	27	3	6	False	3	Trigonal planar	3	0.848	25.81
+ABEDAN	Ni	2	3	28	2	8	False	6	Octahedral	18	1.085	-31.41
+ABOTNI	Ni	0	3	28	2	8	False	6	Octahedral	18	1.106	-17.81
+ACEGOH	Cr	0	4	24	3	3	False	5	Square pyramidal	14	1.04	-41.92
+ACEYOW	Fe	2	5	26	2	6	False	6	Octahedral	18	1.094	-16.04
+ACNCOB20	Co	1	1	27	1	8	True	5	Trigonal bipyramidal	13	0.963	38.62
+ACODUR	Fe	0	1	26	2	6	True	4	Tetrahedral	8	0.956	106.08
+ADEQUY	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.996	-13.2
+ADERAF	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.998	-17.75
+ADIGEB	Fe	0	6	26	3	5	False	4	Tetrahedral	8	0.963	-45.98
+AENNIN	Ni	2	3	28	2	8	False	6	Octahedral	18	1.132	-37.94
+AETSFE	Fe	1	2	26	3	5	False	6	Octahedral	18	0.951	49.29
+AFAVIO	Ni	0	3	28	2	8	False	6	Octahedral	18	1.121	-42.1
+AFOMEQ	Cr	0	4	24	3	3	False	6	Octahedral	18	0.961	-35.94
+AFOSUM	Cr	0	5	24	2	4	False	4	Square planar	7	0.986	-64.17
+AFUDAH	Ni	0	1	28	2	8	False	4	Square planar	7	0.973	16.19
+AGAMIH	Ni	1	3	28	2	8	False	6	Octahedral	18	1.113	-41.88
+AGAVAI	Co	0	2	27	2	7	False	4	Square planar	7	0.898	45.76
+AGEZIW	Co	1	1	27	3	6	True	4	Tetrahedral	8	1.036	55.97
+AGIDEC	Co	-2	4	27	2	7	False	4	Seesaw	9	1.027	-28.72
+AGLCMN	Mn	0	6	25	2	5	False	6	Octahedral	18	1.086	-47.11
+AGODAC	Co	0	1	27	3	6	False	6	Octahedral	18	0.973	93.29
+AGOZUR	Ni	0	3	28	2	8	False	6	Octahedral	18	1.119	-50.34
+AGUBAF	Mn	0	6	25	2	5	False	6	Octahedral	18	1.085	-46.05
+AGUDUE	Co	1	2	27	2	7	False	4	Square planar	7	0.924	26.38
+AGXICO	Co	0	2	27	2	7	False	4	Square planar	7	0.935	50.84
+AHABER	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.004	-27.85
+AHABIV	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.032	-32.54
+AHEZAO	Cr	0	4	24	3	3	False	6	Octahedral	18	0.952	-36.09
+AHIGOO	Ni	0	1	28	2	8	False	5	Trigonal bipyramidal	13	0.947	45.82
+AHUCUE	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.013	-15.77
+AHUGOA	Fe	0	5	26	2	6	False	4	Seesaw	9	0.988	-39.1
+AJAFEX	Ni	0	1	28	2	8	False	4	Square planar	7	0.923	55.06
+AJALAZ	Co	0	2	27	2	7	False	4	Square planar	7	0.925	24.93
+AJALED	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.984	-44.46
+AJALIH	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.965	-40.85
+AJICUT	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.044	-60.54
+AJIMOV	Fe	0	1	26	2	6	False	6	Octahedral	18	0.903	106.56
+AJUKIA	Fe	0	1	26	2	6	True	2	Linear	0	1.033	66.84
+AKASIQ	Cr	0	5	24	2	4	False	3	Trigonal planar	3	0.897	-55.23
+ALALAA	Fe	0	2	26	3	5	False	5	Square pyramidal	14	0.962	34.29
+ALEQEO	Fe	0	1	26	2	6	False	6	Octahedral	18	0.916	76.99
+ALILOX	Fe	0	1	26	2	6	False	6	Octahedral	18	0.945	45.28
+ALIYOJ	Mn	0	5	25	3	4	False	6	Octahedral	18	0.988	-57.71
+ALLPMN	Mn	0	1	25	1	6	True	5	Trigonal bipyramidal	13	0.9	144.18
+ALOTOL	Ni	0	1	28	2	8	False	4	Square planar	7	0.924	60.44
+ALOTUR	Ni	0	1	28	2	8	False	4	Square planar	7	0.94	59.83
+AMATEQ	Mn	-2	6	25	2	5	False	6	Octahedral	18	1.088	-43.75
+APOHUK	Co	-2	4	27	2	7	False	4	Tetrahedral	8	0.998	-19.51
+APRCOB	Co	1	1	27	3	6	False	6	Octahedral	18	0.985	57.18
+APUDUM	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.989	-28.08
+AQIYAA	Fe	-2	1	26	2	6	False	6	Octahedral	18	0.894	108.23
+AQIYII	Fe	-1	1	26	2	6	False	6	Octahedral	18	0.893	107.26
+AQIZEF	Fe	-2	1	26	2	6	False	6	Octahedral	18	0.886	120.34
+AQSUMN	Mn	0	6	25	2	5	False	6	Octahedral	18	1.086	-44.12
+AQUGEY	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.003	-27.24
+AQUGIF	Co	0	3	27	1	8	False	3	T-shaped	6	0.948	-24.75
+AREJUD	Ni	0	1	28	2	8	False	4	Square planar	7	0.955	57.82
+ARIMUJ	Co	1	1	27	3	6	False	6	Octahedral	18	0.983	83.25
+ARIRIC	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.025	-19.35
+ARIVEE	Ni	0	1	28	2	8	False	4	Square planar	7	0.952	19.15
+ASASOF	Fe	0	1	26	2	6	True	4	Tetrahedral	8	1.007	43.83
+ASATEW	Fe	0	2	26	3	5	True	4	Tetrahedral	8	1.008	53.46
+ASENIA	Ni	-2	1	28	2	8	False	4	Square planar	7	0.953	19.03
+ASUTUD	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.102	-51.92
+ASUVIT	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.091	-67.71
+ATOCOC	Ni	0	3	28	2	8	False	6	Octahedral	18	1.126	-29.02
+ATOFAS	Fe	0	6	26	3	5	False	6	Octahedral	18	1.042	-19.85
+ATOMOM	Mn	2	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.153	-46.48
+ATUFAW	Co	0	1	27	1	8	True	3	Trigonal planar	3	1.067	34.19
+AVALAL	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.042	-56.18
+AVOKAX	Ni	0	1	28	2	8	True	4	Tetrahedral	8	1.016	47.99
+AVUCUP	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.042	-30.07
+AWESAY	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.083	-22.84
+AWOLOO	Mn	0	5	25	3	4	False	5	Square pyramidal	14	0.924	-50.25
+AXISIJ	Mn	0	5	25	3	4	False	6	Octahedral	18	0.99	-43.95
+AXITAC	Mn	0	6	25	2	5	False	6	Octahedral	18	1.097	-48.18
+AYAGIQ	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.087	24.08
+AYIZOY	Co	-4	4	27	2	7	False	6	Octahedral	18	1.134	-16.98
+AYOYES	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.07	-30.0
+AZIDIY	Ni	-1	3	28	2	8	False	4	Tetrahedral	8	1.012	-39.96
+AZISUY	Mn	0	6	25	2	5	False	6	Octahedral	18	1.11	-51.53
+AZOCNI16	Ni	1	3	28	2	8	False	5	Trigonal bipyramidal	13	1.099	-29.59
+AZUMAJ	Mn	0	6	25	2	5	False	6	Octahedral	18	1.106	-49.47
+BABCAK	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.978	-20.36
+BABPAX	Ni	-2	1	28	2	8	False	4	Square planar	7	0.923	27.34
+BABQIE	Fe	0	1	26	0	6	True	4	Tetrahedral	8	0.939	129.15
+BABTED	Co	0	1	27	1	8	True	4	Tetrahedral	8	0.947	47.56
+BACNOK	Mn	1	6	25	2	5	False	5	Trigonal bipyramidal	13	1.07	-46.79
+BADHIZ	Ni	0	3	28	2	8	False	6	Octahedral	18	1.135	-32.29
+BAFSIO	Co	0	1	27	1	8	False	4	Square planar	7	0.887	30.12
+BAHDAS	Co	-2	4	27	2	7	False	7	Pentagonal bipyramidal	23	1.226	-38.4
+BAJJEB	Co	0	4	27	2	7	False	6	Octahedral	18	1.131	-9.39
+BAJVUE	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.078	-18.42
+BAJWAL	Ni	0	3	28	2	8	False	4	Seesaw	9	1.002	-14.07
+BAJWEP	Ni	0	3	28	2	8	False	4	Seesaw	9	0.997	-13.71
+BAJWOZ	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.991	-35.98
+BAMBAV	Fe	-4	1	26	2	6	False	6	Octahedral	18	0.891	132.98
+BAMCOM	Co	-2	2	27	2	7	False	4	Square planar	7	0.883	23.11
+BAPKEI	Ni	1	1	28	2	8	False	5	Trigonal bipyramidal	13	0.969	48.64
+BAPPOX	Cr	2	4	24	3	3	False	6	Octahedral	18	0.979	-23.27
+BATSIY	Ni	1	3	28	2	8	False	5	Square pyramidal	14	1.09	-22.84
+BAVNAN	Ni	2	3	28	2	8	False	6	Octahedral	18	1.127	-42.77
+BAWLAN	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.075	-46.41
+BAWZIL	Co	0	4	27	2	7	False	6	Octahedral	18	1.127	-14.91
+BAYDEL	Fe	0	1	26	2	6	False	6	Octahedral	18	0.952	69.98
+BAYHUF	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.108	-27.9
+BAZSUR	Ni	0	1	28	2	8	False	4	Square planar	7	0.921	35.04
+BEFPOR	Mn	0	1	25	1	6	True	4	Tetrahedral	8	0.946	88.66
+BEJDUS	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.061	16.26
+BEKGAB	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.048	-28.97
+BEKGOP	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.07	-19.32
+BEKPUE	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.044	58.55
+BEKZIA	Fe	0	6	26	3	5	False	5	Square pyramidal	14	0.974	-29.49
+BEMJIN	Co	0	4	27	2	7	False	6	Octahedral	18	1.144	-18.75
+BEMNAK	Ni	0	1	28	2	8	False	4	Square planar	7	0.927	37.6
+BEMWUM	Mn	2	6	25	2	5	False	6	Octahedral	18	1.091	-54.5
+BEPRET	Mn	0	5	25	3	4	False	5	Square pyramidal	14	0.906	-54.04
+BEPTIA	Mn	0	5	25	3	4	False	6	Octahedral	18	0.987	-41.85
+BEQYOM	Cr	0	4	24	3	3	True	3	Trigonal planar	3	1.08	-32.51
+BESBEI	Fe	0	6	26	3	5	False	5	Square pyramidal	14	1.023	-36.92
+BETQAT	Mn	1	1	25	1	6	False	6	Octahedral	18	0.876	95.46
+BEXJEW	Ni	-1	2	28	3	7	False	4	Square planar	7	0.89	35.75
+BEXJUK	Mn	0	6	25	2	5	True	4	Tetrahedral	8	1.196	-44.4
+BEXKOE	Ni	0	1	28	2	8	False	4	Square planar	7	0.94	23.01
+BEXLIC	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.99	-36.94
+BEXZIN	Ni	0	1	28	2	8	False	4	Square planar	7	0.935	43.67
+BEZLOH	Cr	0	1	24	0	5	True	5	Trigonal bipyramidal	13	1.026	117.68
+BGUCRM	Cr	0	4	24	3	3	False	6	Octahedral	18	0.94	-37.03
+BIBDOG	Ni	-1	1	28	2	8	False	4	Square planar	7	0.897	29.36
+BIBDUM	Ni	-1	2	28	3	7	False	5	Trigonal bipyramidal	13	0.941	27.58
+BIBFEY	Ni	-1	2	28	3	7	False	5	Trigonal bipyramidal	13	0.959	25.59
+BIHKAE	Ni	0	3	28	2	8	False	6	Octahedral	18	1.106	-36.97
+BIJJAG	Fe	0	5	26	2	6	False	3	Trigonal planar	3	0.959	-58.32
+BIKDAA	Mn	0	6	25	2	5	False	8	Dodecahedral	33	1.215	-65.8
+BILQUI	Fe	1	1	26	2	6	True	5	Square pyramidal	14	0.938	92.07
+BILVUQ	Cr	0	4	24	3	3	False	6	Octahedral	18	0.983	-43.42
+BILWAX	Cr	0	4	24	3	3	False	6	Octahedral	18	0.974	-42.64
+BINCOR	Ni	0	2	28	3	7	False	5	Square pyramidal	14	1.017	42.88
+BINJOZ	Co	-2	4	27	2	7	False	4	Tetrahedral	8	0.994	-45.1
+BIPJER	Mn	-2	6	25	2	5	False	6	Trigonal prismatic	19	1.096	-52.01
+BIPMAO	Cr	0	1	24	0	5	True	4	Tetrahedral	8	0.994	89.3
+BISHIX	Mn	0	1	25	1	6	True	4	Tetrahedral	8	0.926	118.42
+BISXIK	Co	0	1	27	3	6	False	6	Octahedral	18	0.949	90.29
+BITTAC	Co	0	2	27	2	7	False	4	Square planar	7	0.907	37.16
+BIVTOP	Cr	0	1	24	0	5	False	6	Octahedral	18	0.863	140.39
+BIWPED	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.032	-27.08
+BIXWOX	Co	0	2	27	2	7	False	4	Square planar	7	0.969	55.08
+BIZQOQ	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.013	47.43
+BODQES	Co	-1	1	27	3	6	False	6	Octahedral	18	0.971	102.23
+BOFGOS	Fe	0	1	26	2	6	True	4	Tetrahedral	8	0.972	99.21
+BOHGAG	Co	3	1	27	3	6	False	6	Octahedral	18	1.002	89.36
+BOJPOI	Ni	0	1	28	0	8	False	4	Tetrahedral	8	0.873	78.34
+BOKZEH	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.056	-24.73
+BOLVAA	Ni	0	1	28	2	8	False	4	Square planar	7	0.95	63.91
+BOMVEF	Ni	0	1	28	2	8	False	4	Square planar	7	0.918	39.51
+BONGEQ	Cr	0	1	24	0	5	True	4	Tetrahedral	8	0.966	106.81
+BOQPIH	Co	2	4	27	2	7	False	6	Octahedral	18	1.147	-14.51
+BORFET	Cr	0	1	24	0	5	False	6	Octahedral	18	0.873	126.89
+BOTHEX	Cr	0	4	24	3	3	False	6	Octahedral	18	0.948	-22.11
+BOTQEH	Co	2	1	27	3	6	False	6	Octahedral	18	0.986	63.89
+BOWYUJ	Fe	-1	6	26	3	5	False	4	Tetrahedral	8	0.861	-48.72
+BOXMIK	Co	2	2	27	2	7	False	6	Octahedral	18	1.008	18.41
+BOZJEH	Ni	2	3	28	2	8	False	6	Octahedral	18	1.126	-42.72
+BRURMN	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.026	-74.27
+BUBHEM	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.089	-65.29
+BUBLEQ	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.975	-32.95
+BUCRAS	Mn	1	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.136	-58.8
+BUDHEN	Ni	0	2	28	3	7	False	5	Square pyramidal	14	1.015	40.86
+BUJPIH	Cr	0	5	24	2	4	False	5	Square pyramidal	14	1.027	-55.99
+BUKFAR	Co	0	4	27	2	7	False	6	Octahedral	18	1.137	-15.52
+BUQCUL	Fe	1	2	26	3	5	True	4	Tetrahedral	8	1.022	51.94
+BURMIL	Mn	0	1	25	1	6	False	6	Octahedral	18	0.827	166.92
+BUSMOR	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.077	-59.15
+BUTDAV	Cr	1	4	24	3	3	False	6	Octahedral	18	0.955	-49.15
+BUXJEJ	Ni	2	3	28	2	8	False	6	Octahedral	18	1.078	-31.76
+BUXYIE	Mn	0	5	25	3	4	False	5	Square pyramidal	14	0.942	-38.67
+CADHOE	Co	1	1	27	3	6	False	6	Octahedral	18	0.947	80.76
+CADYEM	Fe	-1	1	26	2	6	False	6	Octahedral	18	0.865	159.07
+CADYUC	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.006	-27.43
+CADZAJ	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.009	-26.05
+CAFTIM	Fe	0	1	26	0	6	False	5	Trigonal bipyramidal	13	0.824	154.98
+CAFYAK	Co	0	3	27	1	8	False	4	Tetrahedral	8	0.963	-39.82
+CAFZAM	Cr	0	5	24	2	4	False	4	Seesaw	9	0.968	-48.87
+CAGCIW	Cr	-2	5	24	2	4	False	6	Octahedral	18	1.071	-52.51
+CAGSOV	Ni	1	3	28	2	8	False	6	Octahedral	18	1.143	-34.48
+CAHCOP	Co	0	1	27	1	8	False	5	Trigonal bipyramidal	13	0.874	52.26
+CAHGAW	Mn	0	6	25	2	5	False	6	Trigonal prismatic	19	1.117	-64.34
+CAHQAD	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.044	-44.31
+CAHQEH	Co	0	3	27	1	8	True	4	Seesaw	9	1.076	-37.36
+CAJFAV	Fe	1	5	26	2	6	False	5	Trigonal bipyramidal	13	1.067	-33.97
+CAJFEZ	Fe	2	2	26	3	5	False	6	Octahedral	18	0.941	45.99
+CAMRAM	Ni	-2	1	28	2	8	False	4	Square planar	7	0.924	12.84
+CAPZAW	Fe	-1	6	26	3	5	False	6	Octahedral	18	1.039	-18.39
+CASLOX	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.104	-32.46
+CASXAY	Co	-2	4	27	2	7	False	4	Tetrahedral	8	0.988	-24.44
+CATGEJ	Fe	0	1	26	0	6	True	4	Tetrahedral	8	0.937	107.23
+CAWPOG	Ni	2	1	28	2	8	False	5	Square pyramidal	14	1.017	28.49
+CAXVAZ	Mn	1	5	25	3	4	False	6	Octahedral	18	0.986	-54.55
+CAZVAA	Cr	-1	4	24	3	3	False	6	Octahedral	18	0.966	-21.79
+CAZZUY	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.072	-52.01
+CEBZIS	Ni	-2	1	28	2	8	False	4	Square planar	7	0.915	26.31
+CECBOB	Fe	0	1	26	2	6	False	6	Octahedral	18	0.897	78.94
+CECKEB	Ni	-2	1	28	2	8	False	4	Square planar	7	0.902	19.43
+CEDXIT	Mn	2	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.142	-57.22
+CEDYAM	Ni	2	3	28	2	8	False	7	Pentagonal bipyramidal	23	1.241	-31.02
+CEHHON	Fe	2	1	26	2	6	False	6	Octahedral	18	0.891	134.45
+CEHYAP01	Co	1	1	27	3	6	False	6	Octahedral	18	0.978	89.57
+CEHZOF	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.02	41.15
+CEKJIO	Ni	0	1	28	2	8	False	4	Square planar	7	0.959	37.67
+CEMSIW	Mn	-2	6	25	2	5	False	4	Tetrahedral	8	0.995	-58.11
+CEMWIC	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.106	-47.89
+CEPFEI	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.053	-22.44
+CEQPIZ	Fe	0	2	26	3	5	True	3	Trigonal planar	3	1.049	51.29
+CEQPOF	Fe	0	2	26	3	5	True	3	Trigonal planar	3	1.046	52.56
+CEQSEW	Ni	0	1	28	2	8	False	4	Square planar	7	0.884	26.16
+CESGOW	Fe	1	2	26	3	5	False	6	Octahedral	18	0.92	72.64
+CETFAI	Fe	2	5	26	2	6	False	6	Octahedral	18	1.111	-21.58
+CETGOX	Mn	2	6	25	2	5	False	6	Octahedral	18	1.113	-46.7
+CETJIU	Co	2	4	27	2	7	False	6	Octahedral	18	1.144	-10.3
+CETXAA	Ni	0	2	28	3	7	False	5	Square pyramidal	14	0.943	34.68
+CEXJEW	Mn	1	5	25	3	4	False	6	Octahedral	18	1.024	-47.95
+CEXLUN	Fe	-1	6	26	3	5	False	4	Tetrahedral	8	0.905	-44.79
+CEZYOW	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.028	-65.98
+CEZYUC	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.101	-62.12
+CGLYMN	Mn	0	6	25	2	5	False	6	Octahedral	18	1.092	-60.13
+CIDKEI	Mn	0	6	25	2	5	False	6	Octahedral	18	1.102	-47.36
+CIDVOA	Cr	0	5	24	2	4	False	6	Octahedral	18	1.047	-41.57
+CIGBUP	Ni	2	3	28	2	8	False	6	Octahedral	18	1.127	-28.08
+CIHJEJ	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.035	-37.73
+CIHWAR	Co	1	2	27	2	7	True	3	Trigonal planar	3	1.029	33.75
+CIJYID	Ni	2	3	28	2	8	False	6	Octahedral	18	1.097	-25.95
+CILGIO	Cr	0	5	24	2	4	False	4	Square planar	7	1.003	-61.85
+CIMBUV	Mn	1	1	25	1	6	False	6	Octahedral	18	0.84	120.45
+CIMGOU	Mn	1	1	25	1	6	False	6	Octahedral	18	0.858	120.05
+CIMHEL	Mn	1	1	25	1	6	False	6	Octahedral	18	0.852	146.51
+CIRDEN	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.009	-77.13
+CIXXAJ	Co	0	3	27	1	8	False	4	Tetrahedral	8	0.907	-25.2
+CIXXEN	Co	0	3	27	1	8	False	4	Tetrahedral	8	0.927	-25.59
+CIZLAY	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.007	67.24
+CLSINI10	Ni	0	1	28	2	8	False	4	Square planar	7	0.932	29.52
+CMNMVK	Mn	0	1	25	1	6	True	4	Tetrahedral	8	0.96	107.44
+CMPHSC	Cr	0	1	24	0	5	False	6	Octahedral	18	0.865	137.33
+CMPYCR	Cr	0	1	24	0	5	True	4	Tetrahedral	8	0.96	115.95
+CNITSC	Ni	2	1	28	2	8	False	4	Square planar	7	0.945	25.04
+COBGAB	Ni	1	3	28	2	8	False	6	Octahedral	18	1.14	-40.18
+CODLEO	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.983	-22.81
+CODLIS	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.976	-57.1
+CODWAU	Ni	0	1	28	2	8	False	4	Square planar	7	0.921	52.84
+COETDS10	Co	2	4	27	2	7	False	6	Octahedral	18	1.133	-20.9
+COFMOC	Ni	2	3	28	2	8	False	6	Octahedral	18	1.119	-50.58
+COFRIZ	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.035	-20.26
+COIMAC10	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.039	-35.54
+COJGUG	Mn	0	5	25	3	4	False	5	Trigonal bipyramidal	13	0.937	-33.43
+COJHAN	Mn	-1	5	25	3	4	False	5	Trigonal bipyramidal	13	0.924	-30.43
+COKLOD	Co	2	4	27	2	7	False	7	Pentagonal bipyramidal	23	1.216	-34.0
+COLNEW	Mn	0	6	25	2	5	True	4	Tetrahedral	8	1.234	-49.21
+COPCAM	Cr	0	5	24	2	4	False	4	Seesaw	9	0.954	-53.69
+COPKAU	Cr	0	1	24	0	5	True	4	Tetrahedral	8	0.975	123.59
+CORHUN	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.048	-19.72
+CORSIO	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.983	-55.51
+CORSUA	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.994	-56.0
+COSCIZ	Co	2	1	27	3	6	True	2	Linear	0	1.083	89.93
+COSGEW	Fe	0	1	26	2	6	False	6	Octahedral	18	0.883	118.66
+COYLEH10	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.064	-54.28
+CPMSNI10	Ni	1	3	28	2	8	False	6	Octahedral	18	1.126	-36.8
+CPTCFE	Fe	0	1	26	2	6	False	6	Octahedral	18	0.907	79.81
+CSCNCC01	Co	-3	1	27	3	6	False	6	Octahedral	18	0.91	152.64
+CTHUCO10	Co	0	4	27	2	7	False	6	Octahedral	18	1.165	-15.94
+CUBBOQ	Cr	0	5	24	2	4	False	5	Square pyramidal	14	1.021	-59.63
+CUCQIB	Fe	0	1	26	2	6	False	6	Octahedral	18	0.871	93.57
+CUCWEE	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.052	-43.04
+CUDKAN	Ni	2	3	28	2	8	False	6	Octahedral	18	1.126	-34.1
+CUHGUH	Fe	-1	2	26	3	5	False	6	Octahedral	18	0.933	52.81
+CUHGUK	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.073	-25.66
+CUJNAY	Co	0	3	27	1	8	True	2	Linear	0	1.108	-32.85
+CUJSAD	Mn	-1	5	25	1	6	False	2	Linear	0	1.001	-71.1
+CUPCEV	Cr	2	4	24	3	3	False	6	Octahedral	18	0.973	-20.91
+CUQSEN	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.107	-34.86
+CURVOB	Co	0	4	27	2	7	False	2	Linear	0	0.956	-17.56
+CUVGOP01	Ni	-2	3	28	2	8	False	4	Tetrahedral	8	1.005	-21.7
+CUVZIE	Mn	-1	6	25	2	5	False	4	Tetrahedral	8	0.964	-53.95
+CUWSIW	Co	0	3	27	1	8	False	4	Tetrahedral	8	0.956	-38.16
+CUXREV	Fe	2	1	26	2	6	False	6	Octahedral	18	0.938	54.63
+CUXXOL	Ni	0	1	28	2	8	False	4	Square planar	7	0.906	41.7
+CUZBUU	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.075	-25.54
+CUZWUR	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.053	-16.61
+DABHUK	Co	-1	1	27	3	6	False	6	Octahedral	18	0.956	69.31
+DABPOM	Fe	0	6	26	3	5	False	4	Tetrahedral	8	0.951	-21.96
+DABQED	Fe	0	6	26	3	5	False	4	Tetrahedral	8	0.92	-33.37
+DABSOP	Fe	0	5	26	2	6	False	3	T-shaped	6	0.948	-43.33
+DADJEX	Fe	0	4	26	3	5	False	5	Square pyramidal	14	0.987	-8.04
+DAGFAT	Ni	0	3	28	2	8	False	6	Octahedral	18	1.1	-36.25
+DAJBAS	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.973	-56.18
+DAJVIT	Co	0	3	27	1	8	False	4	Tetrahedral	8	0.924	-35.86
+DAKNEI	Ni	0	1	28	0	8	True	3	Trigonal planar	3	0.902	62.48
+DALPEO	Fe	0	5	26	2	6	False	4	Seesaw	9	1.002	-30.53
+DAMTES	Co	1	4	27	2	7	False	6	Octahedral	18	1.151	-15.12
+DAMYUL	Co	1	4	27	2	7	False	5	Trigonal bipyramidal	13	1.116	-18.0
+DAPQOD	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.987	-26.15
+DAPSCR10	Cr	3	4	24	3	3	False	7	Pentagonal bipyramidal	23	1.019	-25.47
+DAQXEY	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.992	-25.87
+DAXPEY	Mn	0	1	25	1	6	False	6	Octahedral	18	0.871	111.64
+DAXPOI	Mn	0	1	25	1	6	False	6	Octahedral	18	0.867	108.64
+DBENCR11	Cr	0	1	24	0	5	True	2	Linear	0	1.015	91.11
+DECKAZ	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.983	-47.23
+DECKED	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.967	-45.19
+DECKUT	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.991	-56.87
+DECLAA	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.973	-54.93
+DECLEE	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.986	-57.59
+DEDREK	Ni	1	1	28	2	8	False	4	Square planar	7	0.941	28.1
+DEDROU	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.065	-17.3
+DEFPEJ	Ni	0	3	28	2	8	False	6	Octahedral	18	1.106	-38.7
+DEGJEF	Co	0	4	27	2	7	False	6	Octahedral	18	1.147	-8.84
+DEKFAD	Fe	0	1	26	2	6	False	6	Octahedral	18	0.883	104.89
+DEKFEH	Fe	0	1	26	2	6	False	6	Octahedral	18	0.895	92.81
+DELPOZ01	Fe	2	1	26	2	6	False	6	Octahedral	18	0.914	60.72
+DENYAZ	Fe	2	1	26	2	6	False	6	Octahedral	18	0.945	42.77
+DEPLES	Co	2	4	27	2	7	False	6	Trigonal prismatic	19	1.138	-24.39
+DEQNIX	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.001	47.61
+DESSAW	Fe	1	5	26	2	6	False	5	Square pyramidal	14	1.069	-30.8
+DEXFAN	Co	0	2	27	2	7	True	3	Trigonal planar	3	1.039	31.04
+DEXFOB	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.07	-38.06
+DEXZAK	Fe	0	6	26	3	5	False	6	Octahedral	18	1.039	-22.6
+DIBHIF	Ni	0	1	28	0	8	False	5	Pentagon	11	0.99	67.75
+DIDMAG	Ni	-1	3	28	2	8	False	4	Tetrahedral	8	0.98	-34.18
+DIDMEK	Ni	-1	3	28	2	8	False	4	Tetrahedral	8	0.944	-30.22
+DIFKUY	Co	0	4	27	2	7	False	6	Octahedral	18	1.15	-13.4
+DIGJEJ	Ni	0	1	28	2	8	False	4	Square planar	7	0.924	38.79
+DIGNUD	Cr	0	2	24	3	3	True	3	Trigonal planar	3	1.048	20.74
+DIHZEC	Fe	0	6	26	3	5	False	6	Octahedral	18	1.02	-11.71
+DIJJIR	Cr	0	4	24	3	3	False	6	Octahedral	18	0.962	-41.16
+DIJPOE	Ni	1	1	28	2	8	False	4	Square planar	7	0.961	55.33
+DIJQAR	Ni	0	1	28	2	8	False	4	Square planar	7	0.986	36.46
+DIMDAH	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.056	-31.46
+DIMPEU11	Mn	0	6	25	2	5	False	6	Octahedral	18	1.112	-44.02
+DIRPOJ	Ni	0	1	28	2	8	False	4	Square planar	7	0.949	26.25
+DITLAW	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.087	-18.26
+DITQEE	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.153	-57.16
+DIXXEP	Cr	0	5	24	2	4	False	4	Square planar	7	1.02	-65.4
+DIYVAL	Cr	0	4	24	3	3	False	6	Octahedral	18	1.041	-23.12
+DODWUQ	Fe	0	5	26	2	6	False	6	Octahedral	18	1.098	-25.68
+DOFVIG	Cr	1	4	24	3	3	False	6	Octahedral	18	0.945	-44.84
+DOFZAA	Co	0	1	27	3	6	False	6	Octahedral	18	0.989	90.32
+DOGHEM	Co	1	1	27	3	6	False	6	Octahedral	18	0.989	44.54
+DOGHOY	Fe	1	6	26	3	5	False	5	Trigonal bipyramidal	13	1.007	-41.92
+DOHXED	Ni	1	3	28	2	8	False	5	Square pyramidal	14	1.133	-19.34
+DOJCOX	Cr	-1	5	24	2	4	False	5	Square pyramidal	14	0.97	-32.12
+DOKQOJ	Ni	0	1	28	2	8	False	4	Square planar	7	0.944	33.35
+DOPROS	Ni	0	1	28	2	8	False	4	Square planar	7	0.951	35.48
+DOQRAC	Fe	2	1	26	2	6	False	6	Octahedral	18	1.073	5.09
+DOQWUC	Cr	0	5	24	2	4	False	3	T-shaped	6	0.958	-58.55
+DOQXUD	Cr	0	5	24	2	4	False	3	Trigonal planar	3	0.913	-56.41
+DORPIJ	Fe	-1	5	26	2	6	False	6	Octahedral	18	1.11	-15.94
+DORZEP	Cr	-1	4	24	3	3	False	6	Octahedral	18	0.96	-36.59
+DOVKUV	Mn	0	5	25	3	4	False	5	Square pyramidal	14	0.905	-46.38
+DOVMOQ	Ni	0	2	28	3	7	False	6	Octahedral	18	1.078	46.9
+DOVTUD	Ni	0	3	28	2	8	False	6	Octahedral	18	1.121	-41.31
+DOVYES	Co	1	1	27	3	6	True	4	Tetrahedral	8	1.058	65.05
+DOXXOE	Fe	0	6	26	3	5	False	6	Octahedral	18	1.08	-16.37
+DOZQIV	Ni	0	1	28	0	8	True	3	Trigonal planar	3	1.044	41.64
+DPBPCR	Cr	1	4	24	3	3	False	6	Octahedral	18	1.0	-48.39
+DUBPIA	Cr	0	5	24	2	4	False	4	Square planar	7	0.964	-63.47
+DUCGUD	Co	1	1	27	3	6	False	6	Octahedral	18	0.975	98.75
+DUCQIC	Cr	0	4	24	3	3	False	6	Octahedral	18	0.951	-21.12
+DUDTUS	Fe	2	1	26	2	6	False	6	Octahedral	18	0.927	80.36
+DUFLEW	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.038	-30.85
+DUJCIU	Cr	-3	4	24	3	3	False	6	Octahedral	18	0.967	-26.99
+DULQAD	Cr	2	4	24	3	3	False	6	Octahedral	18	0.954	-39.7
+DUMCUJ	Ni	0	1	28	2	8	False	5	Square pyramidal	14	1.015	18.38
+DUPMUX	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.102	-28.17
+DUQQAJ	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.15	-62.61
+DUSSAL	Ni	0	3	28	2	8	False	6	Octahedral	18	1.103	-28.8
+DUSSOB	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.006	-41.47
+DUTMIO10	Cr	0	4	24	3	3	False	6	Octahedral	18	0.997	-43.43
+DUWWEY	Co	1	4	27	2	7	False	5	Trigonal bipyramidal	13	1.12	-28.41
+DUXWAW	Ni	2	3	28	2	8	False	6	Octahedral	18	1.122	-33.58
+DUYZII	Cr	0	5	24	2	4	False	4	Square planar	7	0.978	-66.72
+EACMCO	Co	0	1	27	3	6	False	5	Square pyramidal	14	0.949	57.58
+EAIMCO	Co	0	2	27	2	7	False	4	Square planar	7	0.935	25.83
+EAIVCO	Co	0	1	27	3	6	False	6	Octahedral	18	1.004	70.3
+EAMNCR10	Cr	0	1	24	0	5	False	6	Octahedral	18	0.851	144.29
+EBECAP	Co	-2	4	27	2	7	False	4	Tetrahedral	8	1.002	-23.55
+EBIXAQ	Ni	-1	2	28	3	7	False	4	Square planar	7	0.889	33.33
+EBOTEU	Cr	0	5	24	2	4	True	2	Linear	0	1.072	-53.83
+EBOTIY	Fe	0	3	26	2	6	True	2	Linear	0	1.003	13.06
+EBUSEB	Co	0	4	27	2	7	False	6	Octahedral	18	1.119	-11.9
+ECADOB01	Co	2	4	27	2	7	False	6	Octahedral	18	1.113	-17.58
+ECBIMA10	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.056	-37.81
+ECEWAL	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.095	-30.57
+ECEXIU	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.103	-19.08
+ECOPAO	Fe	0	6	26	3	5	False	5	Square pyramidal	14	0.986	-33.67
+ECOXAW	Cr	0	5	24	2	4	False	4	Square planar	7	0.963	-61.61
+EDAMEE	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.029	84.99
+EDECEX	Fe	0	4	26	3	5	False	5	Trigonal bipyramidal	13	0.955	-1.69
+EDEZEU	Fe	0	5	26	2	6	True	2	Linear	0	1.135	-41.98
+EDIDAX	Co	2	4	27	2	7	False	6	Octahedral	18	1.123	-11.28
+EDIDED	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.998	-46.39
+EDIGON	Fe	0	1	26	2	6	True	2	Linear	0	1.057	52.53
+EDIJIL	Ni	0	1	28	2	8	False	4	Square planar	7	0.955	57.68
+EDISOA	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.095	-43.73
+EDIXIY	Co	0	2	27	2	7	True	3	Trigonal planar	3	1.044	15.19
+EDOZAA	Ni	0	1	28	2	8	False	4	Square planar	7	0.91	39.93
+EDUPOL	Ni	0	1	28	2	8	False	4	Square planar	7	0.945	77.07
+EGAMUX	Fe	0	1	26	2	6	False	4	Tetrahedral	8	0.802	46.81
+EGEMOS	Fe	0	2	26	3	5	False	6	Octahedral	18	0.949	43.97
+EGEYIA	Cr	0	4	24	3	3	False	6	Octahedral	18	0.945	-41.29
+EGUVOR	Fe	0	5	26	2	6	False	6	Octahedral	18	1.114	-37.76
+EGUZUB	Fe	2	1	26	2	6	False	6	Octahedral	18	0.911	56.59
+EHEXOE	Fe	-2	6	26	3	5	False	6	Octahedral	18	1.03	-25.2
+EHIJEM	Co	1	4	27	2	7	False	5	Trigonal bipyramidal	13	1.108	-27.87
+EHIWIC	Mn	-2	6	25	2	5	False	6	Octahedral	18	1.099	-56.48
+EJEVEV	Mn	1	5	25	3	4	False	6	Octahedral	18	1.017	-40.98
+EJOJOC	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.08	-30.94
+EJUSEK	Ni	1	3	28	2	8	False	6	Octahedral	18	1.138	-44.21
+EKOKEV	Co	0	1	27	3	6	False	6	Octahedral	18	0.988	90.21
+EKOXOR	Cr	0	1	24	0	5	False	6	Octahedral	18	0.853	137.14
+ELAKOR	Ni	0	1	28	2	8	False	5	Square pyramidal	14	1.018	43.37
+ELUJUQ	Fe	0	6	26	3	5	False	6	Octahedral	18	1.061	-11.41
+ELUSUB	Ni	0	3	28	2	8	False	6	Octahedral	18	1.174	-21.22
+ELUTAI	Ni	0	3	28	2	8	False	4	Seesaw	9	1.037	-19.64
+ELUXIU	Co	2	2	27	2	7	False	5	Square pyramidal	14	1.021	24.68
+EMEDEH	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.024	-24.64
+ENDACR	Cr	3	4	24	3	3	False	6	Octahedral	18	0.982	-51.08
+ENTXCO	Co	1	1	27	3	6	False	6	Octahedral	18	0.987	59.44
+ENUREM	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.074	-16.48
+ENUSAJ	Ni	0	1	28	2	8	False	5	Trigonal bipyramidal	13	1.013	38.69
+ENUSEN	Ni	0	1	28	2	8	False	5	Square pyramidal	14	1.052	38.82
+EPUTOB	Ni	0	3	28	2	8	False	7	Pentagonal bipyramidal	23	1.202	-36.68
+EQACEF	Fe	-2	6	26	3	5	False	5	Square pyramidal	14	0.983	-40.42
+EQEFAI	Mn	0	6	25	2	5	False	6	Octahedral	18	1.103	-52.09
+EQEQAV	Co	0	2	27	2	7	False	4	Square planar	7	0.96	25.14
+EQIVIJ	Cr	0	5	24	2	4	False	4	Square planar	7	0.965	-64.85
+EQIVOP	Cr	0	5	24	2	4	False	4	Square planar	7	0.98	-67.26
+EQOQIK	Mn	0	1	25	1	6	True	5	Trigonal bipyramidal	13	0.907	134.65
+ERIMEZ02	Fe	-1	2	26	3	5	False	6	Octahedral	18	0.976	39.62
+ERIPEB	Mn	2	6	25	2	5	False	5	Trigonal bipyramidal	13	1.095	-59.85
+ERIQIG	Ni	-2	1	28	2	8	False	4	Square planar	7	0.91	18.22
+ERUXIZ	Co	2	4	27	2	7	False	6	Trigonal prismatic	19	1.176	-27.21
+ESIJEY	Co	2	1	27	3	6	True	4	Tetrahedral	8	1.008	95.45
+ESUYUM	Ni	3	2	28	3	7	False	6	Octahedral	18	1.108	10.32
+ETAKIT	Ni	-2	3	28	2	8	False	4	Tetrahedral	8	0.977	-43.63
+ETOHIF	Fe	0	5	26	2	6	False	6	Octahedral	18	1.116	-19.72
+EVACOT	Ni	0	1	28	2	8	False	4	Square planar	7	0.932	30.58
+EVILOM	Fe	0	6	26	3	5	False	5	Square pyramidal	14	0.977	-30.01
+EVOJEE	Mn	2	6	25	2	5	False	6	Trigonal prismatic	19	1.135	-49.64
+EWABUA	Fe	0	1	26	2	6	False	6	Octahedral	18	0.92	70.58
+EWANAR	Co	-2	2	27	2	7	False	4	Square planar	7	0.896	20.56
+EWOBEX	Fe	0	4	26	3	5	False	5	Square pyramidal	14	0.972	7.85
+EWOBUP02	Ni	1	3	28	2	8	False	5	Trigonal bipyramidal	13	1.061	-15.31
+EWUSEW	Ni	1	1	28	2	8	True	2	Linear	0	1.076	45.77
+EXOCEA	Ni	0	1	28	2	8	False	4	Square planar	7	0.915	40.6
+EXOVIX	Cr	0	4	24	3	3	False	6	Octahedral	18	0.958	-41.23
+EXUKEP	Ni	-2	1	28	2	8	False	4	Square planar	7	0.942	18.64
+EYAQEA	Co	3	1	27	3	6	False	6	Octahedral	18	0.99	75.68
+EYAYIN	Cr	-1	4	24	3	3	False	6	Octahedral	18	0.94	-20.22
+EYEYEM	Ni	0	1	28	2	8	False	4	Square planar	7	0.901	44.02
+EYIRUA	Fe	0	5	26	2	6	False	6	Octahedral	18	1.108	-28.58
+EYITAJ	Fe	0	5	26	2	6	False	3	Trigonal planar	3	0.966	-57.55
+EYOZEY	Co	0	4	27	2	7	False	6	Trigonal prismatic	19	1.138	-20.65
+EZOYIC	Mn	-2	6	25	2	5	False	4	Tetrahedral	8	1.017	-60.22
+FAGKEE	Ni	0	3	28	2	8	False	6	Octahedral	18	1.151	-35.31
+FAHFUQ	Mn	1	6	25	2	5	False	6	Trigonal prismatic	19	1.113	-51.67
+FAJHUX	Co	0	1	27	3	6	True	3	Trigonal planar	3	1.029	75.47
+FAJMAF	Co	-2	4	27	2	7	False	4	Tetrahedral	8	1.018	-41.99
+FALPOA	Mn	1	6	25	2	5	False	6	Octahedral	18	1.097	-49.29
+FANFAD	Ni	0	3	28	2	8	False	6	Octahedral	18	1.124	-34.54
+FAPSAT	Fe	0	1	26	0	6	True	5	Trigonal bipyramidal	13	0.903	83.82
+FARZIH	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.006	-22.93
+FASSEX	Fe	0	1	26	0	6	False	5	Trigonal bipyramidal	13	0.797	146.81
+FAVZUY	Ni	0	1	28	2	8	False	4	Square planar	7	0.915	42.05
+FAWQEZ	Mn	0	1	25	1	6	False	6	Octahedral	18	0.853	103.84
+FAYHIZ	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.975	-20.86
+FAYHOF	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.984	-32.06
+FAYVAF	Ni	0	1	28	2	8	False	4	Seesaw	9	0.911	18.55
+FAZPEE	Ni	0	3	28	2	8	False	6	Octahedral	18	1.166	-30.74
+FAZTEG	Mn	0	1	25	1	6	False	6	Octahedral	18	0.874	109.98
+FAZTIK	Mn	0	1	25	1	6	False	6	Octahedral	18	0.875	109.09
+FEBRAF	Ni	2	3	28	2	8	False	6	Octahedral	18	1.102	-33.72
+FEGVOE	Fe	0	5	26	2	6	False	2	Linear	0	0.866	-38.33
+FEGVUJ	Ni	1	1	28	2	8	False	4	Square planar	7	0.944	42.33
+FEHKUZ	Mn	0	1	25	1	6	False	6	Octahedral	18	0.867	105.29
+FEHLIO	Mn	0	1	25	1	6	False	6	Octahedral	18	0.872	105.6
+FEHNOV	Co	0	2	27	2	7	False	4	Square planar	7	0.882	36.5
+FEKPUG	Fe	1	1	26	2	6	False	6	Octahedral	18	0.895	100.8
+FENLEP	Fe	1	1	26	2	6	True	4	Tetrahedral	8	0.992	91.98
+FERBEK	Fe	0	1	26	2	6	False	6	Octahedral	18	0.923	71.3
+FERWEH	Co	0	4	27	2	7	False	6	Octahedral	18	1.132	-13.3
+FESXOQ	Mn	0	6	25	2	5	False	6	Octahedral	18	1.094	-48.88
+FEVFET	Fe	0	5	26	2	6	False	4	Seesaw	9	1.054	-37.48
+FEVNAW	Co	0	1	27	3	6	False	6	Octahedral	18	0.991	27.38
+FEWFUI	Fe	1	2	26	3	5	True	2	Linear	0	1.041	63.24
+FEWGIX	Cr	1	4	24	3	3	True	2	Linear	0	1.063	-48.74
+FEWMEA	Cr	1	4	24	3	3	False	4	Tetrahedral	8	0.924	-26.15
+FEWRIK	Fe	1	5	26	2	6	False	6	Octahedral	18	1.117	-24.74
+FEWVEL	Co	0	1	27	1	8	False	5	Square pyramidal	14	0.944	33.01
+FEWYAK	Co	1	3	27	1	8	False	3	Trigonal planar	3	0.99	-22.57
+FEWYIS	Co	0	2	27	2	7	False	4	Square planar	7	0.94	46.23
+FEXROR	Cr	0	4	24	3	3	False	6	Octahedral	18	0.968	-34.34
+FEXTUY	Ni	0	3	28	2	8	False	6	Octahedral	18	1.113	-32.83
+FEYMIG	Co	0	2	27	2	7	False	4	Square planar	7	0.903	40.95
+FEZTEM	Mn	1	6	25	2	5	False	5	Square pyramidal	14	1.063	-39.55
+FEZXUD	Cr	1	4	24	3	3	False	6	Octahedral	18	0.976	-43.5
+FIDZEY	Co	0	4	27	2	7	False	6	Octahedral	18	1.173	-19.59
+FIFDUU	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.99	-26.79
+FIGMEQ	Co	1	3	27	1	8	True	2	Linear	0	1.199	-38.11
+FIHFIO	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.983	-27.11
+FILSEY	Fe	0	3	26	0	6	True	4	Tetrahedral	8	0.991	27.5
+FIMPIB	Fe	-1	1	26	2	6	False	4	Tetrahedral	8	0.787	59.64
+FIMPOH	Fe	0	2	26	3	5	False	4	Tetrahedral	8	0.849	45.3
+FIPWEG	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.023	107.7
+FISGAS	Ni	1	3	28	2	8	False	5	Square pyramidal	14	1.132	-25.71
+FIWLEE	Ni	0	1	28	2	8	False	4	Square planar	7	0.968	39.46
+FIYMOP	Co	1	1	27	1	8	False	5	Square pyramidal	14	0.873	59.95
+FIZQIP	Mn	1	5	25	3	4	False	6	Octahedral	18	0.992	-41.55
+FOCSOF	Mn	0	5	25	3	4	False	5	Trigonal bipyramidal	13	0.959	-59.39
+FOGQOI	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.976	-33.74
+FOKYEJ	Cr	0	1	24	0	5	False	6	Octahedral	18	0.858	141.28
+FOMPUU	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.99	-34.18
+FOMQAB	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.983	-19.13
+FONPUT	Fe	0	1	26	0	6	False	5	Square pyramidal	14	0.822	135.11
+FOPJEB	Ni	2	3	28	2	8	False	6	Octahedral	18	1.147	-46.23
+FOQBOC	Fe	-1	5	26	2	6	False	5	Square pyramidal	14	1.021	-17.93
+FOQNOP	Fe	0	1	26	2	6	False	6	Octahedral	18	0.857	175.48
+FOSKEF	Fe	1	5	26	2	6	False	4	Square planar	7	1.011	-37.62
+FOSVIS	Cr	0	4	24	3	3	False	6	Octahedral	18	1.047	-40.41
+FOTSIR	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.087	-16.67
+FOTZET	Fe	0	1	26	0	6	True	4	Tetrahedral	8	1.03	94.19
+FOXCOM	Co	0	4	27	2	7	False	6	Octahedral	18	1.137	-16.4
+FOXGAB	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.065	-61.37
+FUMKIH	Ni	0	3	28	2	8	False	6	Octahedral	18	1.117	-38.72
+FUNHUS	Ni	-1	3	28	2	8	False	4	Tetrahedral	8	1.016	-34.6
+FUQCUR	Co	1	1	27	3	6	False	6	Octahedral	18	0.994	68.41
+FURPEO	Fe	-2	1	26	2	6	False	6	Octahedral	18	0.96	38.73
+FURROZ	Fe	0	1	26	0	6	True	4	Tetrahedral	8	0.908	152.35
+FUWVOJ	Mn	0	6	25	2	5	False	6	Octahedral	18	1.101	-45.24
+FUYTEA	Ni	0	3	28	2	8	False	3	Trigonal planar	3	0.937	-7.85
+FUYYAB	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.038	66.32
+GADMEH	Co	-1	4	27	2	7	False	6	Octahedral	18	1.132	-11.56
+GADMOR	Fe	-1	5	26	2	6	False	6	Octahedral	18	1.116	-24.88
+GADTIS	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.997	-28.96
+GAGVUG	Cr	0	4	24	3	3	False	3	Trigonal planar	3	0.826	-30.91
+GAHJEG	Fe	1	1	26	2	6	False	6	Octahedral	18	0.93	67.89
+GAMQEQ	Fe	0	1	26	0	6	False	5	Trigonal bipyramidal	13	0.811	154.9
+GAMZAW	Fe	0	3	26	2	6	False	4	Square planar	7	0.938	11.88
+GAMZEA	Fe	0	3	26	2	6	False	4	Square planar	7	0.944	6.23
+GAMZIE	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.042	-46.79
+GAMZOK	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.019	-49.6
+GAPZEC	Co	1	1	27	3	6	False	6	Octahedral	18	0.993	47.45
+GARQIB	Mn	0	6	25	2	5	False	7	Capped trigonal prismatic	25	1.166	-50.82
+GAVNEX	Fe	0	6	26	3	5	False	6	Octahedral	18	1.039	-19.96
+GAVXAC	Fe	1	2	26	3	5	True	4	Tetrahedral	8	1.03	76.08
+GAWNAU	Ni	0	1	28	2	8	False	4	Square planar	7	0.984	37.22
+GAXYOW	Ni	0	3	28	2	8	False	3	T-shaped	6	0.973	-17.41
+GAXZEN	Fe	0	5	26	2	6	False	3	Trigonal planar	3	0.989	-56.97
+GAYXEJ	Mn	-1	6	25	2	5	False	4	Tetrahedral	8	0.958	-79.65
+GAYZEL	Fe	0	5	26	2	6	False	6	Octahedral	18	1.105	-19.55
+GAZHAQ	Fe	1	1	26	2	6	True	4	Tetrahedral	8	0.993	70.44
+GEDFIE	Fe	2	1	26	2	6	False	6	Octahedral	18	0.907	90.4
+GEDJEE	Ni	0	3	28	2	8	False	6	Octahedral	18	1.134	-40.97
+GEFTIV	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.991	-39.98
+GEFZEX	Fe	1	1	26	2	6	False	6	Octahedral	18	0.917	50.02
+GEGBUQ	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.069	-16.85
+GELBII	Co	0	1	27	1	8	True	3	Trigonal planar	3	1.012	43.65
+GELRIY	Mn	0	1	25	1	6	False	6	Octahedral	18	0.853	107.72
+GEMZON	Mn	1	1	25	1	6	False	6	Octahedral	18	0.842	160.77
+GENBUW	Mn	0	1	25	1	6	False	6	Octahedral	18	0.842	130.74
+GENQAS	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.078	-7.04
+GENYOP	Ni	0	1	28	2	8	False	4	Square planar	7	0.91	31.11
+GEPBEJ	Mn	0	6	25	2	5	False	6	Octahedral	18	1.109	-44.6
+GEPPEX	Fe	0	3	26	2	6	False	4	Square planar	7	0.869	7.26
+GEPVEF	Fe	0	4	26	3	5	False	5	Trigonal bipyramidal	13	0.955	-12.72
+GEQZUY	Cr	0	4	24	3	3	False	6	Octahedral	18	0.96	-42.13
+GESMUM	Ni	1	1	28	2	8	True	3	Trigonal planar	3	1.031	43.81
+GESNAT	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.004	42.12
+GEWNAX	Co	3	1	27	3	6	False	6	Octahedral	18	0.971	66.13
+GEZGEA	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.063	-21.89
+GEZGIE	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.067	-22.13
+GIBGON	Co	0	4	27	2	7	False	6	Octahedral	18	1.127	-17.86
+GICZIB	Fe	1	2	26	3	5	False	6	Octahedral	18	0.943	64.67
+GIDKAH	Cr	0	4	24	3	3	False	6	Octahedral	18	0.945	-41.25
+GIFFOS	Ni	-1	3	28	2	8	False	4	Tetrahedral	8	0.972	-35.75
+GIFJEM	Cr	0	5	24	2	4	False	4	Square planar	7	0.965	-67.37
+GIGGUZ	Co	0	4	27	2	7	False	4	Seesaw	9	1.036	-25.32
+GILZIK	Ni	0	1	28	2	8	False	5	Square pyramidal	14	1.007	27.8
+GINSUS	Ni	0	1	28	2	8	False	4	Square planar	7	0.894	57.92
+GISLUQ	Fe	1	1	26	2	6	True	4	Tetrahedral	8	0.96	109.98
+GISVAF	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.003	-21.71
+GITHEY	Fe	0	4	26	3	5	False	5	Square pyramidal	14	0.939	2.87
+GITYOY	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.112	-24.86
+GIXYIV	Co	0	1	27	3	6	False	6	Octahedral	18	0.95	117.27
+GIYGUT	Ni	0	3	28	2	8	False	4	Seesaw	9	1.018	-22.24
+GOCDEH	Fe	0	1	26	2	6	False	6	Octahedral	18	0.958	34.86
+GOFXIK	Fe	-2	5	26	2	6	False	4	Tetrahedral	8	0.967	-49.98
+GOHDEN	Ni	-1	2	28	3	7	False	5	Trigonal bipyramidal	13	0.961	27.7
+GOJFIU	Fe	0	1	26	2	6	True	4	Tetrahedral	8	0.978	61.65
+GOJVAC	Mn	0	1	25	1	6	False	6	Octahedral	18	0.844	124.4
+GOJZIP	Fe	-1	1	26	2	6	False	6	Octahedral	18	0.948	69.84
+GOKREF	Mn	1	6	25	2	5	False	5	Square pyramidal	14	1.097	-62.05
+GONTIM	Mn	0	1	25	1	6	False	6	Octahedral	18	0.853	108.73
+GOQYUG	Ni	0	1	28	2	8	False	4	Square planar	7	0.942	24.07
+GOQZIX	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.061	-50.64
+GORWIT	Cr	-1	4	24	3	3	False	6	Octahedral	18	0.988	-36.98
+GOVDOK	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.997	-62.35
+GOXBAW	Ni	0	3	28	2	8	False	6	Octahedral	18	1.137	-37.26
+GOXBOK	Ni	0	1	28	2	8	False	4	Square planar	7	0.923	27.38
+GOXXEW	Mn	0	6	25	2	5	False	6	Octahedral	18	1.086	-59.64
+GUCBAJ	Fe	0	5	26	2	6	False	4	Seesaw	9	1.012	-39.17
+GUGCUI	Co	0	4	27	2	7	False	7	Pentagonal bipyramidal	23	1.21	-21.3
+GUGYIS	Fe	-1	6	26	3	5	False	6	Octahedral	18	1.032	-22.85
+GULWUH	Cr	0	4	24	3	3	False	6	Octahedral	18	0.931	-42.17
+GUQYOH	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	1.002	-17.86
+GUSCOP	Fe	1	1	26	2	6	True	4	Tetrahedral	8	0.983	58.42
+GUSJAI	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.005	65.18
+GUTXEB	Fe	1	1	26	2	6	False	6	Octahedral	18	0.935	73.05
+GUTXOL	Fe	1	2	26	3	5	False	6	Octahedral	18	0.937	62.33
+GUTYAY	Fe	0	1	26	2	6	False	6	Octahedral	18	0.924	50.56
+GUVZIH	Co	0	1	27	3	6	False	6	Octahedral	18	0.96	33.85
+GUWWAW	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.144	-28.56
+GUZCUZ	Co	0	3	27	3	6	False	5	Trigonal bipyramidal	13	1.052	4.0
+GUZTIH	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.098	-6.51
+HABRAG	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.078	-28.46
+HAFQUB	Fe	0	1	26	2	6	True	2	Linear	0	1.014	79.3
+HAFRAI	Fe	1	2	26	3	5	True	2	Linear	0	1.048	85.03
+HAGHOO	Cr	0	5	24	2	4	False	4	Square planar	7	1.029	-60.1
+HAHHII	Ni	0	1	28	2	8	False	4	Square planar	7	0.945	23.5
+HAHXOE	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.03	-63.04
+HAHYAR	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.042	-53.18
+HAKPUF	Cr	0	1	24	2	4	True	5	Square pyramidal	14	0.986	86.12
+HAKQEQ	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.024	-39.12
+HALBEB	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.087	-17.42
+HANJIP	Co	2	1	27	3	6	False	6	Octahedral	18	0.979	63.95
+HARLER	Fe	1	6	26	3	5	False	6	Octahedral	18	1.042	-9.87
+HASJEQ	Fe	0	1	26	2	6	False	6	Octahedral	18	0.951	50.25
+HATNOG	Mn	1	1	25	1	6	False	6	Octahedral	18	0.863	137.27
+HATNUM	Mn	0	1	25	1	6	False	6	Octahedral	18	0.847	151.8
+HATPAU	Mn	0	1	25	1	6	False	6	Octahedral	18	0.856	134.95
+HAVRII	Fe	-1	6	26	3	5	False	6	Octahedral	18	1.022	-19.66
+HAWNUQ	Mn	1	1	25	1	6	False	6	Octahedral	18	0.87	122.36
+HAWSEF	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.043	-29.27
+HAXCOA	Fe	-1	1	26	2	6	False	6	Octahedral	18	0.886	93.63
+HAXXOU	Fe	0	6	26	3	5	False	6	Octahedral	18	1.062	-16.88
+HEBMOQ	Fe	0	1	26	2	6	False	6	Octahedral	18	0.927	69.51
+HEBPUZ	Fe	0	1	26	2	6	False	6	Octahedral	18	0.953	45.72
+HECVER	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.034	-45.81
+HEFGEG	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.087	-23.85
+HEHJOW	Co	-1	3	27	3	6	False	4	Square planar	7	0.89	22.31
+HEKXIG	Co	-2	4	27	2	7	False	4	Tetrahedral	8	0.967	-43.48
+HELJAJ	Co	1	1	27	3	6	False	6	Octahedral	18	0.978	83.59
+HEQZEI	Co	0	2	27	2	7	False	4	Square planar	7	1.013	9.45
+HERFIT	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.06	13.92
+HERGUG	Co	0	1	27	3	6	False	6	Octahedral	18	0.981	50.62
+HERHAN	Co	1	1	27	3	6	False	6	Octahedral	18	0.983	51.36
+HERTII	Ni	2	1	28	2	8	False	4	Square planar	7	0.933	42.53
+HERVOQ	Ni	1	1	28	2	8	False	4	Square planar	7	0.908	31.21
+HESMIB	Cr	1	4	24	3	3	False	6	Octahedral	18	0.877	-42.36
+HESNAX	Co	0	1	27	1	8	False	4	Seesaw	9	0.9	37.69
+HETLEX	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.047	26.89
+HEYKOL	Ni	0	1	28	2	8	False	4	Square planar	7	0.906	48.78
+HEYMIH	Fe	2	1	26	2	6	False	6	Octahedral	18	0.894	91.39
+HEYNII	Fe	0	1	26	2	6	False	6	Octahedral	18	0.931	47.43
+HEYNOO	Fe	0	1	26	2	6	False	6	Octahedral	18	0.932	45.23
+HEYPEG	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.049	-29.96
+HIDQUJ	Fe	2	5	26	2	6	False	8	Dodecahedral	33	1.208	-62.82
+HIDXUP	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.033	-35.61
+HIFCAD	Fe	1	1	26	2	6	False	6	Octahedral	18	0.902	89.23
+HIGVAV	Ni	0	2	28	3	7	False	5	Square pyramidal	14	0.994	54.3
+HIHZII	Fe	0	1	26	0	6	True	4	Tetrahedral	8	0.934	108.21
+HIKNAR	Fe	0	1	26	2	6	True	4	Tetrahedral	8	0.956	100.16
+HIKNEV	Fe	0	1	26	2	6	True	4	Tetrahedral	8	0.963	87.41
+HIKNIZ	Fe	0	1	26	2	6	True	4	Tetrahedral	8	0.958	69.31
+HIMKOE	Ni	1	3	28	2	8	False	5	Square pyramidal	14	1.082	-21.53
+HIMLIZ	Mn	0	5	25	3	4	False	6	Octahedral	18	0.987	-44.58
+HIMYAD	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.077	-23.2
+HINTUU	Cr	0	1	24	0	5	False	6	Octahedral	18	0.899	113.21
+HINVUY	Ni	1	1	28	2	8	False	5	Trigonal bipyramidal	13	0.937	36.27
+HIPCIS	Ni	0	1	28	2	8	False	4	Square planar	7	0.935	53.24
+HIPKUO	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.009	-63.48
+HIPLAU	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.037	-52.13
+HIPLEY	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.052	-29.27
+HIPLIC	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.073	-44.27
+HIPLOI	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.09	-21.31
+HIQLUR	Ni	0	1	28	2	8	False	4	Square planar	7	0.952	22.98
+HITHOI	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.995	-30.2
+HIVDAS	Ni	2	3	28	2	8	False	6	Octahedral	18	1.135	-36.69
+HIXZUJ	Mn	2	6	25	2	5	False	7	Capped trigonal prismatic	25	1.179	-45.54
+HIYRUE	Fe	-2	2	26	3	5	False	6	Octahedral	18	0.929	88.12
+HIZDID	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.012	-58.82
+HIZTUF	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.053	26.08
+HMSIAF13	Fe	0	6	26	3	5	False	3	Trigonal planar	3	0.907	-24.98
+HOCREX	Mn	1	5	25	3	4	False	6	Octahedral	18	0.998	-40.53
+HOGFIV	Fe	0	5	26	2	6	False	7	Capped trigonal prismatic	25	1.187	-53.82
+HOGHEQ	Fe	0	2	26	3	5	False	5	Square pyramidal	14	0.924	56.57
+HOHBUB	Cr	0	4	24	3	3	True	3	Trigonal planar	3	1.056	-19.85
+HOHCAI	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.104	-34.33
+HOKXAG	Ni	2	3	28	2	8	False	6	Octahedral	18	1.138	-41.89
+HOMKUP	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.99	-18.82
+HONGAV	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.977	-41.28
+HONZIT	Cr	0	4	24	3	3	False	5	Trigonal bipyramidal	13	0.996	-29.02
+HONZOZ	Cr	0	4	24	3	3	False	5	Square pyramidal	14	0.978	-33.68
+HONZUF	Cr	0	4	24	3	3	False	5	Square pyramidal	14	1.006	-24.93
+HOPCEU	Ni	2	1	28	2	8	False	4	Square planar	7	0.939	22.95
+HOPYIW	Ni	0	1	28	2	8	False	4	Square planar	7	0.938	27.71
+HOSRUD	Fe	0	5	26	2	6	False	6	Octahedral	18	1.115	-13.25
+HOTRIS	Ni	0	1	28	2	8	False	4	Square planar	7	0.912	17.24
+HOTVIW	Cr	-1	4	24	3	3	False	6	Octahedral	18	0.947	-43.77
+HOTXIX	Ni	0	1	28	2	8	False	4	Square planar	7	0.922	27.63
+HOYFUW	Ni	-1	1	28	2	8	False	4	Square planar	7	0.91	17.81
+HOYHOS	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.985	-45.06
+HUBLEW	Ni	-1	1	28	2	8	False	4	Square planar	7	0.928	22.79
+HUBLUM	Ni	-1	1	28	2	8	False	4	Square planar	7	0.916	27.06
+HUBMUN	Ni	-1	1	28	2	8	False	4	Square planar	7	0.938	38.73
+HUDGOC	Mn	2	6	25	2	5	False	8	Dodecahedral	33	1.286	-56.78
+HUKJAA	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.109	-14.95
+HULQAI	Fe	-2	6	26	3	5	False	6	Octahedral	18	1.025	-18.96
+HUMBEX	Fe	4	5	26	2	6	False	6	Trigonal prismatic	19	1.127	-11.15
+HUMZEW	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.088	-64.44
+HUPLIQ	Ni	1	3	28	2	8	False	5	Trigonal bipyramidal	13	1.105	-30.14
+HUQFAA	Fe	2	1	26	2	6	False	6	Octahedral	18	0.949	69.98
+HURSAR	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.013	-26.96
+HUSXUP	Cr	-2	5	24	2	4	False	4	Square planar	7	0.944	-45.08
+HUTCOR	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.012	-64.53
+HUWTIF	Ni	2	1	28	2	8	False	5	Square pyramidal	14	0.957	44.33
+HUXWAZ	Fe	0	2	26	3	5	True	4	Tetrahedral	8	1.002	42.18
+HUXWED	Fe	0	2	26	3	5	True	4	Tetrahedral	8	1.001	46.06
+HUYDUB	Fe	1	1	26	2	6	False	6	Octahedral	18	0.94	52.29
+HZHCXC	Co	0	4	27	2	7	False	6	Octahedral	18	1.153	-8.22
+IBEGIH	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.999	-31.31
+IBUQOL	Co	2	1	27	3	6	False	6	Octahedral	18	0.99	59.49
+ICASOV	Cr	0	4	24	3	3	False	5	Square pyramidal	14	0.892	-27.15
+ICATIS	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.105	-63.19
+IDIKUD	Mn	0	6	25	2	5	False	6	Octahedral	18	1.101	-49.83
+IDUBEO	Fe	-1	1	26	2	6	False	6	Octahedral	18	0.889	108.13
+IDUBOY	Fe	-1	1	26	2	6	False	6	Octahedral	18	0.886	102.11
+IFEYOK	Fe	2	1	26	2	6	False	6	Octahedral	18	0.922	51.41
+IFIXON	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.102	-12.63
+IFODIR	Fe	0	1	26	2	6	False	6	Octahedral	18	0.908	78.31
+IFOPAU	Mn	-1	6	25	2	5	False	6	Octahedral	18	1.087	-45.11
+IFUFIY	Mn	-1	6	25	2	5	True	3	Trigonal planar	3	1.171	-54.54
+IGIMIU	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.05	94.57
+IGUQUY	Mn	1	6	25	2	5	False	6	Octahedral	18	1.114	-37.64
+IGUREJ	Co	1	4	27	2	7	False	6	Octahedral	18	1.165	-9.73
+IHABID	Mn	0	1	25	1	6	False	6	Octahedral	18	0.869	104.99
+IHALUZ	Mn	0	6	25	2	5	False	6	Octahedral	18	1.117	-33.91
+IHETOG	Cr	0	4	24	3	3	False	6	Octahedral	18	0.953	-36.15
+IHEVUM	Cr	0	5	24	2	4	False	4	Square planar	7	0.983	-64.37
+IHIGEN	Mn	0	1	25	1	6	False	6	Octahedral	18	0.874	109.22
+IHUDUL	Ni	0	1	28	2	8	False	4	Square planar	7	0.948	53.87
+IJEZIJ	Fe	1	1	26	2	6	False	6	Octahedral	18	0.925	73.41
+IJIGUD	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.124	-60.74
+IJOPED	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.055	-31.74
+IJOREG	Ni	0	3	28	2	8	False	6	Octahedral	18	1.14	-34.15
+IJUDAV	Ni	0	1	28	2	8	False	3	Trigonal planar	3	0.881	5.53
+IKERUO	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.123	-35.23
+IKIVOO	Mn	0	6	25	2	5	True	2	Linear	0	1.208	-26.27
+IKURAI	Ni	0	1	28	0	8	True	3	Trigonal planar	3	1.106	42.61
+ILASOE	Fe	1	1	26	2	6	False	6	Octahedral	18	0.898	84.18
+ILATEV	Ni	0	3	28	2	8	False	6	Octahedral	18	1.108	-39.75
+ILIJUK	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.993	-20.17
+ILODOD	Ni	1	3	28	2	8	False	5	Square pyramidal	14	1.13	-19.38
+ILOLOM	Fe	0	5	26	2	6	False	4	Seesaw	9	1.023	-52.09
+ILONUV	Fe	-2	6	26	3	5	False	5	Square pyramidal	14	0.985	-31.22
+ILURIR	Fe	-3	1	26	2	6	False	6	Octahedral	18	0.922	89.69
+IMACEG	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.064	-33.75
+IMETNI01	Ni	1	3	28	2	8	False	5	Trigonal bipyramidal	13	1.11	-13.07
+IMUCAX	Fe	1	1	26	2	6	True	2	Linear	0	1.007	67.73
+IMUDOK	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.101	-7.12
+INAZED	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.045	-19.3
+INEDEM	Fe	0	5	26	2	6	False	3	Trigonal planar	3	0.911	-56.72
+INIFOB	Cr	0	4	24	3	3	False	4	Tetrahedral	8	0.873	-17.19
+INIHAP	Cr	0	5	24	2	4	False	3	Trigonal planar	3	0.891	-52.76
+INILOI	Ni	0	3	28	2	8	False	6	Octahedral	18	1.104	-28.56
+INUVUJ	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.023	-42.75
+INUVUL	Fe	1	2	26	3	5	True	4	Tetrahedral	8	0.99	64.09
+INUXEV	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.016	-38.77
+IPEPNI	Ni	0	1	28	2	8	False	4	Square planar	7	0.918	22.13
+IPIBUE	Mn	0	6	25	2	5	False	6	Octahedral	18	1.111	-45.98
+IPIYEM	Ni	0	1	28	0	8	True	4	Tetrahedral	8	1.056	41.41
+IPOFUR	Co	0	2	27	2	7	False	4	Square planar	7	0.941	46.25
+IPOROX	Mn	0	1	25	1	6	False	6	Octahedral	18	0.874	105.99
+IREWEK	Ni	2	3	28	2	8	False	6	Octahedral	18	1.065	-32.67
+IROJEF	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.968	-58.02
+IRONOS	Mn	1	6	25	2	5	False	6	Octahedral	18	1.108	-47.75
+ISALNI	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.006	-25.98
+ISIBIW	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.973	-41.25
+ISIKEA	Fe	-1	6	26	3	5	False	4	Tetrahedral	8	0.905	-51.29
+ISIPUV	Ni	0	1	28	2	8	False	4	Square planar	7	0.903	34.58
+ISIYAK	Fe	0	1	26	0	6	False	5	Trigonal bipyramidal	13	0.817	132.99
+ISOWOC	Fe	0	1	26	2	6	True	5	Trigonal bipyramidal	13	0.937	144.11
+ITARIF	Fe	0	1	26	2	6	False	6	Octahedral	18	0.945	48.93
+ITERAB	Fe	0	5	26	2	6	False	6	Octahedral	18	1.107	-24.0
+ITEREF	Mn	0	5	25	3	4	False	6	Octahedral	18	0.996	-50.29
+ITERIJ	Mn	0	6	25	2	5	False	6	Octahedral	18	1.104	-46.22
+ITEXAH	Ni	1	1	28	2	8	False	5	Trigonal bipyramidal	13	0.96	36.96
+ITEXIO	Fe	-1	5	26	2	6	False	4	Tetrahedral	8	0.989	-54.27
+ITEXOU	Fe	-1	1	26	2	6	False	6	Octahedral	18	0.898	78.24
+ITITOU	Ni	0	1	28	2	8	False	4	Square planar	7	0.921	29.76
+ITOQIS	Ni	0	3	28	2	8	False	6	Octahedral	18	1.202	-13.21
+IVEQEF	Fe	0	5	26	2	6	False	6	Octahedral	18	1.108	-26.89
+IVILUV	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.007	48.45
+IVOSAO	Fe	2	6	26	3	5	False	7	Capped trigonal prismatic	25	1.13	-12.05
+IVOSES	Fe	2	6	26	3	5	False	7	Pentagonal bipyramidal	23	1.129	-12.33
+IVUQOH	Co	0	4	27	2	7	False	6	Octahedral	18	1.16	-22.25
+IVUTEY	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.098	-22.35
+IWORIX	Cr	2	5	24	2	4	False	6	Octahedral	18	1.028	-32.97
+IWOWEX	Mn	0	6	25	2	5	False	6	Octahedral	18	1.101	-54.79
+IXAQII	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.072	-42.45
+IXARAB	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.067	-48.28
+IXAROP	Fe	0	5	26	2	6	False	4	Seesaw	9	1.017	-50.04
+IXASAC	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.021	-62.11
+IXEPAE	Mn	0	6	25	2	5	False	6	Octahedral	18	1.109	-48.52
+IXEPIM	Co	0	4	27	2	7	False	6	Octahedral	18	1.117	-12.2
+IXEQAF	Co	0	4	27	2	7	False	6	Octahedral	18	1.14	-9.6
+JACCUP	Fe	0	1	26	2	6	False	6	Octahedral	18	0.905	85.92
+JADGOK	Ni	1	2	28	3	7	False	6	Octahedral	18	1.082	37.21
+JADKII	Ni	0	1	28	2	8	False	4	Square planar	7	0.952	44.99
+JAFVOB	Mn	-1	5	25	3	4	False	6	Octahedral	18	0.981	-59.43
+JAGGED	Cr	0	1	24	0	5	False	6	Octahedral	18	0.849	125.14
+JAHBID	Mn	0	6	25	2	5	False	6	Octahedral	18	1.133	-37.34
+JAPLUI	Cr	0	5	24	2	4	False	5	Square pyramidal	14	0.976	-41.3
+JAPRUN	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.989	-24.52
+JAPTAV	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.972	-30.05
+JARKIX	Ni	0	3	28	2	8	False	2	Linear	0	0.906	-18.6
+JASBOV	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.049	-29.24
+JASCEL	Cr	-3	4	24	3	3	False	6	Octahedral	18	0.978	-22.22
+JASLEU	Co	1	2	27	2	7	False	5	Square pyramidal	14	1.046	27.78
+JASRIF	Fe	0	1	26	0	6	False	5	Trigonal bipyramidal	13	0.82	145.61
+JAVLOK	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.048	-12.69
+JAWSUY	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.011	-27.95
+JAXFIX	Ni	0	1	28	2	8	False	4	Square planar	7	0.954	44.03
+JAYNAB	Co	0	1	27	3	6	False	6	Octahedral	18	0.937	113.91
+JAZCAO	Fe	0	5	26	2	6	False	6	Octahedral	18	1.101	-17.08
+JECBEZ	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.048	66.32
+JEDJAE	Mn	-5	5	25	3	4	False	6	Octahedral	18	0.996	-56.1
+JEJTUN	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.088	-69.09
+JELSIC	Cr	1	1	24	2	4	True	5	Square pyramidal	14	0.968	132.29
+JEPNUO	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.086	-9.71
+JEPPOM	Cr	0	4	24	3	3	False	6	Octahedral	18	1.02	-19.81
+JEQNOJ	Cr	1	4	24	3	3	False	6	Octahedral	18	0.961	-39.78
+JEWNEF	Ni	1	1	28	2	8	True	3	Trigonal planar	3	1.084	14.31
+JEXKED	Mn	0	6	25	2	5	False	4	Seesaw	9	1.009	-47.96
+JEXKIH	Fe	0	5	26	2	6	False	4	Seesaw	9	1.009	-37.24
+JIHPAR	Fe	-3	2	26	3	5	False	6	Octahedral	18	0.911	108.28
+JIKPAX	Fe	1	6	26	3	5	False	6	Octahedral	18	1.049	-11.86
+JILVAB	Cr	0	1	24	0	5	True	6	Octahedral	18	0.977	142.75
+JIPDUI	Mn	0	6	25	2	5	False	6	Octahedral	18	1.101	-49.62
+JITWOZ	Co	2	4	27	2	7	False	6	Octahedral	18	1.114	-11.26
+JITWUF	Fe	2	1	26	2	6	False	6	Octahedral	18	0.973	27.88
+JIVFID	Cr	0	3	24	2	4	True	3	Trigonal planar	3	1.032	22.57
+JIVQEL	Ni	0	1	28	2	8	False	4	Square planar	7	0.904	20.63
+JIWFUQ	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.986	-21.94
+JIWMIL	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.98	-23.94
+JIWRIQ	Cr	-1	4	24	3	3	False	4	Seesaw	9	0.997	-32.45
+JIWWUI	Co	0	2	27	2	7	True	3	Trigonal planar	3	1.043	30.09
+JIXLAD	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.003	-49.97
+JIXLEH	Fe	0	5	26	2	6	False	4	Seesaw	9	1.021	-57.94
+JIYYIA	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.006	-29.4
+JIZNEM	Ni	0	1	28	2	8	False	4	Square planar	7	0.923	58.82
+JIZQUG	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.052	-64.51
+JOBBAF	Cr	0	5	24	2	4	False	4	Square planar	7	1.05	-66.25
+JOBJUI	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.96	-76.11
+JODGIT	Co	0	4	27	2	7	False	6	Octahedral	18	1.128	-10.98
+JODGOZ	Ni	0	3	28	2	8	False	6	Octahedral	18	1.122	-44.29
+JODNEV	Fe	0	1	26	0	6	True	4	Tetrahedral	8	0.931	111.74
+JODWII	Cr	0	3	24	2	4	True	4	Tetrahedral	8	1.019	13.99
+JODWUU	Cr	0	3	24	2	4	True	5	Trigonal bipyramidal	13	1.035	25.75
+JOJWAG	Ni	0	1	28	0	8	True	3	Trigonal planar	3	1.008	60.25
+JOMNAA	Cr	2	4	24	3	3	False	6	Octahedral	18	0.976	-44.39
+JONMEE	Cr	0	1	24	0	5	False	6	Octahedral	18	0.845	145.41
+JORKAC	Fe	1	1	26	2	6	True	2	Linear	0	1.02	73.11
+JOTNIS	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.054	-58.39
+JOWGEH	Fe	2	1	26	2	6	False	6	Octahedral	18	0.941	61.46
+JOXCOQ	Mn	0	6	25	2	5	False	6	Octahedral	18	1.115	-46.75
+JOXJAH	Mn	2	6	25	2	5	False	8	Cube	31	1.24	-70.0
+JOYXAW	Co	2	4	27	2	7	False	4	Tetrahedral	8	1.022	-37.75
+JUCJID	Mn	-2	6	25	2	5	False	4	Tetrahedral	8	0.947	-79.62
+JUDRAD	Fe	0	6	26	3	5	False	6	Octahedral	18	1.018	-18.49
+JUGHAU	Ni	-2	1	28	2	8	False	4	Square planar	7	0.879	31.66
+JUHQIM	Mn	-1	1	25	1	6	False	5	Square pyramidal	14	0.791	118.34
+JUHTIP	Co	0	2	27	2	7	False	4	Square planar	7	0.931	26.83
+JULFAX	Fe	0	1	26	0	6	True	5	Square pyramidal	14	0.961	119.22
+JUNGEH	Co	2	4	27	2	7	False	6	Octahedral	18	1.167	-8.62
+JUQDAA	Fe	-1	5	26	2	6	False	4	Tetrahedral	8	0.964	-51.09
+JURHIN	Fe	-1	6	26	3	5	False	4	Tetrahedral	8	0.92	-25.89
+JUVYOO	Cr	0	5	24	2	4	False	6	Octahedral	18	1.096	-49.84
+JUWGUD	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.967	-56.97
+JUWHAK	Fe	0	6	26	3	5	False	4	Tetrahedral	8	0.883	-42.0
+KAFLUA	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.994	-31.22
+KAGCIH	Fe	-1	4	26	3	5	False	5	Trigonal bipyramidal	13	0.93	6.54
+KAGHOS	Co	-1	3	27	1	8	False	2	Linear	0	0.943	-40.07
+KAGJOU	Mn	0	6	25	2	5	False	2	Linear	0	0.869	-63.6
+KAGLUA	Co	-2	4	27	2	7	False	6	Octahedral	18	1.148	-16.64
+KAGRES	Fe	-1	4	26	3	5	False	5	Trigonal bipyramidal	13	0.929	10.12
+KAGXID	Fe	0	1	26	2	6	False	6	Octahedral	18	0.905	75.08
+KAGXUP	Fe	1	2	26	3	5	False	6	Octahedral	18	0.911	94.15
+KAHDOP	Ni	0	3	28	2	8	False	6	Octahedral	18	1.121	-14.5
+KAJHUC	Ni	0	1	28	2	8	False	4	Square planar	7	0.961	32.23
+KAJTOE	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.976	-41.04
+KAKVUO	Co	1	1	27	3	6	False	6	Octahedral	18	0.962	79.7
+KANYON	Ni	1	1	28	2	8	False	4	Square planar	7	0.947	34.79
+KAPJAO	Fe	3	6	26	3	5	False	6	Octahedral	18	1.008	-24.11
+KAPPEW	Cr	0	5	24	2	4	False	4	Seesaw	9	1.076	-63.27
+KAWCIU	Mn	0	5	25	3	4	False	5	Square pyramidal	14	0.913	-48.47
+KAWFET	Fe	0	1	26	2	6	True	2	Linear	0	0.992	70.17
+KAWKIE	Cr	2	5	24	2	4	False	6	Octahedral	18	1.101	-43.27
+KAXMEB	Mn	0	5	25	3	4	False	3	Trigonal planar	3	0.848	-55.33
+KAXMIF	Co	0	5	27	3	6	False	3	Trigonal planar	3	0.921	-17.99
+KAXXIR	Ni	0	3	28	2	8	False	6	Octahedral	18	1.162	-30.68
+KAXYUE	Fe	0	1	26	2	6	False	5	Square pyramidal	14	0.885	31.59
+KEBXOG	Ni	0	3	28	2	8	False	3	T-shaped	6	0.966	-24.64
+KEFLUD	Fe	-3	6	26	3	5	False	6	Octahedral	18	1.041	-16.2
+KEFQES	Mn	1	6	25	2	5	False	6	Octahedral	18	1.101	-46.12
+KEFQOC	Mn	1	6	25	2	5	False	6	Octahedral	18	1.1	-49.99
+KEFYAV	Cr	1	4	24	3	3	False	6	Octahedral	18	0.976	-51.97
+KEGRET	Co	0	1	27	1	8	True	3	Trigonal planar	3	1.056	37.71
+KEHJAK	Co	1	2	27	2	7	False	5	Square pyramidal	14	1.003	58.7
+KEHJOY	Co	0	1	27	3	6	False	6	Octahedral	18	0.99	74.87
+KEHKOX	Mn	0	1	25	1	6	True	4	Tetrahedral	8	0.962	83.63
+KEHREU	Cr	0	1	24	0	5	True	5	Trigonal bipyramidal	13	0.951	142.93
+KEHREV	Fe	2	5	26	2	6	False	7	Pentagonal bipyramidal	23	1.172	-46.6
+KEJTAV	Mn	-1	6	25	2	5	False	5	Square pyramidal	14	1.062	-59.83
+KELXUU	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.97	-54.13
+KEQVAD	Co	0	1	27	3	6	False	6	Octahedral	18	0.99	90.62
+KESFEV	Mn	0	6	25	2	5	False	6	Octahedral	18	1.142	-63.69
+KETVEL	Fe	1	6	26	3	5	False	6	Octahedral	18	1.036	-6.01
+KEVHIC	Ni	-1	2	28	3	7	False	6	Octahedral	18	1.017	32.08
+KEXWIT	Ni	0	3	28	2	8	False	6	Octahedral	18	1.108	-12.7
+KEZRIR	Ni	1	3	28	2	8	False	5	Square pyramidal	14	1.09	-25.0
+KIBBED	Ni	1	1	28	2	8	False	4	Square planar	7	0.911	40.67
+KIDMEQ	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.107	-34.95
+KIDRIY	Co	-1	1	27	3	6	False	6	Octahedral	18	0.955	83.97
+KIFMUK	Co	0	4	27	2	7	False	6	Octahedral	18	1.137	-14.43
+KIJSUR	Cr	0	1	24	0	5	False	6	Octahedral	18	0.861	136.67
+KIJXAC01	Ni	0	1	28	2	8	False	4	Square planar	7	0.942	20.71
+KIKBEM	Ni	0	1	28	2	8	False	4	Square planar	7	0.99	7.25
+KIKNUQ	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.063	-42.16
+KILBAJ	Co	2	4	27	2	7	False	6	Octahedral	18	1.129	-12.51
+KIPLIH	Cr	0	1	24	0	5	False	5	Square pyramidal	14	0.836	108.62
+KIQGOG	Ni	0	1	28	2	8	False	4	Square planar	7	0.934	39.64
+KIQMAB	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.022	-50.47
+KIRDOH	Co	0	4	27	2	7	False	7	Pentagonal bipyramidal	23	1.207	-13.51
+KIRFAV	Ni	0	3	28	2	8	False	7	Pentagonal bipyramidal	23	1.231	-34.87
+KIRKUR	Cr	1	1	24	2	4	True	6	Octahedral	18	0.992	84.76
+KIRPAE	Co	2	4	27	2	7	False	6	Trigonal prismatic	19	1.157	-19.22
+KISKED	Ni	1	1	28	2	8	False	4	Square planar	7	0.952	35.02
+KISKIH	Ni	0	3	28	2	8	False	6	Octahedral	18	1.13	-38.1
+KISKON	Ni	1	1	28	2	8	False	4	Square planar	7	0.974	29.71
+KISMIJ	Fe	-2	5	26	2	6	False	4	Tetrahedral	8	0.979	-65.26
+KITYOE	Fe	0	5	26	2	6	False	6	Octahedral	18	1.117	-22.68
+KIWQOY	Cr	0	4	24	3	3	False	6	Octahedral	18	0.958	-40.32
+KIWZAT	Cr	0	4	24	3	3	False	6	Octahedral	18	0.954	-34.57
+KIYWAR	Mn	0	6	25	2	5	False	6	Trigonal prismatic	19	1.137	-69.97
+KOBREZ	Ni	0	3	28	2	8	False	6	Octahedral	18	1.138	-33.11
+KOBTOL	Ni	0	1	28	2	8	False	4	Square planar	7	0.96	53.86
+KOBYIK	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.968	-22.12
+KOCNUM	Ni	0	1	28	2	8	False	5	Trigonal bipyramidal	13	0.939	42.24
+KOCXEG	Co	2	3	27	3	6	False	4	Square planar	7	0.921	25.3
+KOGFET	Mn	0	1	25	1	6	False	6	Octahedral	18	0.837	133.77
+KOHMAW	Ni	0	1	28	2	8	False	4	Square planar	7	0.918	49.18
+KOHMEA	Ni	0	2	28	3	7	False	5	Square pyramidal	14	0.973	48.97
+KOLZAN	Cr	0	4	24	3	3	False	6	Octahedral	18	0.967	-21.77
+KOQBAT	Cr	0	1	24	0	5	False	6	Octahedral	18	0.86	153.5
+KOTBAW	Ni	2	3	28	2	8	False	6	Octahedral	18	1.144	-26.29
+KOZYED01	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.102	-30.11
+KOZZEE01	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.038	-71.63
+KUBGOD	Fe	0	1	26	0	6	True	5	Trigonal bipyramidal	13	0.888	151.41
+KUBHIZ	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.065	-26.64
+KUGNEG	Mn	1	1	25	1	6	True	4	Tetrahedral	8	0.975	112.91
+KUGWIT	Fe	0	5	26	2	6	False	3	T-shaped	6	0.942	-45.74
+KUGXIU	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.998	-43.52
+KUGXOA	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.981	-35.59
+KUGXUG	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.995	-43.76
+KUHJED	Ni	1	1	28	2	8	False	4	Square planar	7	0.896	61.63
+KULBUO	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.993	-27.69
+KULMIQ	Co	1	1	27	3	6	True	4	Tetrahedral	8	1.03	63.78
+KUSPUJ	Cr	0	4	24	3	3	False	6	Octahedral	18	0.971	-22.32
+KUVWOQ	Co	0	1	27	3	6	False	6	Octahedral	18	0.923	114.15
+KUWWAC	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.98	-25.35
+LADCIC	Co	0	3	27	3	6	False	5	Square pyramidal	14	0.963	12.69
+LADCOI	Co	0	3	27	3	6	False	5	Trigonal bipyramidal	13	0.954	6.01
+LADXIY	Mn	0	6	25	2	5	True	4	Tetrahedral	8	1.217	-45.99
+LAJYUR	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.06	-27.1
+LALBUV	Fe	0	1	26	2	6	False	6	Octahedral	18	0.915	78.21
+LALDEH	Mn	-3	6	25	2	5	False	5	Square pyramidal	14	1.054	-56.99
+LALPET	Ni	0	1	28	2	8	False	5	Trigonal bipyramidal	13	0.955	29.28
+LAMLOC	Ni	-2	1	28	2	8	False	4	Square planar	7	0.919	23.11
+LAMXAA	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.01	-26.8
+LAPNIZ	Co	0	1	27	3	6	False	6	Octahedral	18	1.002	67.44
+LAPYAC	Co	0	2	27	2	7	False	4	Square planar	7	0.917	46.95
+LAQJIX	Ni	0	1	28	2	8	False	4	Square planar	7	0.95	42.79
+LASXIM	Fe	0	1	26	0	6	False	5	Trigonal bipyramidal	13	0.814	132.14
+LAVKEA	Co	1	4	27	2	7	False	5	Trigonal bipyramidal	13	1.088	-21.48
+LAXFAR	Co	1	1	27	3	6	True	4	Tetrahedral	8	1.025	66.89
+LAXNON	Fe	2	1	26	2	6	False	6	Octahedral	18	0.914	49.71
+LAXNUT	Fe	2	1	26	2	6	False	6	Octahedral	18	0.914	53.52
+LAYMEF	Co	-2	2	27	2	7	False	4	Square planar	7	0.905	18.02
+LAYNEF	Co	0	1	27	3	6	False	6	Octahedral	18	0.987	101.45
+LAYVOX	Fe	1	5	26	2	6	False	5	Trigonal bipyramidal	13	1.09	-37.98
+LDHPCR10	Cr	0	4	24	3	3	False	6	Octahedral	18	0.965	-33.98
+LEDQUH	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.079	-22.29
+LELDUE	Co	1	4	27	2	7	False	5	Trigonal bipyramidal	13	1.084	-24.84
+LELLAQ	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.118	-11.82
+LEMRIF	Cr	0	5	24	2	4	False	5	Square pyramidal	14	1.009	-51.75
+LEMVOQ	Ni	0	1	28	2	8	False	4	Square planar	7	0.952	25.68
+LEPSEF	Mn	1	6	25	2	5	False	6	Octahedral	18	1.096	-36.27
+LEPYOV	Ni	0	1	28	2	8	False	4	Square planar	7	1.035	11.56
+LERZOX	Mn	0	6	25	2	5	False	6	Trigonal prismatic	19	1.117	-40.92
+LEWNIN	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.077	-14.81
+LEXQAG	Mn	0	6	25	2	5	False	6	Octahedral	18	1.143	-46.95
+LEYSEN	Cr	1	4	24	3	3	False	6	Octahedral	18	0.964	-22.51
+LEZQUC	Ni	2	1	28	2	8	False	4	Square planar	7	0.937	57.76
+LIFVOM	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.085	-20.88
+LIGBUA	Ni	0	1	28	2	8	False	4	Square planar	7	0.933	29.71
+LIJBUB	Fe	0	2	26	3	5	False	6	Octahedral	18	0.968	66.22
+LILBOY	Mn	0	6	25	2	5	False	6	Octahedral	18	1.104	-38.84
+LILLEZ	Mn	0	5	25	3	4	False	5	Square pyramidal	14	0.927	-52.26
+LILYOW	Fe	1	5	26	2	6	False	6	Trigonal prismatic	19	1.108	-29.84
+LILZAJ	Mn	1	6	25	2	5	False	6	Octahedral	18	1.095	-35.62
+LINROQ	Fe	1	1	26	2	6	False	6	Octahedral	18	0.967	50.55
+LINRUW	Fe	1	5	26	2	6	False	6	Octahedral	18	1.129	-22.89
+LINSOR	Ni	1	3	28	2	8	False	6	Octahedral	18	1.121	-41.45
+LISJEC	Ni	0	1	28	2	8	False	5	Trigonal bipyramidal	13	0.972	40.45
+LIWSIT	Mn	0	2	25	2	5	True	4	Tetrahedral	8	0.946	74.79
+LIXMOX	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.075	-25.01
+LIXMUD	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.073	-24.72
+LIYCUU	Ni	2	3	28	2	8	False	7	Pentagonal bipyramidal	23	1.196	-39.3
+LIYMAH	Ni	2	3	28	2	8	False	6	Octahedral	18	1.117	-40.83
+LODBEL	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.06	-29.03
+LODFAL	Ni	0	1	28	2	8	False	4	Square planar	7	0.972	51.2
+LODYOS	Co	0	2	27	2	7	True	3	Trigonal planar	3	1.041	23.37
+LOGKEZ	Ni	1	2	28	3	7	False	6	Octahedral	18	1.021	19.79
+LOJVEN	Fe	0	5	26	2	6	False	6	Octahedral	18	1.095	-18.37
+LOLTOV	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.986	-57.31
+LONGAW	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.023	-34.76
+LONGEA	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.028	-31.79
+LONRUC	Cr	1	4	24	3	3	False	6	Octahedral	18	0.95	-22.54
+LOPXOD	Ni	0	1	28	2	8	False	4	Square planar	7	0.942	39.75
+LOQLOS	Fe	0	4	26	3	5	False	5	Trigonal bipyramidal	13	0.936	8.54
+LOSHOS	Ni	0	3	28	2	8	False	6	Octahedral	18	1.13	-43.24
+LOVBUT	Mn	1	1	25	1	6	False	6	Octahedral	18	0.847	129.73
+LOXSAS	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.995	-36.81
+LOXSIA	Fe	0	2	26	3	5	False	6	Octahedral	18	0.952	23.98
+LOXWUQ	Fe	-1	6	26	3	5	False	6	Trigonal prismatic	19	1.044	-16.84
+LOYYUT	Mn	0	6	25	2	5	False	6	Octahedral	18	1.108	-46.79
+LOZTEC	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.023	-20.98
+LOZWIJ	Cr	0	5	24	2	4	False	4	Square planar	7	0.988	-56.47
+LOZXOQ	Cr	1	4	24	3	3	False	5	Square pyramidal	14	0.986	-40.36
+LUBPOQ	Cr	0	4	24	3	3	False	4	Tetrahedral	8	0.934	-17.46
+LUCYOX	Fe	0	1	26	2	6	True	2	Linear	0	1.011	59.64
+LUGDUM	Cr	0	4	24	3	3	False	6	Octahedral	18	1.001	-21.72
+LUGPAE	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.008	-39.99
+LUHHAA	Cr	0	1	24	0	5	True	4	Tetrahedral	8	0.917	95.38
+LUHPIO	Ni	1	1	28	2	8	False	4	Square planar	7	0.967	22.19
+LUJPAI	Fe	1	2	26	3	5	False	6	Octahedral	18	0.981	32.89
+LUJREN	Ni	-1	1	28	2	8	False	4	Square planar	7	0.927	51.1
+LUJROX	Ni	0	1	28	2	8	False	4	Square planar	7	0.927	68.41
+LULDOM	Ni	-3	3	28	2	8	False	5	Square pyramidal	14	1.056	-30.18
+LUMVEU	Ni	2	3	28	2	8	False	6	Octahedral	18	1.132	-26.85
+LUNGOS	Fe	0	5	26	2	6	False	4	Seesaw	9	0.986	-39.11
+LUTFAJ	Fe	0	1	26	2	6	False	5	Square pyramidal	14	0.852	63.53
+LUVYAD	Fe	0	1	26	2	6	True	2	Linear	0	0.993	70.3
+LUWCIP	Co	0	4	27	2	7	False	6	Octahedral	18	1.175	-13.6
+LUWCUB	Ni	0	3	28	2	8	False	6	Octahedral	18	1.16	-29.62
+LUWDAI	Ni	0	3	28	2	8	False	6	Octahedral	18	1.161	-26.78
+LUYBEP	Mn	-1	6	25	2	5	False	3	fac-Trivacant octahedron	5	1.047	-74.85
+LUYMAU	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.069	-23.08
+LUYXEJ	Cr	0	5	24	2	4	False	4	Seesaw	9	0.973	-55.01
+LUYXUZ	Fe	0	5	26	2	6	False	4	Seesaw	9	1.012	-35.9
+LUZXEL	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.053	-25.38
+MABHAZ	Mn	0	1	25	1	6	True	4	Tetrahedral	8	0.954	126.17
+MABLUA	Co	1	1	27	3	6	False	6	Octahedral	18	0.966	81.05
+MACPUC	Mn	0	1	25	1	6	True	4	Tetrahedral	8	0.942	118.29
+MACRCC	Cr	2	4	24	3	3	False	6	Octahedral	18	0.986	-23.28
+MACZEW	Cr	0	1	24	0	5	False	6	Octahedral	18	0.878	143.5
+MADLOV	Fe	0	6	26	3	5	False	4	Tetrahedral	8	0.923	-36.63
+MAENCO	Co	2	1	27	3	6	False	6	Octahedral	18	0.998	55.98
+MAFECL	Fe	-4	5	26	2	6	False	6	Octahedral	18	1.037	-27.76
+MAGGEK	Ni	0	1	28	2	8	False	4	Square planar	7	0.92	27.88
+MAHNOZ	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.971	-34.94
+MAJCAC	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.948	-27.05
+MAJWUT	Ni	0	1	28	2	8	False	5	Trigonal bipyramidal	13	1.024	36.86
+MAJYOM	Fe	-2	3	26	2	6	False	4	Square planar	7	0.89	-9.48
+MAJYUS	Co	-1	3	27	3	6	False	4	Square planar	7	0.877	27.54
+MAKBUW	Fe	-1	4	26	3	5	False	4	Square planar	7	0.901	13.55
+MAKPIX	Co	1	1	27	3	6	False	6	Octahedral	18	0.983	50.2
+MAKPOD	Co	1	1	27	3	6	False	6	Octahedral	18	0.971	53.72
+MALGAI	Fe	0	1	26	0	6	False	5	Square pyramidal	14	0.814	141.06
+MALGIQ	Fe	1	1	26	2	6	False	6	Octahedral	18	0.887	134.9
+MALNET	Co	0	1	27	3	6	True	3	Trigonal planar	3	1.041	68.08
+MALVUQ	Co	0	1	27	1	8	True	2	Linear	0	1.041	20.45
+MAMCOS	Mn	1	6	25	2	5	False	6	Trigonal prismatic	19	1.114	-46.88
+MANHAM	Fe	-2	4	26	3	5	False	5	Square pyramidal	14	0.936	4.93
+MANHEQ	Fe	-2	4	26	3	5	False	5	Square pyramidal	14	0.92	7.69
+MARJIZ	Fe	1	5	26	2	6	False	5	Square pyramidal	14	1.112	-39.89
+MASNUR	Fe	0	5	26	2	6	False	4	Seesaw	9	1.001	-37.69
+MASPAZ	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.005	-44.63
+MASPED	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.039	-46.35
+MATFUL	Fe	0	5	26	2	6	False	6	Trigonal prismatic	19	1.121	-41.46
+MAWLOL	Fe	1	1	26	2	6	True	4	Tetrahedral	8	0.961	60.23
+MAXZOC	Co	0	3	27	1	8	False	3	Trigonal planar	3	0.965	-21.73
+MAZOCT	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.092	-32.15
+MCEACR	Cr	1	4	24	3	3	False	6	Octahedral	18	0.977	-39.51
+MCENCR	Cr	1	4	24	3	3	False	6	Octahedral	18	0.976	-22.33
+MCPTCO	Co	0	4	27	2	7	False	4	Seesaw	9	1.042	-16.73
+MCYSCO	Co	1	1	27	3	6	False	6	Octahedral	18	0.979	57.36
+MECPCO	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.059	43.55
+MEDCAA	Ni	0	2	28	3	7	False	5	Trigonal bipyramidal	13	0.95	27.95
+MEDCEE	Ni	-1	1	28	2	8	False	5	Trigonal bipyramidal	13	0.962	16.96
+MEDCOO	Ni	-1	1	28	2	8	False	4	Square planar	7	0.91	26.71
+MEDCUU	Ni	0	1	28	2	8	False	5	Square pyramidal	14	0.975	24.91
+MEHBAC	Cr	0	1	24	0	5	False	6	Octahedral	18	0.905	103.27
+MEHKOA	Ni	-2	3	28	2	8	False	4	Tetrahedral	8	0.985	-43.42
+MEHNOC	Ni	0	3	28	2	8	False	6	Octahedral	18	1.128	-41.07
+MEIMMN	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.063	-61.51
+MEJYOS	Fe	-2	5	26	2	6	False	4	Tetrahedral	8	0.946	-71.08
+MEJZAF	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.96	-55.81
+MENWUY	Fe	0	5	26	2	6	False	6	Octahedral	18	1.122	-13.86
+MERECO	Co	0	4	27	2	7	False	4	Seesaw	9	1.019	-12.19
+MESROU	Fe	-1	6	26	3	5	False	4	Tetrahedral	8	0.898	-57.38
+METGOH	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.021	-34.88
+METGUN	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.002	-32.6
+METYEQ	Fe	0	5	26	2	6	False	6	Octahedral	18	1.12	-19.41
+MHPCOB01	Co	0	1	27	1	8	True	3	Trigonal planar	3	1.072	44.07
+MICHOV	Co	0	1	27	3	6	False	6	Octahedral	18	0.966	80.99
+MIDJOY	Fe	1	2	26	3	5	False	6	Octahedral	18	0.948	46.94
+MIJPAZ	Ni	0	1	28	2	8	False	4	Square planar	7	0.946	58.74
+MIJSOP	Fe	0	4	26	3	5	False	5	Square pyramidal	14	0.93	12.27
+MIJVAE	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.079	-28.97
+MIKROO	Co	0	1	27	3	6	False	6	Octahedral	18	0.964	62.68
+MIMGIY	Co	0	1	27	1	8	True	2	Linear	0	1.024	51.44
+MINNAZ	Ni	0	1	28	2	8	False	4	Square planar	7	0.944	35.48
+MINWIR	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.054	-38.68
+MIPYOA	Cr	0	1	24	2	4	True	4	Tetrahedral	8	1.02	103.87
+MIRVEP	Cr	0	5	24	2	4	False	4	Square planar	7	1.004	-65.13
+MIVGIH	Ni	-2	3	28	2	8	False	4	Tetrahedral	8	0.961	-30.55
+MIVGUV	Fe	0	6	26	3	5	False	4	Tetrahedral	8	0.926	-39.24
+MIZSEV	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.967	-68.72
+MNMTBH	Mn	0	5	25	3	4	False	6	Octahedral	18	0.979	-40.21
+MOBKET	Fe	0	6	26	3	5	False	4	Tetrahedral	8	0.893	-41.87
+MOCMAT	Fe	-1	4	26	3	5	False	5	Square pyramidal	14	0.921	10.53
+MODREE	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.084	-26.91
+MOFMAV	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.981	-40.45
+MOHFUM	Co	1	4	27	2	7	False	6	Octahedral	18	1.127	-11.69
+MOHWOW	Co	0	1	27	1	8	True	3	Trigonal planar	3	1.006	25.85
+MOHWUC	Co	0	1	27	1	8	True	3	Trigonal planar	3	1.025	36.66
+MOMCIB	Cr	0	4	24	3	3	False	5	Trigonal bipyramidal	13	0.94	-12.99
+MOMXUJ	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.982	-25.87
+MONTIU	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.073	-43.85
+MONZEU	Co	0	4	27	2	7	False	3	Trigonal planar	3	0.979	-11.75
+MOPSUF	Mn	0	1	25	1	6	True	4	Tetrahedral	8	0.945	90.88
+MORDOM	Ni	0	1	28	2	8	False	4	Square planar	7	0.99	32.9
+MOTCMN	Mn	0	5	25	3	4	False	6	Octahedral	18	1.015	-43.71
+MOWVOK	Fe	0	3	26	2	6	True	3	Trigonal planar	3	1.055	16.95
+MOZRIC	Mn	0	5	25	3	4	False	5	Trigonal bipyramidal	13	0.924	-35.06
+MTACNI	Ni	0	1	28	2	8	False	4	Square planar	7	0.932	24.19
+MTCBFE	Fe	0	6	26	3	5	False	6	Octahedral	18	1.058	-14.78
+MTHUNI	Ni	0	3	28	2	8	False	6	Octahedral	18	1.142	-35.99
+MUCBIV	Mn	2	6	25	2	5	False	7	Capped trigonal prismatic	25	1.165	-52.67
+MUDMIJ	Mn	-2	6	25	2	5	False	4	Tetrahedral	8	0.958	-70.18
+MUFXIU	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.003	-24.45
+MUGYEU	Co	0	4	27	2	7	False	3	Trigonal planar	3	0.98	-18.77
+MUGYIY	Co	0	4	27	2	7	False	3	Trigonal planar	3	0.994	-16.06
+MUJZUM	Fe	0	6	26	3	5	False	7	Pentagonal bipyramidal	23	1.106	-32.66
+MUKGUU	Ni	-1	2	28	3	7	False	4	Square planar	7	0.896	31.07
+MUKJOS	Ni	-1	2	28	3	7	False	4	Square planar	7	0.982	71.88
+MULJIM	Co	0	1	27	3	6	True	4	Tetrahedral	8	0.987	56.43
+MUMPAL	Ni	-1	3	28	2	8	False	5	Square pyramidal	14	1.085	-25.37
+MUNLIQ	Cr	0	5	24	2	4	False	5	Square pyramidal	14	1.045	-56.62
+MUQPOF	Fe	-2	5	26	2	6	False	4	Tetrahedral	8	0.983	-38.02
+MUQQOE	Cr	0	5	24	2	4	False	5	Square pyramidal	14	1.039	-64.69
+MUTVUU	Ni	0	3	28	2	8	False	6	Octahedral	18	1.117	-52.7
+MUXVEJ	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.082	-65.81
+NABDEZ	Co	1	2	27	2	7	False	5	Trigonal bipyramidal	13	0.959	30.03
+NABDID	Co	1	2	27	2	7	False	5	Square pyramidal	14	0.972	24.37
+NABFOL	Co	1	2	27	2	7	False	5	Trigonal bipyramidal	13	0.949	33.91
+NADLIO	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.015	-58.56
+NADLOU	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.01	-58.73
+NAFDAB	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.147	-26.95
+NAFNEO	Cr	0	3	24	2	4	False	6	Octahedral	18	0.958	0.41
+NAJKIS	Fe	2	1	26	2	6	False	6	Octahedral	18	0.911	75.22
+NAKHEN	Ni	0	1	28	2	8	True	2	Linear	0	1.044	53.65
+NAKWUS	Mn	0	1	25	1	6	False	6	Octahedral	18	0.894	107.46
+NALPUL	Fe	0	1	26	2	6	False	6	Octahedral	18	0.916	71.22
+NAMYOQ	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.091	-20.19
+NANJEU	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.0	-20.6
+NANJUJ	Fe	-1	6	26	3	5	False	6	Octahedral	18	1.033	-24.82
+NAPYFE10	Fe	2	5	26	2	6	False	8	Dodecahedral	33	1.243	-51.26
+NAQQAY	Mn	0	2	25	2	5	False	6	Octahedral	18	0.868	104.1
+NASJAT	Fe	0	5	26	2	6	False	3	Trigonal planar	3	0.945	-50.52
+NASJEX	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.006	-43.98
+NAVVIQ	Fe	-2	4	26	3	5	False	5	Square pyramidal	14	0.939	-1.43
+NAYMUY	Mn	0	1	25	1	6	False	6	Octahedral	18	0.878	112.39
+NAZROW	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.101	-32.32
+NAZRUC	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.093	-30.16
+NCACON	Co	2	1	27	3	6	False	6	Octahedral	18	0.991	57.04
+NEBKIR	Fe	-1	1	26	2	6	False	6	Octahedral	18	0.885	80.52
+NEDGIM	Mn	0	5	25	3	4	False	5	Trigonal bipyramidal	13	0.927	-49.03
+NEFQEU	Ni	1	3	28	2	8	False	6	Octahedral	18	1.148	-35.07
+NEHDIO	Ni	1	1	28	2	8	True	4	Tetrahedral	8	0.996	46.75
+NEHWIH	Mn	0	6	25	2	5	False	6	Octahedral	18	1.122	-52.6
+NEJBIN	Fe	-1	5	26	2	6	False	5	Square pyramidal	14	1.106	-45.31
+NELGOA	Fe	2	5	26	2	6	False	8	Cube	31	1.325	-61.13
+NEMXIN	Fe	0	2	26	3	5	False	6	Octahedral	18	0.927	55.44
+NENNEA	Fe	1	3	26	2	6	False	5	Square pyramidal	14	1.014	-8.9
+NENWEK	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.97	-61.75
+NEPMEC	Mn	-2	6	25	2	5	False	8	Dodecahedral	33	1.209	-80.73
+NEPPIJ	Fe	-3	6	26	3	5	False	6	Octahedral	18	1.027	-20.95
+NETCAT	Mn	0	6	25	2	5	False	6	Octahedral	18	1.105	-55.37
+NETTOX	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.087	-16.45
+NEXYAS	Co	-1	1	27	3	6	False	6	Octahedral	18	0.984	62.31
+NEYJUY	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.093	-46.72
+NEYVUI	Ni	0	1	28	2	8	False	4	Square planar	7	0.949	21.09
+NEYWOD	Cr	0	3	24	2	4	False	6	Octahedral	18	0.942	27.18
+NEYWUJ	Cr	0	4	24	3	3	False	6	Octahedral	18	0.953	-16.86
+NEZBIG	Ni	-2	3	28	2	8	False	4	Tetrahedral	8	1.009	-36.67
+NEZGIJ	Co	0	2	27	2	7	True	4	Tetrahedral	8	1.036	33.2
+NEZPEQ	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.005	-21.06
+NICFAH	Co	-1	4	27	2	7	False	4	Tetrahedral	8	1.025	-19.4
+NIDMOE	Fe	0	5	26	2	6	False	3	Trigonal planar	3	0.989	-63.32
+NIDTHC11	Ni	0	1	28	2	8	False	4	Square planar	7	0.935	23.73
+NIFWAB	Ni	0	1	28	2	8	True	3	Trigonal planar	3	0.986	47.19
+NIHXEK	Co	0	3	27	1	8	False	4	Seesaw	9	0.994	-36.47
+NIHYIP	Co	0	3	27	1	8	False	4	Tetrahedral	8	0.993	-39.88
+NIHZCH11	Ni	-1	3	28	2	8	False	6	Octahedral	18	1.116	-46.27
+NIJZEM	Mn	0	6	25	2	5	False	8	Dodecahedral	33	1.206	-57.22
+NISBEW	Fe	0	1	26	2	6	False	6	Octahedral	18	0.92	64.03
+NIVWOF	Fe	0	1	26	2	6	False	6	Octahedral	18	0.882	179.41
+NIWTOC	Mn	-1	5	25	3	4	False	5	Trigonal bipyramidal	13	0.944	-41.15
+NOBHET	Cr	1	4	24	3	3	False	6	Octahedral	18	0.999	-33.98
+NOFJOI	Fe	-1	6	26	3	5	False	5	Trigonal bipyramidal	13	1.005	-22.28
+NOGWIQ	Cr	0	4	24	3	3	False	6	Octahedral	18	0.976	-21.77
+NOHKUQ	Cr	0	4	24	3	3	False	3	Trigonal planar	3	0.826	-42.24
+NOJJAX	Cr	1	4	24	3	3	False	6	Octahedral	18	0.955	-20.45
+NOKSOX	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.104	-48.76
+NONTIW	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.042	-20.08
+NONTUI	Cr	0	4	24	3	3	True	3	Trigonal planar	3	1.022	-15.91
+NONVEU	Cr	0	5	24	2	4	True	3	Trigonal planar	3	1.107	-49.88
+NONYUN	Ni	0	1	28	0	8	True	3	Trigonal planar	3	0.961	68.25
+NOPTES	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.969	-10.91
+NOQTAP	Ni	0	3	28	2	8	False	6	Octahedral	18	1.185	-24.04
+NOSHEI	Fe	0	1	26	2	6	True	4	Tetrahedral	8	0.973	47.76
+NOTPUK	Mn	0	1	25	1	6	False	6	Octahedral	18	0.844	153.44
+NOYCIN	Co	2	4	27	2	7	False	6	Octahedral	18	1.121	-9.38
+NOYJUG	Fe	-3	6	26	3	5	False	6	Trigonal prismatic	19	1.027	-18.14
+NOZPAT	Co	0	1	27	3	6	False	6	Octahedral	18	0.971	104.59
+NTMTUC	Co	0	4	27	2	7	False	6	Octahedral	18	1.175	-19.31
+NUKPAM01	Fe	0	5	26	2	6	False	7	Pentagonal bipyramidal	23	1.172	-45.29
+NUNTAR	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.142	-60.02
+NUNWUP	Fe	0	3	26	0	6	False	4	Tetrahedral	8	0.798	62.76
+NUPTAT	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.967	-21.99
+NURPUN	Co	1	3	27	1	8	False	2	Linear	0	0.963	-28.77
+NUSMIY	Fe	-2	2	26	3	5	False	6	Octahedral	18	0.946	25.75
+NUTHIU	Co	0	4	27	2	7	False	6	Octahedral	18	1.148	-14.62
+NUYHOE	Ni	1	1	28	2	8	False	5	Square pyramidal	14	0.978	33.35
+NUZCUG	Co	1	1	27	3	6	True	4	Tetrahedral	8	1.015	87.53
+NUZSUX	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.033	-60.14
+OBIMOC	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.996	-31.29
+OBIVAX	Ni	2	1	28	2	8	False	4	Square planar	7	0.925	35.76
+OBOFOC	Fe	2	1	26	2	6	False	6	Octahedral	18	0.914	65.61
+OBOKAR	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.007	-40.55
+OBOKOF	Ni	0	1	28	2	8	False	4	Square planar	7	0.917	37.78
+OCOCFE	Fe	0	1	26	0	6	True	2	Linear	0	1.028	78.86
+OCUJOL	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.074	-45.84
+ODIHOY	Cr	0	5	24	2	4	False	4	Seesaw	9	0.97	-48.17
+ODOWUC	Co	0	4	27	2	7	False	6	Octahedral	18	1.104	-13.09
+ODUXIX	Fe	0	5	26	2	6	False	4	Seesaw	9	1.018	-37.68
+OEPHNI	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.985	-28.2
+OFANER	Fe	0	5	26	2	6	False	6	Octahedral	18	1.119	-17.08
+OFEXAA	Ni	-2	1	28	2	8	False	4	Square planar	7	0.918	67.79
+OFINAT	Co	2	4	27	2	7	False	6	Octahedral	18	1.113	-13.22
+OFIXEI	Cr	0	4	24	3	3	False	6	Octahedral	18	0.948	-38.43
+OFUROX	Ni	0	1	28	2	8	True	2	Linear	0	1.082	39.28
+OGEVUS	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.019	-45.16
+OGUBOH	Co	1	1	27	3	6	True	4	Tetrahedral	8	1.048	69.17
+OHUSEQ	Ni	0	1	28	2	8	False	4	Square planar	7	0.972	19.96
+OJEBUB	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.145	-54.35
+OJUHAF	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.167	-56.88
+OKEMUO	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.133	-46.03
+OLENAU	Mn	0	6	25	2	5	False	8	Dodecahedral	33	1.31	-91.24
+OLIWUB	Co	0	4	27	2	7	False	6	Octahedral	18	1.142	-11.56
+OLOZAR	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.0	-16.63
+OMANIB	Fe	0	2	26	3	5	False	6	Octahedral	18	0.939	33.7
+OMIXAL	Mn	0	6	25	2	5	False	6	Octahedral	18	1.112	-38.71
+OMUHAG	Mn	0	6	25	2	5	False	6	Trigonal prismatic	19	1.135	-64.57
+ONAPOL	Fe	-1	6	26	3	5	False	4	Tetrahedral	8	0.952	-13.81
+ONAXIM	Co	0	2	27	2	7	False	5	Square pyramidal	14	0.984	28.34
+ONUQAR	Fe	0	5	26	2	6	False	3	Trigonal planar	3	0.931	-45.56
+OPAKUM	Ni	0	1	28	2	8	False	3	T-shaped	6	0.931	27.73
+OQAKAV	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.042	71.69
+OQEDOE	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.038	-25.39
+OQEPOR	Co	0	3	27	1	8	True	4	Tetrahedral	8	1.084	-23.23
+ORESUC	Ni	0	1	28	2	8	False	4	Square planar	7	0.937	38.93
+ORODOP	Ni	0	2	28	3	7	False	5	Square pyramidal	14	0.973	47.99
+OROFEH	Ni	0	1	28	2	8	False	4	Square planar	7	0.932	49.89
+ORUDUB	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.049	31.99
+OSELOO	Fe	0	5	26	2	6	False	6	Octahedral	18	1.107	-18.44
+OTIQIT	Co	0	1	27	1	8	True	2	Linear	0	1.038	37.54
+OTOTEX	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.985	-50.26
+OTOTIB	Fe	0	6	26	3	5	False	4	Tetrahedral	8	0.902	-30.21
+OVOJIU	Co	0	1	27	3	6	False	6	Octahedral	18	0.914	131.81
+OWIQER	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.054	54.45
+OWOGUE	Cr	0	4	24	3	3	False	6	Octahedral	18	0.939	-38.75
+OYIKOY	Fe	-1	5	26	2	6	False	4	Tetrahedral	8	0.981	-81.07
+OYIKUE	Fe	-1	5	26	2	6	False	4	Tetrahedral	8	0.98	-54.65
+OYILIT	Fe	-1	5	26	2	6	False	4	Tetrahedral	8	0.962	-52.63
+OYUKOK	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.008	-45.71
+OZEDIH	Ni	3	2	28	3	7	False	6	Octahedral	18	1.062	42.96
+OZIREV	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.077	-41.91
+OZUSOT	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.029	-57.1
+PAACCO	Co	0	1	27	3	6	False	6	Octahedral	18	0.975	47.48
+PABZIC	Cr	2	2	24	3	3	True	5	Square pyramidal	14	0.996	47.16
+PACHEI	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.999	-69.94
+PADJAH	Fe	0	6	26	3	5	False	5	Square pyramidal	14	0.983	-36.65
+PAHMUJ	Ni	1	2	28	3	7	False	5	Square pyramidal	14	1.07	61.55
+PAMSUT	Co	-1	4	27	2	7	False	4	Tetrahedral	8	0.982	-37.44
+PANGER	Ni	0	3	28	2	8	False	6	Octahedral	18	1.127	-34.19
+PARRUW	Co	0	4	27	2	7	False	6	Octahedral	18	1.184	-15.95
+PARSOR	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.023	-42.1
+PASGIZ	Ni	1	3	28	2	8	False	6	Octahedral	18	1.158	-22.68
+PATACO10	Co	2	1	27	3	6	False	6	Octahedral	18	0.99	62.22
+PATQEG	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.981	-33.19
+PAXVAM	Mn	0	5	25	3	4	False	6	Octahedral	18	0.98	-53.53
+PAYHIG	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.067	-59.52
+PAYVAO	Mn	2	6	25	2	5	False	6	Octahedral	18	1.11	-50.42
+PAZDUQ	Cr	0	4	24	3	3	False	6	Octahedral	18	0.983	-46.04
+PAZPAI	Ni	2	3	28	2	8	False	6	Octahedral	18	1.134	-33.23
+PAZXAP	Fe	2	1	26	2	6	False	6	Octahedral	18	0.989	40.19
+PCTHFC	Cr	0	1	24	0	5	False	6	Octahedral	18	0.868	130.61
+PEHZOU	Ni	0	1	28	2	8	False	5	Trigonal bipyramidal	13	0.916	46.03
+PEJCOZ	Mn	0	6	25	2	5	False	6	Octahedral	18	1.146	-56.66
+PEKPAW	Ni	2	3	28	2	8	False	6	Octahedral	18	1.135	-36.39
+PEMENI	Ni	1	1	28	2	8	False	5	Square pyramidal	14	1.046	30.32
+PEMSOP	Cr	0	1	24	0	5	False	6	Octahedral	18	0.845	167.19
+PEMTAC	Cr	0	1	24	0	5	False	6	Octahedral	18	0.876	123.65
+PENBUG	Co	-1	3	27	3	6	False	4	Square planar	7	0.913	18.05
+PENHOI	Mn	-1	5	25	3	4	False	5	Square pyramidal	14	0.927	-62.42
+PEPPEI	Fe	0	3	26	2	6	False	5	Square pyramidal	14	0.902	22.47
+PEQMEE	Ni	-2	1	28	2	8	False	4	Square planar	7	0.91	34.38
+PERJIG	Co	3	1	27	3	6	False	6	Octahedral	18	0.974	100.48
+PEVHAC	Fe	1	3	26	2	6	False	5	Trigonal bipyramidal	13	0.899	9.49
+PEXKAF	Co	2	1	27	3	6	False	6	Octahedral	18	0.99	57.61
+PEXKUB	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.049	-20.7
+PIBPOH	Ni	1	3	28	2	8	False	5	Square pyramidal	14	1.081	-19.97
+PIGDIS	Ni	1	3	28	2	8	False	6	Octahedral	18	1.108	-37.57
+PIHWEI	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.172	-49.42
+PIKZIT	Mn	0	6	25	2	5	False	6	Octahedral	18	1.118	-45.07
+PIMMOQ	Fe	0	5	26	2	6	False	6	Octahedral	18	1.109	-27.17
+PINBUJ	Ni	2	3	28	2	8	False	6	Octahedral	18	1.098	-28.36
+PIQKOR	Co	1	1	27	3	6	True	4	Tetrahedral	8	1.042	52.33
+PITBUP	Cr	-1	4	24	3	3	False	6	Octahedral	18	1.059	-41.29
+PITHAD	Co	2	4	27	2	7	False	6	Octahedral	18	1.129	-11.63
+PIVDAB	Ni	1	3	28	2	8	False	4	Tetrahedral	8	1.037	-39.19
+PIVHUZ	Co	0	4	27	2	7	False	2	Linear	0	0.879	-14.08
+PIYYON	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.07	-35.75
+PMCCOC	Co	0	1	27	1	8	True	3	Trigonal planar	3	0.996	48.7
+POBWUA	Co	2	2	27	2	7	False	5	Square pyramidal	14	1.0	50.07
+PODCIX	Co	0	4	27	2	7	False	6	Trigonal prismatic	19	1.167	-20.34
+POJHUT	Ni	0	3	28	2	8	False	7	Pentagonal bipyramidal	23	1.219	-24.02
+POJREL	Fe	0	6	26	3	5	False	6	Octahedral	18	1.05	-28.55
+POPFEC10	Fe	0	1	26	0	6	False	5	Trigonal bipyramidal	13	0.805	120.94
+PORNES	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.11	-9.68
+PORPOB	Co	3	1	27	3	6	False	6	Octahedral	18	0.977	76.65
+POWRID	Co	0	4	27	2	7	False	6	Octahedral	18	1.14	-12.9
+POWROJ	Mn	1	6	25	2	5	False	6	Octahedral	18	1.091	-52.11
+PUCFID	Fe	0	1	26	2	6	False	6	Octahedral	18	0.903	76.52
+PUCHOL	Fe	0	5	26	2	6	True	3	Trigonal planar	3	1.157	-58.96
+PUCHUR	Co	0	2	27	2	7	True	3	Trigonal planar	3	1.09	26.28
+PUDPAG	Cr	0	4	24	3	3	False	6	Octahedral	18	0.935	-34.84
+PUGLOS	Fe	1	1	26	2	6	True	4	Tetrahedral	8	0.981	58.07
+PUHWUL	Mn	1	5	25	3	4	False	6	Octahedral	18	1.006	-43.61
+PUJBAX	Mn	-2	5	25	3	4	False	6	Octahedral	18	0.982	-60.22
+PUJSOC	Ni	1	1	28	2	8	False	4	Seesaw	9	0.881	29.89
+PUKPUG	Co	0	1	27	3	6	True	3	Trigonal planar	3	1.025	96.75
+PUMQAQ	Co	-2	4	27	2	7	False	4	Tetrahedral	8	1.006	-51.58
+PUQJAM	Fe	-1	5	26	2	6	False	6	Octahedral	18	1.117	-22.06
+PURCUA	Fe	0	5	26	2	6	True	2	Linear	0	1.113	-31.18
+PUTTUT	Co	1	1	27	3	6	False	6	Octahedral	18	0.962	62.79
+PUTVAB	Co	2	1	27	3	6	False	6	Octahedral	18	0.96	75.0
+PUVLAV	Cr	0	5	24	2	4	False	4	Seesaw	9	1.094	-61.13
+PUWMAX	Co	1	1	27	3	6	False	6	Octahedral	18	0.989	48.13
+PUXRAC	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.992	-46.96
+PUXVIO	Cr	0	4	24	3	3	False	4	Tetrahedral	8	0.897	-30.11
+PUXVOU	Cr	0	5	24	2	4	False	3	Trigonal planar	3	0.925	-58.83
+PYESAF10	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.03	-30.75
+PYRMNC	Mn	0	1	25	1	6	False	6	Octahedral	18	0.843	134.02
+QABMIP	Ni	1	1	28	2	8	True	3	Trigonal planar	3	1.047	21.87
+QADJEK	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.117	-30.32
+QAFCEG	Ni	0	3	28	2	8	False	6	Octahedral	18	1.106	-32.14
+QAFCOS	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.065	-47.41
+QAFPAO	Co	1	1	27	3	6	False	6	Octahedral	18	0.981	63.84
+QAGCEG	Ni	-2	3	28	2	8	False	6	Octahedral	18	1.146	-38.31
+QAHQAT	Ni	1	1	28	2	8	False	4	Square planar	7	0.946	31.94
+QAHWUT	Ni	0	1	28	2	8	False	4	Square planar	7	0.927	25.2
+QALDUD	Ni	0	3	28	2	8	False	6	Octahedral	18	1.119	-13.55
+QANFOD	Co	-1	3	27	3	6	False	4	Square planar	7	0.865	20.85
+QANMOK	Co	0	2	27	2	7	False	4	Square planar	7	1.006	20.72
+QAQBIV	Co	0	1	27	1	8	False	5	Trigonal bipyramidal	13	0.883	75.09
+QAQBOB	Fe	0	1	26	2	6	True	4	Tetrahedral	8	0.956	125.89
+QAQZEO	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.059	16.41
+QARMIF	Fe	1	1	26	2	6	True	2	Linear	0	1.004	73.81
+QARPEF	Fe	0	6	26	3	5	False	6	Octahedral	18	1.042	-19.79
+QASCUI	Ni	0	3	28	2	8	False	4	Seesaw	9	1.017	-35.83
+QAVFID	Fe	0	5	26	2	6	False	4	Square planar	7	1.081	-38.2
+QAWZET	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.103	-19.67
+QAWZIX	Cr	1	4	24	3	3	True	4	Tetrahedral	8	1.079	-19.7
+QAYBAT	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.017	-44.0
+QAYCEY	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	1.001	-26.26
+QAZCIF	Co	0	2	27	2	7	False	4	Square planar	7	0.951	26.77
+QEDCOR	Fe	2	5	26	2	6	False	6	Octahedral	18	1.094	-30.27
+QEDKOZ	Co	0	4	27	2	7	False	6	Octahedral	18	1.152	-8.4
+QEFDOW	Fe	0	6	26	3	5	False	6	Octahedral	18	1.039	-13.98
+QEHKUL	Ni	1	1	28	2	8	True	3	Trigonal planar	3	1.052	24.18
+QEHZIN	Fe	2	2	26	3	5	False	6	Octahedral	18	0.947	89.86
+QEKCAN	Ni	0	2	28	3	7	False	6	Octahedral	18	1.092	60.89
+QEKFET	Ni	0	3	28	2	8	False	6	Octahedral	18	1.128	-36.41
+QENWUC	Fe	2	1	26	2	6	False	6	Octahedral	18	0.922	79.51
+QEQVEO	Cr	0	4	24	3	3	False	6	Octahedral	18	0.95	-33.57
+QETKOS	Fe	3	2	26	3	5	False	6	Octahedral	18	0.975	48.88
+QETLAF	Mn	1	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.155	-61.43
+QETVAM	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.097	-19.85
+QEWGOR	Ni	0	1	28	2	8	False	4	Square planar	7	0.939	25.61
+QEZYUP	Fe	0	1	26	2	6	False	6	Octahedral	18	0.919	80.07
+QIDNAU	Co	0	3	27	1	8	False	3	Trigonal planar	3	0.971	-33.79
+QIGGOC	Co	1	1	27	3	6	True	3	Trigonal planar	3	1.074	75.5
+QIGRED	Co	0	1	27	3	6	False	6	Octahedral	18	0.961	101.48
+QIGRON	Co	0	1	27	3	6	False	6	Octahedral	18	0.99	45.53
+QIGSEE	Co	0	1	27	3	6	False	6	Octahedral	18	1.002	87.76
+QIJTAE	Fe	0	6	26	3	5	False	6	Octahedral	18	1.039	-18.48
+QILWUD	Co	2	1	27	3	6	False	6	Octahedral	18	0.997	55.98
+QIMXUI	Ni	-2	1	28	2	8	False	4	Square planar	7	0.884	21.66
+QIRWIZ	Cr	1	5	24	2	4	False	5	Trigonal bipyramidal	13	1.043	-46.78
+QIRWOF	Cr	1	5	24	2	4	False	5	Trigonal bipyramidal	13	1.029	-47.42
+QIRWUL	Cr	1	5	24	2	4	False	5	Square pyramidal	14	1.029	-51.76
+QITBEA	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.098	-65.07
+QITSUJ	Co	-2	4	27	2	7	False	4	Tetrahedral	8	0.987	-45.39
+QITWUO	Fe	1	4	26	3	5	False	5	Square pyramidal	14	0.99	-7.17
+QIVYEZ	Fe	0	5	26	2	6	False	2	Linear	0	0.996	-75.69
+QIWCUU	Ni	0	1	28	2	8	False	5	Trigonal bipyramidal	13	0.992	14.51
+QIWKOX	Co	0	1	27	3	6	False	6	Octahedral	18	0.982	105.13
+QIXCOR	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.077	-50.34
+QIXDEI	Fe	0	5	26	2	6	False	6	Octahedral	18	1.111	-26.35
+QIXDIM	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.074	-49.45
+QIYMAN	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.03	48.81
+QIZCAF	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.064	-32.79
+QOBRIK	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.108	-34.65
+QOCDUI01	Fe	0	4	26	3	5	False	5	Square pyramidal	14	0.96	0.87
+QOFDIZ	Mn	1	2	25	2	5	True	4	Tetrahedral	8	0.949	109.75
+QOFVOW	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.027	-25.9
+QOGLAZ	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.992	-40.92
+QOGNAD	Co	1	1	27	3	6	False	6	Octahedral	18	0.983	83.75
+QOJDEZ	Ni	0	3	28	2	8	False	6	Octahedral	18	1.098	-38.86
+QOKSOY	Fe	0	1	26	2	6	False	6	Octahedral	18	0.881	118.89
+QOKYIY	Fe	0	1	26	0	6	True	5	Trigonal bipyramidal	13	0.911	108.68
+QOLKIM	Fe	0	4	26	3	5	False	5	Square pyramidal	14	0.948	7.71
+QOLZOH	Mn	0	6	25	2	5	False	6	Octahedral	18	1.115	-49.85
+QOMLOU	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.085	-31.87
+QOMQOZ	Fe	1	5	26	2	6	False	7	Pentagonal bipyramidal	23	1.166	-43.53
+QOPWOK	Fe	0	3	26	2	6	False	4	Square planar	7	0.927	2.77
+QOQKIQ	Ni	2	3	28	2	8	False	6	Octahedral	18	1.117	-49.8
+QORDUY	Fe	-1	4	26	3	5	False	5	Square pyramidal	14	0.936	1.58
+QORFAG	Fe	-2	4	26	3	5	False	5	Square pyramidal	14	0.938	9.49
+QOSGEL	Fe	1	5	26	2	6	False	4	Tetrahedral	8	1.05	-49.58
+QOSTAT	Ni	2	1	28	2	8	False	4	Square planar	7	0.977	29.54
+QOSZON	Fe	0	1	26	2	6	False	6	Octahedral	18	0.834	191.59
+QOWJOE	Co	-1	4	27	2	7	False	6	Trigonal prismatic	19	1.159	-28.09
+QOXKUL	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.963	-48.93
+QOXZAG	Co	1	1	27	3	6	False	4	Seesaw	9	0.902	26.97
+QOXZEK	Co	1	1	27	3	6	False	4	Tetrahedral	8	0.884	33.41
+QOYFEQ	Ni	0	2	28	3	7	False	5	Square pyramidal	14	1.021	42.21
+QOYWIN	Mn	0	6	25	2	5	False	6	Octahedral	18	1.037	-29.88
+QOZZUB	Fe	0	6	26	3	5	False	6	Octahedral	18	1.039	-20.21
+QUCBOG	Co	-1	3	27	3	6	False	4	Square planar	7	0.925	27.72
+QUGQUF	Ni	1	3	28	2	8	False	6	Octahedral	18	1.115	-35.27
+QUHKIO	Ni	0	1	28	2	8	False	4	Square planar	7	0.945	44.49
+QUKTAS	Fe	0	5	26	2	6	False	6	Trigonal prismatic	19	1.145	-49.17
+QUSJAQ	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.974	-38.11
+QUSPOJ	Fe	1	1	26	2	6	True	4	Tetrahedral	8	0.975	83.41
+QUTFIW	Cr	-3	4	24	3	3	False	6	Octahedral	18	0.942	-48.52
+QUZWAL	Ni	-1	2	28	3	7	False	5	Trigonal bipyramidal	13	0.956	27.45
+RABJOX	Ni	0	1	28	2	8	False	4	Square planar	7	1.025	50.32
+RABLAL	Ni	1	1	28	2	8	True	3	Trigonal planar	3	0.994	53.58
+RABVOG	Co	0	1	27	1	8	False	5	Trigonal bipyramidal	13	0.894	60.39
+RACNIV	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.086	-25.23
+RADLEO	Ni	0	1	28	2	8	False	4	Square planar	7	0.977	44.46
+RADSEU	Fe	1	1	26	2	6	True	4	Tetrahedral	8	0.995	108.58
+RAFLIV	Mn	0	6	25	2	5	False	6	Trigonal prismatic	19	1.119	-44.61
+RAGLOD	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.071	-50.94
+RAHXAB	Mn	0	6	25	2	5	False	6	Octahedral	18	1.106	-52.81
+RAKTAA	Fe	0	6	26	3	5	False	5	Square pyramidal	14	0.991	-26.38
+RALNUO	Fe	0	3	26	2	6	False	4	Square planar	7	0.883	-4.8
+RANJIA	Fe	1	5	26	2	6	False	4	Tetrahedral	8	1.022	-50.22
+RAPJAT	Ni	0	3	28	2	8	False	6	Octahedral	18	1.123	-45.81
+RARMIG	Mn	0	1	25	1	6	True	4	Tetrahedral	8	0.968	102.69
+RATBIY	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.014	-26.33
+RATCAR	Fe	0	6	26	3	5	False	6	Octahedral	18	1.048	-19.03
+RATDIZ	Co	2	1	27	3	6	False	6	Octahedral	18	1.018	80.67
+RATDOF	Co	2	1	27	3	6	False	6	Octahedral	18	1.017	77.66
+RAVYIX	Fe	1	5	26	2	6	False	5	Square pyramidal	14	1.104	-40.3
+RAWPUB	Ni	0	1	28	2	8	False	5	Trigonal bipyramidal	13	0.951	29.75
+RAWRUF	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.075	-20.73
+RAWTEO	Cr	0	4	24	3	3	True	3	Trigonal planar	3	1.035	-16.25
+RAXMOT	Co	0	4	27	2	7	False	6	Octahedral	18	1.137	-19.41
+RAXXUM	Co	0	4	27	2	7	False	6	Octahedral	18	1.118	-10.33
+REGBUA	Fe	0	5	26	2	6	False	6	Trigonal prismatic	19	1.148	-51.64
+REJDAN	Co	1	3	27	3	6	False	5	Square pyramidal	14	0.974	8.99
+REMMEB	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.997	-35.9
+REMMOM	Ni	0	1	28	2	8	False	4	Square planar	7	0.919	28.83
+RENGAV	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.116	-49.68
+RERCUP	Mn	0	1	25	1	6	False	6	Octahedral	18	0.86	114.45
+RETFOM	Co	0	4	27	2	7	False	6	Octahedral	18	1.14	-10.43
+RETGON	Ni	1	3	28	2	8	False	6	Octahedral	18	1.098	-40.78
+REXCUS	Mn	0	5	25	3	4	False	6	Octahedral	18	0.968	-44.42
+REXMIQ	Fe	0	6	26	3	5	False	6	Octahedral	18	1.062	-21.0
+REXQAN	Co	0	1	27	3	6	False	6	Octahedral	18	1.044	74.9
+RIHLAY	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.156	-54.79
+RIMDIA	Cr	0	1	24	0	5	False	6	Octahedral	18	0.923	128.94
+RIPHEG	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.04	-47.76
+RIPQAL	Ni	0	1	28	2	8	False	4	Square planar	7	0.947	23.6
+RIPXIX	Fe	0	6	26	3	5	False	6	Octahedral	18	1.049	-17.25
+RIQQAJ	Cr	-1	1	24	0	5	False	6	Octahedral	18	0.883	114.11
+RIQQEN	Cr	-1	1	24	0	5	False	6	Octahedral	18	0.888	113.99
+RIQSAM	Ni	1	3	28	2	8	False	6	Octahedral	18	1.143	-37.43
+RIRCIH	Ni	2	3	28	2	8	False	5	Trigonal bipyramidal	13	1.116	-19.55
+RIRFAB	Fe	-2	5	26	2	6	False	4	Tetrahedral	8	0.95	-54.92
+RIRFEF	Fe	0	5	26	2	6	False	3	Trigonal planar	3	0.971	-57.71
+RIRFIJ	Fe	-1	5	26	2	6	False	4	Tetrahedral	8	0.992	-48.75
+RISNOZ	Fe	0	6	26	3	5	False	5	Square pyramidal	14	1.001	-18.35
+RISQOC	Ni	0	1	28	2	8	False	4	Square planar	7	0.91	26.6
+RISSIW	Co	0	1	27	3	6	False	6	Octahedral	18	0.971	76.66
+RITTAR	Co	0	4	27	2	7	False	3	Trigonal planar	3	0.99	-15.43
+RITYOK	Fe	2	5	26	2	6	False	5	Trigonal bipyramidal	13	1.081	-32.88
+RIVWEA	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.016	-83.72
+RIWXEA	Cr	0	5	24	2	4	False	4	Seesaw	9	1.022	-55.63
+RIXROH	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.047	62.12
+RIXTIC	Ni	0	1	28	2	8	False	4	Square planar	7	0.96	43.96
+RIZGUF	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.993	-52.8
+ROBXEM	Co	-2	4	27	2	7	False	4	Tetrahedral	8	0.958	-41.61
+ROCCOB	Cr	0	1	24	2	4	True	5	Square pyramidal	14	1.0	124.25
+ROCDOC	Ni	2	1	28	2	8	False	5	Trigonal bipyramidal	13	0.948	32.79
+ROFKOO	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.121	-37.51
+ROFKUV	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.042	-63.38
+ROFXAO	Ni	0	1	28	2	8	False	4	Square planar	7	0.949	27.4
+ROKBUO	Cr	0	1	24	0	5	False	6	Octahedral	18	0.855	148.97
+ROKMOT	Fe	0	1	26	2	6	True	4	Tetrahedral	8	0.964	84.55
+ROLQUE	Co	0	1	27	3	6	False	6	Octahedral	18	0.961	40.79
+ROLXIZ	Ni	1	1	28	2	8	False	4	Square planar	7	0.899	45.1
+ROMSUI	Mn	0	5	25	3	4	False	5	Square pyramidal	14	0.934	-58.99
+RONREU	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.053	-26.84
+ROPBIH	Mn	0	6	25	2	5	False	8	Dodecahedral	33	1.211	-66.76
+ROPBON	Mn	2	6	25	2	5	False	7	Capped trigonal prismatic	25	1.171	-54.53
+RORXUR	Ni	0	1	28	2	8	False	4	Square planar	7	0.967	15.07
+ROYGUJ	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.146	-40.05
+RUHGUW	Ni	0	3	28	2	8	False	6	Octahedral	18	1.152	-14.44
+RUHHOS	Cr	1	4	24	3	3	False	6	Octahedral	18	0.983	-29.91
+RUHMAI	Fe	1	6	26	3	5	False	6	Octahedral	18	1.065	-8.98
+RUHRIV	Co	2	4	27	2	7	False	8	Dodecahedral	33	1.3	-50.09
+RUJSOE	Co	1	4	27	2	7	False	5	Square pyramidal	14	1.128	-6.54
+RUJSUK	Co	2	4	27	2	7	False	6	Octahedral	18	1.179	-5.16
+RUKLAK	Cr	0	1	24	0	5	False	6	Octahedral	18	0.911	96.94
+RULVEA	Mn	0	5	25	3	4	False	6	Octahedral	18	0.988	-42.8
+RUMGUB	Co	0	2	27	2	7	False	4	Square planar	7	0.981	24.77
+RUMHAI	Co	0	2	27	2	7	False	6	Octahedral	18	1.092	23.01
+RUMNUK	Fe	0	6	26	3	5	False	3	Trigonal planar	3	0.875	-47.82
+RUMRAU	Fe	-3	6	26	3	5	False	6	Octahedral	18	1.027	-29.97
+RUMZOP	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.066	-56.74
+RUTMAV	Ni	-1	2	28	3	7	False	5	Trigonal bipyramidal	13	0.96	42.7
+RUTRUT	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.983	-21.28
+RUWKEA	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.058	-62.48
+RUWSAG	Cr	0	5	24	2	4	False	4	Square planar	7	0.978	-61.75
+RUWSOU	Cr	0	5	24	2	4	False	4	Square planar	7	1.012	-61.51
+RUXYER	Ni	0	1	28	2	8	False	4	Square planar	7	0.961	48.55
+SABDAB	Fe	0	5	26	2	6	False	4	Seesaw	9	1.029	-41.05
+SADRAU	Fe	0	1	26	2	6	False	6	Octahedral	18	0.923	103.52
+SAFTEZ	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.163	-57.77
+SAFTID	Mn	0	6	25	2	5	False	7	Capped trigonal prismatic	25	1.168	-57.18
+SAFTOJ	Mn	0	6	25	2	5	False	7	Capped trigonal prismatic	25	1.171	-56.9
+SAFTUP	Mn	0	6	25	2	5	False	7	Capped trigonal prismatic	25	1.171	-61.62
+SAFVAX	Mn	0	6	25	2	5	False	8	Dodecahedral	33	1.201	-69.7
+SAGCAF	Fe	0	2	26	3	5	False	6	Octahedral	18	0.948	66.71
+SAGFUB	Fe	0	1	26	2	6	False	6	Octahedral	18	0.886	85.52
+SAHHAN	Ni	-1	3	28	2	8	False	4	Tetrahedral	8	1.008	-28.99
+SAHZIK	Fe	0	6	26	3	5	False	6	Octahedral	18	1.032	-31.08
+SAJKUN	Mn	1	1	25	1	6	False	6	Octahedral	18	0.885	87.05
+SAKWOS	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.062	-58.38
+SALDNI	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.074	-19.82
+SAPJUO	Mn	1	5	25	3	4	False	6	Octahedral	18	0.996	-35.11
+SASPAD	Ni	1	2	28	3	7	False	6	Octahedral	18	1.058	38.24
+SATGOK	Ni	0	3	28	2	8	False	6	Octahedral	18	1.119	-13.24
+SAVHIG	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	1.014	-31.98
+SAVHOM	Fe	0	4	26	3	5	False	5	Trigonal bipyramidal	13	0.934	-7.86
+SAXSOZ	Ni	0	1	28	0	8	True	3	Trigonal planar	3	1.034	65.33
+SAYMIO	Fe	0	6	26	3	5	False	4	Tetrahedral	8	0.892	-40.25
+SAYZAV	Fe	0	5	26	2	6	False	4	Seesaw	9	1.029	-36.98
+SCYSCR	Cr	-1	4	24	3	3	False	6	Octahedral	18	0.969	-36.99
+SEBQAS	Ni	2	3	28	2	8	False	6	Trigonal prismatic	19	1.144	-36.17
+SEDHOZ	Fe	0	5	26	2	6	True	4	Tetrahedral	8	1.2	-25.04
+SEDREZ	Fe	-1	2	26	3	5	False	6	Octahedral	18	0.944	72.59
+SELSEI	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.061	-44.71
+SEMCUK	Ni	0	1	28	2	8	False	4	Square planar	7	0.908	31.07
+SEMROU	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.07	-17.06
+SEPHOL	Cr	0	4	24	3	3	False	6	Octahedral	18	0.983	-41.39
+SEPPUZ	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.167	-53.41
+SESGUT	Co	2	4	27	2	7	False	6	Octahedral	18	1.122	-21.37
+SEWBUR	Mn	0	1	25	1	6	False	6	Octahedral	18	0.838	130.45
+SEWMAK	Co	-2	4	27	2	7	False	4	Seesaw	9	1.025	-14.48
+SEZTUM	Cr	0	5	24	2	4	False	5	Square pyramidal	14	1.045	-55.26
+SEZVAU	Cr	0	5	24	2	4	False	4	Square planar	7	0.993	-64.73
+SEZVEY	Cr	-2	5	24	2	4	False	4	Square planar	7	0.987	-65.66
+SIBLIZ	Ni	1	1	28	2	8	False	4	Square planar	7	0.955	33.85
+SIBZAE	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.092	-31.63
+SICCAL	Co	1	1	27	3	6	False	6	Octahedral	18	0.965	74.98
+SICCUC	Ni	2	3	28	2	8	False	6	Octahedral	18	1.106	-29.93
+SICFAM	Mn	0	1	25	1	6	False	6	Octahedral	18	0.883	108.97
+SICFEQ	Mn	0	1	25	1	6	False	6	Octahedral	18	0.881	106.18
+SIFQAA	Ni	0	1	28	2	8	False	4	Square planar	7	0.944	74.54
+SIHKEA	Ni	1	2	28	3	7	False	4	Square planar	7	0.924	37.69
+SILCIZ	Ni	0	1	28	2	8	False	4	Square planar	7	0.942	24.48
+SILWOA	Fe	-2	6	26	3	5	False	6	Octahedral	18	1.014	-18.4
+SILYOC	Mn	0	1	25	1	6	False	6	Octahedral	18	0.857	128.62
+SINDIC	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.047	-67.64
+SINMIO	Co	1	4	27	2	7	False	5	Trigonal bipyramidal	13	1.087	-24.11
+SIPHAA	Co	0	3	27	1	8	False	4	Tetrahedral	8	0.943	-35.86
+SIPLEI	Co	2	1	27	3	6	False	6	Octahedral	18	0.996	58.54
+SIQMEL	Ni	0	1	28	0	8	True	3	Trigonal planar	3	1.051	82.08
+SIQNAK	Co	0	1	27	3	6	False	6	Octahedral	18	0.93	116.03
+SIQNEO	Co	0	1	27	3	6	False	6	Octahedral	18	0.95	83.61
+SIQZOH	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.07	-50.71
+SIRMIP	Fe	0	1	26	2	6	True	4	Tetrahedral	8	0.979	69.47
+SISNAK	Co	1	4	27	2	7	False	7	Capped trigonal prismatic	25	1.233	-31.89
+SITFEG	Ni	0	3	28	2	8	False	6	Octahedral	18	1.102	-23.86
+SIVQEU	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.058	-20.07
+SIXMES	Fe	1	5	26	2	6	False	6	Octahedral	18	1.135	-22.83
+SIXMOC	Fe	1	5	26	2	6	False	5	Trigonal bipyramidal	13	1.08	-36.69
+SIXRAV	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.07	-22.59
+SIXZAA	Ni	0	1	28	2	8	False	5	Trigonal bipyramidal	13	1.007	16.14
+SIYHOA	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.008	-31.83
+SOBXAI	Cr	0	1	24	0	5	False	6	Octahedral	18	0.863	111.43
+SOCMEC	Fe	1	1	26	2	6	True	4	Tetrahedral	8	0.961	105.0
+SOFGOK	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.062	36.23
+SOFWIU	Ni	2	3	28	2	8	False	6	Octahedral	18	1.113	-53.18
+SOGFAY	Ni	0	1	28	2	8	False	3	T-shaped	6	0.901	31.34
+SOGFEC	Ni	1	1	28	2	8	True	3	Trigonal planar	3	1.106	55.96
+SOGPIO	Co	2	1	27	3	6	True	4	Tetrahedral	8	1.039	71.32
+SOHJIJ	Mn	0	6	25	2	5	False	6	Octahedral	18	1.117	-36.16
+SOHKAC	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.076	-47.19
+SOHKEG	Mn	0	6	25	2	5	False	6	Octahedral	18	1.134	-37.74
+SOMTIY	Mn	1	6	25	2	5	False	7	Capped trigonal prismatic	25	1.197	-54.09
+SOPCAB	Ni	0	2	28	3	7	True	3	Trigonal planar	3	1.043	25.07
+SOQLOZ	Fe	0	1	26	2	6	True	4	Tetrahedral	8	0.993	44.92
+SOQLUF	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.036	-51.3
+SOSVAX	Ni	0	1	28	2	8	False	4	Square planar	7	0.934	24.08
+SOTLET	Fe	0	5	26	2	6	False	7	Pentagonal bipyramidal	23	1.189	-56.85
+SOWKIY	Co	0	1	27	3	6	False	6	Octahedral	18	0.986	85.38
+SOXJUK	Co	-1	4	27	2	7	False	4	Tetrahedral	8	0.993	-21.16
+SOZYEL	Co	0	1	27	3	6	False	6	Octahedral	18	0.974	92.14
+SUBGOO	Mn	-1	6	25	2	5	False	4	Tetrahedral	8	0.96	-69.59
+SUBJIL	Ni	0	2	28	3	7	False	5	Square pyramidal	14	0.999	46.34
+SUBQAK	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.984	-65.78
+SUFBUS	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.11	-17.54
+SUFDEC	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.053	-69.89
+SUJVAW	Fe	1	5	26	2	6	False	6	Octahedral	18	1.117	-31.52
+SUKQUK	Co	-1	1	27	3	6	False	6	Octahedral	18	0.97	68.82
+SUKWUQ	Co	1	1	27	3	6	False	6	Octahedral	18	0.97	65.82
+SUPKIY	Mn	1	5	25	3	4	False	6	Octahedral	18	0.988	-40.81
+SUSGEV	Fe	0	3	26	2	6	False	4	Square planar	7	0.893	3.42
+SUTQAB	Fe	0	6	26	3	5	False	6	Octahedral	18	1.043	-20.37
+SUVREI	Ni	0	3	28	2	8	False	6	Octahedral	18	1.144	-38.81
+SUXTEL	Ni	1	1	28	2	8	False	4	Square planar	7	0.927	28.81
+TABNEP	Cr	0	1	24	0	5	False	6	Octahedral	18	0.859	143.36
+TACNAN	Mn	0	1	25	1	6	False	6	Octahedral	18	0.84	165.33
+TACSAU	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.975	-60.78
+TADFEJ	Cr	0	4	24	3	3	False	6	Octahedral	18	0.957	-23.15
+TADSUQ	Co	1	1	27	3	6	True	4	Tetrahedral	8	1.075	85.08
+TAFTAV	Mn	2	6	25	2	5	False	7	Capped trigonal prismatic	25	1.189	-46.33
+TAGFIR	Ni	-1	2	28	3	7	False	4	Square planar	7	0.897	35.46
+TAGFUD	Ni	-1	2	28	3	7	False	4	Square planar	7	0.887	32.83
+TAGLES10	Fe	0	1	26	2	6	False	6	Octahedral	18	0.9	79.0
+TAGZUA	Co	0	4	27	2	7	False	6	Octahedral	18	1.133	-14.0
+TAHYOQ	Mn	-1	1	25	1	6	False	6	Octahedral	18	0.822	120.71
+TAJXUX	Fe	-1	1	26	0	6	True	3	Trigonal planar	3	0.956	97.7
+TAJXUZ	Cr	0	1	24	0	5	False	6	Octahedral	18	0.847	144.35
+TAJYAG	Cr	0	1	24	0	5	False	6	Octahedral	18	0.869	123.35
+TAKDEQ	Mn	-1	5	25	3	4	False	6	Octahedral	18	0.983	-57.1
+TAKZAH	Co	0	4	27	2	7	False	6	Octahedral	18	1.132	-13.06
+TALMEZ	Fe	-1	4	26	3	5	False	5	Square pyramidal	14	0.939	9.13
+TALYIO	Cr	0	1	24	0	5	True	4	Tetrahedral	8	0.968	142.89
+TAMZAJ	Fe	1	1	26	2	6	False	6	Octahedral	18	0.884	103.75
+TANLEA	Co	0	2	27	2	7	False	4	Seesaw	9	0.906	13.36
+TANLOK	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.0	-13.01
+TANLUQ	Co	0	2	27	2	7	False	4	Tetrahedral	8	0.902	16.08
+TAPGUM	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.004	-39.36
+TAPZUI	Fe	1	5	26	2	6	False	5	Square pyramidal	14	1.122	-42.45
+TAQZEQ	Cr	1	1	24	2	4	True	5	Square pyramidal	14	0.979	121.68
+TARWIU	Ni	0	1	28	2	8	False	4	Square planar	7	0.956	27.22
+TAVHOO	Fe	-1	6	26	3	5	False	5	Trigonal bipyramidal	13	1.017	-16.17
+TAVWAP	Mn	1	6	25	2	5	False	7	Capped trigonal prismatic	25	1.179	-48.85
+TAWNEK	Cr	0	1	24	0	5	False	6	Octahedral	18	0.858	149.18
+TCDYNI	Ni	0	3	28	2	8	True	2	Linear	0	1.177	-22.55
+TDTCCO	Co	0	1	27	3	6	False	6	Octahedral	18	0.973	51.17
+TEANIN	Ni	2	3	28	2	8	False	6	Octahedral	18	1.137	-47.73
+TEBKIW	Fe	-1	5	26	2	6	False	5	Square pyramidal	14	1.03	-40.25
+TEBKOC	Fe	-1	5	26	2	6	False	5	Square pyramidal	14	1.03	-25.6
+TEBLAP	Fe	-1	5	26	2	6	False	5	Square pyramidal	14	1.029	-34.77
+TEBRUP	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.027	-27.62
+TEBVIH	Mn	2	6	25	2	5	False	6	Octahedral	18	1.145	-37.31
+TECFIR	Mn	0	6	25	2	5	False	6	Octahedral	18	1.09	-46.5
+TECRAW	Ni	-1	2	28	3	7	False	4	Square planar	7	0.888	39.19
+TEHGAQ	Mn	1	5	25	3	4	False	6	Octahedral	18	0.977	-45.47
+TEHYOV	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.981	-18.59
+TEPCUM	Ni	0	1	28	2	8	False	4	Square planar	7	0.926	22.24
+TEQPUA	Fe	-1	5	26	2	6	False	4	Tetrahedral	8	1.008	-46.16
+TEQQAH	Fe	-1	3	26	2	6	False	5	Trigonal bipyramidal	13	0.934	13.48
+TETFON	Ni	1	3	28	2	8	False	6	Octahedral	18	1.158	-27.14
+TEVLAK	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.166	-52.15
+TEVXIC	Co	2	1	27	3	6	False	6	Octahedral	18	0.969	64.47
+TEVXUQ	Co	0	2	27	2	7	True	3	Trigonal planar	3	1.021	34.96
+TEVYAX	Co	0	2	27	2	7	True	3	T-shaped	6	1.017	48.15
+TEXLIS	Co	0	4	27	2	7	False	4	Seesaw	9	1.021	-20.73
+TEZKIS	Ni	2	1	28	2	8	False	5	Trigonal bipyramidal	13	0.97	25.37
+TGLYCR	Cr	0	4	24	3	3	False	6	Octahedral	18	0.958	-45.47
+THETCO	Co	0	4	27	2	7	False	6	Octahedral	18	1.129	-12.96
+THOCCR	Cr	0	1	24	0	5	False	6	Octahedral	18	0.871	127.49
+TIBKOH	Ni	0	1	28	2	8	False	4	Square planar	7	0.962	23.15
+TICJEX	Fe	2	5	26	2	6	False	5	Square pyramidal	14	1.105	-32.87
+TICMAW	Fe	0	5	26	2	6	False	4	Seesaw	9	1.035	-31.79
+TIDCAL	Fe	0	5	26	2	6	False	6	Octahedral	18	1.134	-26.33
+TIGBIV	Co	2	4	27	2	7	False	6	Octahedral	18	1.146	-16.01
+TIGGEW	Ni	-4	3	28	2	8	False	6	Octahedral	18	1.11	-52.76
+TIKYOC	Mn	0	6	25	2	5	False	6	Octahedral	18	1.15	-41.07
+TILSUD	Co	2	2	27	2	7	False	4	Square planar	7	0.998	15.43
+TINTUG	Ni	0	1	28	2	8	False	4	Square planar	7	0.929	26.61
+TIQZIE	Fe	0	4	26	3	5	False	5	Square pyramidal	14	0.982	1.43
+TIRDUU	Mn	2	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.16	-56.58
+TIRKAG	Ni	0	1	28	0	8	True	4	Tetrahedral	8	1.043	59.46
+TIRKOU	Ni	0	1	28	0	8	True	3	Trigonal planar	3	0.997	47.99
+TITRAQ	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.094	-5.54
+TIVNUJ	Ni	1	3	28	2	8	False	5	Trigonal bipyramidal	13	1.108	-11.73
+TIVZIJ	Ni	0	1	28	2	8	False	4	Square planar	7	0.981	37.44
+TIZJES	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.02	-65.83
+TOBBAP	Ni	0	1	28	2	8	False	4	Square planar	7	0.943	42.82
+TOBWEO	Ni	0	3	28	2	8	False	4	Seesaw	9	1.024	-34.36
+TOCSOV	Fe	-1	6	26	3	5	False	4	Tetrahedral	8	1.037	-21.69
+TODDUL	Ni	-2	1	28	2	8	False	4	Square planar	7	0.908	73.48
+TOHNEJ	Cr	0	1	24	0	5	True	6	Octahedral	18	1.065	114.07
+TOKRAN	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.991	-67.4
+TOLBEB	Ni	-1	1	28	2	8	False	5	Trigonal bipyramidal	13	0.94	25.73
+TOLMEO	Mn	0	6	25	2	5	False	6	Octahedral	18	1.094	-45.95
+TOLTET	Co	1	1	27	3	6	False	6	Octahedral	18	0.95	43.33
+TOLZOK	Ni	0	1	28	2	8	False	3	Trigonal planar	3	0.901	11.77
+TOLZUQ	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.007	-25.77
+TOPJEO	Mn	2	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.146	-57.73
+TOPJUF	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.09	-51.65
+TOPKAM	Mn	0	6	25	2	5	False	6	Trigonal prismatic	19	1.165	-56.86
+TOTGOY	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.017	-33.05
+TOWCEN	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.091	-23.71
+TOWFAM	Mn	0	1	25	1	6	True	6	Octahedral	18	0.983	134.13
+TRENCM	Mn	1	6	25	2	5	False	5	Trigonal bipyramidal	13	1.079	-54.34
+TUDGII	Ni	2	3	28	2	8	False	6	Octahedral	18	1.139	-43.0
+TUDJEH	Mn	0	5	25	3	4	False	6	Octahedral	18	0.99	-27.36
+TUDJIL	Cr	-1	4	24	3	3	False	6	Octahedral	18	0.945	-21.54
+TUJWIE	Ni	1	1	28	2	8	False	5	Square pyramidal	14	1.032	24.99
+TUKGUB	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.078	-16.49
+TUMYUV	Co	0	3	27	1	8	False	4	Tetrahedral	8	0.954	-36.42
+TUPMAV	Ni	0	1	28	2	8	False	4	Square planar	7	0.954	40.92
+TUSBOZ	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.171	-59.08
+TUTJOH	Cr	-1	1	24	0	5	False	6	Octahedral	18	0.881	119.33
+TUTKEA	Ni	1	3	28	2	8	False	6	Octahedral	18	1.115	-38.86
+TUTMAW	Ni	0	3	28	2	8	False	6	Octahedral	18	1.119	-38.71
+TUTMUS	Fe	1	1	26	2	6	False	6	Octahedral	18	0.936	47.07
+TUTPAB	Fe	0	1	26	2	6	False	6	Octahedral	18	0.913	58.4
+UBEVOP	Fe	0	1	26	2	6	False	6	Octahedral	18	0.922	59.21
+UBEXOQ	Fe	2	5	26	2	6	False	7	Pentagonal bipyramidal	23	1.191	-50.35
+UBICEP	Co	2	1	27	3	6	False	6	Octahedral	18	0.962	54.18
+UBODUK	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.037	-53.98
+UBOFOG	Mn	0	5	25	3	4	False	5	Square pyramidal	14	0.94	-53.09
+UBOMEG	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.95	-37.69
+UBUBAU	Fe	0	6	26	3	5	False	6	Octahedral	18	1.055	-14.35
+UCECEL	Fe	-1	4	26	3	5	False	5	Square pyramidal	14	0.935	13.02
+UCISAA	Ni	0	3	28	2	8	False	6	Octahedral	18	1.117	-41.65
+UCIVOT	Fe	-2	6	26	3	5	False	5	Square pyramidal	14	0.97	-37.02
+UCIVUZ	Fe	-2	6	26	3	5	False	5	Trigonal bipyramidal	13	0.972	-39.81
+UCIWOS	Fe	0	1	26	2	6	False	6	Octahedral	18	0.934	88.91
+UCOJIF	Co	0	4	27	2	7	True	4	Tetrahedral	8	1.185	-8.75
+UCOMEE	Cr	3	4	24	3	3	False	6	Octahedral	18	0.94	-23.42
+UDUGUY	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.15	-58.91
+UDUMEL	Fe	1	5	26	2	6	False	6	Octahedral	18	1.119	-20.53
+UDURUJ	Cr	0	5	24	2	4	False	4	Square planar	7	0.962	-62.98
+UDUSAQ	Cr	0	5	24	2	4	False	4	Square planar	7	0.991	-64.7
+UFAWOO	Cr	0	4	24	3	3	False	6	Octahedral	18	0.965	-22.25
+UFOYOF	Co	-1	4	27	2	7	False	4	Tetrahedral	8	0.983	-31.78
+UFUVUP	Ni	1	3	28	2	8	False	6	Octahedral	18	1.116	-42.27
+UGEKAT	Mn	1	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.154	-59.59
+UGINOP	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.047	-59.2
+UGODAW	Ni	0	1	28	2	8	False	4	Square planar	7	0.955	30.71
+UGOLOT	Fe	2	2	26	3	5	False	6	Octahedral	18	0.964	34.49
+UGUNUF	Cr	0	4	24	3	3	False	6	Octahedral	18	0.969	-44.28
+UHEHAQ	Fe	0	6	26	3	5	False	6	Octahedral	18	1.033	-13.02
+UHEPED	Mn	2	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.15	-58.28
+UHIBAP	Fe	0	2	26	3	5	False	6	Octahedral	18	0.933	49.31
+UHIZAM	Cr	0	4	24	3	3	False	6	Octahedral	18	0.968	-39.34
+UHOXOE	Co	1	4	27	2	7	False	4	Tetrahedral	8	1.037	-31.31
+UJOLEK	Co	0	1	27	3	6	False	6	Octahedral	18	0.971	52.49
+UJUPAR	Co	1	4	27	2	7	False	5	Trigonal bipyramidal	13	1.11	-25.08
+UJUPOF	Fe	1	5	26	2	6	False	5	Trigonal bipyramidal	13	1.093	-43.62
+UJUSOI	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.013	-27.59
+ULANIF	Cr	0	1	24	0	5	True	5	Trigonal bipyramidal	13	0.962	137.35
+ULAYUC	Cr	1	4	24	3	3	False	6	Octahedral	18	0.971	-42.59
+ULEVIQ	Fe	-1	4	26	3	5	False	5	Square pyramidal	14	0.945	3.81
+ULITUH	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.114	-39.19
+ULONEP	Co	3	1	27	3	6	False	6	Octahedral	18	0.998	64.71
+ULOVEY	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.012	-52.94
+ULOVUO	Fe	0	5	26	2	6	False	3	Trigonal planar	3	0.939	-35.18
+ULOXUQ	Fe	0	5	26	2	6	False	3	Trigonal planar	3	0.962	-73.46
+UMIPIP	Mn	2	6	25	2	5	False	6	Octahedral	18	1.109	-46.22
+UMIZUL	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.098	-13.19
+UMUBAF	Ni	1	1	28	2	8	False	4	Square planar	7	0.931	35.08
+UMUJUK	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.986	-17.3
+UNEHIG	Fe	1	5	26	2	6	False	4	Tetrahedral	8	1.042	-46.41
+UNEREL	Cr	0	5	24	2	4	False	4	Square planar	7	0.996	-67.13
+UNILIN	Ni	0	1	28	2	8	False	4	Square planar	7	0.924	32.96
+UNOFEJ	Ni	0	1	28	2	8	False	4	Square planar	7	0.896	52.47
+UNOJIR	Ni	0	1	28	2	8	True	2	Linear	0	1.035	29.88
+UNONOB	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.174	-63.1
+UPIDIH	Ni	1	1	28	2	8	False	4	Square planar	7	0.981	49.04
+UPIFUV	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.058	-33.42
+UPIMAI	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.992	-39.81
+UQAREK	Ni	0	1	28	2	8	False	4	Square planar	7	0.969	16.8
+URIRUL	Ni	0	1	28	2	8	False	6	Octahedral	18	1.148	26.77
+URUKIC	Co	0	1	27	1	8	True	4	Tetrahedral	8	0.967	58.8
+URUKUO	Co	0	1	27	1	8	True	4	Tetrahedral	8	1.009	40.76
+USORUS	Ni	1	3	28	2	8	False	6	Octahedral	18	1.121	-41.79
+UTEMIR	Ni	0	1	28	2	8	False	4	Square planar	7	0.89	38.93
+UTEMOX	Ni	0	1	28	2	8	False	4	Square planar	7	0.894	35.29
+UTODAK	Mn	0	1	25	1	6	False	6	Octahedral	18	0.878	107.22
+UWIFOW	Ni	1	3	28	2	8	False	6	Octahedral	18	1.145	-39.45
+UWIPEW	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.132	-32.21
+UWIPOG	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.102	-24.56
+UWUYER	Cr	0	4	24	3	3	False	5	Square pyramidal	14	0.924	-21.84
+UXOBEQ	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.011	-38.54
+UXOHAS02	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.027	-37.46
+UYAHOS	Mn	0	6	25	2	5	False	6	Trigonal prismatic	19	1.099	-38.7
+UYAKAI	Cr	0	4	24	3	3	False	6	Octahedral	18	0.946	-21.42
+UYIFUF02	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.029	-17.36
+UZEVUR	Mn	1	5	25	3	4	False	5	Square pyramidal	14	0.985	-48.33
+UZEXON	Co	0	3	27	1	8	False	3	Trigonal planar	3	0.98	-18.86
+UZEXUT	Co	0	3	27	1	8	True	2	Linear	0	1.096	-25.29
+UZEYEE	Co	0	1	27	1	8	False	4	Square planar	7	0.889	36.94
+VABFIQ	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.067	-43.77
+VABKUE	Co	2	1	27	3	6	False	6	Octahedral	18	1.022	68.98
+VABTOH	Cr	0	5	24	2	4	False	4	Square planar	7	1.023	-59.72
+VADBOR	Cr	0	1	24	0	5	True	6	Octahedral	18	0.981	140.94
+VADLUH	Ni	0	1	28	0	8	True	2	Linear	0	1.08	52.42
+VAFDIR	Cr	0	4	24	3	3	False	6	Octahedral	18	0.958	-19.7
+VAFHAM	Co	0	1	27	1	8	False	5	Trigonal bipyramidal	13	0.893	58.47
+VAHGES	Fe	1	5	26	2	6	False	6	Trigonal prismatic	19	1.152	-35.94
+VAHGOC	Co	1	4	27	2	7	False	6	Octahedral	18	1.141	-15.24
+VAKYOX	Fe	2	5	26	2	6	False	5	Trigonal bipyramidal	13	1.075	-36.13
+VAMNAY	Cr	0	5	24	2	4	False	4	Square planar	7	0.978	-65.09
+VAPCAR	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.093	-22.1
+VAPFEY	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.086	-21.02
+VAQFAU	Cr	0	5	24	2	4	False	6	Octahedral	18	1.122	-61.72
+VARVIU	Co	3	1	27	3	6	False	6	Octahedral	18	0.982	69.89
+VAVDOM	Mn	1	6	25	2	5	False	6	Trigonal prismatic	19	1.105	-60.82
+VAWNIQ	Mn	0	5	25	3	4	False	5	Trigonal bipyramidal	13	0.942	-58.59
+VAYWEY	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.975	-82.89
+VEBKAQ	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.003	-31.0
+VECTUU	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.013	-30.2
+VEDXOS	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.015	-23.92
+VEGCEQ	Fe	1	2	26	3	5	False	6	Octahedral	18	0.967	34.42
+VEHDOC	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.088	23.69
+VEKNAA	Fe	-1	5	26	2	6	False	5	Square pyramidal	14	1.078	-45.55
+VEKNEE	Co	-1	4	27	2	7	False	5	Square pyramidal	14	1.114	-22.73
+VEKNOO	Fe	-2	4	26	3	5	False	5	Square pyramidal	14	0.947	-5.17
+VEKNUU	Fe	0	6	26	3	5	False	6	Octahedral	18	1.078	-8.03
+VEMYOB	Fe	0	6	26	3	5	False	4	Tetrahedral	8	0.888	-48.08
+VENGUS	Fe	0	6	26	3	5	False	6	Octahedral	18	1.042	-17.45
+VENJOO	Co	0	4	27	2	7	False	7	Pentagonal bipyramidal	23	1.188	-27.76
+VENTAL	Co	0	4	27	2	7	False	4	Seesaw	9	1.044	-14.3
+VESZUP	Co	0	1	27	3	6	False	6	Octahedral	18	0.941	49.95
+VEWDIN	Ni	0	1	28	2	8	False	4	Square planar	7	0.938	22.55
+VEWKIU	Cr	0	4	24	3	3	False	6	Octahedral	18	0.962	-37.48
+VEWQUK	Ni	0	3	28	2	8	False	4	Seesaw	9	1.006	-10.66
+VEWVEZ	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.093	-23.11
+VEXLIU	Co	0	2	27	2	7	False	4	Square planar	7	0.92	29.93
+VEXWON	Cr	1	4	24	3	3	False	6	Octahedral	18	0.946	-31.9
+VEXXIH	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.99	-39.47
+VEYTAW	Fe	-1	5	26	2	6	False	3	Trigonal planar	3	0.914	-71.94
+VEYTAX	Ni	0	1	28	2	8	False	4	Square planar	7	0.973	20.67
+VEYTEB	Ni	0	1	28	2	8	False	4	Square planar	7	0.928	29.75
+VEYWOO	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.057	-38.4
+VEYXOP	Co	0	3	27	1	8	False	3	T-shaped	6	0.998	-30.03
+VIBPOM	Ni	1	1	28	2	8	False	4	Square planar	7	0.924	45.98
+VIBRIK	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.011	-52.83
+VIBWUZ	Ni	0	1	28	2	8	False	4	Square planar	7	0.923	23.84
+VIDMIH	Co	1	1	27	3	6	False	6	Octahedral	18	0.987	85.19
+VIFKED	Fe	0	4	26	3	5	False	5	Square pyramidal	14	0.952	6.23
+VIFWUD	Mn	0	6	25	2	5	False	6	Octahedral	18	1.107	-51.49
+VIGLOP	Ni	0	1	28	2	8	False	4	Square planar	7	0.948	38.51
+VIHXAN	Ni	2	3	28	2	8	False	6	Octahedral	18	1.129	-42.05
+VIJQUB	Fe	0	6	26	3	5	False	6	Octahedral	18	1.047	-17.34
+VIJVIT	Ni	-2	1	28	2	8	False	4	Square planar	7	0.923	24.03
+VIKYOE	Cr	1	5	24	2	4	False	4	Square planar	7	1.037	-66.96
+VILRIT	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.994	-34.12
+VILVIX	Co	-2	4	27	2	7	False	4	Tetrahedral	8	0.978	-17.42
+VISVEA	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.014	-51.68
+VIVGIQ	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.03	46.46
+VIWQEX	Co	-1	3	27	3	6	False	4	Square planar	7	0.893	20.37
+VOBYEQ	Fe	-1	6	26	3	5	False	6	Octahedral	18	1.03	-16.53
+VOCBAQ	Fe	-2	6	26	3	5	False	6	Octahedral	18	1.036	-23.27
+VOCTIQ	Cr	0	4	24	3	3	False	4	Tetrahedral	8	0.905	-16.65
+VOGGOO	Ni	0	1	28	2	8	False	4	Square planar	7	0.987	43.65
+VOGHIJ	Fe	0	1	26	2	6	True	3	Trigonal planar	3	1.042	61.76
+VOGYOG	Cr	0	4	24	3	3	False	6	Octahedral	18	0.953	-39.99
+VOGYUM	Cr	-1	4	24	3	3	False	6	Octahedral	18	0.96	-38.72
+VOPCIM	Ni	0	1	28	2	8	False	4	Square planar	7	0.956	22.81
+VOPPAR	Fe	0	6	26	3	5	False	6	Octahedral	18	1.02	-22.47
+VOPPEV	Fe	0	6	26	3	5	False	6	Octahedral	18	1.013	-22.12
+VOVDIT	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.058	-37.91
+VOWRAA	Cr	-1	1	24	0	5	False	6	Octahedral	18	0.856	131.67
+VOYFIA	Co	0	3	27	3	6	False	5	Trigonal bipyramidal	13	0.986	-1.92
+VOYJEY	Cr	0	1	24	0	5	False	6	Octahedral	18	0.84	171.67
+VUCFAA	Mn	0	1	25	1	6	False	6	Octahedral	18	0.845	137.44
+VUCPIU	Co	0	4	27	2	7	False	3	Trigonal planar	3	1.018	-26.57
+VUCYAV	Co	1	4	27	2	7	False	6	Trigonal prismatic	19	1.193	-24.79
+VUDCEF	Ni	1	1	28	2	8	True	3	Trigonal planar	3	1.005	46.0
+VUDDON	Ni	0	1	28	2	8	False	5	Square pyramidal	14	0.997	21.86
+VUDXOH	Fe	0	1	26	2	6	False	6	Octahedral	18	0.94	41.89
+VUJLOC	Fe	0	1	26	2	6	False	6	Octahedral	18	0.948	56.46
+VUJMAP	Fe	0	1	26	2	6	False	6	Octahedral	18	0.935	94.46
+VUJPIZ	Co	0	1	27	1	8	False	5	Square pyramidal	14	0.878	40.89
+VULMOE	Mn	0	5	25	3	4	False	5	Trigonal bipyramidal	13	1.015	-76.37
+VUMCIP	Ni	0	1	28	2	8	False	4	Square planar	7	0.968	17.42
+VUMFOA01	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.972	-52.54
+VUMSUT	Mn	0	5	25	3	4	False	6	Octahedral	18	0.986	-61.55
+VUTSUY	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.998	-22.82
+VUTTAH	Cr	0	3	24	2	4	False	6	Octahedral	18	0.935	15.33
+WABGOW	Ni	0	2	28	3	7	False	6	Octahedral	18	0.984	31.22
+WABMOB	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.143	-60.7
+WABZAC	Ni	0	1	28	2	8	False	5	Square pyramidal	14	1.003	36.19
+WACDAF	Mn	0	5	25	3	4	False	5	Trigonal bipyramidal	13	0.935	-36.56
+WAFWEJ	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.065	-50.66
+WAFZUA	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.03	-31.38
+WAGHET	Cr	0	4	24	3	3	False	6	Octahedral	18	0.945	-21.24
+WAHQEE	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.012	-29.29
+WAJGUL	Fe	-1	5	26	2	6	False	5	Trigonal bipyramidal	13	1.062	-44.14
+WALJOL	Ni	0	1	28	0	8	False	4	Tetrahedral	8	0.889	75.63
+WALJUR	Ni	0	1	28	0	8	False	4	Tetrahedral	8	0.922	58.37
+WAMLEC	Mn	0	6	25	2	5	False	6	Octahedral	18	1.089	-51.01
+WAMYAL	Co	0	4	27	2	7	False	6	Octahedral	18	1.123	-8.22
+WAQVIT	Ni	0	1	28	2	8	False	4	Square planar	7	0.894	41.34
+WASDOM	Mn	1	6	25	2	5	False	5	Square pyramidal	14	1.064	-55.78
+WATSUF	Co	0	1	27	3	6	False	5	Square pyramidal	14	0.952	51.97
+WAVTOF	Ni	0	1	28	0	8	False	4	Tetrahedral	8	0.894	73.35
+WAVVEX	Ni	0	1	28	0	8	False	3	Trigonal planar	3	0.883	50.18
+WAVWEY	Fe	0	1	26	2	6	True	4	Seesaw	9	0.957	85.8
+WAWSEU	Mn	0	1	25	1	6	True	4	Tetrahedral	8	0.925	129.95
+WAXJIQ	Mn	0	6	25	2	5	False	7	Capped trigonal prismatic	25	1.165	-52.31
+WAZWEC	Fe	0	1	26	2	6	False	6	Octahedral	18	0.898	86.03
+WEFCIT	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.966	-67.61
+WEFCOZ	Mn	0	6	25	2	5	False	4	Tetrahedral	8	0.946	-75.88
+WEHFOE	Ni	0	1	28	2	8	True	3	T-shaped	6	1.083	21.39
+WEHWAI	Fe	-1	5	26	2	6	False	4	Tetrahedral	8	0.985	-57.65
+WEHZER	Fe	0	5	26	2	6	True	4	Tetrahedral	8	1.197	-23.53
+WEJKOL	Ni	0	1	28	2	8	False	4	Square planar	7	0.94	30.93
+WELKED	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.032	98.17
+WELPIM	Co	1	1	27	3	6	False	6	Octahedral	18	0.946	82.67
+WELREL	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.119	-27.45
+WEMNIM	Co	1	1	27	3	6	False	6	Octahedral	18	0.985	53.83
+WEMVUH	Fe	0	1	26	2	6	False	6	Octahedral	18	0.931	94.64
+WEMWAO	Fe	0	1	26	2	6	False	5	Square pyramidal	14	0.851	66.45
+WEPVOC	Ni	0	1	28	0	8	True	3	Trigonal planar	3	0.949	69.5
+WERHUZ	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.041	-49.34
+WERKIN	Co	-3	1	27	3	6	False	6	Octahedral	18	0.995	88.31
+WEXYIH	Mn	0	6	25	2	5	False	6	Octahedral	18	1.106	-49.1
+WIBLUO	Mn	0	1	25	1	6	False	6	Octahedral	18	0.844	125.15
+WIFSEJ	Mn	0	6	25	2	5	False	6	Octahedral	18	1.094	-42.41
+WIGMAA	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.073	-23.84
+WIGXUI	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.075	-21.98
+WIHFEB	Fe	2	2	26	3	5	False	6	Octahedral	18	0.944	35.87
+WIJLUZ	Ni	0	1	28	2	8	False	4	Square planar	7	0.966	55.93
+WIMNIR	Cr	0	4	24	3	3	False	6	Octahedral	18	0.961	-42.39
+WISHUE	Fe	0	6	26	3	5	False	6	Octahedral	18	1.047	-22.54
+WITBEJ	Fe	0	5	26	2	6	False	6	Octahedral	18	1.121	-31.27
+WITBOT	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.081	-49.44
+WIVDUB	Mn	0	5	25	3	4	False	6	Octahedral	18	0.981	-50.36
+WIVQIC	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.106	-8.53
+WIVQOI	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.091	-22.78
+WIWJOD	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.09	-31.31
+WIYCUF	Ni	0	1	28	2	8	False	4	Square planar	7	0.895	59.7
+WIYSII	Fe	0	6	26	3	5	False	5	Square pyramidal	14	0.975	-27.02
+WOBXER	Fe	1	6	26	3	5	False	6	Octahedral	18	1.061	-15.77
+WOFREP	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.022	-19.51
+WOGMEL	Fe	2	1	26	2	6	False	6	Octahedral	18	0.917	69.14
+WOJLUC	Fe	2	5	26	2	6	False	7	Capped trigonal prismatic	25	1.211	-38.06
+WOKCEE	Ni	-1	2	28	3	7	False	4	Square planar	7	0.885	39.79
+WOKYOL	Co	0	1	27	1	8	False	5	Trigonal bipyramidal	13	0.928	12.48
+WOPGIS	Mn	-1	5	25	3	4	False	5	Square pyramidal	14	0.95	-51.74
+WOTRUU	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.037	-62.94
+WOVMAY	Mn	-1	1	25	1	6	True	2	Linear	0	0.964	75.64
+WOWTOR	Ni	2	1	28	2	8	False	4	Square planar	7	0.964	33.1
+WOZHUQ	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.006	45.15
+WUBGEI	Ni	0	2	28	3	7	False	5	Square pyramidal	14	1.03	54.75
+WUFFAF	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.05	-52.56
+WUFVIC	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.034	-28.11
+WUFVOI	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.05	-32.29
+WUGCAD	Mn	0	6	25	2	5	False	2	Bent (V-shape, 109.47°)	1	0.913	-56.0
+WUGCIL	Mn	0	6	25	2	5	False	3	Trigonal planar	3	0.968	-62.08
+WUKDOV	Cr	1	4	24	3	3	False	5	Trigonal bipyramidal	13	0.942	-35.36
+WULSEB	Fe	1	5	26	2	6	False	6	Octahedral	18	1.11	-25.09
+WULSIF	Mn	1	6	25	2	5	False	6	Trigonal prismatic	19	1.108	-45.88
+WUMPOL	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.08	-32.78
+WUNCAK	Cr	0	5	24	2	4	False	5	Square pyramidal	14	1.037	-68.36
+WUNCEO	Cr	1	5	24	2	4	False	5	Square pyramidal	14	1.042	-74.57
+WUPWOU	Ni	2	3	28	2	8	False	5	Trigonal bipyramidal	13	1.08	-17.19
+WURXOZ	Mn	-2	6	25	2	5	False	4	Tetrahedral	8	0.938	-77.92
+WUSFEX	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.985	-41.95
+WUTDAQ	Fe	0	1	26	2	6	False	6	Octahedral	18	0.905	64.06
+WUTDEW	Cr	2	5	24	2	4	False	6	Octahedral	18	1.068	-48.04
+WUXVOA	Ni	0	3	28	2	8	False	3	Trigonal planar	3	0.97	-6.15
+WUYFIH	Mn	-3	3	25	3	4	False	6	Octahedral	18	0.911	6.63
+XABHIV	Fe	1	1	26	2	6	False	6	Octahedral	18	0.856	166.1
+XADCIP	Ni	0	1	28	2	8	False	4	Seesaw	9	0.903	11.03
+XADCOV	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.003	-32.38
+XADMAR	Ni	1	3	28	2	8	False	6	Octahedral	18	1.126	-43.57
+XAGLAU	Mn	1	6	25	2	5	False	7	Capped trigonal prismatic	25	1.188	-55.08
+XAHLEY	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.047	-54.68
+XAHLOI	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.16	-49.37
+XAJWOU	Ni	0	1	28	2	8	False	4	Square planar	7	0.929	41.55
+XAKHOI	Fe	-2	5	26	2	6	False	6	Octahedral	18	1.118	-30.95
+XAKPUU	Co	4	1	27	3	6	False	6	Octahedral	18	0.999	73.49
+XARGON	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.996	-39.42
+XAWJUB	Ni	0	2	28	3	7	True	3	Trigonal planar	3	1.031	38.64
+XAWVEX	Ni	0	1	28	2	8	False	4	Square planar	7	0.968	23.16
+XAXYEC	Fe	0	1	26	2	6	False	6	Octahedral	18	0.898	103.19
+XEFXEM	Cr	0	1	24	2	4	True	3	Trigonal planar	3	1.009	70.54
+XEFYAJ	Cr	1	2	24	3	3	True	3	Trigonal planar	3	1.026	25.51
+XEGPEF	Ni	0	1	28	2	8	False	4	Square planar	7	0.952	45.3
+XEHSOV	Co	0	3	27	3	6	False	4	Square planar	7	0.9	35.49
+XEHYER	Mn	0	6	25	2	5	False	6	Trigonal prismatic	19	1.162	-51.64
+XEKKUT	Co	0	1	27	1	8	True	3	Trigonal planar	3	1.045	20.91
+XELNAD	Mn	1	5	25	3	4	False	6	Octahedral	18	1.017	-42.51
+XEMSAK	Cr	0	5	24	2	4	False	4	Square planar	7	1.009	-56.12
+XENBIE	Ni	2	3	28	2	8	False	6	Octahedral	18	1.093	-53.54
+XENPAI	Fe	1	2	26	3	5	False	6	Octahedral	18	0.934	55.2
+XESMUG	Fe	-2	1	26	2	6	False	6	Octahedral	18	0.883	130.22
+XETGUY	Cr	-1	4	24	3	3	False	6	Octahedral	18	0.953	-21.35
+XEVKIU	Fe	2	5	26	2	6	False	6	Octahedral	18	1.128	-13.33
+XEVMAN	Fe	1	1	26	2	6	True	4	Tetrahedral	8	0.968	94.03
+XEYZEH	Ni	2	3	28	2	8	False	6	Octahedral	18	1.148	-29.28
+XEZMEU	Fe	0	5	26	2	6	False	7	Pentagonal bipyramidal	23	1.15	-23.58
+XEZNUM	Mn	0	6	25	2	5	False	5	Trigonal bipyramidal	13	1.073	-64.32
+XEZTEE	Mn	0	6	25	2	5	False	6	Octahedral	18	1.104	-58.93
+XEZWOQ	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.998	-27.12
+XEZZUX	Fe	1	2	26	3	5	False	6	Octahedral	18	0.949	38.51
+XIBBAL	Fe	1	2	26	3	5	False	6	Octahedral	18	0.946	52.9
+XIBNUS	Co	0	2	27	2	7	True	2	Linear	0	1.013	33.17
+XIDNON	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.163	-59.99
+XIFPAD	Ni	0	1	28	2	8	True	2	Linear	0	1.077	16.7
+XIHVIT	Fe	-2	1	26	2	6	False	6	Octahedral	18	0.883	136.86
+XILJEH	Cr	0	5	24	2	4	True	4	Tetrahedral	8	1.131	-34.04
+XILTIV	Fe	0	1	26	2	6	False	6	Octahedral	18	0.9	96.81
+XIMHAD	Mn	0	6	25	2	5	False	7	Pentagonal bipyramidal	23	1.165	-58.23
+XIMROB	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.996	-29.29
+XIMSAO	Fe	-2	5	26	2	6	False	4	Tetrahedral	8	0.948	-63.42
+XIMYUO	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.971	-25.58
+XITQEX	Co	0	2	27	2	7	False	6	Octahedral	18	1.09	30.68
+XITQIB	Co	0	2	27	2	7	False	6	Octahedral	18	1.071	30.24
+XIVKOD	Co	1	4	27	2	7	False	5	Trigonal bipyramidal	13	1.093	-28.19
+XIWBEK	Cr	1	4	24	3	3	False	6	Octahedral	18	0.965	-22.17
+XIXTAA	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.981	-19.74
+XIXTEE	Ni	0	1	28	2	8	False	4	Square planar	7	0.919	48.05
+XIXTII	Ni	0	3	28	2	8	False	5	Square pyramidal	14	1.073	-20.23
+XIYMEY	Co	2	4	27	2	7	False	6	Octahedral	18	1.12	-22.02
+XIYPAY	Fe	-2	5	26	2	6	False	4	Square planar	7	1.0	-48.96
+XOBBIZ	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.011	-56.03
+XOCJAB	Ni	0	1	28	2	8	False	4	Square planar	7	0.975	45.94
+XOCJUV	Ni	0	1	28	2	8	False	4	Square planar	7	0.948	48.34
+XOCNUY	Cr	0	1	24	0	5	False	6	Octahedral	18	0.879	116.0
+XOFDUR	Fe	1	6	26	3	5	False	6	Octahedral	18	1.042	-17.55
+XOGXAS	Co	0	4	27	2	7	False	5	Square pyramidal	14	1.091	-6.75
+XOMCOS	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.055	-33.83
+XONCEJ	Co	0	3	27	1	8	False	4	Tetrahedral	8	0.971	-34.71
+XOPSEB	Fe	1	1	26	2	6	False	6	Octahedral	18	0.955	73.84
+XOQVAC	Co	0	1	27	3	6	False	6	Octahedral	18	0.993	54.69
+XOQZOT	Ni	1	3	28	2	8	False	5	Square pyramidal	14	1.094	-17.72
+XOTGOC	Ni	0	3	28	2	8	False	4	Tetrahedral	8	1.018	-20.39
+XOZXIV	Ni	0	1	28	2	8	False	4	Square planar	7	0.95	40.09
+XUBJEK	Ni	0	1	28	0	8	False	4	Tetrahedral	8	0.862	67.2
+XUBMUF	Co	2	4	27	2	7	False	6	Pentagonal pyramidal	17	1.214	-38.42
+XUJXOP	Cr	1	4	24	3	3	False	6	Octahedral	18	0.96	-37.47
+XUKHOC	Ni	0	1	28	2	8	False	4	Square planar	7	0.931	31.36
+XULXAG	Ni	0	1	28	2	8	False	4	Square planar	7	0.927	31.04
+XUNTAB	Co	0	4	27	2	7	False	3	Trigonal planar	3	0.927	-10.43
+XUPJOI	Fe	0	1	26	2	6	False	6	Octahedral	18	0.906	99.9
+XUPRAB	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.991	-25.78
+XUPREF	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.997	-13.51
+XUPSIL	Ni	0	1	28	2	8	False	4	Square planar	7	0.948	26.46
+XUQXEO	Ni	0	3	28	2	8	False	7	Pentagonal bipyramidal	23	1.227	-26.45
+XUSCIY	Co	1	1	27	1	8	True	4	Tetrahedral	8	0.892	25.32
+XUVTIR	Mn	1	1	25	1	6	True	4	Tetrahedral	8	0.935	114.26
+XUVVAN	Co	0	4	27	2	7	False	7	Pentagonal bipyramidal	23	1.216	-17.88
+XUWPAH	Ni	0	3	28	2	8	False	6	Octahedral	18	1.123	-29.94
+XUYWAQ	Ni	1	1	28	2	8	False	4	Square planar	7	0.937	32.74
+YABLIW	Ni	0	1	28	2	8	False	4	Square planar	7	0.921	47.9
+YABPEW	Ni	0	1	28	2	8	False	4	Square planar	7	0.947	36.93
+YADKET	Ni	0	1	28	2	8	False	5	Square pyramidal	14	0.998	23.97
+YAGBIR	Mn	0	5	25	3	4	False	5	Square pyramidal	14	0.924	-46.82
+YAJLAW	Fe	0	5	26	2	6	False	6	Octahedral	18	1.095	-16.51
+YAJLEA	Fe	0	5	26	2	6	False	6	Octahedral	18	1.108	-15.89
+YAKFOG	Cr	0	4	24	3	3	False	6	Octahedral	18	0.961	-20.94
+YAKGAT	Cr	0	4	24	3	3	False	6	Octahedral	18	0.954	-21.23
+YALHUP	Co	0	3	27	1	8	False	4	Seesaw	9	1.099	-44.53
+YALZET	Co	1	4	27	2	7	False	6	Octahedral	18	1.138	-12.78
+YANKOQ	Mn	2	6	25	2	5	False	6	Octahedral	18	1.122	-33.16
+YANKUW	Fe	2	5	26	2	6	False	6	Octahedral	18	1.135	-6.16
+YAPGUS	Ni	0	1	28	2	8	False	4	Square planar	7	0.935	20.62
+YAPZIA	Ni	0	3	28	2	8	False	5	Trigonal bipyramidal	13	1.08	-27.23
+YAQBEA	Fe	1	2	26	3	5	False	6	Octahedral	18	0.956	70.48
+YAQLOR	Cr	0	3	24	2	4	True	2	Linear	0	1.055	-3.77
+YAQMEI	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.071	-19.14
+YARTIW	Cr	-3	4	24	3	3	False	6	Octahedral	18	0.974	-43.66
+YASHOP	Cr	-2	4	24	3	3	False	6	Octahedral	18	0.951	-47.86
+YASHUV	Fe	-2	6	26	3	5	False	6	Octahedral	18	1.026	-23.15
+YASPUE	Fe	0	5	26	2	6	False	6	Octahedral	18	1.112	-22.58
+YATQER	Cr	0	4	24	3	3	False	6	Octahedral	18	0.937	-21.55
+YAWWEZ	Ni	0	1	28	2	8	True	5	Trigonal bipyramidal	13	1.023	48.73
+YECRII	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.017	-56.9
+YECSIK	Ni	1	3	28	2	8	False	5	Square pyramidal	14	1.063	-15.63
+YECSOQ	Mn	1	6	25	2	5	False	5	Trigonal bipyramidal	13	1.068	-47.84
+YECSUW	Co	1	4	27	2	7	False	5	Trigonal bipyramidal	13	1.087	-13.83
+YEDTAC	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.052	43.84
+YEFFOE	Cr	0	4	24	3	3	False	6	Octahedral	18	0.968	-17.9
+YEHDUM	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	1.063	-36.87
+YEJJIG	Cr	0	4	24	3	3	False	5	Square pyramidal	14	0.919	-34.82
+YEJWAM	Cr	0	1	24	0	5	False	6	Octahedral	18	0.861	155.41
+YEKLOQ	Cr	0	4	24	3	3	False	6	Octahedral	18	1.012	-21.08
+YEKLUW	Cr	0	4	24	3	3	False	6	Octahedral	18	0.972	-20.62
+YELWAN	Ni	2	3	28	2	8	False	6	Octahedral	18	1.133	-29.45
+YEQTOE	Fe	0	1	26	2	6	False	6	Octahedral	18	0.882	115.39
+YEQZID	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.033	-14.2
+YETBOP	Co	1	1	27	3	6	False	6	Octahedral	18	0.986	61.82
+YETBUV	Co	1	1	27	3	6	False	6	Octahedral	18	0.971	70.33
+YETCAC	Co	3	1	27	3	6	False	6	Octahedral	18	1.006	79.14
+YETCEG	Co	1	1	27	3	6	False	6	Octahedral	18	0.978	63.48
+YETCIK	Co	2	1	27	3	6	False	6	Octahedral	18	0.989	75.12
+YETYOM	Ni	-1	2	28	3	7	False	5	Trigonal bipyramidal	13	0.949	25.68
+YEWSOI	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.977	-32.71
+YEWSUO	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.975	-33.63
+YEXVAA	Co	0	1	27	3	6	False	6	Octahedral	18	0.99	91.2
+YEXVEE	Co	0	1	27	3	6	False	6	Octahedral	18	1.01	87.01
+YEZLEU	Co	0	2	27	2	7	False	6	Octahedral	18	0.991	54.37
+YEZYUZ	Cr	0	4	24	3	3	False	6	Octahedral	18	0.98	-21.53
+YIBHUM	Mn	-2	6	25	2	5	False	4	Tetrahedral	8	0.973	-73.34
+YIJDED	Mn	1	6	25	2	5	False	6	Octahedral	18	1.096	-52.7
+YIJGII	Ni	0	1	28	2	8	False	4	Square planar	7	0.915	27.12
+YIKVUJ	Cr	1	4	24	3	3	False	6	Octahedral	18	0.953	-35.63
+YIKVUM	Co	0	3	27	1	8	False	4	Seesaw	9	1.001	-26.44
+YILLAH	Fe	-1	6	26	3	5	False	6	Octahedral	18	1.044	-22.2
+YINCOO	Co	0	4	27	2	7	False	4	Tetrahedral	8	0.994	-32.87
+YISQAT	Co	0	1	27	3	6	False	6	Octahedral	18	0.977	90.18
+YITNAR	Fe	-1	2	26	3	5	False	6	Octahedral	18	0.925	77.05
+YITRUO	Fe	1	2	26	3	5	False	5	Square pyramidal	14	0.885	57.53
+YITVON	Fe	0	6	26	3	5	False	6	Octahedral	18	1.027	-16.37
+YIXFER	Co	0	1	27	1	8	True	5	Trigonal bipyramidal	13	0.967	33.14
+YIYDAM	Ni	0	1	28	2	8	False	4	Square planar	7	0.897	34.95
+YIZNOL	Mn	0	6	25	2	5	False	4	Seesaw	9	1.065	-56.75
+YIZZIR	Co	0	2	27	2	7	True	2	Linear	0	1.089	29.88
+YOBCUO	Ni	0	3	28	2	8	False	4	Seesaw	9	1.03	-23.79
+YOJKEN	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.076	-37.11
+YOJKIR	Cr	-1	4	24	3	3	True	4	Tetrahedral	8	0.999	-22.02
+YOJQEU	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.965	-37.76
+YOJQIY	Ni	0	3	28	2	8	False	4	Tetrahedral	8	0.952	-36.63
+YOJVOJ	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.965	-42.03
+YOLDAG	Ni	-1	1	28	2	8	False	3	T-shaped	6	0.944	20.73
+YONHAK	Cr	0	1	24	0	5	True	5	Trigonal bipyramidal	13	1.035	116.44
+YONWUT	Mn	-1	6	25	2	5	False	4	Tetrahedral	8	0.97	-71.25
+YORSEE	Fe	1	5	26	2	6	False	5	Square pyramidal	14	1.048	-30.77
+YOSKAV	Co	0	2	27	2	7	True	2	Linear	0	1.048	39.55
+YOWZOB	Fe	0	5	26	2	6	False	4	Tetrahedral	8	1.036	-39.08
+YOYVOY	Mn	0	6	25	2	5	False	6	Octahedral	18	1.102	-39.81
+YOYXES	Ni	0	1	28	2	8	False	4	Square planar	7	0.951	44.88
+YOZRAG	Fe	-2	6	26	3	5	False	5	Trigonal bipyramidal	13	0.978	-43.04
+YOZYIW	Fe	0	1	26	2	6	False	6	Octahedral	18	0.89	95.44
+YOZZET	Fe	0	1	26	2	6	False	6	Octahedral	18	0.93	76.41
+YUBDAB	Fe	0	5	26	2	6	False	4	Tetrahedral	8	0.989	-44.13
+YUDFOS	Mn	0	1	25	1	6	False	6	Octahedral	18	0.847	123.31
+YUJZAF	Ni	0	1	28	2	8	False	5	Square pyramidal	14	1.058	19.45
+YULMUP	Ni	0	1	28	2	8	False	4	Square planar	7	0.952	33.11
+YUMGOF	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.077	-40.52
+YUMJIB	Cr	0	4	24	3	3	True	4	Tetrahedral	8	1.045	-19.68
+YURDIY	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.033	53.11
+YUXHUV	Ni	0	1	28	2	8	True	3	Trigonal planar	3	1.019	53.2
+ZALRUZ	Ni	0	1	28	2	8	False	4	Square planar	7	0.961	33.24
+ZARXAU	Ni	2	3	28	2	8	False	6	Octahedral	18	1.119	-44.89
+ZASROA	Ni	2	1	28	2	8	False	4	Square planar	7	0.986	34.72
+ZASRUG	Ni	2	1	28	2	8	False	4	Square planar	7	0.984	34.92
+ZATWOI	Cr	1	5	24	2	4	False	5	Trigonal bipyramidal	13	1.026	-44.98
+ZAVTUN	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	0.997	-29.3
+ZAXBUX	Cr	0	4	24	3	3	False	6	Octahedral	18	0.946	-39.74
+ZAXWUQ	Cr	0	4	24	3	3	False	6	Octahedral	18	0.96	-21.66
+ZAXYEC	Cr	1	4	24	3	3	False	6	Octahedral	18	0.977	-21.91
+ZAYJOB	Mn	-2	6	25	2	5	False	4	Tetrahedral	8	0.963	-78.44
+ZAZNOD	Fe	-1	5	26	2	6	False	4	Tetrahedral	8	0.986	-43.83
+ZAZNUJ	Fe	0	6	26	3	5	False	5	Trigonal bipyramidal	13	1.015	-6.6
+ZEBCEQ	Mn	0	6	25	2	5	False	7	Capped trigonal prismatic	25	1.17	-52.78
+ZEBSAA	Fe	0	1	26	2	6	False	6	Octahedral	18	0.922	54.45
+ZEDSOT	Co	0	4	27	2	7	False	5	Trigonal bipyramidal	13	1.102	-13.23
+ZEGSOT01	Cr	0	1	24	2	4	True	5	Trigonal bipyramidal	13	0.943	133.1
+ZEHMEG	Ni	0	1	28	2	8	False	3	Trigonal planar	3	0.874	23.26
+ZEHPAD	Mn	0	6	25	2	5	False	6	Octahedral	18	1.112	-38.96
+ZELDAX	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.05	-39.82
+ZELWAO	Mn	0	6	25	2	5	False	4	Tetrahedral	8	1.035	-74.0
+ZENBOJ	Co	-1	1	27	3	6	False	6	Octahedral	18	0.976	53.44
+ZEQLUE	Co	1	1	27	3	6	False	6	Octahedral	18	0.962	89.92
+ZERDIJ	Mn	0	5	25	3	4	False	5	Square pyramidal	14	0.894	-41.19
+ZEWDIO	Co	0	1	27	3	6	False	6	Octahedral	18	0.957	56.34
+ZEYWAD	Mn	0	6	25	2	5	False	5	Square pyramidal	14	1.06	-58.37
+ZIBNIH	Co	0	4	27	2	7	False	6	Octahedral	18	1.15	-10.4
+ZIDKAY	Fe	0	1	26	0	6	True	4	Tetrahedral	8	1.021	98.1
+ZILSEU	Ni	2	1	28	2	8	False	4	Square planar	7	1.052	22.59
+ZILVUO	Mn	1	1	25	1	6	False	6	Octahedral	18	0.86	127.97
+ZILYIC	Fe	0	5	26	2	6	False	6	Octahedral	18	1.113	-25.97
+ZILZUP	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.091	-33.39
+ZIMBEC	Fe	0	6	26	3	5	False	6	Octahedral	18	1.018	-12.73
+ZIMPUG	Co	0	2	27	2	7	False	4	Square planar	7	0.92	29.06
+ZIMQAN	Co	0	2	27	2	7	False	4	Square planar	7	0.933	16.47
+ZIVLIC	Co	2	2	27	2	7	False	5	Square pyramidal	14	1.002	22.99
+ZIXMOI	Co	1	1	27	3	6	False	6	Octahedral	18	0.989	63.94
+ZIZHOI	Fe	0	1	26	2	6	False	6	Octahedral	18	0.91	51.06
+ZOBQIQ	Co	1	2	27	2	7	False	5	Square pyramidal	14	0.967	33.56
+ZOFDAC	Fe	0	6	26	3	5	False	5	Square pyramidal	14	0.977	-21.27
+ZOJXOL	Ni	2	3	28	2	8	False	6	Octahedral	18	1.112	-35.59
+ZOQXIM	Mn	0	1	25	1	6	True	4	Tetrahedral	8	0.977	126.99
+ZOSZIQ	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.025	42.59
+ZOTRAB	Co	0	2	27	2	7	False	6	Octahedral	18	1.058	17.29
+ZOVTUZ	Cr	0	4	24	3	3	True	3	Trigonal planar	3	1.027	-19.33
+ZOVZOB	Cr	0	4	24	3	3	False	6	Octahedral	18	0.976	-22.18
+ZOWPAF	Mn	0	5	25	3	4	False	4	Square planar	7	0.95	-67.16
+ZOYCUL	Cr	0	5	24	2	4	False	4	Square planar	7	0.988	-82.87
+ZOZGEA	Ni	2	3	28	2	8	False	6	Octahedral	18	1.11	-28.05
+ZOZPAF	Co	-1	4	27	2	7	False	6	Octahedral	18	1.157	-6.46
+ZUJRAZ	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.03	-29.53
+ZULGAQ	Fe	-2	6	26	3	5	False	6	Octahedral	18	1.031	-23.78
+ZUMCUI	Co	0	4	27	2	7	False	4	Tetrahedral	8	1.012	-33.95
+ZUMSEH	Fe	0	5	26	2	6	False	5	Square pyramidal	14	1.048	-35.05
+ZUNDIN	Ni	0	1	28	2	8	False	5	Square pyramidal	14	1.008	19.16
+ZUQLAA	Ni	0	3	28	2	8	False	3	Trigonal planar	3	0.983	-20.91
+ZURDEV	Fe	0	1	26	0	6	False	5	Trigonal bipyramidal	13	0.814	142.21
+ZUSSUB	Co	0	1	27	3	6	True	4	Tetrahedral	8	1.063	80.56
+ZUTHEB	Ni	0	1	28	2	8	False	4	Square planar	7	0.919	28.36
+ZUWXUN	Co	0	1	27	1	8	True	3	Trigonal planar	3	0.984	45.15
+ZUWYOI	Co	0	1	27	1	8	True	3	Trigonal planar	3	1.026	38.77
+ZUYNEM	Fe	0	5	26	2	6	False	5	Trigonal bipyramidal	13	1.113	-40.35
+ZUZWEW	Cr	0	4	24	3	3	False	6	Octahedral	18	0.95	-33.04
+ZZZAOG01	Co	0	2	27	2	7	False	4	Square planar	7	0.922	36.16
+ZZZRXM01	Ni	1	3	28	2	8	False	6	Octahedral	18	1.136	-33.32
+ZZZTMK03	Ni	0	1	28	2	8	False	4	Square planar	7	0.936	26.89

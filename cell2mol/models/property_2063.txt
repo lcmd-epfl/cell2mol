@@ -1,0 +1,2064 @@
+refcode	metal	total_charge	spin_multiplicity	elem_nr	m_ox	d_elec	CN	geometry	rel_m
+KIPLIH	Cr	0	1	24	0	5	5	Square pyramidal	0.836
+AYIZIS	Cr	0	1	24	0	5	6	Octahedral	0.848
+MISLAB	Cr	0	1	24	0	5	6	Octahedral	0.859
+KOQBAT	Cr	0	1	24	0	5	6	Octahedral	0.86
+VOWRAA	Cr	-1	1	24	0	5	6	Octahedral	0.856
+YEJWAM	Cr	0	1	24	0	5	6	Octahedral	0.861
+BIVTOP	Cr	0	1	24	0	5	6	Octahedral	0.863
+EAMNCR10	Cr	0	1	24	0	5	6	Octahedral	0.851
+MACZEW	Cr	0	1	24	0	5	6	Octahedral	0.878
+PCTHFC	Cr	0	1	24	0	5	6	Octahedral	0.868
+JONMEE	Cr	0	1	24	0	5	6	Octahedral	0.845
+RIMDIA	Cr	0	1	24	0	5	6	Octahedral	0.923
+JAGGED	Cr	0	1	24	0	5	6	Octahedral	0.849
+TABNEP	Cr	0	1	24	0	5	6	Octahedral	0.859
+CMPHSC	Cr	0	1	24	0	5	6	Octahedral	0.865
+SEKHEX	Cr	0	1	24	0	5	6	Octahedral	0.838
+VOYJEY	Cr	0	1	24	0	5	6	Octahedral	0.84
+PEMSOP	Cr	0	1	24	0	5	6	Octahedral	0.845
+HINTUU	Cr	0	1	24	0	5	6	Octahedral	0.899
+SOBXAI	Cr	0	1	24	0	5	6	Octahedral	0.863
+RIQQAJ	Cr	-1	1	24	0	5	6	Octahedral	0.883
+RIQQEN	Cr	-1	1	24	0	5	6	Octahedral	0.888
+EKOXOR	Cr	0	1	24	0	5	6	Octahedral	0.853
+PEMTAC	Cr	0	1	24	0	5	6	Octahedral	0.876
+ROKBUO	Cr	0	1	24	0	5	6	Octahedral	0.855
+TAJXUZ	Cr	0	1	24	0	5	6	Octahedral	0.847
+KIJSUR	Cr	0	1	24	0	5	6	Octahedral	0.861
+THOCCR	Cr	0	1	24	0	5	6	Octahedral	0.871
+BORFET	Cr	0	1	24	0	5	6	Octahedral	0.873
+TUTJOH	Cr	-1	1	24	0	5	6	Octahedral	0.881
+ISURUK	Cr	0	1	24	0	5	6	Octahedral	0.832
+RUKLAK	Cr	0	1	24	0	5	6	Octahedral	0.911
+TAJYAG	Cr	0	1	24	0	5	6	Octahedral	0.869
+TAWNEK	Cr	0	1	24	0	5	6	Octahedral	0.858
+FOKYEJ	Cr	0	1	24	0	5	6	Octahedral	0.858
+MEHBAC	Cr	0	1	24	0	5	6	Octahedral	0.905
+ISURAQ	Cr	0	1	24	0	5	6	Octahedral	0.852
+XOCNUY	Cr	0	1	24	0	5	6	Octahedral	0.879
+DOQWUC	Cr	0	5	24	2	4	3	T-shaped	0.958
+DOQXUD	Cr	0	5	24	2	4	3	Trigonal planar	0.913
+PUXVOU	Cr	0	5	24	2	4	3	Trigonal planar	0.925
+INIHAP	Cr	0	5	24	2	4	3	Trigonal planar	0.891
+AKASIQ	Cr	0	5	24	2	4	3	Trigonal planar	0.897
+RIWXEA	Cr	0	5	24	2	4	4	Seesaw	1.022
+PUVLAV	Cr	0	5	24	2	4	4	Seesaw	1.095
+VIKYOE	Cr	0	5	24	2	4	4	Seesaw	1.114
+HOXMOX	Cr	-1	5	24	2	4	4	Seesaw	0.965
+COPCAM	Cr	0	5	24	2	4	4	Seesaw	0.954
+ODIHOY	Cr	0	5	24	2	4	4	Seesaw	0.97
+CAFZAM	Cr	0	5	24	2	4	4	Seesaw	0.968
+LUYXEJ	Cr	0	5	24	2	4	4	Seesaw	0.973
+KAPPEW	Cr	0	5	24	2	4	4	Seesaw	1.076
+HAGHOO	Cr	0	5	24	2	4	4	Square planar	1.029
+UNEREL	Cr	0	5	24	2	4	4	Square planar	0.996
+VABTOH	Cr	0	5	24	2	4	4	Square planar	1.023
+UDUSAQ	Cr	0	5	24	2	4	4	Square planar	0.991
+CILGIO	Cr	0	5	24	2	4	4	Square planar	1.003
+RUWSOU	Cr	0	5	24	2	4	4	Square planar	1.012
+EQIVOP	Cr	0	5	24	2	4	4	Square planar	0.98
+ZOYCUL	Cr	0	5	24	2	4	4	Square planar	0.988
+XEMSAK	Cr	0	5	24	2	4	4	Square planar	1.009
+DIXXEP	Cr	0	5	24	2	4	4	Square planar	1.02
+UDURUJ	Cr	0	5	24	2	4	4	Square planar	0.962
+RUWSAG	Cr	0	5	24	2	4	4	Square planar	0.978
+DUYZII	Cr	0	5	24	2	4	4	Square planar	0.978
+SEZVAU	Cr	0	5	24	2	4	4	Square planar	0.993
+ZURVIR	Cr	-2	5	24	2	4	4	Square planar	0.947
+WAFBUA	Cr	-2	5	24	2	4	4	Square planar	1.03
+LOZWIJ	Cr	0	5	24	2	4	4	Square planar	0.988
+IHEVUM	Cr	0	5	24	2	4	4	Square planar	0.983
+SEZVEY	Cr	-2	5	24	2	4	4	Square planar	0.987
+JOBBAF	Cr	0	5	24	2	4	4	Square planar	1.05
+AFOSUM	Cr	0	5	24	2	4	4	Square planar	0.986
+EQIVIJ	Cr	0	5	24	2	4	4	Square planar	0.965
+GIFJEM	Cr	0	5	24	2	4	4	Square planar	0.965
+DUBPIA	Cr	0	5	24	2	4	4	Square planar	0.964
+MIRVEP	Cr	0	5	24	2	4	4	Square planar	1.004
+ECOXAW	Cr	0	5	24	2	4	4	Square planar	0.963
+VAMNAY	Cr	0	5	24	2	4	4	Square planar	0.978
+HUSXUP	Cr	-2	5	24	2	4	4	Square planar	0.944
+MUQQOE	Cr	0	5	24	2	4	5	Square pyramidal	1.039
+JAPLUI	Cr	0	5	24	2	4	5	Square pyramidal	0.976
+LEMRIF	Cr	0	5	24	2	4	5	Square pyramidal	1.009
+MUNLIQ	Cr	0	5	24	2	4	5	Square pyramidal	1.045
+QIRWUL	Cr	1	5	24	2	4	5	Square pyramidal	1.029
+BUJPIH	Cr	0	5	24	2	4	5	Square pyramidal	1.027
+DOJCOX	Cr	-1	5	24	2	4	5	Square pyramidal	0.97
+WUNCAK	Cr	0	5	24	2	4	5	Square pyramidal	1.037
+WUNCEO	Cr	1	5	24	2	4	5	Square pyramidal	1.042
+SEZTUM	Cr	0	5	24	2	4	5	Square pyramidal	1.045
+CUBBOQ	Cr	0	5	24	2	4	5	Square pyramidal	1.021
+QIRWIZ	Cr	1	5	24	2	4	5	Trigonal bipyramidal	1.043
+ZATWOI	Cr	1	5	24	2	4	5	Trigonal bipyramidal	1.026
+QIRWOF	Cr	1	5	24	2	4	5	Trigonal bipyramidal	1.029
+CAGCIW	Cr	-2	5	24	2	4	6	Octahedral	1.071
+VAQFAU	Cr	0	5	24	2	4	6	Octahedral	1.122
+VUTTAH	Cr	0	3	24	2	4	6	Octahedral	0.935
+NEYWOD	Cr	0	3	24	2	4	6	Octahedral	0.942
+NAFNEO	Cr	0	3	24	2	4	6	Octahedral	0.958
+WUTDEW	Cr	2	5	24	2	4	6	Octahedral	1.068
+KAWKIE	Cr	2	5	24	2	4	6	Octahedral	1.101
+JUVYOO	Cr	0	5	24	2	4	6	Octahedral	1.096
+CIDVOA	Cr	0	5	24	2	4	6	Octahedral	1.047
+IWORIX	Cr	2	5	24	2	4	6	Octahedral	1.028
+NOHKUQ	Cr	0	4	24	3	3	3	Trigonal planar	0.826
+GAGVUG	Cr	0	4	24	3	3	3	Trigonal planar	0.826
+JIWRIQ	Cr	-1	4	24	3	3	4	Seesaw	0.997
+LUBPOQ	Cr	0	4	24	3	3	4	Tetrahedral	0.934
+FEWMEA	Cr	1	4	24	3	3	4	Tetrahedral	0.924
+VOCTIQ	Cr	0	4	24	3	3	4	Tetrahedral	0.905
+PUXVIO	Cr	0	4	24	3	3	4	Tetrahedral	0.897
+INIFOB	Cr	0	4	24	3	3	4	Tetrahedral	0.873
+HONZUF	Cr	0	4	24	3	3	5	Square pyramidal	1.006
+HONZOZ	Cr	0	4	24	3	3	5	Square pyramidal	0.978
+LOZXOQ	Cr	1	4	24	3	3	5	Square pyramidal	0.986
+UWUYER	Cr	0	4	24	3	3	5	Square pyramidal	0.924
+ACEGOH	Cr	0	4	24	3	3	5	Square pyramidal	1.04
+ICASOV	Cr	0	4	24	3	3	5	Square pyramidal	0.892
+YEJJIG	Cr	0	4	24	3	3	5	Square pyramidal	0.919
+HONZIT	Cr	0	4	24	3	3	5	Trigonal bipyramidal	0.997
+ILUFUQ	Cr	-1	4	24	3	3	5	Trigonal bipyramidal	0.952
+MOMCIB	Cr	0	4	24	3	3	5	Trigonal bipyramidal	0.94
+WUKDOV	Cr	1	4	24	3	3	5	Trigonal bipyramidal	0.942
+PUDPAG	Cr	0	4	24	3	3	6	Octahedral	0.935
+YARTIW	Cr	-3	4	24	3	3	6	Octahedral	0.974
+PITBUP	Cr	-1	4	24	3	3	6	Octahedral	1.059
+LUGDUM	Cr	0	4	24	3	3	6	Octahedral	1.001
+DIYVAL	Cr	0	4	24	3	3	6	Octahedral	1.041
+JEPPOM	Cr	0	4	24	3	3	6	Octahedral	1.02
+FOSVIS	Cr	0	4	24	3	3	6	Octahedral	1.047
+NEYWUJ	Cr	0	4	24	3	3	6	Octahedral	0.953
+KEFYAV	Cr	1	4	24	3	3	6	Octahedral	0.976
+DPBPCR	Cr	1	4	24	3	3	6	Octahedral	1.0
+RUHHOS	Cr	1	4	24	3	3	6	Octahedral	0.983
+KIWMAG	Cr	1	4	24	3	3	6	Octahedral	1.001
+YEKLOQ	Cr	0	4	24	3	3	6	Octahedral	1.012
+VOGYUM	Cr	-1	4	24	3	3	6	Octahedral	0.96
+FIKXEF	Cr	-1	4	24	3	3	6	Octahedral	0.968
+CAZVAA	Cr	-1	4	24	3	3	6	Octahedral	0.966
+AHEZAO	Cr	0	4	24	3	3	6	Octahedral	0.952
+PAZDUQ	Cr	0	4	24	3	3	6	Octahedral	0.983
+EGEYIA	Cr	0	4	24	3	3	6	Octahedral	0.945
+VOGYOG	Cr	0	4	24	3	3	6	Octahedral	0.953
+ZAXBUX	Cr	0	4	24	3	3	6	Octahedral	0.946
+YEZYUZ	Cr	0	4	24	3	3	6	Octahedral	0.98
+WIMNIR	Cr	0	4	24	3	3	6	Octahedral	0.961
+KOLZAN	Cr	0	4	24	3	3	6	Octahedral	0.967
+GIDKAH	Cr	0	4	24	3	3	6	Octahedral	0.945
+ZOVZOB	Cr	0	4	24	3	3	6	Octahedral	0.976
+KIWQOY	Cr	0	4	24	3	3	6	Octahedral	0.958
+KIWZAT	Cr	0	4	24	3	3	6	Octahedral	0.954
+YAKFOG	Cr	0	4	24	3	3	6	Octahedral	0.961
+YAKGAT	Cr	0	4	24	3	3	6	Octahedral	0.954
+UHIZAM	Cr	0	4	24	3	3	6	Octahedral	0.968
+TADFEJ	Cr	0	4	24	3	3	6	Octahedral	0.957
+NOGWIQ	Cr	0	4	24	3	3	6	Octahedral	0.976
+VEWKIU	Cr	0	4	24	3	3	6	Octahedral	0.962
+ZAXWUQ	Cr	0	4	24	3	3	6	Octahedral	0.96
+GEQZUY	Cr	0	4	24	3	3	6	Octahedral	0.96
+ULAYUC	Cr	1	4	24	3	3	6	Octahedral	0.971
+WAGHET	Cr	0	4	24	3	3	6	Octahedral	0.945
+LONRUC	Cr	1	4	24	3	3	6	Octahedral	0.95
+XETGUY	Cr	-1	4	24	3	3	6	Octahedral	0.953
+OWOGUE	Cr	0	4	24	3	3	6	Octahedral	0.939
+IHETOG	Cr	0	4	24	3	3	6	Octahedral	0.953
+DOFVIG	Cr	1	4	24	3	3	6	Octahedral	0.945
+DIJJIR	Cr	0	4	24	3	3	6	Octahedral	0.962
+YIKVUJ	Cr	1	4	24	3	3	6	Octahedral	0.953
+MACRCC	Cr	2	4	24	3	3	6	Octahedral	0.986
+JOMNAA	Cr	2	4	24	3	3	6	Octahedral	0.976
+NOBHET	Cr	1	4	24	3	3	6	Octahedral	0.999
+EXOVIX	Cr	0	4	24	3	3	6	Octahedral	0.958
+SEPHOL	Cr	0	4	24	3	3	6	Octahedral	0.983
+UFAWOO	Cr	0	4	24	3	3	6	Octahedral	0.965
+YATQER	Cr	0	4	24	3	3	6	Octahedral	0.937
+YEFFOE	Cr	0	4	24	3	3	6	Octahedral	0.968
+GULWUH	Cr	0	4	24	3	3	6	Octahedral	0.931
+XUJXOP	Cr	1	4	24	3	3	6	Octahedral	0.96
+YASHOP	Cr	-2	4	24	3	3	6	Octahedral	0.951
+VAFDIR	Cr	0	4	24	3	3	6	Octahedral	0.958
+DUCQIC	Cr	0	4	24	3	3	6	Octahedral	0.951
+FEZXUD	Cr	1	4	24	3	3	6	Octahedral	0.976
+BUTDAV	Cr	1	4	24	3	3	6	Octahedral	0.955
+DORZEP	Cr	-1	4	24	3	3	6	Octahedral	0.96
+BAPPOX	Cr	2	4	24	3	3	6	Octahedral	0.979
+DULQAD	Cr	2	4	24	3	3	6	Octahedral	0.954
+LEYSEN	Cr	1	4	24	3	3	6	Octahedral	0.964
+YEKLUW	Cr	0	4	24	3	3	6	Octahedral	0.972
+AFOMEQ	Cr	0	4	24	3	3	6	Octahedral	0.961
+EYAYIN	Cr	-1	4	24	3	3	6	Octahedral	0.94
+BGUCRM	Cr	0	4	24	3	3	6	Octahedral	0.94
+ENDACR	Cr	3	4	24	3	3	6	Octahedral	0.982
+CUPCEV	Cr	2	4	24	3	3	6	Octahedral	0.973
+ZAXYEC	Cr	1	4	24	3	3	6	Octahedral	0.977
+QEQVEO	Cr	0	4	24	3	3	6	Octahedral	0.95
+JEQNOJ	Cr	1	4	24	3	3	6	Octahedral	0.961
+XIWBEK	Cr	1	4	24	3	3	6	Octahedral	0.965
+HESMIB	Cr	1	4	24	3	3	6	Octahedral	0.877
+MCENCR	Cr	1	4	24	3	3	6	Octahedral	0.976
+MCEACR	Cr	1	4	24	3	3	6	Octahedral	0.977
+TGLYCR	Cr	0	4	24	3	3	6	Octahedral	0.958
+BOTHEX	Cr	0	4	24	3	3	6	Octahedral	0.948
+LDHPCR10	Cr	0	4	24	3	3	6	Octahedral	0.965
+OFIXEI	Cr	0	4	24	3	3	6	Octahedral	0.948
+KUSPUJ	Cr	0	4	24	3	3	6	Octahedral	0.971
+NOJJAX	Cr	1	4	24	3	3	6	Octahedral	0.955
+TUDJIL	Cr	-1	4	24	3	3	6	Octahedral	0.945
+VEXWON	Cr	1	4	24	3	3	6	Octahedral	0.946
+SCYSCR	Cr	-1	4	24	3	3	6	Octahedral	0.969
+GORWIT	Cr	-1	4	24	3	3	6	Octahedral	0.988
+UYAKAI	Cr	0	4	24	3	3	6	Octahedral	0.946
+UCOMEE	Cr	3	4	24	3	3	6	Octahedral	0.94
+HOTVIW	Cr	-1	4	24	3	3	6	Octahedral	0.947
+QUTFIW	Cr	-3	4	24	3	3	6	Octahedral	0.942
+ZUZWEW	Cr	0	4	24	3	3	6	Octahedral	0.95
+FEXROR	Cr	0	4	24	3	3	6	Octahedral	0.968
+DUJCIU	Cr	-3	4	24	3	3	6	Octahedral	0.967
+DUTMIO10	Cr	0	4	24	3	3	6	Octahedral	0.997
+UGUNUF	Cr	0	4	24	3	3	6	Octahedral	0.969
+JASCEL	Cr	-3	4	24	3	3	6	Octahedral	0.978
+BILWAX	Cr	0	4	24	3	3	6	Octahedral	0.974
+BILVUQ	Cr	0	4	24	3	3	6	Octahedral	0.983
+DAPSCR10	Cr	3	4	24	3	3	7	Pentagonal bipyramidal	1.019
+CUJSAD	Mn	-1	5	25	1	6	2	Linear	1.001
+JUHQIM	Mn	-1	1	25	1	6	5	Square pyramidal	0.791
+TACNAN	Mn	0	1	25	1	6	6	Octahedral	0.84
+KOGFET	Mn	0	1	25	1	6	6	Octahedral	0.837
+SEWBUR	Mn	0	1	25	1	6	6	Octahedral	0.838
+DAXPEY	Mn	0	1	25	1	6	6	Octahedral	0.871
+DAXPOI	Mn	0	1	25	1	6	6	Octahedral	0.867
+RERCUP	Mn	0	1	25	1	6	6	Octahedral	0.86
+FAZTEG	Mn	0	1	25	1	6	6	Octahedral	0.874
+WIBLUO	Mn	0	1	25	1	6	6	Octahedral	0.844
+FAWQEZ	Mn	0	1	25	1	6	6	Octahedral	0.853
+GELRIY	Mn	0	1	25	1	6	6	Octahedral	0.853
+PYRMNC	Mn	0	1	25	1	6	6	Octahedral	0.843
+NOTPUK	Mn	0	1	25	1	6	6	Octahedral	0.844
+VUCFAA	Mn	0	1	25	1	6	6	Octahedral	0.845
+LOJLEE	Mn	-1	1	25	1	6	6	Octahedral	0.846
+SILYOC	Mn	0	1	25	1	6	6	Octahedral	0.857
+MIMZAJ	Mn	0	1	25	1	6	6	Octahedral	0.819
+HATNUM	Mn	0	1	25	1	6	6	Octahedral	0.847
+YUDFOS	Mn	0	1	25	1	6	6	Octahedral	0.847
+TAHYOQ	Mn	-1	1	25	1	6	6	Octahedral	0.822
+SICFAM	Mn	0	1	25	1	6	6	Octahedral	0.883
+GOJVAC	Mn	0	1	25	1	6	6	Octahedral	0.844
+LOVBUT	Mn	1	1	25	1	6	6	Octahedral	0.847
+IHABID	Mn	0	1	25	1	6	6	Octahedral	0.869
+GONTIM	Mn	0	1	25	1	6	6	Octahedral	0.853
+VUVJUS	Mn	0	1	25	1	6	6	Octahedral	0.852
+BURMIL	Mn	0	1	25	1	6	6	Octahedral	0.82
+FEHKUZ	Mn	0	1	25	1	6	6	Octahedral	0.868
+SICFEQ	Mn	0	1	25	1	6	6	Octahedral	0.881
+HAWNUQ	Mn	1	1	25	1	6	6	Octahedral	0.87
+IHIGEN	Mn	0	1	25	1	6	6	Octahedral	0.874
+FAZTIK	Mn	0	1	25	1	6	6	Octahedral	0.875
+ZILVUO	Mn	1	1	25	1	6	6	Octahedral	0.86
+NAKWUS	Mn	0	1	25	1	6	6	Octahedral	0.894
+HATNOG	Mn	1	1	25	1	6	6	Octahedral	0.863
+FEHLIO	Mn	0	1	25	1	6	6	Octahedral	0.872
+ISURIY	Mn	1	1	25	1	6	6	Octahedral	0.852
+IPOROX	Mn	0	1	25	1	6	6	Octahedral	0.874
+HATPAU	Mn	0	1	25	1	6	6	Octahedral	0.856
+CIMHEL	Mn	1	1	25	1	6	6	Octahedral	0.852
+GENBUW	Mn	0	1	25	1	6	6	Octahedral	0.842
+CIHYEY	Mn	0	1	25	1	6	6	Octahedral	0.821
+GEMZON	Mn	1	1	25	1	6	6	Octahedral	0.842
+CIMGOU	Mn	1	1	25	1	6	6	Octahedral	0.858
+ISUQUJ	Mn	1	1	25	1	6	6	Octahedral	0.83
+SEKHAT	Mn	1	1	25	1	6	6	Octahedral	0.823
+CIMBUV	Mn	1	1	25	1	6	6	Octahedral	0.84
+NAYMUY	Mn	0	1	25	1	6	6	Octahedral	0.883
+SAJKUN	Mn	1	1	25	1	6	6	Octahedral	0.885
+UTODAK	Mn	0	1	25	1	6	6	Octahedral	0.878
+SIFWUB	Mn	1	1	25	1	6	6	Octahedral	0.836
+BETQAT	Mn	1	1	25	1	6	6	Octahedral	0.876
+WUGCAD	Mn	0	6	25	2	5	2	Bent (V-shape, 109.47°)	0.913
+KAGJOU	Mn	0	6	25	2	5	2	Linear	0.869
+NITVES	Mn	-1	6	25	2	5	3	Trigonal planar	0.998
+CIVREF	Mn	-1	6	25	2	5	3	Trigonal planar	1.014
+WUGCIL	Mn	0	6	25	2	5	3	Trigonal planar	0.968
+CUWMOW	Mn	-1	6	25	2	5	3	Trigonal planar	1.002
+CORLIE	Mn	-1	6	25	2	5	3	Trigonal planar	0.953
+LUYBEP	Mn	-1	6	25	2	5	3	fac-Trivacant octahedron	1.047
+YIZNOL	Mn	0	6	25	2	5	4	Seesaw	1.065
+JEXKED	Mn	0	6	25	2	5	4	Seesaw	1.009
+IZOJEO	Mn	-1	6	25	2	5	4	Seesaw	1.009
+WURXOZ	Mn	-2	6	25	2	5	4	Tetrahedral	0.938
+SUBGOO	Mn	-1	6	25	2	5	4	Tetrahedral	0.96
+SUBQAK	Mn	0	6	25	2	5	4	Tetrahedral	0.984
+LOLTOV	Mn	0	6	25	2	5	4	Tetrahedral	0.986
+JOBJUI	Mn	0	6	25	2	5	4	Tetrahedral	0.96
+MIZSEV	Mn	0	6	25	2	5	4	Tetrahedral	0.967
+XOTLUO	Mn	-2	6	25	2	5	4	Tetrahedral	1.014
+EZOYIC	Mn	-2	6	25	2	5	4	Tetrahedral	1.017
+VAWRIU	Mn	0	6	25	2	5	4	Tetrahedral	1.094
+BUSMOR	Mn	0	6	25	2	5	4	Tetrahedral	1.077
+NADLIO	Mn	0	6	25	2	5	4	Tetrahedral	1.015
+NADLOU	Mn	0	6	25	2	5	4	Tetrahedral	1.01
+BUBHEM	Mn	0	6	25	2	5	4	Tetrahedral	1.088
+ASUVIT	Mn	0	6	25	2	5	4	Tetrahedral	1.091
+CAZZUY	Mn	0	6	25	2	5	4	Tetrahedral	1.072
+ZAYJOB	Mn	-2	6	25	2	5	4	Tetrahedral	0.963
+CUVZIE	Mn	-1	6	25	2	5	4	Tetrahedral	0.964
+YIBHUM	Mn	-2	6	25	2	5	4	Tetrahedral	0.973
+TOKRAN	Mn	0	6	25	2	5	4	Tetrahedral	0.991
+VAYWEY	Mn	0	6	25	2	5	4	Tetrahedral	0.975
+HUTCOR	Mn	0	6	25	2	5	4	Tetrahedral	1.011
+HURSOD	Mn	-1	6	25	2	5	4	Tetrahedral	1.009
+JUCJID	Mn	-2	6	25	2	5	4	Tetrahedral	0.947
+YONWUT	Mn	-1	6	25	2	5	4	Tetrahedral	0.97
+GAYXEJ	Mn	-1	6	25	2	5	4	Tetrahedral	0.958
+ZELWAO	Mn	0	6	25	2	5	4	Tetrahedral	1.035
+WEFCOZ	Mn	0	6	25	2	5	4	Tetrahedral	0.946
+WEFCIT	Mn	0	6	25	2	5	4	Tetrahedral	0.966
+SUFDEC	Mn	0	6	25	2	5	4	Tetrahedral	1.053
+CODLIS	Mn	0	6	25	2	5	4	Tetrahedral	0.976
+MUDMIJ	Mn	-2	6	25	2	5	4	Tetrahedral	0.958
+JIZQUG	Mn	0	6	25	2	5	4	Tetrahedral	1.052
+BEXLIC	Mn	0	6	25	2	5	4	Tetrahedral	0.99
+HIZDID	Mn	0	6	25	2	5	4	Tetrahedral	1.012
+KOZZEE01	Mn	0	6	25	2	5	4	Tetrahedral	1.038
+JIXLAD	Mn	0	6	25	2	5	4	Tetrahedral	1.003
+CEZYOW	Mn	0	6	25	2	5	4	Tetrahedral	1.028
+HIPKUO	Mn	0	6	25	2	5	4	Tetrahedral	1.009
+CIRDEN	Mn	0	6	25	2	5	4	Tetrahedral	1.009
+COYLEH10	Mn	0	6	25	2	5	4	Tetrahedral	1.064
+PACHEI	Mn	0	6	25	2	5	4	Tetrahedral	0.999
+GOVDOK	Mn	0	6	25	2	5	4	Tetrahedral	0.997
+IJIGUD	Mn	0	6	25	2	5	4	Tetrahedral	1.124
+CEMSIW	Mn	-2	6	25	2	5	4	Tetrahedral	0.995
+TIZJES	Mn	0	6	25	2	5	5	Square pyramidal	1.02
+WERHUZ	Mn	0	6	25	2	5	5	Square pyramidal	1.041
+OZUSOT	Mn	0	6	25	2	5	5	Square pyramidal	1.029
+ROFKUV	Mn	0	6	25	2	5	5	Square pyramidal	1.042
+WITBOT	Mn	0	6	25	2	5	5	Square pyramidal	1.081
+AJICUT	Mn	0	6	25	2	5	5	Square pyramidal	1.044
+NOKSOX	Mn	0	6	25	2	5	5	Square pyramidal	1.104
+TOPJUF	Mn	0	6	25	2	5	5	Square pyramidal	1.09
+WOTRUU	Mn	0	6	25	2	5	5	Square pyramidal	1.037
+QAFCOS	Mn	0	6	25	2	5	5	Square pyramidal	1.065
+WASDOM	Mn	0	6	25	2	5	5	Square pyramidal	1.064
+KEJTAV	Mn	-1	6	25	2	5	5	Square pyramidal	1.062
+LALDEH	Mn	-3	6	25	2	5	5	Square pyramidal	1.054
+RAGLOD	Mn	0	6	25	2	5	5	Square pyramidal	1.071
+ZEYWAD	Mn	0	6	25	2	5	5	Square pyramidal	1.06
+UBODUK	Mn	0	6	25	2	5	5	Square pyramidal	1.037
+FEZTEM	Mn	1	6	25	2	5	5	Square pyramidal	1.063
+JEJTUN	Mn	0	6	25	2	5	5	Square pyramidal	1.088
+GOKREF	Mn	1	6	25	2	5	5	Square pyramidal	1.097
+SOHKAC	Mn	0	6	25	2	5	5	Square pyramidal	1.076
+AVALAL	Mn	0	6	25	2	5	5	Square pyramidal	1.042
+BAWLAN	Mn	0	6	25	2	5	5	Square pyramidal	1.075
+CEZYUC	Mn	0	6	25	2	5	5	Square pyramidal	1.101
+SINDIC	Mn	0	6	25	2	5	5	Square pyramidal	1.047
+ROYGUJ	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.146
+XAHLEY	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.046
+HAHXOE	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.03
+BRURMN	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.026
+ICATIS	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.105
+JOTNIS	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.054
+GOQZIX	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.061
+MEIMMN	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.063
+HUMZEW	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.088
+WUFFAF	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.05
+BACNOK	Mn	1	6	25	2	5	5	Trigonal bipyramidal	1.07
+HAHYAR	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.042
+TRENCM	Mn	1	6	25	2	5	5	Trigonal bipyramidal	1.08
+MUXVEJ	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.082
+SIQZOH	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.07
+YECSOQ	Mn	1	6	25	2	5	5	Trigonal bipyramidal	1.068
+FOXGAB	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.065
+XEZNUM	Mn	0	6	25	2	5	5	Trigonal bipyramidal	1.073
+ERIPEB	Mn	2	6	25	2	5	5	Trigonal bipyramidal	1.095
+DIMPEU11	Mn	0	6	25	2	5	6	Octahedral	1.112
+RAHXAB	Mn	0	6	25	2	5	6	Octahedral	1.106
+AXITAC	Mn	0	6	25	2	5	6	Octahedral	1.097
+IPIBUE	Mn	0	6	25	2	5	6	Octahedral	1.111
+AZUMAJ	Mn	0	6	25	2	5	6	Octahedral	1.106
+GOXXEW	Mn	0	6	25	2	5	6	Octahedral	1.086
+IHALUZ	Mn	0	6	25	2	5	6	Octahedral	1.117
+JAHBID	Mn	0	6	25	2	5	6	Octahedral	1.133
+LILZAJ	Mn	1	6	25	2	5	6	Octahedral	1.095
+KEFQES	Mn	1	6	25	2	5	6	Octahedral	1.101
+FALPOA	Mn	1	6	25	2	5	6	Octahedral	1.097
+NAQQAY	Mn	0	2	25	2	5	6	Octahedral	0.868
+EHIWIC	Mn	-2	6	25	2	5	6	Octahedral	1.099
+IDIKUD	Mn	0	6	25	2	5	6	Octahedral	1.101
+VIFWUD	Mn	0	6	25	2	5	6	Octahedral	1.107
+NETCAT	Mn	0	6	25	2	5	6	Octahedral	1.105
+AZISUY	Mn	0	6	25	2	5	6	Octahedral	1.11
+XEZTEE	Mn	0	6	25	2	5	6	Octahedral	1.104
+GEPBEJ	Mn	0	6	25	2	5	6	Octahedral	1.109
+IXEPAE	Mn	0	6	25	2	5	6	Octahedral	1.109
+WEXYIH	Mn	0	6	25	2	5	6	Octahedral	1.106
+CGLYMN	Mn	0	6	25	2	5	6	Octahedral	1.092
+KESFEV	Mn	0	6	25	2	5	6	Octahedral	1.142
+IGUQUY	Mn	1	6	25	2	5	6	Octahedral	1.114
+CIDKEI	Mn	0	6	25	2	5	6	Octahedral	1.102
+IRONOS	Mn	1	6	25	2	5	6	Octahedral	1.108
+YIJDED	Mn	1	6	25	2	5	6	Octahedral	1.096
+POWROJ	Mn	1	6	25	2	5	6	Octahedral	1.091
+JOXCOQ	Mn	0	6	25	2	5	6	Octahedral	1.115
+KEFQOC	Mn	1	6	25	2	5	6	Octahedral	1.1
+TEBVIH	Mn	2	6	25	2	5	6	Octahedral	1.145
+YANKOQ	Mn	2	6	25	2	5	6	Octahedral	1.122
+TIKYOC	Mn	0	6	25	2	5	6	Octahedral	1.15
+ITERIJ	Mn	0	6	25	2	5	6	Octahedral	1.104
+LEPSEF	Mn	1	6	25	2	5	6	Octahedral	1.096
+SOHKEG	Mn	0	6	25	2	5	6	Octahedral	1.135
+AMATEQ	Mn	-2	6	25	2	5	6	Octahedral	1.088
+PAYVAO	Mn	2	6	25	2	5	6	Octahedral	1.11
+IWOWEX	Mn	0	6	25	2	5	6	Octahedral	1.101
+ZEHPAD	Mn	0	6	25	2	5	6	Octahedral	1.112
+LILBOY	Mn	0	6	25	2	5	6	Octahedral	1.104
+LEXQAG	Mn	0	6	25	2	5	6	Octahedral	1.143
+SOHJIJ	Mn	0	6	25	2	5	6	Octahedral	1.117
+YOYVOY	Mn	0	6	25	2	5	6	Octahedral	1.102
+UMIPIP	Mn	2	6	25	2	5	6	Octahedral	1.109
+FUWVOJ	Mn	0	6	25	2	5	6	Octahedral	1.101
+QOLZOH	Mn	0	6	25	2	5	6	Octahedral	1.115
+EQEFAI	Mn	0	6	25	2	5	6	Octahedral	1.103
+LOYYUT	Mn	0	6	25	2	5	6	Octahedral	1.108
+PEJCOZ	Mn	0	6	25	2	5	6	Octahedral	1.146
+WAMLEC	Mn	0	6	25	2	5	6	Octahedral	1.089
+JIPDUI	Mn	0	6	25	2	5	6	Octahedral	1.101
+FESXOQ	Mn	0	6	25	2	5	6	Octahedral	1.094
+CETGOX	Mn	2	6	25	2	5	6	Octahedral	1.113
+PIKZIT	Mn	0	6	25	2	5	6	Octahedral	1.118
+OMIXAL	Mn	0	6	25	2	5	6	Octahedral	1.112
+AQSUMN	Mn	0	6	25	2	5	6	Octahedral	1.086
+QOYWIN	Mn	0	6	25	2	5	6	Octahedral	1.037
+TECFIR	Mn	0	6	25	2	5	6	Octahedral	1.09
+TOLMEO	Mn	0	6	25	2	5	6	Octahedral	1.094
+BEMWUM	Mn	2	6	25	2	5	6	Octahedral	1.091
+AGUBAF	Mn	0	6	25	2	5	6	Octahedral	1.085
+AGLCMN	Mn	0	6	25	2	5	6	Octahedral	1.086
+WIFSEJ	Mn	0	6	25	2	5	6	Octahedral	1.094
+IFOPAU	Mn	-1	6	25	2	5	6	Octahedral	1.087
+NEHWIH	Mn	0	6	25	2	5	6	Octahedral	1.122
+CAHGAW	Mn	0	6	25	2	5	6	Trigonal prismatic	1.117
+KIYWAR	Mn	0	6	25	2	5	6	Trigonal prismatic	1.137
+MAMCOS	Mn	1	6	25	2	5	6	Trigonal prismatic	1.114
+WULSIF	Mn	1	6	25	2	5	6	Trigonal prismatic	1.108
+VAVDOM	Mn	1	6	25	2	5	6	Trigonal prismatic	1.105
+EVOJEE	Mn	2	6	25	2	5	6	Trigonal prismatic	1.135
+FAHFUQ	Mn	1	6	25	2	5	6	Trigonal prismatic	1.113
+OMUHAG	Mn	0	6	25	2	5	6	Trigonal prismatic	1.135
+XEHYER	Mn	0	6	25	2	5	6	Trigonal prismatic	1.162
+RAFLIV	Mn	0	6	25	2	5	6	Trigonal prismatic	1.119
+UYAHOS	Mn	0	6	25	2	5	6	Trigonal prismatic	1.099
+TOPKAM	Mn	0	6	25	2	5	6	Trigonal prismatic	1.165
+BIPJER	Mn	-2	6	25	2	5	6	Trigonal prismatic	1.096
+LERZOX	Mn	0	6	25	2	5	6	Trigonal prismatic	1.117
+SOMTIY	Mn	1	6	25	2	5	7	Capped trigonal prismatic	1.197
+TAVWAP	Mn	1	6	25	2	5	7	Capped trigonal prismatic	1.179
+TAFTAV	Mn	2	6	25	2	5	7	Capped trigonal prismatic	1.189
+HIXZUJ	Mn	2	6	25	2	5	7	Capped trigonal prismatic	1.179
+ROPBON	Mn	2	6	25	2	5	7	Capped trigonal prismatic	1.171
+WAXJIQ	Mn	0	6	25	2	5	7	Capped trigonal prismatic	1.165
+SAFTUP	Mn	0	6	25	2	5	7	Capped trigonal prismatic	1.171
+SAFTID	Mn	0	6	25	2	5	7	Capped trigonal prismatic	1.168
+ZEBCEQ	Mn	0	6	25	2	5	7	Capped trigonal prismatic	1.17
+SAFTOJ	Mn	0	6	25	2	5	7	Capped trigonal prismatic	1.171
+XAGLAU	Mn	1	6	25	2	5	7	Capped trigonal prismatic	1.188
+GARQIB	Mn	0	6	25	2	5	7	Capped trigonal prismatic	1.166
+MUCBIV	Mn	2	6	25	2	5	7	Capped trigonal prismatic	1.164
+UDUGUY	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.15
+XIDNON	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.163
+PIHWEI	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.172
+DUQQAJ	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.15
+BUCRAS	Mn	1	6	25	2	5	7	Pentagonal bipyramidal	1.136
+OJUHAF	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.167
+ATOMOM	Mn	2	6	25	2	5	7	Pentagonal bipyramidal	1.153
+WABMOB	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.143
+OKEMUO	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.133
+TIRDUU	Mn	2	6	25	2	5	7	Pentagonal bipyramidal	1.159
+UHEPED	Mn	2	6	25	2	5	7	Pentagonal bipyramidal	1.15
+XIMHAD	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.165
+CEDXIT	Mn	2	6	25	2	5	7	Pentagonal bipyramidal	1.142
+OJEBUB	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.145
+SAFTEZ	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.163
+SEPPUZ	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.167
+UGEKAT	Mn	1	6	25	2	5	7	Pentagonal bipyramidal	1.153
+DITQEE	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.153
+XAHLOI	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.16
+RIHLAY	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.156
+UNONOB	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.174
+TOPJEO	Mn	2	6	25	2	5	7	Pentagonal bipyramidal	1.146
+QETLAF	Mn	1	6	25	2	5	7	Pentagonal bipyramidal	1.155
+TEVLAK	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.166
+TUSBOZ	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.171
+NUNTAR	Mn	0	6	25	2	5	7	Pentagonal bipyramidal	1.142
+JOXJAH	Mn	2	6	25	2	5	8	Cube	1.24
+HUDGOC	Mn	2	6	25	2	5	8	Dodecahedral	1.286
+NEPMEC	Mn	-2	6	25	2	5	8	Dodecahedral	1.209
+SAFVAX	Mn	0	6	25	2	5	8	Dodecahedral	1.201
+ROPBIH	Mn	0	6	25	2	5	8	Dodecahedral	1.211
+NIJZEM	Mn	0	6	25	2	5	8	Dodecahedral	1.206
+BIKDAA	Mn	0	6	25	2	5	8	Dodecahedral	1.215
+OLENAU	Mn	0	6	25	2	5	8	Dodecahedral	1.31
+KAXMEB	Mn	0	5	25	3	4	3	Trigonal planar	0.848
+ZOWPAF	Mn	0	5	25	3	4	4	Square planar	0.95
+DOVKUV	Mn	0	5	25	3	4	5	Square pyramidal	0.905
+ZERDIJ	Mn	0	5	25	3	4	5	Square pyramidal	0.894
+UBOFOG	Mn	0	5	25	3	4	5	Square pyramidal	0.94
+LILLEZ	Mn	0	5	25	3	4	5	Square pyramidal	0.927
+ROMSUI	Mn	0	5	25	3	4	5	Square pyramidal	0.934
+BEPRET	Mn	0	5	25	3	4	5	Square pyramidal	0.906
+BUXYIE	Mn	0	5	25	3	4	5	Square pyramidal	0.942
+YAGBIR	Mn	0	5	25	3	4	5	Square pyramidal	0.924
+UZEVUR	Mn	1	5	25	3	4	5	Square pyramidal	0.985
+KAWCIU	Mn	0	5	25	3	4	5	Square pyramidal	0.913
+AWOLOO	Mn	0	5	25	3	4	5	Square pyramidal	0.924
+PENHOI	Mn	-1	5	25	3	4	5	Square pyramidal	0.927
+WOPGIS	Mn	-1	5	25	3	4	5	Square pyramidal	0.95
+FOCSOF	Mn	0	5	25	3	4	5	Trigonal bipyramidal	0.959
+VULMOE	Mn	0	5	25	3	4	5	Trigonal bipyramidal	1.015
+NEDGIM	Mn	0	5	25	3	4	5	Trigonal bipyramidal	0.927
+WACDAF	Mn	0	5	25	3	4	5	Trigonal bipyramidal	0.935
+VAWNIQ	Mn	0	5	25	3	4	5	Trigonal bipyramidal	0.942
+NIWTOC	Mn	-1	5	25	3	4	5	Trigonal bipyramidal	0.944
+MOZRIC	Mn	0	5	25	3	4	5	Trigonal bipyramidal	0.924
+COJGUG	Mn	0	5	25	3	4	5	Trigonal bipyramidal	0.937
+COJHAN	Mn	-1	5	25	3	4	5	Trigonal bipyramidal	0.924
+HIMLIZ	Mn	0	5	25	3	4	6	Octahedral	0.987
+WUYFIH	Mn	-3	3	25	3	4	6	Octahedral	0.911
+PAXVAM	Mn	0	5	25	3	4	6	Octahedral	0.98
+TUDJEH	Mn	0	5	25	3	4	6	Octahedral	0.99
+VUMSUT	Mn	0	5	25	3	4	6	Octahedral	0.986
+PUHWUL	Mn	1	5	25	3	4	6	Octahedral	1.006
+AXISIJ	Mn	0	5	25	3	4	6	Octahedral	0.99
+FIZQIP	Mn	1	5	25	3	4	6	Octahedral	0.992
+EJEVEV	Mn	1	5	25	3	4	6	Octahedral	1.017
+RULVEA	Mn	0	5	25	3	4	6	Octahedral	0.988
+BEPTIA	Mn	0	5	25	3	4	6	Octahedral	0.987
+PUJBAX	Mn	-2	5	25	3	4	6	Octahedral	0.982
+JAFVOB	Mn	-1	5	25	3	4	6	Octahedral	0.981
+ALIYOJ	Mn	0	5	25	3	4	6	Octahedral	0.988
+WIVDUB	Mn	0	5	25	3	4	6	Octahedral	0.981
+CAXVAZ	Mn	1	5	25	3	4	6	Octahedral	0.986
+TAKDEQ	Mn	-1	5	25	3	4	6	Octahedral	0.983
+SUPKIY	Mn	1	5	25	3	4	6	Octahedral	0.988
+ITEREF	Mn	0	5	25	3	4	6	Octahedral	0.996
+HOCREX	Mn	1	5	25	3	4	6	Octahedral	0.998
+XELNAD	Mn	1	5	25	3	4	6	Octahedral	1.017
+CEXJEW	Mn	1	5	25	3	4	6	Octahedral	1.024
+SAPJUO	Mn	1	5	25	3	4	6	Octahedral	0.996
+TEHGAQ	Mn	1	5	25	3	4	6	Octahedral	0.977
+VAGCAH	Mn	1	5	25	3	4	6	Octahedral	0.996
+REXCUS	Mn	0	5	25	3	4	6	Octahedral	0.968
+JEDJAE	Mn	-5	5	25	3	4	6	Octahedral	0.996
+VOBCEV	Mn	-3	5	25	3	4	6	Octahedral	0.971
+MNMTBH	Mn	0	5	25	3	4	6	Octahedral	0.979
+MOTCMN	Mn	0	5	25	3	4	6	Octahedral	1.015
+NUNWUP	Fe	0	3	26	0	6	4	Tetrahedral	0.798
+FONPUT	Fe	0	1	26	0	6	5	Square pyramidal	0.822
+MALGAI	Fe	0	1	26	0	6	5	Square pyramidal	0.814
+CAFTIM	Fe	0	1	26	0	6	5	Trigonal bipyramidal	0.824
+SIXDUB	Fe	0	1	26	0	6	5	Trigonal bipyramidal	0.805
+JASRIF	Fe	0	1	26	0	6	5	Trigonal bipyramidal	0.82
+GAMQEQ	Fe	0	1	26	0	6	5	Trigonal bipyramidal	0.811
+LASXIM	Fe	0	1	26	0	6	5	Trigonal bipyramidal	0.814
+ZURDEV	Fe	0	1	26	0	6	5	Trigonal bipyramidal	0.814
+FASSEX	Fe	0	1	26	0	6	5	Trigonal bipyramidal	0.797
+ISIYAK	Fe	0	1	26	0	6	5	Trigonal bipyramidal	0.817
+POPFEC10	Fe	0	1	26	0	6	5	Trigonal bipyramidal	0.805
+QIVYEZ	Fe	0	5	26	2	6	2	Linear	0.996
+FEGVOE	Fe	0	5	26	2	6	2	Linear	0.866
+DABSOP	Fe	0	5	26	2	6	3	T-shaped	0.948
+KUGWIT	Fe	0	5	26	2	6	3	T-shaped	0.942
+ULOVUO	Fe	0	5	26	2	6	3	Trigonal planar	0.939
+INEDEM	Fe	0	5	26	2	6	3	Trigonal planar	0.911
+QUDDOJ	Fe	-1	5	26	2	6	3	Trigonal planar	0.988
+NIDMOE	Fe	0	5	26	2	6	3	Trigonal planar	0.989
+ULOXUQ	Fe	0	5	26	2	6	3	Trigonal planar	0.962
+EYITAJ	Fe	0	5	26	2	6	3	Trigonal planar	0.966
+FIYFEB	Fe	-1	5	26	2	6	3	Trigonal planar	0.99
+BIJJAG	Fe	0	5	26	2	6	3	Trigonal planar	0.959
+RIRFEF	Fe	0	5	26	2	6	3	Trigonal planar	0.971
+VEVWEY	Fe	-1	5	26	2	6	3	Trigonal planar	0.954
+HURSIX	Fe	-1	5	26	2	6	3	Trigonal planar	0.927
+LIHRUR	Fe	-1	5	26	2	6	3	Trigonal planar	0.923
+NASJAT	Fe	0	5	26	2	6	3	Trigonal planar	0.945
+BOXSEO	Fe	-1	5	26	2	6	3	Trigonal planar	0.943
+QUSHET	Fe	-1	5	26	2	6	3	Trigonal planar	0.986
+ONUQAR	Fe	0	5	26	2	6	3	Trigonal planar	0.931
+GAXZEN	Fe	0	5	26	2	6	3	Trigonal planar	0.989
+VEYTAW	Fe	-1	5	26	2	6	3	Trigonal planar	0.914
+SAYZAV	Fe	0	5	26	2	6	4	Seesaw	1.029
+GUCBAJ	Fe	0	5	26	2	6	4	Seesaw	1.012
+SABDAB	Fe	0	5	26	2	6	4	Seesaw	1.029
+FEVFET	Fe	0	5	26	2	6	4	Seesaw	1.054
+ODUXIX	Fe	0	5	26	2	6	4	Seesaw	1.018
+LUNGOS	Fe	0	5	26	2	6	4	Seesaw	0.986
+LUYXUZ	Fe	0	5	26	2	6	4	Seesaw	1.012
+JEXKIH	Fe	0	5	26	2	6	4	Seesaw	1.009
+DALPEO	Fe	0	5	26	2	6	4	Seesaw	1.002
+ILOLOM	Fe	0	5	26	2	6	4	Seesaw	1.023
+TICMAW	Fe	0	5	26	2	6	4	Seesaw	1.035
+IXAROP	Fe	0	5	26	2	6	4	Seesaw	1.017
+AHUGOA	Fe	0	5	26	2	6	4	Seesaw	0.988
+MASNUR	Fe	0	5	26	2	6	4	Seesaw	1.001
+JIXLEH	Fe	0	5	26	2	6	4	Seesaw	1.021
+GAMZEA	Fe	0	3	26	2	6	4	Square planar	0.944
+GAMZAW	Fe	0	3	26	2	6	4	Square planar	0.938
+QAVFID	Fe	0	5	26	2	6	4	Square planar	1.081
+QOPWOK	Fe	0	3	26	2	6	4	Square planar	0.927
+GEPPEX	Fe	0	3	26	2	6	4	Square planar	0.869
+FOSKEF	Fe	1	5	26	2	6	4	Square planar	1.011
+RALNUO	Fe	0	3	26	2	6	4	Square planar	0.883
+SUSGEV	Fe	0	3	26	2	6	4	Square planar	0.893
+XIYPAY	Fe	-2	5	26	2	6	4	Square planar	1.0
+UTASAM	Fe	-2	5	26	2	6	4	Square planar	1.006
+MAJYOM	Fe	-2	3	26	2	6	4	Square planar	0.89
+XIMSAO	Fe	-2	5	26	2	6	4	Tetrahedral	0.948
+OYILIT	Fe	-1	5	26	2	6	4	Tetrahedral	0.962
+ULOVEY	Fe	0	5	26	2	6	4	Tetrahedral	1.012
+QOXKUL	Fe	0	5	26	2	6	4	Tetrahedral	0.963
+YOJVOJ	Fe	0	5	26	2	6	4	Tetrahedral	0.965
+DECKED	Fe	0	5	26	2	6	4	Tetrahedral	0.967
+DECLAA	Fe	0	5	26	2	6	4	Tetrahedral	0.973
+UBOMEG	Fe	0	5	26	2	6	4	Tetrahedral	0.95
+NENWEK	Fe	0	5	26	2	6	4	Tetrahedral	0.97
+AJALIH	Fe	0	5	26	2	6	4	Tetrahedral	0.965
+MEJZAF	Fe	0	5	26	2	6	4	Tetrahedral	0.96
+YOWZOB	Fe	0	5	26	2	6	4	Tetrahedral	1.036
+RUMZOP	Fe	0	5	26	2	6	4	Tetrahedral	1.066
+OYUKOK	Fe	0	5	26	2	6	4	Tetrahedral	1.008
+OTOTEX	Fe	0	5	26	2	6	4	Tetrahedral	0.985
+WUSFEX	Fe	0	5	26	2	6	4	Tetrahedral	0.985
+HONGAV	Fe	0	5	26	2	6	4	Tetrahedral	0.977
+OZIREV	Fe	0	5	26	2	6	4	Tetrahedral	1.077
+UNEHIG	Fe	1	5	26	2	6	4	Tetrahedral	1.042
+QAYBAT	Fe	0	5	26	2	6	4	Tetrahedral	1.017
+DUSSOB	Fe	0	5	26	2	6	4	Tetrahedral	1.006
+ASUTUD	Fe	0	5	26	2	6	4	Tetrahedral	1.102
+RENGAV	Fe	0	5	26	2	6	4	Tetrahedral	1.116
+EDIDED	Fe	0	5	26	2	6	4	Tetrahedral	0.998
+GAMZIE	Fe	0	5	26	2	6	4	Tetrahedral	1.042
+UPIMAI	Fe	0	5	26	2	6	4	Tetrahedral	0.992
+GAMZOK	Fe	0	5	26	2	6	4	Tetrahedral	1.019
+HIPLIC	Fe	0	5	26	2	6	4	Tetrahedral	1.073
+QOSGEL	Fe	1	5	26	2	6	4	Tetrahedral	1.05
+RIPHEG	Fe	0	5	26	2	6	4	Tetrahedral	1.04
+KUGXOA	Fe	0	5	26	2	6	4	Tetrahedral	0.981
+MASPED	Fe	0	5	26	2	6	4	Tetrahedral	1.039
+SOQLUF	Fe	0	5	26	2	6	4	Tetrahedral	1.036
+RUWKEA	Fe	0	5	26	2	6	4	Tetrahedral	1.058
+OGEVUS	Fe	0	5	26	2	6	4	Tetrahedral	1.019
+RIRFIJ	Fe	-1	5	26	2	6	4	Tetrahedral	0.992
+KISMIJ	Fe	-2	5	26	2	6	4	Tetrahedral	0.979
+WEHWAI	Fe	-1	5	26	2	6	4	Tetrahedral	0.985
+OYIKOY	Fe	-1	5	26	2	6	4	Tetrahedral	0.981
+OYIKUE	Fe	-1	5	26	2	6	4	Tetrahedral	0.98
+VIBRIK	Fe	0	5	26	2	6	4	Tetrahedral	1.011
+PUXRAC	Fe	0	5	26	2	6	4	Tetrahedral	0.992
+CORSIO	Fe	0	5	26	2	6	4	Tetrahedral	0.983
+CORSUA	Fe	0	5	26	2	6	4	Tetrahedral	0.994
+DECKAZ	Fe	0	5	26	2	6	4	Tetrahedral	0.983
+DECKUT	Fe	0	5	26	2	6	4	Tetrahedral	0.991
+DECLEE	Fe	0	5	26	2	6	4	Tetrahedral	0.986
+IROJEF	Fe	0	5	26	2	6	4	Tetrahedral	0.968
+AJALED	Fe	0	5	26	2	6	4	Tetrahedral	0.984
+DAJBAS	Fe	0	5	26	2	6	4	Tetrahedral	0.973
+TACSAU	Fe	0	5	26	2	6	4	Tetrahedral	0.975
+HIPLAU	Fe	0	5	26	2	6	4	Tetrahedral	1.037
+VISVEA	Fe	0	5	26	2	6	4	Tetrahedral	1.014
+GEFTIV	Fe	0	5	26	2	6	4	Tetrahedral	0.991
+RANJIA	Fe	1	5	26	2	6	4	Tetrahedral	1.022
+NASJEX	Fe	0	5	26	2	6	4	Tetrahedral	1.006
+AQUGEY	Fe	0	5	26	2	6	4	Tetrahedral	1.037
+NUZSUX	Fe	0	5	26	2	6	4	Tetrahedral	1.052
+MEJYOS	Fe	-2	5	26	2	6	4	Tetrahedral	0.946
+JUQDAA	Fe	-1	5	26	2	6	4	Tetrahedral	0.964
+ISIBIW	Fe	0	5	26	2	6	4	Tetrahedral	0.973
+HOYHOS	Fe	0	5	26	2	6	4	Tetrahedral	0.985
+VUMFOA01	Fe	0	5	26	2	6	4	Tetrahedral	0.972
+JUWGUD	Fe	0	5	26	2	6	4	Tetrahedral	0.967
+KELXUU	Fe	0	5	26	2	6	4	Tetrahedral	0.97
+INUVUJ	Fe	0	5	26	2	6	4	Tetrahedral	1.023
+APUDUM	Fe	0	5	26	2	6	4	Tetrahedral	0.989
+TEQPUA	Fe	-1	5	26	2	6	4	Tetrahedral	1.008
+INUXEV	Fe	0	5	26	2	6	4	Tetrahedral	1.016
+YUBDAB	Fe	0	5	26	2	6	4	Tetrahedral	0.989
+UGINOP	Fe	0	5	26	2	6	4	Tetrahedral	1.047
+KUGXUG	Fe	0	5	26	2	6	4	Tetrahedral	0.995
+MOFMAV	Fe	0	5	26	2	6	4	Tetrahedral	0.981
+XOBBIZ	Fe	0	5	26	2	6	4	Tetrahedral	1.011
+KIQMAB	Fe	0	5	26	2	6	4	Tetrahedral	1.022
+KUGXIU	Fe	0	5	26	2	6	4	Tetrahedral	0.998
+SAKWOS	Fe	0	5	26	2	6	4	Tetrahedral	1.062
+MASPAZ	Fe	0	5	26	2	6	4	Tetrahedral	1.005
+QUSJAQ	Fe	0	5	26	2	6	4	Tetrahedral	0.974
+IXASAC	Fe	0	5	26	2	6	4	Tetrahedral	1.021
+EGAMUX	Fe	0	1	26	2	6	4	Tetrahedral	0.802
+FIMPIB	Fe	-1	1	26	2	6	4	Tetrahedral	0.787
+ZAZNOD	Fe	-1	5	26	2	6	4	Tetrahedral	0.986
+RIVWEA	Fe	0	5	26	2	6	4	Tetrahedral	1.016
+HECVER	Fe	0	5	26	2	6	4	Tetrahedral	1.034
+YECRII	Fe	0	5	26	2	6	4	Tetrahedral	1.017
+ITEXIO	Fe	-1	5	26	2	6	4	Tetrahedral	0.989
+LUGPAE	Fe	0	5	26	2	6	4	Tetrahedral	1.008
+YEWSOI	Fe	0	5	26	2	6	4	Tetrahedral	0.977
+YEWSUO	Fe	0	5	26	2	6	4	Tetrahedral	0.975
+GOFXIK	Fe	-2	5	26	2	6	4	Tetrahedral	0.967
+MUQPOF	Fe	-2	5	26	2	6	4	Tetrahedral	0.983
+RIRFAB	Fe	-2	5	26	2	6	4	Tetrahedral	0.95
+VEYWOO	Fe	0	5	26	2	6	5	Square pyramidal	1.057
+ZUMSEH	Fe	0	5	26	2	6	5	Square pyramidal	1.048
+MINWIR	Fe	0	5	26	2	6	5	Square pyramidal	1.054
+CUCWEE	Fe	0	5	26	2	6	5	Square pyramidal	1.052
+ZELDAX	Fe	0	5	26	2	6	5	Square pyramidal	1.05
+ULITUH	Fe	0	5	26	2	6	5	Square pyramidal	1.114
+LUTFAJ	Fe	0	1	26	2	6	5	Square pyramidal	0.852
+CEMWIC	Fe	0	5	26	2	6	5	Square pyramidal	1.106
+FOQBOC	Fe	-1	5	26	2	6	5	Square pyramidal	1.021
+KAXYUE	Fe	0	1	26	2	6	5	Square pyramidal	0.885
+MARJIZ	Fe	1	5	26	2	6	5	Square pyramidal	1.112
+TEBKOC	Fe	-1	5	26	2	6	5	Square pyramidal	1.03
+WEMWAO	Fe	0	1	26	2	6	5	Square pyramidal	0.851
+QITBEA	Fe	0	5	26	2	6	5	Square pyramidal	1.098
+OCUJOL	Fe	0	5	26	2	6	5	Square pyramidal	1.074
+QIZCAF	Fe	0	5	26	2	6	5	Square pyramidal	1.064
+QIXDIM	Fe	0	5	26	2	6	5	Square pyramidal	1.074
+KIKNUQ	Fe	0	5	26	2	6	5	Square pyramidal	1.063
+XOMCOS	Fe	0	5	26	2	6	5	Square pyramidal	1.055
+TAPZUI	Fe	1	5	26	2	6	5	Square pyramidal	1.122
+TEBKIW	Fe	-1	5	26	2	6	5	Square pyramidal	1.03
+YORSEE	Fe	1	5	26	2	6	5	Square pyramidal	1.048
+VEKNAA	Fe	-1	5	26	2	6	5	Square pyramidal	1.078
+RAVYIX	Fe	1	5	26	2	6	5	Square pyramidal	1.104
+SIXRAV	Fe	0	5	26	2	6	5	Square pyramidal	1.07
+TICJEX	Fe	2	5	26	2	6	5	Square pyramidal	1.105
+EJOJOC	Fe	0	5	26	2	6	5	Square pyramidal	1.08
+DESSAW	Fe	1	5	26	2	6	5	Square pyramidal	1.069
+ZUJRAZ	Fe	0	5	26	2	6	5	Square pyramidal	1.03
+NENNEA	Fe	1	3	26	2	6	5	Square pyramidal	1.014
+IXARAB	Fe	0	5	26	2	6	5	Square pyramidal	1.067
+TEBRUP	Fe	0	5	26	2	6	5	Square pyramidal	1.027
+TEBLAP	Fe	-1	5	26	2	6	5	Square pyramidal	1.029
+IXAQII	Fe	0	5	26	2	6	5	Square pyramidal	1.072
+EDISOA	Fe	0	5	26	2	6	5	Square pyramidal	1.095
+PYESAF10	Fe	0	5	26	2	6	5	Square pyramidal	1.03
+UPIFUV	Fe	0	5	26	2	6	5	Square pyramidal	1.058
+BAYHUF	Fe	0	5	26	2	6	5	Square pyramidal	1.108
+DEXFOB	Fe	0	5	26	2	6	5	Square pyramidal	1.07
+DUFLEW	Fe	0	5	26	2	6	5	Square pyramidal	1.038
+ZILZUP	Fe	0	5	26	2	6	5	Square pyramidal	1.091
+NEJBIN	Fe	-1	5	26	2	6	5	Square pyramidal	1.106
+PAYHIG	Fe	0	5	26	2	6	5	Square pyramidal	1.067
+JASBOV	Fe	0	5	26	2	6	5	Square pyramidal	1.049
+PEPPEI	Fe	0	3	26	2	6	5	Square pyramidal	0.902
+QOBRIK	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.108
+CUQSEN	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.107
+IMACEG	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.064
+JOGYAH	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.024
+YUMGOF	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.077
+NAZRUC	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.093
+ZUYNEM	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.113
+ROFKOO	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.122
+TEQQAH	Fe	-1	3	26	2	6	5	Trigonal bipyramidal	0.934
+NEYJUY	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.093
+MONTIU	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.073
+QIXCOR	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.077
+PIYYON	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.07
+WAFWEJ	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.065
+WUMPOL	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.08
+UJUPOF	Fe	1	5	26	2	6	5	Trigonal bipyramidal	1.093
+SELSEI	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.061
+NAZROW	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.101
+WAJGUL	Fe	-1	5	26	2	6	5	Trigonal bipyramidal	1.062
+PEVHAC	Fe	1	3	26	2	6	5	Trigonal bipyramidal	0.899
+VAKYOX	Fe	2	5	26	2	6	5	Trigonal bipyramidal	1.075
+RITYOK	Fe	2	5	26	2	6	5	Trigonal bipyramidal	1.081
+SIXMOC	Fe	1	5	26	2	6	5	Trigonal bipyramidal	1.08
+LAYVOX	Fe	1	5	26	2	6	5	Trigonal bipyramidal	1.09
+CAJFAV	Fe	1	5	26	2	6	5	Trigonal bipyramidal	1.067
+VOVDIT	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.058
+ECEWAL	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.095
+VABFIQ	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.067
+HEYPEG	Fe	0	5	26	2	6	5	Trigonal bipyramidal	1.049
+BANLOR	Fe	0	1	26	2	6	6	Octahedral	0.803
+MENWUY	Fe	0	5	26	2	6	6	Octahedral	1.122
+EGUVOR	Fe	0	5	26	2	6	6	Octahedral	1.114
+ZIZHOI	Fe	0	1	26	2	6	6	Octahedral	0.91
+IDUBEO	Fe	-1	1	26	2	6	6	Octahedral	0.889
+GUTYAY	Fe	0	1	26	2	6	6	Octahedral	0.924
+UDUMEL	Fe	1	5	26	2	6	6	Octahedral	1.119
+FEWRIK	Fe	1	5	26	2	6	6	Octahedral	1.117
+GEFZEX	Fe	1	1	26	2	6	6	Octahedral	0.917
+CEHHON	Fe	2	1	26	2	6	6	Octahedral	0.891
+BAMBAV	Fe	-4	1	26	2	6	6	Octahedral	0.891
+XESMUG	Fe	-2	1	26	2	6	6	Octahedral	0.883
+CADYEM	Fe	-1	1	26	2	6	6	Octahedral	0.865
+XIHVIT	Fe	-2	1	26	2	6	6	Octahedral	0.883
+DUGPIF	Fe	-2	1	26	2	6	6	Octahedral	0.885
+ILURIR	Fe	-3	1	26	2	6	6	Octahedral	0.922
+QOKSOY	Fe	0	1	26	2	6	6	Octahedral	0.881
+AQIZEF	Fe	-2	1	26	2	6	6	Octahedral	0.886
+HAXCOA	Fe	-1	1	26	2	6	6	Octahedral	0.886
+CUCQIB	Fe	0	1	26	2	6	6	Octahedral	0.871
+SAGFUB	Fe	0	1	26	2	6	6	Octahedral	0.886
+DEKFAD	Fe	0	1	26	2	6	6	Octahedral	0.883
+HIFCAD	Fe	1	1	26	2	6	6	Octahedral	0.902
+IDUBOY	Fe	-1	1	26	2	6	6	Octahedral	0.886
+AQIYAA	Fe	-2	1	26	2	6	6	Octahedral	0.894
+AQIYII	Fe	-1	1	26	2	6	6	Octahedral	0.893
+FOQNOP	Fe	0	1	26	2	6	6	Octahedral	0.857
+NIVWOF	Fe	0	1	26	2	6	6	Octahedral	0.882
+XABHIV	Fe	1	1	26	2	6	6	Octahedral	0.852
+NEBKIR	Fe	-1	1	26	2	6	6	Octahedral	0.885
+CUCQUN	Fe	0	1	26	2	6	6	Octahedral	0.88
+COSGEW	Fe	0	1	26	2	6	6	Octahedral	0.883
+DEKFEH	Fe	0	1	26	2	6	6	Octahedral	0.895
+GOJZIP	Fe	-1	1	26	2	6	6	Octahedral	0.948
+UCIWOS	Fe	0	1	26	2	6	6	Octahedral	0.934
+SADRAU	Fe	0	1	26	2	6	6	Octahedral	0.923
+VUJMAP	Fe	0	1	26	2	6	6	Octahedral	0.935
+MALGIQ	Fe	1	1	26	2	6	6	Octahedral	0.887
+UDUQAL	Fe	0	1	26	2	6	6	Octahedral	0.859
+ITEXOU	Fe	-1	1	26	2	6	6	Octahedral	0.898
+ILASOE	Fe	1	1	26	2	6	6	Octahedral	0.898
+QOSZON	Fe	0	1	26	2	6	6	Octahedral	0.811
+PUCFID	Fe	0	1	26	2	6	6	Octahedral	0.903
+AJIMOV	Fe	0	1	26	2	6	6	Octahedral	0.903
+FURPEO	Fe	-2	1	26	2	6	6	Octahedral	0.96
+XOPSEB	Fe	1	1	26	2	6	6	Octahedral	0.955
+UBEVOP	Fe	0	1	26	2	6	6	Octahedral	0.922
+QEZYUP	Fe	0	1	26	2	6	6	Octahedral	0.919
+ALEQEO	Fe	0	1	26	2	6	6	Octahedral	0.916
+IFODIR	Fe	0	1	26	2	6	6	Octahedral	0.908
+LALBUV	Fe	0	1	26	2	6	6	Octahedral	0.915
+FERBEK	Fe	0	1	26	2	6	6	Octahedral	0.923
+KAGXID	Fe	0	1	26	2	6	6	Octahedral	0.905
+XILTIV	Fe	0	1	26	2	6	6	Octahedral	0.9
+WAZWEC	Fe	0	1	26	2	6	6	Octahedral	0.898
+HEYMIH	Fe	2	1	26	2	6	6	Octahedral	0.894
+CECBOB	Fe	0	1	26	2	6	6	Octahedral	0.897
+CPTCFE	Fe	0	1	26	2	6	6	Octahedral	0.907
+TUTPAB	Fe	0	1	26	2	6	6	Octahedral	0.913
+EWABUA	Fe	0	1	26	2	6	6	Octahedral	0.92
+IJEZIJ	Fe	1	1	26	2	6	6	Octahedral	0.925
+VUJLOC	Fe	0	1	26	2	6	6	Octahedral	0.948
+TAGLES10	Fe	0	1	26	2	6	6	Octahedral	0.9
+XAXYEC	Fe	0	1	26	2	6	6	Octahedral	0.886
+YOZYIW	Fe	0	1	26	2	6	6	Octahedral	0.883
+YEQTOE	Fe	0	1	26	2	6	6	Octahedral	0.88
+XUPJOI	Fe	0	1	26	2	6	6	Octahedral	0.906
+ALILOX	Fe	0	1	26	2	6	6	Octahedral	0.945
+YOZZET	Fe	0	1	26	2	6	6	Octahedral	0.93
+BAYDEL	Fe	0	1	26	2	6	6	Octahedral	0.952
+HUQFAA	Fe	2	1	26	2	6	6	Octahedral	0.949
+LINROQ	Fe	1	1	26	2	6	6	Octahedral	0.967
+DUDTUS	Fe	2	1	26	2	6	6	Octahedral	0.927
+ITARIF	Fe	0	1	26	2	6	6	Octahedral	0.945
+HUYDUB	Fe	1	1	26	2	6	6	Octahedral	0.94
+GUTXEB	Fe	1	1	26	2	6	6	Octahedral	0.935
+HEBMOQ	Fe	0	1	26	2	6	6	Octahedral	0.927
+HASJEQ	Fe	0	1	26	2	6	6	Octahedral	0.951
+CUXREV	Fe	2	1	26	2	6	6	Octahedral	0.938
+NAJKIS	Fe	2	1	26	2	6	6	Octahedral	0.911
+WEMVUH	Fe	0	1	26	2	6	6	Octahedral	0.931
+WUTDAQ	Fe	0	1	26	2	6	6	Octahedral	0.905
+MAFECL	Fe	-4	5	26	2	6	6	Octahedral	1.037
+XAKHOI	Fe	-2	5	26	2	6	6	Octahedral	1.118
+METYEQ	Fe	0	5	26	2	6	6	Octahedral	1.12
+QIXDEI	Fe	0	5	26	2	6	6	Octahedral	1.111
+WITBEJ	Fe	0	5	26	2	6	6	Octahedral	1.121
+PIMMOQ	Fe	0	5	26	2	6	6	Octahedral	1.109
+KITYOE	Fe	0	5	26	2	6	6	Octahedral	1.117
+EYIRUA	Fe	0	5	26	2	6	6	Octahedral	1.108
+IVEQEF	Fe	0	5	26	2	6	6	Octahedral	1.107
+NISBEW	Fe	0	1	26	2	6	6	Octahedral	0.92
+VUDXOH	Fe	0	1	26	2	6	6	Octahedral	0.94
+SIXMES	Fe	1	5	26	2	6	6	Octahedral	1.135
+DODWUQ	Fe	0	5	26	2	6	6	Octahedral	1.098
+TIDCAL	Fe	0	5	26	2	6	6	Octahedral	1.134
+WULSEB	Fe	1	5	26	2	6	6	Octahedral	1.11
+PUQJAM	Fe	-1	5	26	2	6	6	Octahedral	1.117
+TUTMUS	Fe	1	1	26	2	6	6	Octahedral	0.936
+GAHJEG	Fe	1	1	26	2	6	6	Octahedral	0.93
+TAMZAJ	Fe	1	1	26	2	6	6	Octahedral	0.885
+JACCUP	Fe	0	1	26	2	6	6	Octahedral	0.895
+FEKPUG	Fe	1	1	26	2	6	6	Octahedral	0.879
+GOCDEH	Fe	0	1	26	2	6	6	Octahedral	0.958
+JAZCAO	Fe	0	5	26	2	6	6	Octahedral	1.101
+LINRUW	Fe	1	5	26	2	6	6	Octahedral	1.129
+ACEYOW	Fe	2	5	26	2	6	6	Octahedral	1.094
+DOQRAC	Fe	2	1	26	2	6	6	Octahedral	1.073
+PAZXAP	Fe	2	1	26	2	6	6	Octahedral	0.989
+JOWGEH	Fe	2	1	26	2	6	6	Octahedral	0.941
+YANKUW	Fe	2	5	26	2	6	6	Octahedral	1.135
+ETOHIF	Fe	0	5	26	2	6	6	Octahedral	1.116
+DELPOZ01	Fe	2	1	26	2	6	6	Octahedral	0.914
+ITERAB	Fe	0	5	26	2	6	6	Octahedral	1.107
+NALPUL	Fe	0	1	26	2	6	6	Octahedral	0.916
+DENYAZ	Fe	2	1	26	2	6	6	Octahedral	0.945
+HOSRUD	Fe	0	5	26	2	6	6	Octahedral	1.115
+XEVKIU	Fe	2	5	26	2	6	6	Octahedral	1.128
+SUJVAW	Fe	1	5	26	2	6	6	Octahedral	1.117
+OBOFOC	Fe	2	1	26	2	6	6	Octahedral	0.914
+WOGMEL	Fe	2	1	26	2	6	6	Octahedral	0.917
+YASPUE	Fe	0	5	26	2	6	6	Octahedral	1.112
+IFEYOK	Fe	2	1	26	2	6	6	Octahedral	0.922
+LOJVEN	Fe	0	5	26	2	6	6	Octahedral	1.095
+OSELOO	Fe	0	5	26	2	6	6	Octahedral	1.107
+GADMOR	Fe	-1	5	26	2	6	6	Octahedral	1.116
+JITWUF	Fe	2	1	26	2	6	6	Octahedral	0.973
+DORPIJ	Fe	-1	5	26	2	6	6	Octahedral	1.11
+OFANER	Fe	0	5	26	2	6	6	Octahedral	1.119
+CETFAI	Fe	2	5	26	2	6	6	Octahedral	1.111
+ZEBSAA	Fe	0	1	26	2	6	6	Octahedral	0.922
+GEDFIE	Fe	2	1	26	2	6	6	Octahedral	0.907
+QENWUC	Fe	2	1	26	2	6	6	Octahedral	0.922
+HEBPUZ	Fe	0	1	26	2	6	6	Octahedral	0.953
+YAJLEA	Fe	0	5	26	2	6	6	Octahedral	1.108
+ZILYIC	Fe	0	5	26	2	6	6	Octahedral	1.113
+YAJLAW	Fe	0	5	26	2	6	6	Octahedral	1.095
+HEYNOO	Fe	0	1	26	2	6	6	Octahedral	0.932
+HEYNII	Fe	0	1	26	2	6	6	Octahedral	0.931
+QEDCOR	Fe	2	5	26	2	6	6	Octahedral	1.094
+GAYZEL	Fe	0	5	26	2	6	6	Octahedral	1.105
+EGUZUB	Fe	2	1	26	2	6	6	Octahedral	0.911
+LAXNON	Fe	2	1	26	2	6	6	Octahedral	0.914
+LAXNUT	Fe	2	1	26	2	6	6	Octahedral	0.914
+LILYOW	Fe	1	5	26	2	6	6	Trigonal prismatic	1.108
+QUKTAS	Fe	0	5	26	2	6	6	Trigonal prismatic	1.145
+HUMBEX	Fe	4	5	26	2	6	6	Trigonal prismatic	1.127
+VAHGES	Fe	1	5	26	2	6	6	Trigonal prismatic	1.152
+MATFUL	Fe	0	5	26	2	6	6	Trigonal prismatic	1.121
+REGBUA	Fe	0	5	26	2	6	6	Trigonal prismatic	1.148
+WOJLUC	Fe	2	5	26	2	6	7	Capped trigonal prismatic	1.211
+HOGFIV	Fe	0	5	26	2	6	7	Capped trigonal prismatic	1.187
+XEZMEU	Fe	0	5	26	2	6	7	Pentagonal bipyramidal	1.15
+NUKPAM01	Fe	0	5	26	2	6	7	Pentagonal bipyramidal	1.172
+UBEXOQ	Fe	2	5	26	2	6	7	Pentagonal bipyramidal	1.191
+KEHREV	Fe	2	5	26	2	6	7	Pentagonal bipyramidal	1.172
+QOMQOZ	Fe	1	5	26	2	6	7	Pentagonal bipyramidal	1.166
+SOTLET	Fe	0	5	26	2	6	7	Pentagonal bipyramidal	1.189
+NELGOA	Fe	2	5	26	2	6	8	Cube	1.325
+NAPYFE10	Fe	2	5	26	2	6	8	Dodecahedral	1.243
+HIDQUJ	Fe	2	5	26	2	6	8	Dodecahedral	1.208
+HMSIAF13	Fe	0	6	26	3	5	3	Trigonal planar	0.907
+RUMNUK	Fe	0	6	26	3	5	3	Trigonal planar	0.875
+MAKBUW	Fe	-1	4	26	3	5	4	Square planar	0.901
+BOWYUJ	Fe	-1	6	26	3	5	4	Tetrahedral	0.861
+OTOTIB	Fe	0	6	26	3	5	4	Tetrahedral	0.902
+TOCSOV	Fe	-1	6	26	3	5	4	Tetrahedral	1.037
+MIVGUV	Fe	0	6	26	3	5	4	Tetrahedral	0.926
+ISIKEA	Fe	-1	6	26	3	5	4	Tetrahedral	0.905
+ADIGEB	Fe	0	6	26	3	5	4	Tetrahedral	0.963
+VEMYOB	Fe	0	6	26	3	5	4	Tetrahedral	0.887
+MOBKET	Fe	0	6	26	3	5	4	Tetrahedral	0.893
+MADLOV	Fe	0	6	26	3	5	4	Tetrahedral	0.923
+LIBYOM	Fe	-1	6	26	3	5	4	Tetrahedral	0.94
+DABQED	Fe	0	6	26	3	5	4	Tetrahedral	0.92
+CEXLUN	Fe	-1	6	26	3	5	4	Tetrahedral	0.905
+JUWHAK	Fe	0	6	26	3	5	4	Tetrahedral	0.883
+SAYMIO	Fe	0	6	26	3	5	4	Tetrahedral	0.892
+BOXSAK	Fe	-1	6	26	3	5	4	Tetrahedral	0.935
+ONAPOL	Fe	-1	6	26	3	5	4	Tetrahedral	0.952
+DABPOM	Fe	0	6	26	3	5	4	Tetrahedral	0.951
+FIMPOH	Fe	0	2	26	3	5	4	Tetrahedral	0.849
+MESROU	Fe	-1	6	26	3	5	4	Tetrahedral	0.898
+JURHIN	Fe	-1	6	26	3	5	4	Tetrahedral	0.92
+EWOBEX	Fe	0	4	26	3	5	5	Square pyramidal	0.972
+QOCDUI01	Fe	0	4	26	3	5	5	Square pyramidal	0.96
+VIFKED	Fe	0	4	26	3	5	5	Square pyramidal	0.952
+MANHEQ	Fe	-2	4	26	3	5	5	Square pyramidal	0.92
+DADJEX	Fe	0	4	26	3	5	5	Square pyramidal	0.987
+ALALAA	Fe	0	2	26	3	5	5	Square pyramidal	0.962
+HOGHEQ	Fe	0	2	26	3	5	5	Square pyramidal	0.924
+EQACEF	Fe	-2	6	26	3	5	5	Square pyramidal	0.983
+RAKTAA	Fe	0	6	26	3	5	5	Square pyramidal	0.991
+ECOPAO	Fe	0	6	26	3	5	5	Square pyramidal	0.986
+PADJAH	Fe	0	6	26	3	5	5	Square pyramidal	0.983
+EVILOM	Fe	0	6	26	3	5	5	Square pyramidal	0.977
+QOLKIM	Fe	0	4	26	3	5	5	Square pyramidal	0.948
+WIYSII	Fe	0	6	26	3	5	5	Square pyramidal	0.975
+NAVVIQ	Fe	-2	4	26	3	5	5	Square pyramidal	0.939
+VEKNOO	Fe	-2	4	26	3	5	5	Square pyramidal	0.947
+GITHEY	Fe	0	4	26	3	5	5	Square pyramidal	0.939
+MIJSOP	Fe	0	4	26	3	5	5	Square pyramidal	0.929
+MOCMAT	Fe	-1	4	26	3	5	5	Square pyramidal	0.921
+TIQZIE	Fe	0	4	26	3	5	5	Square pyramidal	0.982
+QITWUO	Fe	1	4	26	3	5	5	Square pyramidal	0.99
+RISNOZ	Fe	0	6	26	3	5	5	Square pyramidal	1.001
+ZOFDAC	Fe	0	6	26	3	5	5	Square pyramidal	0.977
+BESBEI	Fe	0	6	26	3	5	5	Square pyramidal	1.023
+QORDUY	Fe	-1	4	26	3	5	5	Square pyramidal	0.936
+BEKZIA	Fe	0	6	26	3	5	5	Square pyramidal	0.974
+ILONUV	Fe	-2	6	26	3	5	5	Square pyramidal	0.985
+QORFAG	Fe	-2	4	26	3	5	5	Square pyramidal	0.938
+UCECEL	Fe	-1	4	26	3	5	5	Square pyramidal	0.935
+TALMEZ	Fe	-1	4	26	3	5	5	Square pyramidal	0.939
+UCIVOT	Fe	-2	6	26	3	5	5	Square pyramidal	0.97
+ULEVIQ	Fe	-1	4	26	3	5	5	Square pyramidal	0.945
+YITRUO	Fe	1	2	26	3	5	5	Square pyramidal	0.885
+MANHAM	Fe	-2	4	26	3	5	5	Square pyramidal	0.936
+YEHDUM	Fe	0	6	26	3	5	5	Trigonal bipyramidal	1.063
+MOMXUJ	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.982
+LOQLOS	Fe	0	4	26	3	5	5	Trigonal bipyramidal	0.936
+ZAVTUN	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.997
+YOZRAG	Fe	-2	6	26	3	5	5	Trigonal bipyramidal	0.978
+VILRIT	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.994
+KAJTOE	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.976
+GEPVEF	Fe	0	4	26	3	5	5	Trigonal bipyramidal	0.955
+SAVHOM	Fe	0	4	26	3	5	5	Trigonal bipyramidal	0.934
+SAVHIG	Fe	0	6	26	3	5	5	Trigonal bipyramidal	1.014
+DAQXEY	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.992
+IBEGIH	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.999
+KAFLUA	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.994
+MAHNOZ	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.971
+EDECEX	Fe	0	4	26	3	5	5	Trigonal bipyramidal	0.955
+QAYCEY	Fe	0	6	26	3	5	5	Trigonal bipyramidal	1.001
+FIHFIO	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.983
+HITHOI	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.995
+GADTIS	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.997
+KAGCIH	Fe	-1	4	26	3	5	5	Trigonal bipyramidal	0.93
+TAVHOO	Fe	-1	6	26	3	5	5	Trigonal bipyramidal	1.017
+NOFJOI	Fe	-1	6	26	3	5	5	Trigonal bipyramidal	1.005
+DOGHOY	Fe	1	6	26	3	5	5	Trigonal bipyramidal	1.007
+JIWFUQ	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.986
+GUQYOH	Fe	0	6	26	3	5	5	Trigonal bipyramidal	1.002
+ZAZNUJ	Fe	0	6	26	3	5	5	Trigonal bipyramidal	1.015
+JIWMIL	Fe	0	6	26	3	5	5	Trigonal bipyramidal	0.98
+UCIVUZ	Fe	-2	6	26	3	5	5	Trigonal bipyramidal	0.972
+KAGRES	Fe	-1	4	26	3	5	5	Trigonal bipyramidal	0.929
+QEFDOW	Fe	0	6	26	3	5	6	Octahedral	1.039
+UHEHAQ	Fe	0	6	26	3	5	6	Octahedral	1.033
+GUTXOL	Fe	1	2	26	3	5	6	Octahedral	0.937
+HAXXOU	Fe	0	6	26	3	5	6	Octahedral	1.062
+SUTQAB	Fe	0	6	26	3	5	6	Octahedral	1.043
+QOZZUB	Fe	0	6	26	3	5	6	Octahedral	1.039
+VOPPEV	Fe	0	6	26	3	5	6	Octahedral	1.013
+JIHPAR	Fe	-3	2	26	3	5	6	Octahedral	0.911
+HIYRUE	Fe	-2	2	26	3	5	6	Octahedral	0.929
+SEDREZ	Fe	-1	2	26	3	5	6	Octahedral	0.944
+YITNAR	Fe	-1	2	26	3	5	6	Octahedral	0.925
+SAGCAF	Fe	0	2	26	3	5	6	Octahedral	0.948
+ERIMEZ02	Fe	-1	2	26	3	5	6	Octahedral	0.976
+GICZIB	Fe	1	2	26	3	5	6	Octahedral	0.943
+YAQBEA	Fe	1	2	26	3	5	6	Octahedral	0.956
+KAGXUP	Fe	1	2	26	3	5	6	Octahedral	0.911
+LIJBUB	Fe	0	2	26	3	5	6	Octahedral	0.968
+XIBBAL	Fe	1	2	26	3	5	6	Octahedral	0.946
+UHIBAP	Fe	0	2	26	3	5	6	Octahedral	0.933
+QEHZIN	Fe	2	2	26	3	5	6	Octahedral	0.947
+VOCBAQ	Fe	-2	6	26	3	5	6	Octahedral	1.036
+YILLAH	Fe	-1	6	26	3	5	6	Octahedral	1.044
+VOBYEQ	Fe	-1	6	26	3	5	6	Octahedral	1.03
+POJREL	Fe	0	6	26	3	5	6	Octahedral	1.05
+ATOFAS	Fe	-2	6	26	3	5	6	Octahedral	1.042
+REXMIQ	Fe	0	6	26	3	5	6	Octahedral	1.062
+ZULGAQ	Fe	-2	6	26	3	5	6	Octahedral	1.031
+YITVON	Fe	0	6	26	3	5	6	Octahedral	1.027
+RUHMAI	Fe	1	6	26	3	5	6	Octahedral	1.065
+JIKPAX	Fe	1	6	26	3	5	6	Octahedral	1.049
+RIPXIX	Fe	0	6	26	3	5	6	Octahedral	1.049
+GAVNEX	Fe	0	6	26	3	5	6	Octahedral	1.039
+QARPEF	Fe	0	6	26	3	5	6	Octahedral	1.042
+EHEXOE	Fe	-2	6	26	3	5	6	Octahedral	1.03
+SAHZIK	Fe	0	6	26	3	5	6	Octahedral	1.032
+WIHFEB	Fe	2	2	26	3	5	6	Octahedral	0.944
+XEZZUX	Fe	1	2	26	3	5	6	Octahedral	0.949
+OLUYEB	Fe	2	2	26	3	5	6	Octahedral	1.005
+XOFDUR	Fe	1	6	26	3	5	6	Octahedral	1.042
+VIJQUB	Fe	0	6	26	3	5	6	Octahedral	1.047
+CAPZAW	Fe	-1	6	26	3	5	6	Octahedral	1.039
+QIJTAE	Fe	0	6	26	3	5	6	Octahedral	1.039
+ZIMBEC	Fe	0	6	26	3	5	6	Octahedral	1.018
+WISHUE	Fe	0	6	26	3	5	6	Octahedral	1.047
+VOPPAR	Fe	0	6	26	3	5	6	Octahedral	1.02
+RUMRAU	Fe	-3	6	26	3	5	6	Octahedral	1.027
+YASHUV	Fe	-2	6	26	3	5	6	Octahedral	1.026
+HARLER	Fe	1	6	26	3	5	6	Octahedral	1.042
+VEGCEQ	Fe	1	2	26	3	5	6	Octahedral	0.967
+NEPPIJ	Fe	-3	6	26	3	5	6	Octahedral	1.027
+NEMXIN	Fe	0	2	26	3	5	6	Octahedral	0.927
+HULQAI	Fe	-2	6	26	3	5	6	Octahedral	1.025
+ELUJUQ	Fe	0	6	26	3	5	6	Octahedral	1.061
+QETKOS	Fe	3	2	26	3	5	6	Octahedral	0.975
+SILWOA	Fe	-2	6	26	3	5	6	Octahedral	1.014
+UGOLOT	Fe	2	2	26	3	5	6	Octahedral	0.964
+CESGOW	Fe	1	2	26	3	5	6	Octahedral	0.92
+CAJFEZ	Fe	2	2	26	3	5	6	Octahedral	0.941
+KETVEL	Fe	1	6	26	3	5	6	Octahedral	1.036
+WOBXER	Fe	1	6	26	3	5	6	Octahedral	1.061
+VENGUS	Fe	0	6	26	3	5	6	Octahedral	1.042
+GUGYIS	Fe	-1	6	26	3	5	6	Octahedral	1.032
+AETSFE	Fe	1	2	26	3	5	6	Octahedral	0.951
+LUJPAI	Fe	1	2	26	3	5	6	Octahedral	0.981
+EGEMOS	Fe	0	2	26	3	5	6	Octahedral	0.949
+XENPAI	Fe	1	2	26	3	5	6	Octahedral	0.934
+MIDJOY	Fe	1	2	26	3	5	6	Octahedral	0.948
+JUDRAD	Fe	0	6	26	3	5	6	Octahedral	1.018
+UBUBAU	Fe	0	6	26	3	5	6	Octahedral	1.055
+DOXXOE	Fe	0	6	26	3	5	6	Octahedral	1.08
+HAVRII	Fe	-1	6	26	3	5	6	Octahedral	1.022
+OMANIB	Fe	0	2	26	3	5	6	Octahedral	0.939
+CUHGUH	Fe	-1	2	26	3	5	6	Octahedral	0.933
+DIHZEC	Fe	0	6	26	3	5	6	Octahedral	1.02
+KAPJAO	Fe	3	6	26	3	5	6	Octahedral	1.008
+KEFLUD	Fe	-3	6	26	3	5	6	Octahedral	1.041
+BOFFOS	Fe	-3	6	26	3	5	6	Octahedral	1.021
+NANJUJ	Fe	-1	6	26	3	5	6	Octahedral	1.033
+RATCAR	Fe	0	6	26	3	5	6	Octahedral	1.048
+MTCBFE	Fe	0	6	26	3	5	6	Octahedral	1.058
+DEXZAK	Fe	0	6	26	3	5	6	Octahedral	1.039
+NUSMIY	Fe	-2	2	26	3	5	6	Octahedral	0.946
+VEKNUU	Fe	0	6	26	3	5	6	Octahedral	1.078
+LOXSIA	Fe	0	2	26	3	5	6	Octahedral	0.952
+LOXWUQ	Fe	-1	6	26	3	5	6	Trigonal prismatic	1.044
+NOYJUG	Fe	-3	6	26	3	5	6	Trigonal prismatic	1.027
+IVOSAO	Fe	2	6	26	3	5	7	Capped trigonal prismatic	1.13
+IVOSES	Fe	2	6	26	3	5	7	Pentagonal bipyramidal	1.129
+MUJZUM	Fe	0	6	26	3	5	7	Pentagonal bipyramidal	1.106
+NURPUN	Co	1	3	27	1	8	2	Linear	0.963
+KAGHOS	Co	-1	3	27	1	8	2	Linear	0.943
+VEYXOP	Co	0	3	27	1	8	3	T-shaped	0.998
+AQUGIF	Co	0	3	27	1	8	3	T-shaped	0.948
+FEWYAK	Co	1	3	27	1	8	3	Trigonal planar	0.99
+QIDNAU	Co	0	3	27	1	8	3	Trigonal planar	0.971
+MAXZOC	Co	0	3	27	1	8	3	Trigonal planar	0.965
+UZEXON	Co	0	3	27	1	8	3	Trigonal planar	0.98
+HESNAX	Co	0	1	27	1	8	4	Seesaw	0.9
+NIHXEK	Co	0	3	27	1	8	4	Seesaw	0.994
+YALHUP	Co	0	3	27	1	8	4	Seesaw	1.099
+YIKVUM	Co	0	3	27	1	8	4	Seesaw	1.001
+UZEYEE	Co	0	1	27	1	8	4	Square planar	0.889
+BAFSIO	Co	0	1	27	1	8	4	Square planar	0.887
+SIPHAA	Co	0	3	27	1	8	4	Tetrahedral	0.943
+CUWSIW	Co	0	3	27	1	8	4	Tetrahedral	0.956
+NIHYIP	Co	0	3	27	1	8	4	Tetrahedral	0.993
+DAJVIT	Co	0	3	27	1	8	4	Tetrahedral	0.924
+CAFYAK	Co	0	3	27	1	8	4	Tetrahedral	0.963
+TUMYUV	Co	0	3	27	1	8	4	Tetrahedral	0.954
+CIXXEN	Co	0	3	27	1	8	4	Tetrahedral	0.927
+CIXXAJ	Co	0	3	27	1	8	4	Tetrahedral	0.907
+XONCEJ	Co	0	3	27	1	8	4	Tetrahedral	0.971
+FIYMOP	Co	1	1	27	1	8	5	Square pyramidal	0.873
+FEWVEL	Co	0	1	27	1	8	5	Square pyramidal	0.935
+VUJPIZ	Co	0	1	27	1	8	5	Square pyramidal	0.878
+VAFHAM	Co	0	1	27	1	8	5	Trigonal bipyramidal	0.893
+QAQBIV	Co	0	1	27	1	8	5	Trigonal bipyramidal	0.883
+RABVOG	Co	0	1	27	1	8	5	Trigonal bipyramidal	0.894
+CAHCOP	Co	0	1	27	1	8	5	Trigonal bipyramidal	0.862
+WOKYOL	Co	0	1	27	1	8	5	Trigonal bipyramidal	0.928
+CURVOB	Co	0	4	27	2	7	2	Linear	0.956
+PIVHUZ	Co	0	4	27	2	7	2	Linear	0.879
+MUGYIY	Co	0	4	27	2	7	3	Trigonal planar	0.994
+MUGYEU	Co	0	4	27	2	7	3	Trigonal planar	0.98
+VUCPIU	Co	0	4	27	2	7	3	Trigonal planar	1.018
+XUNTAB	Co	0	4	27	2	7	3	Trigonal planar	0.927
+MONZEU	Co	0	4	27	2	7	3	Trigonal planar	0.979
+RITTAR	Co	0	4	27	2	7	3	Trigonal planar	0.99
+DOZZEX	Co	0	4	27	2	7	3	Trigonal planar	0.989
+DAQRAR	Co	-1	4	27	2	7	3	Trigonal planar	0.958
+VENTAL	Co	0	4	27	2	7	4	Seesaw	1.044
+GIGGUZ	Co	0	4	27	2	7	4	Seesaw	1.036
+TEXLIS	Co	0	4	27	2	7	4	Seesaw	1.021
+MCPTCO	Co	0	4	27	2	7	4	Seesaw	1.042
+MERECO	Co	0	4	27	2	7	4	Seesaw	1.019
+AGIDEC	Co	-2	4	27	2	7	4	Seesaw	1.027
+SEWMAK	Co	-2	4	27	2	7	4	Seesaw	1.025
+TANLEA	Co	0	2	27	2	7	4	Seesaw	0.906
+BITTAC	Co	0	2	27	2	7	4	Square planar	0.907
+BIXWOX	Co	0	2	27	2	7	4	Square planar	0.969
+FEWYIS	Co	0	2	27	2	7	4	Square planar	0.94
+EQEQAV	Co	0	2	27	2	7	4	Square planar	0.96
+QANMOK	Co	0	2	27	2	7	4	Square planar	1.006
+IPOFUR	Co	0	2	27	2	7	4	Square planar	0.941
+AGAVAI	Co	0	2	27	2	7	4	Square planar	0.898
+HEQZEI	Co	0	2	27	2	7	4	Square planar	1.013
+FEYMIG	Co	0	2	27	2	7	4	Square planar	0.903
+QAZCIF	Co	0	2	27	2	7	4	Square planar	0.951
+LAPYAC	Co	0	2	27	2	7	4	Square planar	0.917
+ZZZAOG01	Co	0	2	27	2	7	4	Square planar	0.922
+JUHTIP	Co	0	2	27	2	7	4	Square planar	0.931
+AGXICO	Co	0	2	27	2	7	4	Square planar	0.935
+ZIMPUG	Co	0	2	27	2	7	4	Square planar	0.92
+ZIMQAN	Co	0	2	27	2	7	4	Square planar	0.933
+AGUDUE	Co	1	2	27	2	7	4	Square planar	0.924
+VEXLIU	Co	0	2	27	2	7	4	Square planar	0.92
+EAIMCO	Co	0	2	27	2	7	4	Square planar	0.935
+RUMGUB	Co	0	2	27	2	7	4	Square planar	0.981
+AJALAZ	Co	0	2	27	2	7	4	Square planar	0.925
+FEHNOV	Co	0	2	27	2	7	4	Square planar	0.882
+TILSUD	Co	2	2	27	2	7	4	Square planar	0.998
+EWANAR	Co	-2	2	27	2	7	4	Square planar	0.896
+BAMCOM	Co	-2	2	27	2	7	4	Square planar	0.883
+LAYMEF	Co	-2	2	27	2	7	4	Square planar	0.905
+PELZAH	Co	-1	4	27	2	7	4	Tetrahedral	0.97
+HEKXIG	Co	-2	4	27	2	7	4	Tetrahedral	0.967
+UFOYOF	Co	-1	4	27	2	7	4	Tetrahedral	0.983
+PAMSUT	Co	-1	4	27	2	7	4	Tetrahedral	0.982
+VEBKAQ	Co	0	4	27	2	7	4	Tetrahedral	1.003
+METGUN	Co	0	4	27	2	7	4	Tetrahedral	1.002
+TEHYOV	Co	0	4	27	2	7	4	Tetrahedral	0.981
+BABCAK	Co	0	4	27	2	7	4	Tetrahedral	0.978
+FOMQAB	Co	0	4	27	2	7	4	Tetrahedral	0.983
+QOGLAZ	Co	0	4	27	2	7	4	Tetrahedral	0.992
+NUPTAT	Co	0	4	27	2	7	4	Tetrahedral	0.967
+FAYHIZ	Co	0	4	27	2	7	4	Tetrahedral	0.975
+ZUMCUI	Co	0	4	27	2	7	4	Tetrahedral	1.012
+CADYUC	Co	0	4	27	2	7	4	Tetrahedral	1.006
+OBIMOC	Co	0	4	27	2	7	4	Tetrahedral	0.996
+HIDXUP	Co	0	4	27	2	7	4	Tetrahedral	1.033
+KOZYED01	Co	0	4	27	2	7	4	Tetrahedral	1.102
+DIMDAH	Co	0	4	27	2	7	4	Tetrahedral	1.056
+HURSAR	Co	0	4	27	2	7	4	Tetrahedral	1.013
+HIPLOI	Co	0	4	27	2	7	4	Tetrahedral	1.09
+YEQZID	Co	0	4	27	2	7	4	Tetrahedral	1.033
+BINJOZ	Co	-2	4	27	2	7	4	Tetrahedral	0.994
+SOXJUK	Co	-1	4	27	2	7	4	Tetrahedral	0.993
+GISVAF	Co	0	4	27	2	7	4	Tetrahedral	1.003
+YINCOO	Co	0	4	27	2	7	4	Tetrahedral	0.994
+ILIJUK	Co	0	4	27	2	7	4	Tetrahedral	0.993
+METGOH	Co	0	4	27	2	7	4	Tetrahedral	1.021
+PUMQAQ	Co	-2	4	27	2	7	4	Tetrahedral	1.006
+RIZGUF	Co	0	4	27	2	7	4	Tetrahedral	0.993
+TOTGOY	Co	0	4	27	2	7	4	Tetrahedral	1.017
+LAJYUR	Co	0	4	27	2	7	4	Tetrahedral	1.06
+JAWSUY	Co	0	4	27	2	7	4	Tetrahedral	1.011
+NANJEU	Co	0	4	27	2	7	4	Tetrahedral	1.0
+NEZPEQ	Co	0	4	27	2	7	4	Tetrahedral	1.005
+VECTUU	Co	0	4	27	2	7	4	Tetrahedral	1.013
+FOMPUU	Co	0	4	27	2	7	4	Tetrahedral	0.99
+FARZIH	Co	0	4	27	2	7	4	Tetrahedral	1.006
+FAJMAF	Co	-2	4	27	2	7	4	Tetrahedral	1.018
+SIYHOA	Co	0	4	27	2	7	4	Tetrahedral	1.008
+RUTRUT	Co	0	4	27	2	7	4	Tetrahedral	0.983
+LOXSAS	Co	0	4	27	2	7	4	Tetrahedral	0.995
+REMMEB	Co	0	4	27	2	7	4	Tetrahedral	0.997
+HIPLEY	Co	0	4	27	2	7	4	Tetrahedral	1.052
+IJOPED	Co	0	4	27	2	7	4	Tetrahedral	1.055
+VEDXOS	Co	0	4	27	2	7	4	Tetrahedral	1.015
+XEZWOQ	Co	0	4	27	2	7	4	Tetrahedral	0.998
+BIWPED	Co	0	4	27	2	7	4	Tetrahedral	1.032
+JAPRUN	Co	0	4	27	2	7	4	Tetrahedral	0.989
+LEWNIN	Co	0	4	27	2	7	4	Tetrahedral	1.077
+SIBZAE	Co	0	4	27	2	7	4	Tetrahedral	1.092
+CAHQAD	Co	0	4	27	2	7	4	Tetrahedral	1.062
+ROBXEM	Co	-2	4	27	2	7	4	Tetrahedral	0.958
+DAPQOD	Co	0	4	27	2	7	4	Tetrahedral	0.987
+KUWWAC	Co	0	4	27	2	7	4	Tetrahedral	0.98
+TAPGUM	Co	0	4	27	2	7	4	Tetrahedral	1.004
+UMUJUK	Co	0	4	27	2	7	4	Tetrahedral	0.986
+FAYHOF	Co	0	4	27	2	7	4	Tetrahedral	0.984
+HOMKUP	Co	0	4	27	2	7	4	Tetrahedral	0.99
+XUPRAB	Co	0	4	27	2	7	4	Tetrahedral	0.991
+CODLEO	Co	0	4	27	2	7	4	Tetrahedral	0.983
+CASXAY	Co	-2	4	27	2	7	4	Tetrahedral	0.988
+QITSUJ	Co	-2	4	27	2	7	4	Tetrahedral	0.987
+ADERAF	Co	0	4	27	2	7	4	Tetrahedral	0.998
+IZOJAK	Co	0	4	27	2	7	4	Tetrahedral	1.032
+NICFAH	Co	-1	4	27	2	7	4	Tetrahedral	1.025
+UHOXOE	Co	1	4	27	2	7	4	Tetrahedral	1.037
+WIGMAA	Co	0	4	27	2	7	4	Tetrahedral	1.073
+EMEDEH	Co	0	4	27	2	7	4	Tetrahedral	1.024
+CADZAJ	Co	0	4	27	2	7	4	Tetrahedral	1.009
+ECBIMA10	Co	0	4	27	2	7	4	Tetrahedral	1.056
+COIMAC10	Co	0	4	27	2	7	4	Tetrahedral	1.039
+ADEQUY	Co	0	4	27	2	7	4	Tetrahedral	0.996
+WAHQEE	Co	0	4	27	2	7	4	Tetrahedral	1.012
+UYIFUF02	Co	0	4	27	2	7	4	Tetrahedral	1.029
+UJUSOI	Co	0	4	27	2	7	4	Tetrahedral	1.013
+WOFREP	Co	0	4	27	2	7	4	Tetrahedral	1.022
+OQEDOE	Co	0	4	27	2	7	4	Tetrahedral	1.038
+SAZFOR	Co	0	2	27	2	7	4	Tetrahedral	0.867
+JOYXAW	Co	2	4	27	2	7	4	Tetrahedral	1.022
+RATBIY	Co	0	4	27	2	7	4	Tetrahedral	1.014
+XUPREF	Co	0	4	27	2	7	4	Tetrahedral	0.997
+TANLOK	Co	0	4	27	2	7	4	Tetrahedral	1.0
+TANLUQ	Co	0	2	27	2	7	4	Tetrahedral	0.902
+EBECAP	Co	-2	4	27	2	7	4	Tetrahedral	1.002
+APOHUK	Co	-2	4	27	2	7	4	Tetrahedral	0.998
+VILVIX	Co	-2	4	27	2	7	4	Tetrahedral	0.978
+RUJSOE	Co	0	4	27	2	7	5	Square pyramidal	1.129
+KEHJAK	Co	0	2	27	2	7	5	Square pyramidal	1.003
+SEMROU	Co	0	4	27	2	7	5	Square pyramidal	1.07
+VAPCAR	Co	0	4	27	2	7	5	Square pyramidal	1.093
+ONAXIM	Co	0	2	27	2	7	5	Square pyramidal	0.984
+VEKNEE	Co	-1	4	27	2	7	5	Square pyramidal	1.114
+ELUXIU	Co	1	2	27	2	7	5	Square pyramidal	1.021
+ZIVLIC	Co	1	2	27	2	7	5	Square pyramidal	1.002
+ABAJIX	Co	2	2	27	2	7	5	Square pyramidal	1.038
+POBWUA	Co	1	2	27	2	7	5	Square pyramidal	1.0
+RAWRUF	Co	0	4	27	2	7	5	Square pyramidal	1.075
+YUBZUR	Co	2	2	27	2	7	5	Square pyramidal	1.072
+JASLEU	Co	1	2	27	2	7	5	Square pyramidal	1.046
+GUZTIH	Co	0	4	27	2	7	5	Square pyramidal	1.098
+WIVQIC	Co	0	4	27	2	7	5	Square pyramidal	1.106
+SUFBUS	Co	0	4	27	2	7	5	Square pyramidal	1.11
+PORNES	Co	0	4	27	2	7	5	Square pyramidal	1.11
+IFIXON	Co	0	4	27	2	7	5	Square pyramidal	1.102
+JEPNUO	Co	0	4	27	2	7	5	Square pyramidal	1.086
+IMUDOK	Co	0	4	27	2	7	5	Square pyramidal	1.101
+XOGXAS	Co	0	4	27	2	7	5	Square pyramidal	1.091
+LELLAQ	Co	0	4	27	2	7	5	Square pyramidal	1.118
+ZOBQIQ	Co	1	2	27	2	7	5	Square pyramidal	0.967
+NABDID	Co	1	2	27	2	7	5	Square pyramidal	0.972
+WIGXUI	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.075
+UJUPAR	Co	1	4	27	2	7	5	Trigonal bipyramidal	1.11
+XIVKOD	Co	1	4	27	2	7	5	Trigonal bipyramidal	1.093
+UMIZUL	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.098
+VAPFEY	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.086
+DITLAW	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.087
+LELDUE	Co	1	4	27	2	7	5	Trigonal bipyramidal	1.084
+EHIJEM	Co	1	4	27	2	7	5	Trigonal bipyramidal	1.108
+WIWJOD	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.09
+AWESAY	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.083
+GUWWAW	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.144
+DAMYUL	Co	1	4	27	2	7	5	Trigonal bipyramidal	1.116
+SINMIO	Co	1	4	27	2	7	5	Trigonal bipyramidal	1.087
+LAVKEA	Co	1	4	27	2	7	5	Trigonal bipyramidal	1.088
+DUWWEY	Co	1	4	27	2	7	5	Trigonal bipyramidal	1.12
+YECSUW	Co	1	4	27	2	7	5	Trigonal bipyramidal	1.087
+QADJEK	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.117
+ZEDSOT	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.102
+IKERUO	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.123
+CUZBUU	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.075
+SIVQEU	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.058
+NAFDAB	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.147
+NABDEZ	Co	1	2	27	2	7	5	Trigonal bipyramidal	0.959
+NABFOL	Co	1	2	27	2	7	5	Trigonal bipyramidal	0.949
+HUKJAA	Co	0	4	27	2	7	5	Trigonal bipyramidal	1.109
+QEDKOZ	Co	0	4	27	2	7	6	Octahedral	1.152
+BEMJIN	Co	0	4	27	2	7	6	Octahedral	1.144
+TAGZUA	Co	0	4	27	2	7	6	Octahedral	1.133
+EBUSEB	Co	0	4	27	2	7	6	Octahedral	1.119
+YEZLEU	Co	0	2	27	2	7	6	Octahedral	0.991
+COBDEC	Co	0	2	27	2	7	6	Octahedral	0.975
+LUWCIP	Co	0	4	27	2	7	6	Octahedral	1.175
+KAGLUA	Co	-2	4	27	2	7	6	Octahedral	1.148
+PARRUW	Co	0	4	27	2	7	6	Octahedral	1.184
+BUKFAR	Co	0	4	27	2	7	6	Octahedral	1.137
+OLIWUB	Co	0	4	27	2	7	6	Octahedral	1.142
+DIFKUY	Co	0	4	27	2	7	6	Octahedral	1.15
+IXEQAF	Co	0	4	27	2	7	6	Octahedral	1.14
+POWRID	Co	0	4	27	2	7	6	Octahedral	1.14
+JODGIT	Co	0	4	27	2	7	6	Octahedral	1.128
+THETCO	Co	0	4	27	2	7	6	Octahedral	1.129
+CTHUCO10	Co	0	4	27	2	7	6	Octahedral	1.165
+MGXANC	Co	0	2	27	2	7	6	Octahedral	0.96
+IGUREJ	Co	1	4	27	2	7	6	Octahedral	1.165
+FERWEH	Co	0	4	27	2	7	6	Octahedral	1.132
+YALZET	Co	1	4	27	2	7	6	Octahedral	1.138
+DAMTES	Co	1	4	27	2	7	6	Octahedral	1.151
+VAHGOC	Co	1	4	27	2	7	6	Octahedral	1.141
+MOHFUM	Co	1	4	27	2	7	6	Octahedral	1.127
+NUTHIU	Co	0	4	27	2	7	6	Octahedral	1.148
+KIFMUK	Co	0	4	27	2	7	6	Octahedral	1.137
+IVUQOH	Co	0	4	27	2	7	6	Octahedral	1.16
+CAWQIB	Co	0	4	27	2	7	6	Octahedral	1.152
+RAXMOT	Co	0	4	27	2	7	6	Octahedral	1.137
+OFINAT	Co	2	4	27	2	7	6	Octahedral	1.113
+JUNGEH	Co	2	4	27	2	7	6	Octahedral	1.167
+KILBAJ	Co	2	4	27	2	7	6	Octahedral	1.129
+RUJSUK	Co	2	4	27	2	7	6	Octahedral	1.179
+FOXCOM	Co	0	4	27	2	7	6	Octahedral	1.137
+HZHCXC	Co	0	4	27	2	7	6	Octahedral	1.153
+PITHAD	Co	2	4	27	2	7	6	Octahedral	1.129
+IXEPIM	Co	0	4	27	2	7	6	Octahedral	1.117
+GADMEH	Co	-1	4	27	2	7	6	Octahedral	1.132
+DEGJEF	Co	0	4	27	2	7	6	Octahedral	1.147
+JITWOZ	Co	2	4	27	2	7	6	Octahedral	1.114
+ZOZPAF	Co	-1	4	27	2	7	6	Octahedral	1.157
+BAWZIL	Co	0	4	27	2	7	6	Octahedral	1.127
+RAXXUM	Co	0	4	27	2	7	6	Octahedral	1.118
+ECADOB01	Co	2	4	27	2	7	6	Octahedral	1.113
+BOQPIH	Co	2	4	27	2	7	6	Octahedral	1.147
+EDIDAX	Co	2	4	27	2	7	6	Octahedral	1.123
+RETFOM	Co	0	4	27	2	7	6	Octahedral	1.14
+WAMYAL	Co	0	4	27	2	7	6	Octahedral	1.123
+XITQIB	Co	0	2	27	2	7	6	Octahedral	1.071
+XITQEX	Co	0	2	27	2	7	6	Octahedral	1.09
+CETJIU	Co	2	4	27	2	7	6	Octahedral	1.144
+ODOWUC	Co	0	4	27	2	7	6	Octahedral	1.104
+RUMHAI	Co	0	2	27	2	7	6	Octahedral	1.092
+NOYCIN	Co	2	4	27	2	7	6	Octahedral	1.121
+TIGBIV	Co	2	4	27	2	7	6	Octahedral	1.146
+GIBGON	Co	0	4	27	2	7	6	Octahedral	1.127
+XIYMEY	Co	2	4	27	2	7	6	Octahedral	1.12
+SESGUT	Co	2	4	27	2	7	6	Octahedral	1.122
+AYIZOY	Co	-4	4	27	2	7	6	Octahedral	1.134
+COETDS10	Co	2	4	27	2	7	6	Octahedral	1.133
+TAKZAH	Co	0	4	27	2	7	6	Octahedral	1.132
+FIDZEY	Co	0	4	27	2	7	6	Octahedral	1.173
+ZIBNIH	Co	0	4	27	2	7	6	Octahedral	1.15
+BAJJEB	Co	0	4	27	2	7	6	Octahedral	1.131
+NTMTUC	Co	0	4	27	2	7	6	Octahedral	1.175
+BOXMIK	Co	2	2	27	2	7	6	Octahedral	1.008
+ZOTRAB	Co	0	2	27	2	7	6	Octahedral	1.058
+XUBMUF	Co	2	4	27	2	7	6	Pentagonal pyramidal	1.214
+PODCIX	Co	0	4	27	2	7	6	Trigonal prismatic	1.167
+ERUXIZ	Co	2	4	27	2	7	6	Trigonal prismatic	1.176
+VUCYAV	Co	1	4	27	2	7	6	Trigonal prismatic	1.193
+KIRPAE	Co	2	4	27	2	7	6	Trigonal prismatic	1.157
+DEPLES	Co	2	4	27	2	7	6	Trigonal prismatic	1.138
+FURBIF	Co	0	4	27	2	7	6	Trigonal prismatic	1.154
+EYOZEY	Co	0	4	27	2	7	6	Trigonal prismatic	1.138
+QOWJOE	Co	-1	4	27	2	7	6	Trigonal prismatic	1.159
+SISNAK	Co	1	4	27	2	7	7	Capped trigonal prismatic	1.233
+GUGCUI	Co	0	4	27	2	7	7	Pentagonal bipyramidal	1.21
+KIRDOH	Co	0	4	27	2	7	7	Pentagonal bipyramidal	1.207
+COKLOD	Co	2	4	27	2	7	7	Pentagonal bipyramidal	1.216
+VENJOO	Co	0	4	27	2	7	7	Pentagonal bipyramidal	1.188
+XUVVAN	Co	0	4	27	2	7	7	Pentagonal bipyramidal	1.216
+BAHDAS	Co	-2	4	27	2	7	7	Pentagonal bipyramidal	1.226
+RUHRIV	Co	2	4	27	2	7	8	Dodecahedral	1.3
+KAXMIF	Co	0	5	27	3	6	3	Trigonal planar	0.921
+ABATUT	Co	0	1	27	3	6	3	Trigonal planar	0.848
+QOXZAG	Co	1	1	27	3	6	4	Seesaw	0.902
+QUCBOG	Co	-1	3	27	3	6	4	Square planar	0.925
+KOCXEG	Co	2	3	27	3	6	4	Square planar	0.921
+XEHSOV	Co	0	3	27	3	6	4	Square planar	0.9
+PENBUG	Co	-1	3	27	3	6	4	Square planar	0.913
+VIWQEX	Co	-1	3	27	3	6	4	Square planar	0.893
+HEHJOW	Co	-1	3	27	3	6	4	Square planar	0.89
+MAJYUS	Co	-1	3	27	3	6	4	Square planar	0.877
+QANFOD	Co	-1	3	27	3	6	4	Square planar	0.865
+QOXZEK	Co	1	1	27	3	6	4	Tetrahedral	0.884
+WATSUF	Co	0	1	27	3	6	5	Square pyramidal	0.952
+EACMCO	Co	0	1	27	3	6	5	Square pyramidal	0.949
+LADCIC	Co	0	3	27	3	6	5	Square pyramidal	0.963
+REJDAN	Co	1	3	27	3	6	5	Square pyramidal	0.974
+GUZCUZ	Co	0	3	27	3	6	5	Trigonal bipyramidal	1.052
+LADCOI	Co	0	3	27	3	6	5	Trigonal bipyramidal	0.954
+VOYFIA	Co	0	3	27	3	6	5	Trigonal bipyramidal	0.986
+XANMAA	Co	1	1	27	3	6	6	Octahedral	0.93
+PIDPUN	Co	1	1	27	3	6	6	Octahedral	0.972
+OVOJIU	Co	0	1	27	3	6	6	Octahedral	0.907
+UJOLEK	Co	0	1	27	3	6	6	Octahedral	0.971
+MAKPOD	Co	1	1	27	3	6	6	Octahedral	0.971
+TOLTET	Co	1	1	27	3	6	6	Octahedral	0.95
+MICHOV	Co	0	1	27	3	6	6	Octahedral	0.966
+SOWKIY	Co	0	1	27	3	6	6	Octahedral	0.986
+HANJIP	Co	2	1	27	3	6	6	Octahedral	0.979
+CSCNCC01	Co	-3	1	27	3	6	6	Octahedral	0.91
+BODQES	Co	-1	1	27	3	6	6	Octahedral	0.971
+QIGRED	Co	0	1	27	3	6	6	Octahedral	0.961
+REXQAN	Co	0	1	27	3	6	6	Octahedral	1.044
+QIWKOX	Co	0	1	27	3	6	6	Octahedral	0.982
+YEXVAA	Co	0	1	27	3	6	6	Octahedral	0.99
+EKOKEV	Co	0	1	27	3	6	6	Octahedral	0.988
+SIQNAK	Co	0	1	27	3	6	6	Octahedral	0.919
+KUVWOQ	Co	0	1	27	3	6	6	Octahedral	0.91
+SIQNEO	Co	0	1	27	3	6	6	Octahedral	0.95
+DOFZAA	Co	0	1	27	3	6	6	Octahedral	0.989
+CEHYAP01	Co	1	1	27	3	6	6	Octahedral	0.978
+VIDMIH	Co	1	1	27	3	6	6	Octahedral	0.987
+NEXYAS	Co	-1	1	27	3	6	6	Octahedral	0.984
+DABHUK	Co	-1	1	27	3	6	6	Octahedral	0.956
+LAYNEF	Co	0	1	27	3	6	6	Octahedral	0.987
+SUKQUK	Co	-1	1	27	3	6	6	Octahedral	0.97
+KEQVAD	Co	0	1	27	3	6	6	Octahedral	0.99
+YEXVEE	Co	0	1	27	3	6	6	Octahedral	1.01
+AGODAC	Co	0	1	27	3	6	6	Octahedral	0.973
+RISSIW	Co	0	1	27	3	6	6	Octahedral	0.971
+FUQCUR	Co	1	1	27	3	6	6	Octahedral	0.994
+XOQVAC	Co	0	1	27	3	6	6	Octahedral	0.993
+GIXYIV	Co	0	1	27	3	6	6	Octahedral	0.931
+SOZYEL	Co	0	1	27	3	6	6	Octahedral	0.974
+RATDIZ	Co	2	1	27	3	6	6	Octahedral	1.018
+QIGSEE	Co	0	1	27	3	6	6	Octahedral	1.002
+RATDOF	Co	2	1	27	3	6	6	Octahedral	1.017
+ARIMUJ	Co	1	1	27	3	6	6	Octahedral	0.983
+NOZPAT	Co	0	1	27	3	6	6	Octahedral	0.971
+DUCGUD	Co	1	1	27	3	6	6	Octahedral	0.975
+VABKUE	Co	2	1	27	3	6	6	Octahedral	1.022
+LAPNIZ	Co	0	1	27	3	6	6	Octahedral	1.002
+ZIXMOI	Co	1	1	27	3	6	6	Octahedral	0.989
+EAIVCO	Co	0	1	27	3	6	6	Octahedral	1.004
+KEHJOY	Co	0	1	27	3	6	6	Octahedral	0.99
+QAFPAO	Co	1	1	27	3	6	6	Octahedral	0.981
+MIKROO	Co	0	1	27	3	6	6	Octahedral	0.964
+YISQAT	Co	0	1	27	3	6	6	Octahedral	0.977
+QIGRON	Co	0	1	27	3	6	6	Octahedral	0.99
+WEMNIM	Co	1	1	27	3	6	6	Octahedral	0.985
+MAKPIX	Co	1	1	27	3	6	6	Octahedral	0.983
+YETBOP	Co	1	1	27	3	6	6	Octahedral	0.986
+YETBUV	Co	1	1	27	3	6	6	Octahedral	0.971
+KAKVUO	Co	1	1	27	3	6	6	Octahedral	0.962
+PUTTUT	Co	1	1	27	3	6	6	Octahedral	0.962
+MABLUA	Co	1	1	27	3	6	6	Octahedral	0.966
+JAYNAB	Co	0	1	27	3	6	6	Octahedral	0.915
+SIPLEI	Co	2	1	27	3	6	6	Octahedral	0.996
+PEXKAF	Co	2	1	27	3	6	6	Octahedral	0.99
+BISXIK	Co	0	1	27	3	6	6	Octahedral	0.949
+HERHAN	Co	1	1	27	3	6	6	Octahedral	0.983
+TEVXIC	Co	2	1	27	3	6	6	Octahedral	0.968
+HERGUG	Co	0	1	27	3	6	6	Octahedral	0.981
+KIDRIY	Co	-1	1	27	3	6	6	Octahedral	0.955
+EYAQEA	Co	3	1	27	3	6	6	Octahedral	0.99
+QOGNAD	Co	1	1	27	3	6	6	Octahedral	0.983
+XAKPUU	Co	4	1	27	3	6	6	Octahedral	0.999
+WERKIN	Co	-3	1	27	3	6	6	Octahedral	0.995
+NCACON	Co	2	1	27	3	6	6	Octahedral	0.991
+PATACO10	Co	2	1	27	3	6	6	Octahedral	0.99
+MAENCO	Co	2	1	27	3	6	6	Octahedral	0.998
+YETCAC	Co	3	1	27	3	6	6	Octahedral	1.006
+QILWUD	Co	2	1	27	3	6	6	Octahedral	0.997
+IBUQOL	Co	2	1	27	3	6	6	Octahedral	0.99
+BOTQEH	Co	2	1	27	3	6	6	Octahedral	0.986
+GAPZEC	Co	1	1	27	3	6	6	Octahedral	0.993
+APRCOB	Co	1	1	27	3	6	6	Octahedral	0.985
+ULONEP	Co	3	1	27	3	6	6	Octahedral	0.998
+ENTXCO	Co	1	1	27	3	6	6	Octahedral	0.987
+BOHGAG	Co	3	1	27	3	6	6	Octahedral	1.002
+ZEQLUE	Co	1	1	27	3	6	6	Octahedral	0.962
+HELJAJ	Co	1	1	27	3	6	6	Octahedral	0.978
+PUWMAX	Co	1	1	27	3	6	6	Octahedral	0.989
+VARVIU	Co	3	1	27	3	6	6	Octahedral	0.982
+PERJIG	Co	3	1	27	3	6	6	Octahedral	0.974
+GEWNAX	Co	3	1	27	3	6	6	Octahedral	0.971
+ZENBOJ	Co	-1	1	27	3	6	6	Octahedral	0.976
+SICCAL	Co	1	1	27	3	6	6	Octahedral	0.965
+MCYSCO	Co	1	1	27	3	6	6	Octahedral	0.979
+ZEWDIO	Co	0	1	27	3	6	6	Octahedral	0.957
+UBICEP	Co	2	1	27	3	6	6	Octahedral	0.962
+YETCIK	Co	2	1	27	3	6	6	Octahedral	0.989
+PORPOB	Co	3	1	27	3	6	6	Octahedral	0.977
+PAACCO	Co	0	1	27	3	6	6	Octahedral	0.975
+YETCEG	Co	1	1	27	3	6	6	Octahedral	0.978
+FEVNAW	Co	0	1	27	3	6	6	Octahedral	0.991
+DOGHEM	Co	1	1	27	3	6	6	Octahedral	0.989
+SUKWUQ	Co	1	1	27	3	6	6	Octahedral	0.97
+ROLQUE	Co	0	1	27	3	6	6	Octahedral	0.961
+GUVZIH	Co	0	1	27	3	6	6	Octahedral	0.96
+PUTVAB	Co	2	1	27	3	6	6	Octahedral	0.96
+WELPIM	Co	1	1	27	3	6	6	Octahedral	0.946
+CADHOE	Co	1	1	27	3	6	6	Octahedral	0.947
+TDTCCO	Co	0	1	27	3	6	6	Octahedral	0.973
+VESZUP	Co	0	1	27	3	6	6	Octahedral	0.941
+WAVVEX	Ni	0	1	28	0	8	3	Trigonal planar	0.883
+MISLOP	Ni	0	1	28	0	8	4	Tetrahedral	0.889
+WAVTOF	Ni	0	1	28	0	8	4	Tetrahedral	0.894
+BOJPOI	Ni	0	1	28	0	8	4	Tetrahedral	0.873
+MISLUV	Ni	0	1	28	0	8	4	Tetrahedral	0.871
+XUBJEK	Ni	0	1	28	0	8	4	Tetrahedral	0.862
+WALJUR	Ni	0	1	28	0	8	4	Tetrahedral	0.922
+WALJOL	Ni	0	1	28	0	8	4	Tetrahedral	0.889
+DIBHIF	Ni	0	1	28	0	8	5	Pentagon	0.99
+JARKIX	Ni	0	3	28	2	8	2	Linear	0.906
+OPAKUM	Ni	0	1	28	2	8	3	T-shaped	0.931
+SOGFAY	Ni	0	1	28	2	8	3	T-shaped	0.901
+YOLDAG	Ni	-1	1	28	2	8	3	T-shaped	0.944
+KEBXOG	Ni	0	3	28	2	8	3	T-shaped	0.966
+GAXYOW	Ni	0	3	28	2	8	3	T-shaped	0.973
+IJUDAV	Ni	0	1	28	2	8	3	Trigonal planar	0.881
+LIHSUS	Ni	-1	3	28	2	8	3	Trigonal planar	0.944
+ZEHMEG	Ni	0	1	28	2	8	3	Trigonal planar	0.874
+WUXVOA	Ni	0	3	28	2	8	3	Trigonal planar	0.97
+TOLZOK	Ni	0	1	28	2	8	3	Trigonal planar	0.901
+ZUQLAA	Ni	0	3	28	2	8	3	Trigonal planar	0.983
+FUYTOK	Ni	-1	3	28	2	8	3	Trigonal planar	0.937
+FUYTEA	Ni	0	3	28	2	8	3	Trigonal planar	0.937
+ELUTAI	Ni	0	3	28	2	8	4	Seesaw	1.037
+QASCUI	Ni	0	3	28	2	8	4	Seesaw	1.017
+BAJWAL	Ni	0	3	28	2	8	4	Seesaw	1.002
+YOBCUO	Ni	0	3	28	2	8	4	Seesaw	1.03
+PUJSOC	Ni	1	1	28	2	8	4	Seesaw	0.881
+TOBWEO	Ni	0	3	28	2	8	4	Seesaw	1.024
+FAYVAF	Ni	0	1	28	2	8	4	Seesaw	0.911
+BAJWEP	Ni	0	3	28	2	8	4	Seesaw	0.997
+VEWQUK	Ni	0	3	28	2	8	4	Seesaw	1.006
+GIYGUT	Ni	0	3	28	2	8	4	Seesaw	1.018
+XADCIP	Ni	0	1	28	2	8	4	Seesaw	0.903
+GINSUS	Ni	0	1	28	2	8	4	Square planar	0.894
+BEMNAK	Ni	0	1	28	2	8	4	Square planar	0.927
+CUXXOL	Ni	0	1	28	2	8	4	Square planar	0.906
+KIKBEM	Ni	0	1	28	2	8	4	Square planar	0.99
+YIJGII	Ni	0	1	28	2	8	4	Square planar	0.915
+UTEMIR	Ni	0	1	28	2	8	4	Square planar	0.89
+JIVQEL	Ni	0	1	28	2	8	4	Square planar	0.904
+LODFAL	Ni	0	1	28	2	8	4	Square planar	0.972
+LUJREN	Ni	-1	1	28	2	8	4	Square planar	0.927
+VIBPOM	Ni	1	1	28	2	8	4	Square planar	0.924
+XOZXIV	Ni	0	1	28	2	8	4	Square planar	0.95
+OROFEH	Ni	0	1	28	2	8	4	Square planar	0.932
+KAJHUC	Ni	0	1	28	2	8	4	Square planar	0.961
+KOHMAW	Ni	0	1	28	2	8	4	Square planar	0.918
+BOMVEF	Ni	0	1	28	2	8	4	Square planar	0.918
+ARIVEE	Ni	0	1	28	2	8	4	Square planar	0.952
+VEWDIN	Ni	0	1	28	2	8	4	Square planar	0.938
+DEDREK	Ni	0	1	28	2	8	4	Square planar	0.941
+YIYDAM	Ni	0	1	28	2	8	4	Square planar	0.897
+ZUTHEB	Ni	0	1	28	2	8	4	Square planar	0.919
+GENYOP	Ni	0	1	28	2	8	4	Square planar	0.91
+VIBWUZ	Ni	0	1	28	2	8	4	Square planar	0.923
+HUBLUM	Ni	-1	1	28	2	8	4	Square planar	0.916
+HERVOQ	Ni	1	1	28	2	8	4	Square planar	0.908
+GOXBOK	Ni	0	1	28	2	8	4	Square planar	0.923
+OFEXAA	Ni	-2	1	28	2	8	4	Square planar	0.918
+TODDUL	Ni	-2	1	28	2	8	4	Square planar	0.908
+EDUPOL	Ni	0	1	28	2	8	4	Square planar	0.945
+LUJROX	Ni	0	1	28	2	8	4	Square planar	0.927
+AREJUD	Ni	0	1	28	2	8	4	Square planar	0.955
+VOGGOO	Ni	0	1	28	2	8	4	Square planar	0.987
+HIPCIS	Ni	0	1	28	2	8	4	Square planar	0.935
+XOCJAB	Ni	0	1	28	2	8	4	Square planar	0.975
+EDIJIL	Ni	0	1	28	2	8	4	Square planar	0.955
+XOCJUV	Ni	0	1	28	2	8	4	Square planar	0.948
+SIFQAA	Ni	0	1	28	2	8	4	Square planar	0.944
+DOKQOJ	Ni	0	1	28	2	8	4	Square planar	0.944
+QUHKIO	Ni	0	1	28	2	8	4	Square planar	0.945
+IHUDUL	Ni	0	1	28	2	8	4	Square planar	0.928
+ALOTUR	Ni	0	1	28	2	8	4	Square planar	0.928
+UNILIN	Ni	0	1	28	2	8	4	Square planar	0.924
+LAQJIX	Ni	0	1	28	2	8	4	Square planar	0.95
+RABJOX	Ni	0	1	28	2	8	4	Square planar	1.025
+KOBTOL	Ni	0	1	28	2	8	4	Square planar	0.96
+WIJLUZ	Ni	0	1	28	2	8	4	Square planar	0.966
+YABLIW	Ni	0	1	28	2	8	4	Square planar	0.921
+FIWLEE	Ni	0	1	28	2	8	4	Square planar	0.968
+RUXYER	Ni	0	1	28	2	8	4	Square planar	0.961
+XEGPEF	Ni	0	1	28	2	8	4	Square planar	0.952
+BOLVAA	Ni	0	1	28	2	8	4	Square planar	0.95
+EYEYEM	Ni	0	1	28	2	8	4	Square planar	0.901
+ALOTOL	Ni	0	1	28	2	8	4	Square planar	0.924
+LEMVOQ	Ni	0	1	28	2	8	4	Square planar	0.952
+XUPSIL	Ni	0	1	28	2	8	4	Square planar	0.948
+GAWNAU	Ni	0	1	28	2	8	4	Square planar	0.984
+TIBKOH	Ni	0	1	28	2	8	4	Square planar	0.962
+YOYXES	Ni	0	1	28	2	8	4	Square planar	0.951
+VIGLOP	Ni	0	1	28	2	8	4	Square planar	0.948
+HEYKOL	Ni	0	1	28	2	8	4	Square planar	0.906
+DOPROS	Ni	0	1	28	2	8	4	Square planar	0.951
+MIJPAZ	Ni	0	1	28	2	8	4	Square planar	0.946
+KUHJED	Ni	1	1	28	2	8	4	Square planar	0.865
+DIJQAR	Ni	0	1	28	2	8	4	Square planar	0.986
+CEKJIO	Ni	0	1	28	2	8	4	Square planar	0.959
+ORESUC	Ni	0	1	28	2	8	4	Square planar	0.937
+UNOFEJ	Ni	0	1	28	2	8	4	Square planar	0.896
+UPIDIH	Ni	1	1	28	2	8	4	Square planar	0.981
+RADLEO	Ni	0	1	28	2	8	4	Square planar	0.977
+RIXTIC	Ni	0	1	28	2	8	4	Square planar	0.96
+MORDOM	Ni	0	1	28	2	8	4	Square planar	0.99
+ZALRUZ	Ni	0	1	28	2	8	4	Square planar	0.961
+FEGVUJ	Ni	1	1	28	2	8	4	Square planar	0.944
+JADKII	Ni	0	1	28	2	8	4	Square planar	0.952
+TUPMAV	Ni	0	1	28	2	8	4	Square planar	0.954
+DIJPOE	Ni	1	1	28	2	8	4	Square planar	0.961
+HUBMUN	Ni	-1	1	28	2	8	4	Square planar	0.938
+TIVZIJ	Ni	0	1	28	2	8	4	Square planar	0.981
+JAXFIX	Ni	0	1	28	2	8	4	Square planar	0.954
+TOBBAP	Ni	0	1	28	2	8	4	Square planar	0.943
+JIZNEM	Ni	0	1	28	2	8	4	Square planar	0.923
+AJAFEX	Ni	0	1	28	2	8	4	Square planar	0.923
+XAJWOU	Ni	0	1	28	2	8	4	Square planar	0.929
+FAVZUY	Ni	0	1	28	2	8	4	Square planar	0.915
+RISQOC	Ni	0	1	28	2	8	4	Square planar	0.91
+XIXTEE	Ni	0	1	28	2	8	4	Square planar	0.919
+VUMCIP	Ni	0	1	28	2	8	4	Square planar	0.968
+EVACOT	Ni	0	1	28	2	8	4	Square planar	0.932
+OBOKOF	Ni	0	1	28	2	8	4	Square planar	0.917
+OHUSEQ	Ni	0	1	28	2	8	4	Square planar	0.972
+VEYTAX	Ni	0	1	28	2	8	4	Square planar	0.973
+XUYWAQ	Ni	0	1	28	2	8	4	Square planar	0.938
+XULXAG	Ni	0	1	28	2	8	4	Square planar	0.927
+QAHWUT	Ni	0	1	28	2	8	4	Square planar	0.927
+VEYTEB	Ni	0	1	28	2	8	4	Square planar	0.928
+TINTUG	Ni	0	1	28	2	8	4	Square planar	0.929
+KIQGOG	Ni	0	1	28	2	8	4	Square planar	0.934
+CLSINI10	Ni	0	1	28	2	8	4	Square planar	0.932
+UGODAW	Ni	0	1	28	2	8	4	Square planar	0.955
+EDOZAA	Ni	0	1	28	2	8	4	Square planar	0.91
+MEDCOO	Ni	-1	1	28	2	8	4	Square planar	0.91
+HOYFUW	Ni	-1	1	28	2	8	4	Square planar	0.91
+CODWAU	Ni	0	1	28	2	8	4	Square planar	0.909
+UTEMOX	Ni	0	1	28	2	8	4	Square planar	0.894
+AFUDAH	Ni	0	1	28	2	8	4	Square planar	0.973
+SEMCUK	Ni	0	1	28	2	8	4	Square planar	0.908
+HOTXIX	Ni	0	1	28	2	8	4	Square planar	0.922
+OBIVAX	Ni	2	1	28	2	8	4	Square planar	0.925
+LOPXOD	Ni	0	1	28	2	8	4	Square planar	0.942
+ZASROA	Ni	2	1	28	2	8	4	Square planar	0.986
+ZASRUG	Ni	1	1	28	2	8	4	Square planar	0.984
+WOWTOR	Ni	2	1	28	2	8	4	Square planar	0.965
+BEXKOE	Ni	0	1	28	2	8	4	Square planar	0.94
+DIGJEJ	Ni	0	1	28	2	8	4	Square planar	0.924
+BEXZIN	Ni	0	1	28	2	8	4	Square planar	0.935
+MINNAZ	Ni	0	1	28	2	8	4	Square planar	0.944
+ZILSEU	Ni	2	1	28	2	8	4	Square planar	1.052
+KANYON	Ni	1	1	28	2	8	4	Square planar	0.947
+QAHQAT	Ni	1	1	28	2	8	4	Square planar	0.947
+WEJKOL	Ni	0	1	28	2	8	4	Square planar	0.94
+DIRPOJ	Ni	0	1	28	2	8	4	Square planar	0.949
+HOPYIW	Ni	0	1	28	2	8	4	Square planar	0.938
+LUHPIO	Ni	1	1	28	2	8	4	Square planar	0.967
+REMMOM	Ni	0	1	28	2	8	4	Square planar	0.919
+KISKON	Ni	1	1	28	2	8	4	Square planar	0.974
+RORXUR	Ni	0	1	28	2	8	4	Square planar	0.967
+LEPYOV	Ni	0	1	28	2	8	4	Square planar	1.035
+SIBLIZ	Ni	1	1	28	2	8	4	Square planar	0.955
+VOPCIM	Ni	0	1	28	2	8	4	Square planar	0.956
+ZZZTMK03	Ni	0	1	28	2	8	4	Square planar	0.936
+LOHMUS	Ni	0	1	28	2	8	4	Square planar	0.95
+TARWIU	Ni	0	1	28	2	8	4	Square planar	0.956
+XUKHOC	Ni	0	1	28	2	8	4	Square planar	0.931
+BAZSUR	Ni	0	1	28	2	8	4	Square planar	0.921
+ISIPUV	Ni	0	1	28	2	8	4	Square planar	0.903
+CNITSC	Ni	2	1	28	2	8	4	Square planar	0.945
+HOPCEU	Ni	2	1	28	2	8	4	Square planar	0.939
+KIJXAC01	Ni	0	1	28	2	8	4	Square planar	0.942
+BABPAX	Ni	-2	1	28	2	8	4	Square planar	0.923
+HAHHII	Ni	0	1	28	2	8	4	Square planar	0.945
+HIQLUR	Ni	0	1	28	2	8	4	Square planar	0.952
+RIPQAL	Ni	0	1	28	2	8	4	Square planar	0.947
+QEWGOR	Ni	0	1	28	2	8	4	Square planar	0.939
+KISKED	Ni	1	1	28	2	8	4	Square planar	0.952
+LIGBUA	Ni	0	1	28	2	8	4	Square planar	0.933
+SILCIZ	Ni	0	1	28	2	8	4	Square planar	0.942
+ROFXAO	Ni	0	1	28	2	8	4	Square planar	0.949
+SUXTEL	Ni	1	1	28	2	8	4	Square planar	0.927
+MAGGEK	Ni	0	1	28	2	8	4	Square planar	0.92
+SOSVAX	Ni	0	1	28	2	8	4	Square planar	0.934
+HERTII	Ni	2	1	28	2	8	4	Square planar	0.933
+ITITOU	Ni	0	1	28	2	8	4	Square planar	0.921
+UMUBAF	Ni	1	1	28	2	8	4	Square planar	0.931
+HUBLEW	Ni	-1	1	28	2	8	4	Square planar	0.928
+UQAREK	Ni	0	1	28	2	8	4	Square planar	0.969
+QOSTAT	Ni	2	1	28	2	8	4	Square planar	0.977
+XAWVEX	Ni	0	1	28	2	8	4	Square planar	0.968
+YABPEW	Ni	0	1	28	2	8	4	Square planar	0.947
+MTACNI	Ni	0	1	28	2	8	4	Square planar	0.932
+YAPGUS	Ni	0	1	28	2	8	4	Square planar	0.935
+HOTRIS	Ni	0	1	28	2	8	4	Square planar	0.912
+ROLXIZ	Ni	1	1	28	2	8	4	Square planar	0.899
+EXOCEA	Ni	0	1	28	2	8	4	Square planar	0.915
+LEZQUC	Ni	2	1	28	2	8	4	Square planar	0.937
+YULMUP	Ni	0	1	28	2	8	4	Square planar	0.952
+KIBBED	Ni	1	1	28	2	8	4	Square planar	0.911
+WAQVIT	Ni	0	1	28	2	8	4	Square planar	0.894
+WIYCUF	Ni	0	1	28	2	8	4	Square planar	0.895
+DOMMUO	Ni	0	1	28	2	8	4	Square planar	0.924
+NEYVUI	Ni	0	1	28	2	8	4	Square planar	0.949
+CEQSEW	Ni	0	1	28	2	8	4	Square planar	0.884
+BIBDOG	Ni	-1	1	28	2	8	4	Square planar	0.897
+VIJVIT	Ni	-2	1	28	2	8	4	Square planar	0.923
+CECKEB	Ni	-2	1	28	2	8	4	Square planar	0.902
+PEQMEE	Ni	-2	1	28	2	8	4	Square planar	0.91
+ERIQIG	Ni	-2	1	28	2	8	4	Square planar	0.91
+CAMRAM	Ni	-2	1	28	2	8	4	Square planar	0.924
+LAMLOC	Ni	-2	1	28	2	8	4	Square planar	0.919
+IPEPNI	Ni	0	1	28	2	8	4	Square planar	0.918
+EXUKEP	Ni	-2	1	28	2	8	4	Square planar	0.942
+NIDTHC11	Ni	0	1	28	2	8	4	Square planar	0.935
+GOQYUG	Ni	0	1	28	2	8	4	Square planar	0.942
+CEBZIS	Ni	-2	1	28	2	8	4	Square planar	0.915
+TEPCUM	Ni	0	1	28	2	8	4	Square planar	0.926
+ASENIA	Ni	-2	1	28	2	8	4	Square planar	0.953
+DOMMEY	Ni	0	1	28	2	8	4	Square planar	0.934
+QIMXUI	Ni	-2	1	28	2	8	4	Square planar	0.884
+JUGHAU	Ni	-2	1	28	2	8	4	Square planar	0.879
+KOBYOQ	Ni	0	1	28	2	8	4	Square planar	0.913
+MIVGIH	Ni	-2	3	28	2	8	4	Tetrahedral	0.961
+GIFFOS	Ni	-1	3	28	2	8	4	Tetrahedral	0.972
+DIDMEK	Ni	-1	3	28	2	8	4	Tetrahedral	0.944
+AHABER	Ni	0	3	28	2	8	4	Tetrahedral	1.004
+MEHKOA	Ni	-2	3	28	2	8	4	Tetrahedral	0.985
+OBOKAR	Ni	0	3	28	2	8	4	Tetrahedral	1.007
+VEXXIH	Ni	0	3	28	2	8	4	Tetrahedral	0.99
+XOXSUA	Ni	-1	3	28	2	8	4	Tetrahedral	1.006
+FIFDUU	Ni	0	3	28	2	8	4	Tetrahedral	0.99
+FOGQOI	Ni	0	3	28	2	8	4	Tetrahedral	0.975
+NOPTES	Ni	0	3	28	2	8	4	Tetrahedral	0.969
+BAJWOZ	Ni	0	3	28	2	8	4	Tetrahedral	0.991
+MAJCAC	Ni	0	3	28	2	8	4	Tetrahedral	0.948
+YOJQEU	Ni	0	3	28	2	8	4	Tetrahedral	0.965
+YOJQIY	Ni	0	3	28	2	8	4	Tetrahedral	0.952
+PIVDAB	Ni	1	3	28	2	8	4	Tetrahedral	1.037
+AHABIV	Ni	0	3	28	2	8	4	Tetrahedral	1.032
+NEZBIG	Ni	-2	3	28	2	8	4	Tetrahedral	1.009
+SAHHAN	Ni	-1	3	28	2	8	4	Tetrahedral	1.008
+AZIDIY	Ni	-1	3	28	2	8	4	Tetrahedral	1.012
+DIDMAG	Ni	-1	3	28	2	8	4	Tetrahedral	0.98
+PARSOR	Ni	0	3	28	2	8	4	Tetrahedral	1.023
+XARGON	Ni	0	3	28	2	8	4	Tetrahedral	0.996
+BUBLEQ	Ni	0	3	28	2	8	4	Tetrahedral	0.975
+PATQEG	Ni	0	3	28	2	8	4	Tetrahedral	0.981
+SIZMUL	Ni	0	3	28	2	8	4	Tetrahedral	1.019
+OEPHNI	Ni	0	3	28	2	8	4	Tetrahedral	0.985
+LAMXAA	Ni	0	3	28	2	8	4	Tetrahedral	1.01
+UXOBEQ	Ni	0	3	28	2	8	4	Tetrahedral	1.011
+AHUCUE	Ni	0	3	28	2	8	4	Tetrahedral	1.013
+XADCOV	Ni	0	3	28	2	8	4	Tetrahedral	1.003
+JAPTAV	Ni	0	3	28	2	8	4	Tetrahedral	0.972
+XIMROB	Ni	0	3	28	2	8	4	Tetrahedral	0.996
+XIMYUO	Ni	0	3	28	2	8	4	Tetrahedral	0.971
+TOLZUQ	Ni	0	3	28	2	8	4	Tetrahedral	1.007
+ETAKIT	Ni	-2	3	28	2	8	4	Tetrahedral	0.977
+OLOZAR	Ni	0	3	28	2	8	4	Tetrahedral	1.0
+FUNHUS	Ni	-1	3	28	2	8	4	Tetrahedral	1.016
+IZOJIS	Ni	0	3	28	2	8	4	Tetrahedral	1.048
+UXOHAS02	Ni	0	3	28	2	8	4	Tetrahedral	1.027
+JIYYIA	Ni	0	3	28	2	8	4	Tetrahedral	1.006
+ISALNI	Ni	0	3	28	2	8	4	Tetrahedral	1.006
+MUFXIU	Ni	0	3	28	2	8	4	Tetrahedral	1.003
+VUTSUY	Ni	0	3	28	2	8	4	Tetrahedral	0.999
+KULBUO	Ni	0	3	28	2	8	4	Tetrahedral	0.993
+XOTGOC	Ni	0	3	28	2	8	4	Tetrahedral	1.018
+LONGAW	Ni	0	3	28	2	8	4	Tetrahedral	1.023
+LONGEA	Ni	0	3	28	2	8	4	Tetrahedral	1.028
+CUVGOP01	Ni	-2	3	28	2	8	4	Tetrahedral	1.005
+XIXTAA	Ni	0	3	28	2	8	4	Tetrahedral	0.981
+KOBYIK	Ni	0	3	28	2	8	4	Tetrahedral	0.968
+MAXGIC	Ni	0	1	28	2	8	5	Square pyramidal	0.977
+ELAKOR	Ni	0	1	28	2	8	5	Square pyramidal	1.018
+BOKZEH	Ni	0	3	28	2	8	5	Square pyramidal	1.056
+GITYOY	Ni	0	3	28	2	8	5	Square pyramidal	1.112
+LUYMAU	Ni	0	3	28	2	8	5	Square pyramidal	1.069
+KUBHIZ	Ni	0	3	28	2	8	5	Square pyramidal	1.065
+LUZXEL	Ni	0	3	28	2	8	5	Square pyramidal	1.053
+DEDROU	Ni	0	3	28	2	8	5	Square pyramidal	1.065
+GEZGIE	Ni	0	3	28	2	8	5	Square pyramidal	1.067
+CORHUN	Ni	0	3	28	2	8	5	Square pyramidal	1.048
+ENUSEN	Ni	0	1	28	2	8	5	Square pyramidal	1.052
+WABZAC	Ni	0	1	28	2	8	5	Square pyramidal	1.003
+FISGAS	Ni	1	3	28	2	8	5	Square pyramidal	1.132
+QOMLOU	Ni	0	3	28	2	8	5	Square pyramidal	1.085
+HUWTIF	Ni	2	1	28	2	8	5	Square pyramidal	0.957
+MUMPAL	Ni	-1	3	28	2	8	5	Square pyramidal	1.085
+HEFGEG	Ni	0	3	28	2	8	5	Square pyramidal	1.087
+LEDQUH	Ni	0	3	28	2	8	5	Square pyramidal	1.079
+VEWVEZ	Ni	0	3	28	2	8	5	Square pyramidal	1.093
+KIDMEQ	Ni	0	3	28	2	8	5	Square pyramidal	1.107
+MIJVAE	Ni	0	3	28	2	8	5	Square pyramidal	1.079
+CEPFEI	Ni	0	3	28	2	8	5	Square pyramidal	1.053
+ZUNDIN	Ni	0	1	28	2	8	5	Square pyramidal	1.008
+ILODOD	Ni	1	3	28	2	8	5	Square pyramidal	1.13
+MODREE	Ni	0	3	28	2	8	5	Square pyramidal	1.084
+TUJWIE	Ni	1	1	28	2	8	5	Square pyramidal	1.032
+NUYHOE	Ni	1	1	28	2	8	5	Square pyramidal	0.978
+LULDOM	Ni	-3	3	28	2	8	5	Square pyramidal	1.056
+TOWCEN	Ni	0	3	28	2	8	5	Square pyramidal	1.091
+XOQZOT	Ni	1	3	28	2	8	5	Square pyramidal	1.094
+ECEXIU	Ni	0	3	28	2	8	5	Square pyramidal	1.103
+PIBPOH	Ni	1	3	28	2	8	5	Square pyramidal	1.081
+DOHXED	Ni	1	3	28	2	8	5	Square pyramidal	1.133
+BATSIY	Ni	1	3	28	2	8	5	Square pyramidal	1.09
+YECSIK	Ni	1	3	28	2	8	5	Square pyramidal	1.063
+WIVQOI	Ni	0	3	28	2	8	5	Square pyramidal	1.091
+HIMYAD	Ni	0	3	28	2	8	5	Square pyramidal	1.077
+GEGBUQ	Ni	0	3	28	2	8	5	Square pyramidal	1.069
+KEZRIR	Ni	1	3	28	2	8	5	Square pyramidal	1.09
+HIMKOE	Ni	1	3	28	2	8	5	Square pyramidal	1.082
+LIXMOX	Ni	0	3	28	2	8	5	Square pyramidal	1.075
+LIXMUD	Ni	0	3	28	2	8	5	Square pyramidal	1.073
+WELREL	Ni	0	3	28	2	8	5	Square pyramidal	1.119
+AACANI11	Ni	0	3	28	2	8	5	Square pyramidal	1.046
+NETTOX	Ni	0	3	28	2	8	5	Square pyramidal	1.087
+HALBEB	Ni	0	3	28	2	8	5	Square pyramidal	1.087
+FOTSIR	Ni	0	3	28	2	8	5	Square pyramidal	1.087
+LODBEL	Ni	0	3	28	2	8	5	Square pyramidal	1.06
+PEMENI	Ni	1	1	28	2	8	5	Square pyramidal	1.046
+UWIPOG	Ni	0	3	28	2	8	5	Square pyramidal	1.102
+YUJZAF	Ni	0	1	28	2	8	5	Square pyramidal	1.058
+GENQAS	Ni	0	3	28	2	8	5	Square pyramidal	1.078
+CAWPOG	Ni	2	1	28	2	8	5	Square pyramidal	1.017
+NAMYOQ	Ni	0	3	28	2	8	5	Square pyramidal	1.091
+TITRAQ	Ni	0	3	28	2	8	5	Square pyramidal	1.094
+XIXTII	Ni	0	3	28	2	8	5	Square pyramidal	1.073
+GILZIK	Ni	0	1	28	2	8	5	Square pyramidal	1.007
+MEDCUU	Ni	0	1	28	2	8	5	Square pyramidal	0.975
+VUDDON	Ni	0	1	28	2	8	5	Square pyramidal	0.997
+YADKET	Ni	0	1	28	2	8	5	Square pyramidal	0.998
+DUMCUJ	Ni	0	1	28	2	8	5	Square pyramidal	1.015
+MAXGOI	Ni	0	1	28	2	8	5	Square pyramidal	0.996
+PEXKUB	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.049
+RONREU	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.053
+JAVLOK	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.048
+GEZGEA	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.063
+EWOBUP02	Ni	1	3	28	2	8	5	Trigonal bipyramidal	1.061
+HINVUY	Ni	1	1	28	2	8	5	Trigonal bipyramidal	0.937
+ENUSAJ	Ni	0	1	28	2	8	5	Trigonal bipyramidal	1.013
+MAJWUT	Ni	0	1	28	2	8	5	Trigonal bipyramidal	1.024
+KOCNUM	Ni	0	1	28	2	8	5	Trigonal bipyramidal	0.939
+RAWPUB	Ni	0	1	28	2	8	5	Trigonal bipyramidal	0.951
+LISJEC	Ni	0	1	28	2	8	5	Trigonal bipyramidal	0.972
+BAPKEI	Ni	1	1	28	2	8	5	Trigonal bipyramidal	0.969
+AHIGOO	Ni	0	1	28	2	8	5	Trigonal bipyramidal	0.947
+TOLBEB	Ni	-1	1	28	2	8	5	Trigonal bipyramidal	0.94
+AZOCNI16	Ni	1	3	28	2	8	5	Trigonal bipyramidal	1.099
+MAZOCT	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.092
+HABRAG	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.078
+YAPZIA	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.08
+AYOYES	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.07
+TUKGUB	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.078
+QIWCUU	Ni	0	1	28	2	8	5	Trigonal bipyramidal	0.992
+SIXZAA	Ni	0	1	28	2	8	5	Trigonal bipyramidal	1.007
+TIVNUJ	Ni	1	3	28	2	8	5	Trigonal bipyramidal	1.108
+HUPLIQ	Ni	1	3	28	2	8	5	Trigonal bipyramidal	1.105
+BAJVUE	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.078
+PEHZOU	Ni	0	1	28	2	8	5	Trigonal bipyramidal	0.912
+CUHGUK	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.073
+IMETNI01	Ni	1	3	28	2	8	5	Trigonal bipyramidal	1.11
+WUPWOU	Ni	2	3	28	2	8	5	Trigonal bipyramidal	1.08
+CASLOX	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.104
+RIRCIH	Ni	2	3	28	2	8	5	Trigonal bipyramidal	1.116
+RACNIV	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.086
+QETVAM	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.097
+ENUREM	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.074
+SALDNI	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.074
+IVUTEY	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.098
+HAYLOI	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.067
+DUPMUX	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.102
+LALPET	Ni	0	1	28	2	8	5	Trigonal bipyramidal	0.955
+LIFVOM	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.085
+UWIPEW	Ni	0	3	28	2	8	5	Trigonal bipyramidal	1.132
+ITEXAH	Ni	1	1	28	2	8	5	Trigonal bipyramidal	0.96
+ROCDOC	Ni	2	1	28	2	8	5	Trigonal bipyramidal	0.948
+TEZKIS	Ni	2	1	28	2	8	5	Trigonal bipyramidal	0.97
+MEDCEE	Ni	-1	1	28	2	8	5	Trigonal bipyramidal	0.962
+LUWDAI	Ni	0	3	28	2	8	6	Octahedral	1.161
+ELUSUB	Ni	0	3	28	2	8	6	Octahedral	1.174
+QOJDEZ	Ni	0	3	28	2	8	6	Octahedral	1.098
+PANGER	Ni	0	3	28	2	8	6	Octahedral	1.127
+FUMKIH	Ni	0	3	28	2	8	6	Octahedral	1.117
+INILOI	Ni	0	3	28	2	8	6	Octahedral	1.104
+KAHDOP	Ni	0	3	28	2	8	6	Octahedral	1.121
+BIHKAE	Ni	0	3	28	2	8	6	Octahedral	1.106
+FAZPEE	Ni	0	3	28	2	8	6	Octahedral	1.166
+CAGSOV	Ni	1	3	28	2	8	6	Octahedral	1.143
+COBGAB	Ni	1	3	28	2	8	6	Octahedral	1.14
+LINSOR	Ni	1	3	28	2	8	6	Octahedral	1.121
+UFUVUP	Ni	1	3	28	2	8	6	Octahedral	1.116
+KAXXIR	Ni	0	3	28	2	8	6	Octahedral	1.162
+KOBREZ	Ni	0	3	28	2	8	6	Octahedral	1.138
+LUWCUB	Ni	0	3	28	2	8	6	Octahedral	1.16
+AFAVIO	Ni	0	3	28	2	8	6	Octahedral	1.121
+TUTMAW	Ni	0	3	28	2	8	6	Octahedral	1.119
+UCISAA	Ni	0	3	28	2	8	6	Octahedral	1.118
+SUVREI	Ni	0	3	28	2	8	6	Octahedral	1.144
+FANFAD	Ni	0	3	28	2	8	6	Octahedral	1.124
+DUSSAL	Ni	0	3	28	2	8	6	Octahedral	1.103
+FEXTUY	Ni	0	3	28	2	8	6	Octahedral	1.113
+QAFCEG	Ni	0	3	28	2	8	6	Octahedral	1.106
+JODGOZ	Ni	0	3	28	2	8	6	Octahedral	1.122
+ATOCOC	Ni	0	3	28	2	8	6	Octahedral	1.126
+MTHUNI	Ni	0	3	28	2	8	6	Octahedral	1.142
+RIQSAM	Ni	1	3	28	2	8	6	Octahedral	1.143
+TUTKEA	Ni	1	3	28	2	8	6	Octahedral	1.115
+CPMSNI10	Ni	1	3	28	2	8	6	Octahedral	1.126
+QUGQUF	Ni	1	3	28	2	8	6	Octahedral	1.115
+NEFQEU	Ni	1	3	28	2	8	6	Octahedral	1.148
+AGAMIH	Ni	1	3	28	2	8	6	Octahedral	1.113
+TETFON	Ni	1	3	28	2	8	6	Octahedral	1.158
+PIGDIS	Ni	1	3	28	2	8	6	Octahedral	1.108
+RUHGUW	Ni	0	3	28	2	8	6	Octahedral	1.152
+JAZXOX	Ni	0	3	28	2	8	6	Octahedral	1.148
+EJUSEK	Ni	1	3	28	2	8	6	Octahedral	1.138
+ITOQIS	Ni	0	3	28	2	8	6	Octahedral	1.137
+DEFPEJ	Ni	0	3	28	2	8	6	Octahedral	1.106
+ABOTNI	Ni	0	3	28	2	8	6	Octahedral	1.106
+FAGKEE	Ni	0	3	28	2	8	6	Octahedral	1.151
+URIRUL	Ni	0	1	28	2	8	6	Octahedral	1.148
+USORUS	Ni	1	3	28	2	8	6	Octahedral	1.121
+RETGON	Ni	1	3	28	2	8	6	Octahedral	1.098
+PASGIZ	Ni	1	3	28	2	8	6	Octahedral	1.158
+XENBIE	Ni	2	3	28	2	8	6	Octahedral	1.093
+TIGGEW	Ni	-4	3	28	2	8	6	Octahedral	1.11
+MUTVUU	Ni	0	3	28	2	8	6	Octahedral	1.117
+FOPJEB	Ni	2	3	28	2	8	6	Octahedral	1.147
+RAPJAT	Ni	0	3	28	2	8	6	Octahedral	1.123
+TEANIN	Ni	2	3	28	2	8	6	Octahedral	1.137
+HOKXAG	Ni	2	3	28	2	8	6	Octahedral	1.138
+ZARXAU	Ni	2	3	28	2	8	6	Octahedral	1.119
+PEKPAW	Ni	2	3	28	2	8	6	Octahedral	1.135
+DOVTUD	Ni	0	3	28	2	8	6	Octahedral	1.122
+GOXBAW	Ni	0	3	28	2	8	6	Octahedral	1.137
+KOTBAW	Ni	2	3	28	2	8	6	Octahedral	1.144
+XEYZEH	Ni	2	3	28	2	8	6	Octahedral	1.148
+LUMVEU	Ni	2	3	28	2	8	6	Octahedral	1.132
+VIHXAN	Ni	2	3	28	2	8	6	Octahedral	1.129
+CIGBUP	Ni	2	3	28	2	8	6	Octahedral	1.127
+UWIFOW	Ni	1	3	28	2	8	6	Octahedral	1.145
+ZZZRXM01	Ni	1	3	28	2	8	6	Octahedral	1.136
+XADMAR	Ni	1	3	28	2	8	6	Octahedral	1.126
+CUDKAN	Ni	2	3	28	2	8	6	Octahedral	1.126
+IREWEK	Ni	2	3	28	2	8	6	Octahedral	1.065
+TUDGII	Ni	2	3	28	2	8	6	Octahedral	1.139
+PAZPAI	Ni	2	3	28	2	8	6	Octahedral	1.134
+BAVNAN	Ni	2	3	28	2	8	6	Octahedral	1.127
+BADHIZ	Ni	0	3	28	2	8	6	Octahedral	1.135
+NIHZCH11	Ni	-1	3	28	2	8	6	Octahedral	1.116
+SATGOK	Ni	0	3	28	2	8	6	Octahedral	1.119
+DUXWAW	Ni	2	3	28	2	8	6	Octahedral	1.122
+SITFEG	Ni	0	3	28	2	8	6	Octahedral	1.102
+ABEDAN	Ni	2	3	28	2	8	6	Octahedral	1.085
+QOQKIQ	Ni	2	3	28	2	8	6	Octahedral	1.117
+LOSHOS	Ni	0	3	28	2	8	6	Octahedral	1.13
+HIVDAS	Ni	2	3	28	2	8	6	Octahedral	1.135
+AENNIN	Ni	2	3	28	2	8	6	Octahedral	1.132
+GEDJEE	Ni	0	3	28	2	8	6	Octahedral	1.134
+XUWPAH	Ni	0	3	28	2	8	6	Octahedral	1.123
+MEHNOC	Ni	0	3	28	2	8	6	Octahedral	1.128
+NOQTAP	Ni	0	3	28	2	8	6	Octahedral	1.185
+DAGFAT	Ni	0	3	28	2	8	6	Octahedral	1.1
+ZOJXOL	Ni	2	3	28	2	8	6	Octahedral	1.112
+FEBRAF	Ni	2	3	28	2	8	6	Octahedral	1.102
+YELWAN	Ni	2	3	28	2	8	6	Octahedral	1.133
+SICCUC	Ni	2	3	28	2	8	6	Octahedral	1.106
+ZOZGEA	Ni	2	3	28	2	8	6	Octahedral	1.11
+IJOREG	Ni	0	3	28	2	8	6	Octahedral	1.14
+BOZJEH	Ni	2	3	28	2	8	6	Octahedral	1.126
+KISKIH	Ni	0	3	28	2	8	6	Octahedral	1.13
+LIYMAH	Ni	2	3	28	2	8	6	Octahedral	1.117
+KEXWIT	Ni	0	3	28	2	8	6	Octahedral	1.108
+SOFWIU	Ni	2	3	28	2	8	6	Octahedral	1.113
+AGOZUR	Ni	0	3	28	2	8	6	Octahedral	1.119
+COFMOC	Ni	2	3	28	2	8	6	Octahedral	1.119
+QALDUD	Ni	0	3	28	2	8	6	Octahedral	1.119
+ILATEV	Ni	0	3	28	2	8	6	Octahedral	1.108
+QAGCEG	Ni	-2	3	28	2	8	6	Octahedral	1.146
+QEKFET	Ni	0	3	28	2	8	6	Octahedral	1.128
+CIJYID	Ni	2	3	28	2	8	6	Octahedral	1.097
+PINBUJ	Ni	2	3	28	2	8	6	Octahedral	1.098
+BUXJEJ	Ni	2	3	28	2	8	6	Octahedral	1.078
+SEBQAS	Ni	2	3	28	2	8	6	Trigonal prismatic	1.144
+EPUTOB	Ni	0	3	28	2	8	7	Pentagonal bipyramidal	1.202
+LIYCUU	Ni	2	3	28	2	8	7	Pentagonal bipyramidal	1.196
+CEDYAM	Ni	2	3	28	2	8	7	Pentagonal bipyramidal	1.241
+KIRFAV	Ni	0	3	28	2	8	7	Pentagonal bipyramidal	1.231
+POJHUT	Ni	0	3	28	2	8	7	Pentagonal bipyramidal	1.219
+XUQXEO	Ni	0	3	28	2	8	7	Pentagonal bipyramidal	1.227
+MUKJOS	Ni	-1	2	28	3	7	4	Square planar	0.982
+SIHKEA	Ni	1	2	28	3	7	4	Square planar	0.924
+TAGFIR	Ni	-1	2	28	3	7	4	Square planar	0.897
+TAGFUD	Ni	-1	2	28	3	7	4	Square planar	0.887
+TECRAW	Ni	-1	2	28	3	7	4	Square planar	0.888
+WOKCEE	Ni	-1	2	28	3	7	4	Square planar	0.885
+EBIXAQ	Ni	-1	2	28	3	7	4	Square planar	0.889
+MUKGUU	Ni	-1	2	28	3	7	4	Square planar	0.896
+BEXJEW	Ni	-1	2	28	3	7	4	Square planar	0.89
+CETXAA	Ni	0	2	28	3	7	5	Square pyramidal	0.943
+ORODOP	Ni	0	2	28	3	7	5	Square pyramidal	0.973
+KOHMEA	Ni	0	2	28	3	7	5	Square pyramidal	0.973
+QOYFEQ	Ni	0	2	28	3	7	5	Square pyramidal	1.021
+PAHMUJ	Ni	1	2	28	3	7	5	Square pyramidal	1.07
+BINCOR	Ni	0	2	28	3	7	5	Square pyramidal	1.017
+HIGVAV	Ni	0	2	28	3	7	5	Square pyramidal	0.994
+BUDHEN	Ni	0	2	28	3	7	5	Square pyramidal	1.015
+SUBJIL	Ni	0	2	28	3	7	5	Square pyramidal	0.999
+WUBGEI	Ni	0	2	28	3	7	5	Square pyramidal	1.03
+RUTMAV	Ni	-1	2	28	3	7	5	Trigonal bipyramidal	0.96
+YETYOM	Ni	-1	2	28	3	7	5	Trigonal bipyramidal	0.949
+QUZWAL	Ni	-1	2	28	3	7	5	Trigonal bipyramidal	0.956
+GOHDEN	Ni	-1	2	28	3	7	5	Trigonal bipyramidal	0.961
+MEDCAA	Ni	0	2	28	3	7	5	Trigonal bipyramidal	0.95
+BIBFEY	Ni	-1	2	28	3	7	5	Trigonal bipyramidal	0.959
+BIBDUM	Ni	-1	2	28	3	7	5	Trigonal bipyramidal	0.941
+SASPAD	Ni	1	2	28	3	7	6	Octahedral	1.058
+QEKCAN	Ni	0	2	28	3	7	6	Octahedral	1.092
+DOVMOQ	Ni	0	2	28	3	7	6	Octahedral	1.078
+JADGOK	Ni	1	2	28	3	7	6	Octahedral	1.082
+ESUYUM	Ni	3	2	28	3	7	6	Octahedral	1.108
+LOGKEZ	Ni	1	2	28	3	7	6	Octahedral	1.021
+OZEDIH	Ni	3	2	28	3	7	6	Octahedral	1.062
+KEVHIC	Ni	-1	2	28	3	7	6	Octahedral	1.017
+WABGOW	Ni	0	2	28	3	7	6	Octahedral	0.984
