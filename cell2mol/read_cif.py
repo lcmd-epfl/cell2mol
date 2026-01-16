@@ -23,7 +23,7 @@ elemdatabase = ElementData()
 logger = logging.getLogger(__name__)
 
 
-def screening_cif(cif_file_path):
+def detect_cif_issues(cif_file_path):
     radical = False
     disorder = False
     notfound_atom = False
@@ -46,7 +46,7 @@ def screening_cif(cif_file_path):
                     disorder = True
 
     moiety_dicts = extract_moiety(cif_file_path)
-    if len(moiety_dicts) == 0:
+    if not moiety_dicts:
         polymeric = False
     else:
         polymeric = any("n(" in moiety["formula"] for moiety in moiety_dicts)
@@ -60,12 +60,11 @@ def prefilter_cif(cif_file_path):
     Returns True if the file is ready for processing, otherwise returns False.
     """
     # Check for radical, disorder, 3D fractional coordinates, and polymeric structure
-    radical, disorder, notfound_atom, polymeric = screening_cif(cif_file_path)
+    radical, disorder, notfound_atom, polymeric = detect_cif_issues(cif_file_path)
 
     message = ""
 
     if any([radical, disorder, notfound_atom, polymeric]):
-        # print(f"{radical=}, {disorder=}, {notfound_atom=}, {polymeric=}")
         if radical:
             message += "\nRadical found in .cif file."
         if disorder:
@@ -111,8 +110,6 @@ def get_geom_bond(cif_file_path):
                 continue
 
             header_map = {h: idx for idx, h in enumerate(headers)}
-            # print("Bond header map:", header_map)
-
             for line in lines[start_idx:]:
                 if line.strip().startswith("_") or line.strip() == "loop_":
                     break
@@ -134,8 +131,9 @@ def get_geom_bond(cif_file_path):
     moieties = list(nx.connected_components(G))
     moiety_list = [sorted(list(group)) for group in moieties]
 
-    logger.debug("Bond data (first 5): %s", geom_bond_data[:5])
-    logger.debug("Moieties: %s", moiety_list)
+    # logger.debug("Bond data (first 5): %s", geom_bond_data[:5])
+    # logger.debug("Moieties: %s", moiety_list)
+
     if geom_bond_data == []:
         geom_bond_data = None
     if moiety_list == []:
@@ -178,7 +176,6 @@ def get_wyckoff_positions(cif_file_path):
                 continue
 
             header_map = {h: idx for idx, h in enumerate(headers)}
-            # print("Atom site header map:", header_map)
 
             for line in lines[start_idx:]:
                 if line.strip().startswith("_") or line.strip() == "loop_":
@@ -247,21 +244,6 @@ def remove_disorder_atoms(atom_site_labels, ref_labels, ref_fracs):
     return atom_site_labels, ref_labels, ref_fracs
 
 
-def get_moiety_indices_from_labels(atom_site_labels, moiety_list):
-    flat_list = [atom for moiety in moiety_list for atom in moiety]
-
-    atom_site_labels = np.array(atom_site_labels)  # ensure it's a numpy array
-    moiety_indices = [
-        np.where(np.isin(atom_site_labels, moiety))[0].tolist()
-        for moiety in moiety_list
-    ]
-    for i, atom in enumerate(atom_site_labels):
-        if atom not in flat_list:
-            moiety_indices.append([i])
-
-    return moiety_indices
-
-
 def extract_moiety(file_path: str) -> list:
     """Extracts the moiety information from a CIF file"""
     uploaded_file_path = Path(file_path)
@@ -290,7 +272,7 @@ def extract_moiety(file_path: str) -> list:
     return moiety_dicts
 
 
-def sum_formulas(formulas, ratios=None):
+def combine_formulas(formulas, ratios=None):
     """
     Sum element counts across a list of formula strings.
     If ratios is provided, multiply each formula's counts by the corresponding ratio.
@@ -422,7 +404,7 @@ def extract_chemical_name(cif_file_path, tag="_chemical_name_systematic"):
         with open(cif_file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
     except FileNotFoundError:
-        print(f"File not found: {cif_file_path}")
+        logger.error("File not found: %s", cif_file_path)
         return None
 
     i = 0
@@ -472,7 +454,6 @@ def extract_chemical_name(cif_file_path, tag="_chemical_name_systematic"):
     return None
 
 
-######
 def extract_metal_oxidation_state(chemical_name):
     oxidation_states = []
 
@@ -505,7 +486,6 @@ def extract_metal_oxidation_state(chemical_name):
     return oxidation_states
 
 
-######
 def parse_moiety(moiety: str) -> Tuple[str, float, int, str]:
     """Parse a moiety string and return its formula, ratio (float), charge, and type"""
     # Default values
@@ -541,7 +521,6 @@ def parse_moiety(moiety: str) -> Tuple[str, float, int, str]:
     return (formula, ratio, charge, compound_type)
 
 
-###############
 def cifformula_to_list(formula: str) -> list:
     # Match element symbols with optional numbers (e.g., 'C4', 'H2', 'N1')
     tokens = re.findall(r"([A-Z][a-z]*)(\d*)", formula)
@@ -552,7 +531,6 @@ def cifformula_to_list(formula: str) -> list:
     return result
 
 
-##########################
 def classify_metals(formula: str) -> Dict[str, Dict[str, int]]:
     # Initialize category results
     result = {
@@ -600,7 +578,6 @@ def classify_metals(formula: str) -> Dict[str, Dict[str, int]]:
     return result
 
 
-##########################
 def metal_info(moiety_dicts: list) -> dict:
     """
     Extracts metal information from moiety dictionaries.
@@ -623,7 +600,6 @@ def metal_info(moiety_dicts: list) -> dict:
     return metal_data
 
 
-##########################
 def flatten_metal_info(metal_info_dict, refcode):
     flat_list = []
 
@@ -705,7 +681,7 @@ def get_cell_parameters(structure):
     return cell_vector, cell_param, sym_ops
 
 
-def compare_reference_with_cif(refcell):
+def compare_cif_with_reference(refcell):
     """Compare reference molecules with chemical name,
     metal oxidation state, and moiety information extracted from the CIF file."""
 
@@ -751,7 +727,6 @@ def compare_reference_with_cif(refcell):
                 )
 
         else:
-            # If there are differences, print them
             logger.debug(
                 "%s %s: Closest match found. %s with difference of %s",
                 ref_idx,
@@ -769,19 +744,19 @@ def compare_reference_with_cif(refcell):
                     info["ref"],
                 )
                 logger.warning(
-                    "This will cause errors in unit cell reconstruction",
-                    "Set --cif_bond_info as True and re-run.",
+                    "This will cause errors in unit cell reconstruction. Set --cif_bond_info as True and re-run.",
                 )
             disagree_with_cif.append(ref_idx)
 
     if len(disagree_with_cif) > 0:
         logger.info("Discrepancies found between refcell and CIF")
+        logger.info("This will cause errors in the charge prediction!")
         refcell.disagree_with_cif_formula = True
         try:
-            cif_totals = sum_formulas(formulas_from_cif, ratios_from_cif)
+            cif_totals = combine_formulas(formulas_from_cif, ratios_from_cif)
             if cif_totals is not None:
                 logger.info(f"Element totals from CIF: {cif_totals}")
-                ref_totals = sum_formulas(formulas_from_refcell)
+                ref_totals = combine_formulas(formulas_from_refcell)
                 df_compare, all_match = compare_totals(
                     cif_totals, ref_totals, atol=1e-9
                 )
