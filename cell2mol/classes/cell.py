@@ -13,14 +13,9 @@ from cell2mol.compare import (
     compare_metals,
     compare_reference_indices,
 )
-from cell2mol.operations import extract_from_list
-from cell2mol.new_charge_assignment import (
-    set_charge_state,
-    prepare_mol,
-)
+from cell2mol.charge.specie_assigner import set_charge_state, prepare_mol
+from cell2mol.operations import extract_from_list, get_moiety_indices_from_labels
 from cell2mol.elementdata import ElementData
-from cell2mol.read_cif import get_moiety_indices_from_labels
-from cell2mol.write_results import handle_error
 from cell2mol.utils import BaseModel, config
 from cell2mol.my_types import NDArray, Type, SubType
 
@@ -139,6 +134,162 @@ class Cell(BaseModel):
         self.reported_metal_os = reported_metal_os
         self.moiety_dicts = moiety_dicts
 
+    def get_reference_molecules(
+        self,
+        cov_factor: float | None = None,
+        metal_factor: float | None = None,
+        use_bond_info: bool | None = None,
+    ):
+        """
+        Generate reference molecules from cell fractional coordinates and labels.
+        Args:
+            cov_factor (float): covalent radius scaling factor for adjacency
+            metal_factor (float): additional scaling factor for metals
+            use_bond_info (bool): whether to use CIF bond information
+        Returns:
+            list: list of reference molecule objects
+        """
+        if cov_factor is None:
+            cov_factor = config.COV_FACTOR
+        if metal_factor is None:
+            metal_factor = config.METAL_FACTOR
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
+
+        logger.info("#########################################")
+        logger.info("    Generate reference molecules    ")
+        if use_bond_info:
+            logger.info("    Consistent with CIF moieties  ")
+        logger.info("#########################################")
+
+        if self.subtype != "reference":
+            logger.error("Cell subtype is not 'reference'")
+            return []
+
+        ref_labels = self.labels
+        ref_fracs = self.frac_coord
+        ref_pos = self.coord
+        atom_site_labels = self.atom_site_labels
+
+        # Determine blocklist
+        if use_bond_info:
+            blocklist = self.moiety_indices
+            logger.info("Using CIF bond/moiety information for blocklist")
+            if self.moiety_indices is None:
+                logger.error("CIF moiety indices are not available")
+                return []
+        else:
+            blocklist = split_species(ref_labels, ref_pos, cov_factor=cov_factor)
+            logger.info("Using distance-based species splitting for blocklist")
+            if self.moiety_indices is not None:
+                logger.info("CIF bond/moiety information is available but not used")
+
+        # logger.debug(f"blocklist={blocklist}")
+        if blocklist is None:
+            logger.warning("No blocklist found")
+            return []
+
+        self.refmoleclist = []
+        # Build reference molecules
+        for b in blocklist:
+            mol_labels = extract_from_list(b, ref_labels, dimension=1)
+            mol_coord = extract_from_list(b, ref_pos, dimension=1)
+            mol_frac_coord = extract_from_list(b, ref_fracs, dimension=1)
+            mol_atom_site_labels = extract_from_list(b, atom_site_labels, dimension=1)
+
+            newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
+            newmolec.add_parent(self, indices=b)
+            newmolec.set_adjacency_parameters(cov_factor, metal_factor)
+            newmolec.set_atoms(
+                create_adjacencies=True,
+                atom_site_labels=mol_atom_site_labels,
+                use_bond_info=use_bond_info,
+            )
+
+            for atom, idx in zip(newmolec.atoms, b):
+                atom.add_parent(self, index=idx)
+
+            if newmolec.iscomplex or newmolec.has_IA_IIA:
+                logger.debug("Is complex: %s", newmolec.formula)
+                logger.debug("Splitting complex: %s", newmolec.formula)
+                newmolec.split_complex()
+            elif newmolec.has_post_transition_metal:
+                logger.debug("Has post-transition metal: %s", newmolec.formula)
+                newmolec.split_complex(post_tms=True)
+            else:
+                newmolec.add_parent(newmolec, indices=list(range(newmolec.natoms)))
+
+            self.refmoleclist.append(newmolec)
+
+        logger.info("Found %d reference molecules", len(self.refmoleclist))
+        logger.info("Formulas: %s", [ref.formula for ref in self.refmoleclist])
+
+        # Check for isolated atoms
+        has_isolated_h = False
+        for ref in self.refmoleclist:
+            if ref.natoms == 1:
+                label = ref.atoms[0].label
+                if label in {"H", "D"}:
+                    has_isolated_h = True
+                else:
+                    logger.warning("Isolated atom found %s", ref.labels)
+
+        self.has_isolated_H = has_isolated_h
+        logger.info("Has isolated hydrogen: %s", self.has_isolated_H)
+
+        # Post-processing: coordination analysis
+        for ref in self.refmoleclist:
+            if ref.iscomplex:
+                logger.info("Has transition metals %s", ref.formula)
+                ref.get_hapticity()
+                if not ref.ligands:
+                    logger.debug("A metal cluster found")
+
+            elif ref.has_IA_IIA:
+                logger.info("Has alkali or alkaline earth metals: %s", ref.formula)
+
+            elif ref.has_post_transition_metal:
+                logger.info("Has post transition metals: %s", ref.formula)
+                logger.debug("metals=%s", [met.label for met in ref.metals])
+                logger.debug("ligands=%s", [lig.formula for lig in ref.ligands])
+
+            else:
+                continue
+
+            # Common ligand analysis
+            for lig in ref.ligands:
+                lig.get_denticity()
+            # Common metal analysis
+            for met in ref.metals:
+                met.get_connected_metals()
+                met.get_coordination_geometry()
+                met.get_coord_sphere_formula()
+
+        return self.refmoleclist
+
+    def check_hydrogens(self):
+        from cell2mol.hydrogen import check_missing_hydrogens
+
+        (
+            has_missing_h,
+            missing_h_in_carbon,
+            missing_h_in_coordinated_water,
+            missing_h_in_water,
+        ) = check_missing_hydrogens(self.refmoleclist)
+        if has_missing_h:
+            logger.info(
+                "Missing hydrogens | carbon=%d, coordinated_water=%d, water=%d",
+                missing_h_in_carbon,
+                missing_h_in_coordinated_water,
+                missing_h_in_water,
+            )
+        self.has_missing_H = has_missing_h
+        self.missing_H_in_Carbon = missing_h_in_carbon
+        self.missing_H_in_CoordWater = missing_h_in_coordinated_water
+        self.missing_H_in_Water = missing_h_in_water
+
+        return self.has_missing_H
+
     def get_unique_species(self):
         """Get unique species in the cell."""
         logger.info("Getting unique species in %s", self.subtype)
@@ -157,11 +308,7 @@ class Cell(BaseModel):
             moleclist = self.moleclist
         for idx, mol in enumerate(moleclist):
             logger.debug("Molecule %d formula=%s", idx, mol.formula)
-            if (
-                not mol.iscomplex
-                and not mol.has_IA_IIA
-                and not mol.has_post_transition_metal
-            ):  # Non-complex molecules
+            if mol.is_non_complex_molecule:  # Non-complex molecules
                 found = False
                 for ldx, typ in enumerate(typelist_mols):
                     issame = compare_species(mol, typ[0])
@@ -272,329 +419,45 @@ class Cell(BaseModel):
 
         return self.unique_species
 
-    def check_hydrogens(self):
-        from cell2mol.hydrogen import check_missing_hydrogens
-
-        (
-            has_missing_h,
-            missing_h_in_carbon,
-            missing_h_in_coordinated_water,
-            missing_h_in_water,
-        ) = check_missing_hydrogens(self.refmoleclist)
-        if has_missing_h:
-            logger.info(
-                "Missing hydrogens | carbon=%d, coordinated_water=%d, water=%d",
-                missing_h_in_carbon,
-                missing_h_in_coordinated_water,
-                missing_h_in_water,
-            )
-        self.has_missing_H = has_missing_h
-        self.missing_H_in_Carbon = missing_h_in_carbon
-        self.missing_H_in_CoordWater = missing_h_in_coordinated_water
-        self.missing_H_in_Water = missing_h_in_water
-
-        return self.has_missing_H
-
-    def get_reference_molecules(
-        self,
-        cov_factor: float | None = None,
-        metal_factor: float | None = None,
-        use_bond_info: bool | None = None,
-    ):
+    def get_selected_cs(self) -> None:
         """
-        Generate reference molecules from cell fractional coordinates and labels.
-        Args:
-            cov_factor (float): covalent radius scaling factor for adjacency
-            metal_factor (float): additional scaling factor for metals
-            use_bond_info (bool): whether to use CIF bond information
-        Returns:
-            list: list of reference molecule objects
+        Get selected (valid) charge states for unique species and species list.
+        Updates self.selected_cs and sets error flags if any None is found.
         """
-        if cov_factor is None:
-            cov_factor = config.COV_FACTOR
-        if metal_factor is None:
-            metal_factor = config.METAL_FACTOR
-        if use_bond_info is None:
-            use_bond_info = config.USE_BOND_INFO
-
-        logger.info("#########################################")
-        logger.info("    Generate reference molecules    ")
-        if use_bond_info:
-            logger.info("  Consistent with CIF moieties  ")
-        logger.info("#########################################")
-
         if self.subtype != "reference":
-            logger.error("Cell subtype is not 'reference'")
-            return []
+            logger.error("get_selected_cs should only be called on reference cells")
+            return
 
-        ref_labels = self.labels
-        ref_fracs = self.frac_coord
-        ref_pos = self.coord
-        atom_site_labels = self.atom_site_labels
-
-        # Determine blocklist
-        if use_bond_info:
-            blocklist = self.moiety_indices
-            logger.info("Using CIF bond/moiety information for blocklist")
-            if self.moiety_indices is None:
-                logger.error("CIF moiety indices are not available")
-                return []
-        else:
-            blocklist = split_species(ref_labels, ref_pos, cov_factor=cov_factor)
-            logger.info("Using distance-based species splitting for blocklist")
-            if self.moiety_indices is not None:
-                logger.info("CIF bond/moiety information is available but not used")
-
-        logger.debug(f"blocklist={blocklist}")
-        if blocklist is None:
-            logger.warning("No blocklist found")
-            return []
-
-        self.refmoleclist = []
-        # Build reference molecules
-        for b in blocklist:
-            mol_labels = extract_from_list(b, ref_labels, dimension=1)
-            mol_coord = extract_from_list(b, ref_pos, dimension=1)
-            mol_frac_coord = extract_from_list(b, ref_fracs, dimension=1)
-            mol_atom_site_labels = extract_from_list(b, atom_site_labels, dimension=1)
-
-            newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
-            newmolec.add_parent(self, indices=b)
-            newmolec.set_adjacency_parameters(cov_factor, metal_factor)
-            newmolec.set_atoms(
-                create_adjacencies=True,
-                atom_site_labels=mol_atom_site_labels,
-                use_bond_info=use_bond_info,
-            )
-
-            for atom, idx in zip(newmolec.atoms, b):
-                atom.add_parent(self, index=idx)
-
-            if newmolec.iscomplex or newmolec.has_IA_IIA:
-                logger.debug("Is complex: %s", newmolec.formula)
-                logger.debug("Splitting complex: %s", newmolec.formula)
-                newmolec.split_complex()
-            elif newmolec.has_post_transition_metal:
-                logger.debug("Has post-transition metal: %s", newmolec.formula)
-                newmolec.split_complex(post_tms=True)
-            else:
-                newmolec.add_parent(newmolec, indices=list(range(newmolec.natoms)))
-
-            self.refmoleclist.append(newmolec)
-
-        logger.info("Found %d reference molecules", len(self.refmoleclist))
-        logger.info("Formulas: %s", [ref.formula for ref in self.refmoleclist])
-
-        # Check for isolated atoms
-        has_isolated_h = False
-        for ref in self.refmoleclist:
-            if ref.natoms == 1:
-                label = ref.atoms[0].label
-                if label in {"H", "D"}:
-                    has_isolated_h = True
-                else:
-                    logger.warning("Isolated atom found %s", ref.labels)
-
-        self.has_isolated_H = has_isolated_h
-        logger.info("Has isolated hydrogen: %s", self.has_isolated_H)
-
-        # Post-processing: coordination analysis
-        for ref in self.refmoleclist:
-            if ref.iscomplex:
-                logger.info("Has transition metals %s", ref.formula)
-                ref.get_hapticity()
-                if not ref.ligands:
-                    logger.debug("A metal cluster found")
-
-            elif ref.has_IA_IIA:
-                logger.info("Has alkali or alkaline earth metals: %s", ref.formula)
-
-            elif ref.has_post_transition_metal:
-                logger.info("Has post transition metals: %s", ref.formula)
-                logger.debug("metals=%s", [met.label for met in ref.metals])
-                logger.debug("ligands=%s", [lig.formula for lig in ref.ligands])
-
-            else:
-                continue
-
-            # Common ligand analysis
-            for lig in ref.ligands:
-                lig.get_denticity()
-            # Common metal analysis
-            for met in ref.metals:
-                met.get_connected_metals()
-                met.get_coordination_geometry()
-                met.get_coord_sphere_formula()
-
-        return self.refmoleclist
-
-    def get_selected_cs(self, debug: int = 0):
-        """Get selected charge states for unique species and species list."""
         if self.unique_species is None:
             self.get_unique_species()
 
         self.selected_cs = []
-        for unique_specie in self.unique_species:
-            logger.info(
-                "Get possible charge states for unique specie %s",
-                unique_specie.formula,
-            )
-            tmp = unique_specie.get_possible_cs()
-            if tmp is None:
-                self.selected_cs.append(None)
-            elif len(tmp) == 0:
-                self.selected_cs.append(None)
-            elif unique_specie.subtype != "metal":
-                self.selected_cs.append(
-                    list([cs.corr_total_charge for cs in unique_specie.possible_cs])
-                )
-            else:
-                self.selected_cs.append(unique_specie.possible_cs)
 
-        for specie in self.species_list:
-            print("Get possible charge states for species list", specie.formula)
-            tmp = specie.get_possible_cs(debug=debug)
-            if tmp is None:
+        # Process unique_species first, then the full species_list
+        all_targets = [(specie, "unique specie") for specie in self.unique_species]
+        all_targets.extend([(specie, "species list") for specie in self.species_list])
+
+        for specie, context_label in all_targets:
+            logger.info(
+                "Get possible charge states for %s: %s",
+                context_label,
+                specie.formula,
+            )
+            possible_cs = specie.get_possible_cs()
+
+            if not possible_cs:
+                # Appending None indicates a failure to find options for this species
                 self.selected_cs.append(None)
-            elif len(tmp) == 0:
-                self.selected_cs.append(None)
-            elif specie.subtype != "metal":
-                self.selected_cs.append(
-                    list([cs.corr_total_charge for cs in specie.possible_cs])
-                )
+                continue
+
+            if specie.subtype != "metal":
+                charges = [cs.corr_total_charge for cs in specie.possible_cs]
+                self.selected_cs.append(charges)
             else:
                 self.selected_cs.append(specie.possible_cs)
 
-        if None in self.selected_cs:
-            self.error_get_poscharges = True
-        else:
-            self.error_get_poscharges = False
-
-    def assign_charges_for_refcell(self, debug: int = 0):
-        for specie in self.unique_species:
-            for idx, ref in enumerate(self.refmoleclist):
-                if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
-                    for jdx, lig in enumerate(ref.ligands):
-                        if lig.unique_index == specie.unique_index:
-                            set_charge_state(specie, lig, mode=1, debug=debug)
-                    for kdx, met in enumerate(ref.metals):
-                        if met.unique_index == specie.unique_index:
-                            met.set_charge(specie.charge)
-                else:
-                    if ref.unique_index == specie.unique_index:
-                        set_charge_state(specie, ref, mode=1, debug=debug)
-        temp = []
-        for idx, ref in enumerate(self.refmoleclist):
-            ref.create_bonds(debug=debug)
-            temp.append(ref.error_create_bonds)
-            if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
-                prepare_mol(ref, debug=debug)
-
-        if any(temp):
-            self.error_create_bonds = True
-        else:
-            self.error_create_bonds = False
-
-        for idx, ref in enumerate(self.refmoleclist):
-            print(f"ASSIGN_CHARGES: Refenrence Molecule {idx}: {ref.formula}")
-            if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
-                print("ASSIGN_CHARGES: Complex", idx, ref.formula, ref.totcharge)
-                for jdx, lig in enumerate(ref.ligands):
-                    print(
-                        "ASSIGN_CHARGES: Ligand",
-                        idx,
-                        jdx,
-                        lig.formula,
-                        lig.totcharge,
-                        lig.smiles,
-                    )
-                for kdx, met in enumerate(ref.metals):
-                    print("ASSIGN_CHARGES: Metal", idx, kdx, met.formula, met.charge)
-            else:
-                print(
-                    "ASSIGN_CHARGES: Non-Complex",
-                    idx,
-                    ref.formula,
-                    ref.totcharge,
-                    ref.smiles,
-                )
-
-    #
-    def assign_charges_for_unitcell(self, debug: int = 0):
-        for idx, mol in enumerate(self.moleclist):
-            print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")
-            if (
-                not mol.iscomplex
-                and not mol.has_IA_IIA
-                and not mol.has_post_transition_metal
-            ):
-                for ref in self.refmoleclist:
-                    if (
-                        not ref.iscomplex
-                        and not ref.has_IA_IIA
-                        and not ref.has_post_transition_metal
-                    ) and (mol.unique_index == ref.unique_index):
-                        issame = compare_reference_indices(ref, mol)
-                        if issame:
-                            set_charge_state(ref, mol, mode=2, debug=debug)
-            else:
-                for ref in self.refmoleclist:
-                    if (
-                        ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal
-                    ) and (mol.formula == ref.formula):
-                        for jdx, lig in enumerate(mol.ligands):
-                            for rdx, ref_lig in enumerate(ref.ligands):
-                                if lig.formula == ref_lig.formula:
-                                    issame = compare_reference_indices(ref_lig, lig)
-                                    if issame:
-                                        set_charge_state(
-                                            ref_lig, lig, mode=2, debug=debug
-                                        )
-                                    # else:
-                                    #     print("ERROR: ASSIGN_CHARGES: Ligand", idx, jdx, rdx, lig.formula, ref_lig.totcharge, ref_lig.smiles)
-                        for kdx, met in enumerate(mol.metals):
-                            for ref_met in ref.metals:
-                                if met.formula == ref_met.formula:
-                                    if ref_met.get_parent_index(
-                                        "reference"
-                                    ) == met.get_parent_index("reference"):
-                                        met.set_charge(ref_met.charge)
-
-        temp = []
-        for idx, mol in enumerate(self.moleclist):
-            mol.create_bonds(debug=debug)
-            temp.append(mol.error_create_bonds)
-            if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
-                prepare_mol(mol, debug=debug)
-
-        if any(temp):
-            self.error_create_bonds = True
-        else:
-            self.error_create_bonds = False
-
-        for idx, mol in enumerate(self.moleclist):
-            print(f"ASSIGN_CHARGES: Unitcell Molecule {idx}: {mol.formula}")
-            if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
-                print("ASSIGN_CHARGES: Complex", idx, mol.formula, mol.totcharge)
-                for jdx, lig in enumerate(mol.ligands):
-                    print(
-                        "ASSIGN_CHARGES: Ligand",
-                        idx,
-                        jdx,
-                        lig.formula,
-                        lig.totcharge,
-                        lig.smiles,
-                    )
-                for kdx, met in enumerate(mol.metals):
-                    print("ASSIGN_CHARGES: Metal", idx, kdx, met.formula, met.charge)
-            else:
-                print(
-                    "ASSIGN_CHARGES: Non-Complex",
-                    idx,
-                    mol.formula,
-                    mol.totcharge,
-                    mol.smiles,
-                )
+        # Update error flag
+        self.error_get_poscharges = None in self.selected_cs
 
     def check_charge_neutrality(self):
         """Check if the total charge of the cell is neutral."""
@@ -616,12 +479,127 @@ class Cell(BaseModel):
 
         if len(totcharge_list) != 0:
             logger.info(
-                f"Total Charge of the Cell ({self.subtype}): {sum(totcharge_list)} {totcharge_list=}"
+                "Total Charge of the Cell (%s) (%s): %d %s",
+                self.subtype,
+                self.subtype,
+                sum(totcharge_list),
+                totcharge_list,
             )
             if sum(totcharge_list) == 0:
                 self.is_neutral = True
             else:
                 self.is_neutral = False
+
+    def assign_charges(self):
+        """
+        Master function to assign charges, create bonds, and log results.
+        """
+
+        if self.subtype == "reference":
+            molecule_list = self.refmoleclist
+            self._map_charges_to_refcell()
+            log_prefix = "Reference"
+        elif self.subtype == "unitcell":
+            molecule_list = self.moleclist
+            self._map_charges_to_unitcell()
+            log_prefix = "UnitCell"
+
+        # Shared Logic: Finalize bonds and Log results
+        self._finalize_bonds_and_prepare(molecule_list)
+        self._log_charge_results(molecule_list, log_prefix)
+
+    def _map_charges_to_refcell(self):
+        """Logic: Propagate charges from Unique Species to Reference Molecules."""
+        for specie in self.unique_species:
+            for ref in self.refmoleclist:
+                if ref.is_non_complex_molecule:
+                    if ref.unique_index == specie.unique_index:
+                        set_charge_state(specie, ref, mode=1)
+                else:
+                    # Match Ligands
+                    for lig in ref.ligands:
+                        if lig.unique_index == specie.unique_index:
+                            set_charge_state(specie, lig, mode=1)
+                    # Match Metals
+                    for met in ref.metals:
+                        if met.unique_index == specie.unique_index:
+                            met.set_charge(specie.charge)
+
+    def _map_charges_to_unitcell(self):
+        """Logic: Propagate charges from Reference Molecules to Unit Cell Molecules."""
+        for mol in self.moleclist:
+            if mol.is_non_complex_molecule:
+                logger.info("Mapping charges for Non-Complex Molecule: %s", mol.formula)
+                for ref in self.refmoleclist:
+                    if ref.is_non_complex_molecule and (
+                        mol.unique_index == ref.unique_index
+                    ):
+                        if compare_reference_indices(ref, mol):
+                            set_charge_state(ref, mol, mode=2)
+            else:
+                logger.info("Mapping charges for Complex Molecule: %s", mol.formula)
+                for ref in self.refmoleclist:
+                    # Complex Molecule Match by Formula
+                    if not ref.is_non_complex_molecule and (mol.formula == ref.formula):
+                        self._map_complex_components(mol, ref)
+
+    def _map_complex_components(self, mol, ref):
+        """Helper to map ligands and metals within a complex."""
+        # Map Ligands
+        for lig in mol.ligands:
+            for ref_lig in ref.ligands:
+                if lig.formula == ref_lig.formula:
+                    if compare_reference_indices(ref_lig, lig):
+                        set_charge_state(ref_lig, lig, mode=2)
+
+        # Map Metals
+        for met in mol.metals:
+            for ref_met in ref.metals:
+                if met.formula == ref_met.formula:
+                    # Compare parent indices to ensure correct metal center
+                    p_idx_ref = ref_met.get_parent_index("reference")
+                    p_idx_mol = met.get_parent_index("reference")
+                    if p_idx_ref == p_idx_mol:
+                        met.set_charge(ref_met.charge)
+
+    def _finalize_bonds_and_prepare(self, molecule_list):
+        """Shared logic to create bonds and prepare complex structures."""
+        errors = []
+        for mol in molecule_list:
+            mol.create_bonds()
+            errors.append(mol.error_create_bonds)
+
+            if not mol.is_non_complex_molecule:
+                prepare_mol(mol)
+
+        self.error_create_bonds = any(errors)
+
+    def _log_charge_results(self, molecule_list, label: str):
+        """Shared logic to log the final state of molecules."""
+        for idx, mol in enumerate(molecule_list):
+            logger.info("ASSIGN_CHARGES: %s Molecule %d %s", label, idx, mol.formula)
+
+            if mol.is_non_complex_molecule:
+                logger.info(
+                    "Non-Complex %d: %s %d %s",
+                    idx,
+                    mol.formula,
+                    mol.totcharge,
+                    mol.smiles,
+                )
+            else:
+                logger.info("Complex %d: %s %d", idx, mol.formula, mol.totcharge)
+
+                for jdx, lig in enumerate(mol.ligands):
+                    logger.info(
+                        "  Ligand %d: %s %d %s",
+                        jdx,
+                        lig.formula,
+                        lig.totcharge,
+                        lig.smiles,
+                    )
+                for kdx, met in enumerate(mol.metals):
+                    logger.info("  Metal %d: %s %d", kdx, met.formula, met.charge)
 
     def create_bonds(self):
         """Create bonds for all molecules in the cell."""
@@ -635,7 +613,7 @@ class Cell(BaseModel):
 
         temp = []
         for mol in moleclist:
-            logger.info(f"Creating Bonds for molecule {mol.formula}")
+            logger.info("Creating Bonds for molecule %s", mol.formula)
             mol.create_bonds()
             temp.append(mol.error_create_bonds)
 
@@ -692,7 +670,6 @@ class Cell(BaseModel):
             logger.info("Check Errors in hydrogens")
             if self.has_isolated_H:
                 case = 1
-            # elif self.has_missing_H:            case = 2
             elif self.missing_H_in_Water:
                 case = 2
             elif self.missing_H_in_CoordWater:
@@ -705,7 +682,6 @@ class Cell(BaseModel):
             logger.info("Check Errors in possible charges")
             if self.has_isolated_H:
                 case = 1
-            # elif self.has_missing_H:            case = 2
             elif self.missing_H_in_Water:
                 case = 2
             elif self.missing_H_in_CoordWater:
@@ -744,22 +720,8 @@ class Cell(BaseModel):
                 case = 6
             elif self.error_empty_distrib:
                 case = 7
-            # elif self.error_create_bonds :      case = 8
             else:
                 case = 0
-        if mode == "hydrogens" or mode == "possible_charges":
-            if case == 2 or case == 3 or case == 4:
-                handle_error(2)
-                if case == 2:
-                    print("    - Missing Hydrogens in Water Molecules")
-                elif case == 3:
-                    print("    - Missing Hydrogens in Coordinated Water Molecules")
-                elif case == 4:
-                    print("    - Missing Hydrogens in Carbon Atoms")
-            else:
-                handle_error(case)
-        else:
-            handle_error(case)
 
         self.error_case = case
 

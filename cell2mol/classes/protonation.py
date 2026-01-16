@@ -130,7 +130,7 @@ class Protonation(BaseModel):
                 if warning:
                     self.status = False
 
-    def reorder(self, map, debug: int = 0):
+    def reorder(self, map):
         ## for protonation states with added atoms, the reorder map will have fewer items. Correct it here
         mapext = np.copy(map)
         if self.added_atoms > 0 and len(map) < len(self.labels):

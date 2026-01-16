@@ -89,7 +89,9 @@ class Ligand(Specie):
                 tmp_adjnum = tmp_adjmat.sum(axis=1)
                 if any(tmp_adjnum) > 0:
                     self.metals.append(met)
-                    logger.debug("%s is is connected to %s", self.formula, met.label)
+                    logger.debug(
+                        "Ligand %s is connected to %s", self.formula, met.label
+                    )
 
     def evaluate_as_nitrosyl(self):
         self.is_nitrosyl = False
@@ -190,8 +192,8 @@ class Ligand(Specie):
             self.get_connected_idx()
         connected_idx = self.connected_idx
 
-        logger.debug(f"Ligand indices: {self.indices=}")
-        logger.debug(f"{connected_idx=}")
+        # logger.debug(f"Ligand indices: {self.indices=}")
+        # logger.debug(f"{connected_idx=}")
 
         conn_labels = extract_from_list(connected_idx, self.labels, dimension=1)
         conn_coord = extract_from_list(connected_idx, self.coord, dimension=1)
@@ -208,8 +210,11 @@ class Ligand(Specie):
         else:
             conn_atom_site_labels = None
 
-        logger.debug(f"{conn_labels=}")
-        logger.debug(f"{conn_atom_site_labels=}")
+        logger.debug(
+            "  coordinating atoms: %s %s",
+            conn_labels,
+            conn_atom_site_labels if conn_atom_site_labels else "",
+        )
 
         blocklist = split_species(
             labels=conn_labels,
@@ -307,16 +312,16 @@ class Ligand(Specie):
                 conn_idx = final_group_indices[0]
                 group_metals = [newgroup.metals[kdx] for kdx in group_metals_indices[0]]
                 if len(conn_idx) == len(newgroup.atoms):
-                    logger.debug("\tLIGAND.SPLIT_LIGAND: new group is found")
+                    logger.debug("  LIGAND.SPLIT_LIGAND: new group is found")
                     newgroup.get_denticity()
                     # Top-down hierarchy
                     self.groups.append(newgroup)
                 elif len(conn_idx) == 0:
-                    logger.debug("\tLIGAND.SPLIT_LIGAND: no group is found")
+                    logger.debug("  LIGAND.SPLIT_LIGAND: no group is found")
                     continue
                 else:
                     logger.debug(
-                        "Enterting SPLIT_GROUP for the GROUP %s with %s",
+                        "  Enterting SPLIT_GROUP for the GROUP %s with %s",
                         newgroup.formula,
                         conn_idx,
                     )
@@ -328,7 +333,7 @@ class Ligand(Specie):
                     )
                     for g in splitted_groups:
                         self.groups.append(g)
-        logger.info("Found groups %s", [group.formula for group in self.groups])
+        logger.info("  Found groups %s", [group.formula for group in self.groups])
 
         return self.groups
 
