@@ -14,7 +14,6 @@ elemdatabase = ElementData()
 logger = logging.getLogger(__name__)
 
 
-#######################
 def exit_with_error_input(message):
     """Logs the error message to a file and exits the program."""
     error_log_path = os.path.join(os.getcwd(), "error_input.out")
@@ -23,7 +22,6 @@ def exit_with_error_input(message):
     sys.exit(message)
 
 
-#######################
 def exit_with_error_exception(e):
     """Logs the error details to a file and exits the program."""
     error_details = traceback.format_exc()
@@ -41,7 +39,6 @@ def exit_with_error_exception(e):
     sys.exit(e)
 
 
-##########################
 def compare_formula_xyz_vs_cif(xyzfile: str, formula_str_from_cif: str) -> dict:
     """
     Compare the elements from CIF with the elements in the XYZ file.
@@ -70,7 +67,6 @@ def compare_formula_xyz_vs_cif(xyzfile: str, formula_str_from_cif: str) -> dict:
     return comparison_result
 
 
-##############
 def readxyz(file):
     labels = []
     pos = []
@@ -90,7 +86,6 @@ def readxyz(file):
     return labels, pos
 
 
-################################
 def printxyz(labels, pos):
     print(len(labels))
     print("")
@@ -98,7 +93,6 @@ def printxyz(labels, pos):
         print("%s  %.6f  %.6f  %.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]))
 
 
-################################
 def writexyz(fdir, fname, labels, pos, charge: int = 0, spin: int = 1, info: str = ""):
     """Writes an XYZ file with given labels and positions."""
     os.makedirs(fdir, exist_ok=True)
@@ -113,7 +107,6 @@ def writexyz(fdir, fname, labels, pos, charge: int = 0, spin: int = 1, info: str
             fil.write(f"{label:<2}  {x:15.8f}  {y:15.8f}  {z:15.8f}\n")
 
 
-################################
 def extract_refmoleclist_xyz(fdir, refmoleclist, name: str):
     """Extracts reference molecules to XYZ files.
 
@@ -164,32 +157,6 @@ def extract_refmoleclist_xyz(fdir, refmoleclist, name: str):
                 )
 
 
-################################
-def print_error_case_reference(error_case, error_fname):
-    """Prints the error case to a file."""
-
-    with open(error_fname, "w") as error_output:
-        with redirect_stdout(error_output):
-            if error_case == 2 or error_case == 3 or error_case == 4:
-                handle_error(2)
-                if error_case == 2:
-                    print("    - Missing Hydrogens in Water Molecules")
-                elif error_case == 3:
-                    print("    - Missing Hydrogens in Coordinated Water Molecules")
-                elif error_case == 4:
-                    print("    - Missing Hydrogens in Carbon Atoms")
-            elif error_case == 9:
-                handle_error(9)
-                print(
-                    "    - Missing elements in Reference Molecules compared to moieties reported in CIF"
-                )
-            elif error_case == "X":
-                print("    - Empty Reference Molecules list")
-            else:
-                handle_error(error_case)
-    return
-
-
 def get_reference_error_message(error_case):
     """
     Return an error message for a given error case.
@@ -199,6 +166,9 @@ def get_reference_error_message(error_case):
     if error_case == 0:
         return "No errors found"
 
+    elif error_case == 1:
+        return "Isolated Hydrogens found"
+
     elif error_case == 2:
         return "Missing Hydrogens in Water Molecules"
 
@@ -207,6 +177,9 @@ def get_reference_error_message(error_case):
 
     elif error_case == 4:
         return "Missing Hydrogens in Coordinated Carbon Atoms"
+
+    elif error_case == 5:
+        return "Error in list of possible charges received for molecule or ligand"
 
     elif error_case == 8:
         return "Error in Creating Bonds"
@@ -218,133 +191,212 @@ def get_reference_error_message(error_case):
         return f"Unhandled error case: {error_case}"
 
 
-######################################################
-def write_refmoleclist(cell, file):
+def get_unitcell_error_message(error_case):
     """
-    Write reference molecule information to a file-like object.
-
-    Args:
-        cell: Reference Cell object.
-        file: File-like object opened for writing.
+    Return an error message for a given error case.
+    If error_fname exists, print the message in the file instead.
     """
 
-    for i, ref in enumerate(cell.refmoleclist):
-        ref_info = f"Reference Molecule {i}: {ref.formula} "
+    if error_case == 0:
+        return "No errors found"
 
-        if ref.iscomplex:
-            ref_info += "(TM Complex) "
-        if ref.has_IA_IIA:
-            ref_info += "(Complex with Alkali or Alkaline metals) "
-        if ref.has_post_transition_metal:
-            ref_info += "(Complex with Post-Transition metals) "
-        if (
-            not ref.iscomplex
-            and not ref.has_IA_IIA
-            and not ref.has_post_transition_metal
-        ):
-            ref_info += "(Non-complex)"
+    elif error_case == 1:
+        return "Isolated Hydrogens found"
 
-        if ref.totcharge is not None:
-            ref_info += f" totcharge={ref.totcharge}"
-        if ref.totcharge_cif is not None:
-            ref_info += f" totcharge_cif={ref.totcharge_cif}"
-        if ref.smiles is not None:
-            ref_info += f" smiles={ref.smiles}"
+    elif error_case == 2:
+        return "Missing Hydrogens"
 
-        print(ref_info, file=file)
+    elif error_case == 3:
+        return "Error in reconstructing fragments"
 
-        # --------------------
-        # Metals
-        # --------------------
-        if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
-            for met in ref.metals:
-                met_info = (
-                    f"\t{met.formula} ({met.subtype}) "
-                    f"atom_site_label={met.atom_site_label}"
+    elif error_case == 4:
+        return "Error in unit cell construction"
+
+    elif error_case == 5:
+        return "Error in list of possible charges received for molecule or ligand"
+
+    elif error_case == 6:
+        return "More than one valid possible charge distribution found"
+
+    elif error_case == 7:
+        return "No valid possible charge distribution found"
+
+    elif error_case == 8:
+        return "Error in Creating Bonds"
+
+    else:
+        return f"Unhandled error case: {error_case}"
+
+
+def get_molecule_error_message(error_case):
+    """
+    Return an error message for a given error case.
+    If error_fname exists, print the message in the file instead.
+    """
+
+    if error_case == 0:
+        return "No errors found"
+
+    elif error_case == 5:
+        return "Error in list of possible charges received for molecule or ligand"
+
+    elif error_case == 6:
+        return "More than one valid possible charge distribution found"
+
+    elif error_case == 7:
+        return "No valid possible charge distribution found"
+
+    elif error_case == 8:
+        return "Error in Creating Bonds"
+
+    else:
+        return f"Unhandled error case: {error_case}"
+
+
+def write_cell_molecules_info(cell, file=None):
+    """
+    Write molecule information within a cell to a file-like object.
+    """
+    if cell.subtype == "reference":
+        cell_type = "Reference"
+        molecule_list = getattr(cell, "refmoleclist", None)
+    elif cell.subtype == "unitcell":
+        cell_type = "Unitcell"
+        molecule_list = getattr(cell, "moleclist", None)
+    else:
+        return
+
+    if molecule_list is None:
+        print(f"\nNo molecules found in the {cell_type} cell.", file=file)
+        return
+
+    print(f"\nMolecules in {cell.subtype}:", file=file)
+
+    for i, mol in enumerate(molecule_list):
+        # Pass the index to keep the output numbered
+        write_molecule_info(mol, file=file, index=i)
+
+
+def write_molecule_info(mol, file=None, index=None):
+    """
+    Writes detailed molecule information to a file-like object or the console.
+    """
+    if mol is None:
+        print("\nNo molecule object.", file=file)
+        return
+
+    # Start header
+    prefix = f"Molecule {index}:" if index is not None else "Molecule:"
+    mol_info_parts = [f"{prefix} {mol.formula}"]
+
+    # Append classification tags
+    if mol.iscomplex:
+        mol_info_parts.append("(TM Complex)")
+    if mol.has_IA_IIA:
+        mol_info_parts.append("(Complex with Alkali or Alkaline metals)")
+    if mol.has_post_transition_metal:
+        mol_info_parts.append("(Complex with Post-Transition metals)")
+    if mol.is_non_complex_molecule:
+        mol_info_parts.append("(Non-complex)")
+
+    # Append properties
+    if mol.totcharge is not None:
+        mol_info_parts.append(f"totcharge={mol.totcharge}")
+    if getattr(mol, "totcharge_cif", None) is not None:
+        mol_info_parts.append(f"totcharge_cif={mol.totcharge_cif}")
+    if getattr(mol, "spin", None) is not None:
+        mol_info_parts.append(f"spin={mol.spin}")
+    if mol.smiles is not None:
+        mol_info_parts.append(f"smiles={mol.smiles}")
+
+    print(" ".join(mol_info_parts), file=file)
+
+    # --------------------
+    # Metals (Coordination Centers)
+    # --------------------
+    if not mol.is_non_complex_molecule and hasattr(mol, "metals"):
+        for met in mol.metals:
+            met_info = f"\t{met.formula} ({met.subtype})"
+
+            labels = getattr(met, "atom_site_labels", None)
+            if labels:
+                met_info += f" atom_site_labels={labels}"
+
+            # Oxidation state
+            if met.charge is not None:
+                met_info += f" metal_OS={met.charge}"
+            elif getattr(met, "possible_cs", None) is not None:
+                met_info += f" metal_possible_OS={met.possible_cs}"
+
+            if getattr(met, "spin", None) is not None:
+                met_info += f" metal_spin={met.spin}"
+
+            print(met_info, file=file)
+
+            # Coordination details
+            if getattr(met, "coord_sphere_formula", None):
+                print(
+                    f"\t|--coord_sphere_formula={met.coord_sphere_formula}", file=file
                 )
 
-                if met.charge is not None:
-                    met_info += f" metal_OS={met.charge}"
-                elif met.possible_cs is not None:
-                    met_info += f" metal_possible_OS={met.possible_cs}"
+            if all(
+                hasattr(met, attr)
+                for attr in ("coord_nr", "coord_geometry", "geom_deviation")
+            ):
+                print(
+                    f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}",
+                    file=file,
+                )
 
-                print(met_info, file=file)
-
-                if met.coord_sphere_formula is not None:
+            # Metal-Metal Bonds
+            if hasattr(met, "metals") and hasattr(met, "coord_nr_with_metal_bonds"):
+                bonded_metals = [m.label for m in met.metals]
+                if bonded_metals:
                     print(
-                        f"\t|--coord_sphere_formula={met.coord_sphere_formula}",
+                        f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} "
+                        f"coord_geometry_with_metal_bonds={getattr(met, 'coord_geometry_with_metal_bonds', 'N/A')} "
+                        f"geom_deviation_with_metal_bonds={getattr(met, 'geom_deviation_with_metal_bonds', 'N/A')}",
                         file=file,
                     )
 
-                if all(
-                    hasattr(met, attr)
-                    for attr in ("coord_nr", "coord_geometry", "geom_deviation")
-                ):
-                    print(
-                        f"\t|--coord_nr={met.coord_nr} "
-                        f"coord_geometry={met.coord_geometry} "
-                        f"geom_deviation={met.geom_deviation}",
-                        file=file,
-                    )
-
-                if all(
-                    hasattr(met, attr)
-                    for attr in (
-                        "coord_nr_with_metal_bonds",
-                        "coord_geometry_with_metal_bonds",
-                        "geom_deviation_with_metal_bonds",
-                        "metals",
-                    )
-                ):
-                    bonded_metals = [m.label for m in met.metals]
-                    if bonded_metals:
-                        print(
-                            f"\t|--bonded metals={bonded_metals} "
-                            f"coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} "
-                            f"coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} "
-                            f"geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}",
-                            file=file,
-                        )
-
-        # --------------------
-        # Ligands
-        # --------------------
-        for lig in ref.ligands:
+    # --------------------
+    # Ligands
+    # --------------------
+    if not mol.is_non_complex_molecule and getattr(mol, "ligands", None):
+        print("", file=file)  # Spacing before ligands
+        for lig in mol.ligands:
             lig_info = f"\t{lig.formula} ({lig.subtype})"
-
             for attr in ("smiles", "denticity", "totcharge"):
-                if hasattr(lig, attr):
-                    lig_info += f" {attr}={getattr(lig, attr)}"
+                val = getattr(lig, attr, None)
+                if val is not None:
+                    lig_info += f" {attr}={val}"
 
-            if lig.possible_cs is not None and lig.totcharge is None:
-                lig_info += (
-                    " lig.possible_cs Exists"
-                    if lig.possible_cs
-                    else " lig.possible_cs Does not exist"
-                )
+            if (
+                getattr(lig, "possible_cs", None) is not None
+                and getattr(lig, "totcharge", None) is None
+            ):
+                status = "Exists" if lig.possible_cs else "Does not exist"
+                lig_info += f" lig.possible_cs {status}"
 
             print(lig_info, file=file)
 
-            if lig.groups:
+            if getattr(lig, "groups", None):
                 for group in lig.groups:
                     group_info = f"\t|--(group) {group.labels}"
-
                     if hasattr(group, "denticity"):
                         group_info += f" denticity={group.denticity}"
-
                     if getattr(group, "is_haptic", False):
                         group_info += f" haptic_type={group.haptic_type}"
 
-                    if group.metals:
-                        group_info += (
-                            f" connected_metals="
-                            f"{[m.atom_site_label for m in group.metals]}"
-                        )
-
+                    if getattr(group, "metals", None):
+                        labels = [
+                            getattr(m, "atom_site_label", None) or m.label
+                            for m in group.metals
+                        ]
+                        group_info += f" connected_metals={labels}"
                     print(group_info, file=file)
 
 
-######################################################
 def write_unique_species(cell, file):
     """
     Write unique species information to a file-like object.
@@ -393,365 +445,94 @@ def write_unique_species(cell, file):
         print("\t" + " ".join(parts), file=file)
 
 
-######################################################
-def print_refmoleclist(cell):
-    for i, ref in enumerate(cell.refmoleclist):
-        ref_info = f"Reference Molecule {i}: {ref.formula} "
-        if ref.iscomplex:
-            ref_info += "(TM Complex) "
-        if ref.has_IA_IIA:
-            ref_info += "(Complex with Alkali or Alkaline metals) "
-        if ref.has_post_transition_metal:
-            ref_info += "(Complex with Post-Transition metals) "
-        if (
-            not ref.iscomplex
-            and not ref.has_IA_IIA
-            and not ref.has_post_transition_metal
-        ):
-            ref_info += "(Non-complex)"
-        ref_info += "\n"
-        if ref.totcharge is not None:
-            ref_info += f"totcharge={ref.totcharge} "
-        if ref.totcharge_cif is not None:
-            ref_info += f"totcharge_cif={ref.totcharge_cif} "
-        if ref.smiles is not None:
-            ref_info += f"smiles={ref.smiles}"
-        print(ref_info)
-
-        if ref.iscomplex or ref.has_IA_IIA or ref.has_post_transition_metal:
-            for met in ref.metals:
-                met_info = f"\t{met.formula} ({met.subtype}) atom_site_label={met.atom_site_label}"
-                if met.charge is not None:
-                    met_info += f" metal_OS={met.charge}"
-                elif met.possible_cs is not None:
-                    met_info += f" metal_possible_OS={met.possible_cs}"
-                print(met_info)
-
-                if met.coord_sphere_formula is not None:
-                    print(
-                        f"\t|--Coordination information coord_sphere_formula={met.coord_sphere_formula}"
-                    )
-
-                if all(
-                    hasattr(met, attr)
-                    for attr in ["coord_nr", "coord_geometry", "geom_deviation"]
-                ):
-                    print(
-                        f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}"
-                    )
-
-                if all(
-                    hasattr(met, attr)
-                    for attr in [
-                        "coord_nr_with_metal_bonds",
-                        "coord_geometry_with_metal_bonds",
-                        "geom_deviation_with_metal_bonds",
-                        "metals",
-                    ]
-                ):
-                    bonded_metals = [m.label for m in met.metals]
-                    if len(bonded_metals) > 0:
-                        print(
-                            f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}"
-                        )
-
-            for lig in ref.ligands:
-                lig_info = f"\t{lig.formula} ({lig.subtype})"
-                for attr in ["smiles", "denticity", "totcharge"]:
-                    if hasattr(lig, attr):
-                        lig_info += f" {attr}={getattr(lig, attr)}"
-
-                if lig.possible_cs is not None and lig.totcharge is None:
-                    if len(lig.possible_cs) > 0:
-                        lig_info += " lig.possible_cs Exists"
-                    else:
-                        lig_info += " lig.possible_cs Does not exist"
-
-                print(lig_info)
-                if lig.groups is not None:
-                    for group in lig.groups:
-                        group_info = f"\t|--(group) {group.labels}"
-                        for attr in ["denticity"]:
-                            if hasattr(group, attr):
-                                group_info += f" {attr}={getattr(group, attr)}"
-                        for attr in ["is_haptic", "haptic_type"]:
-                            if hasattr(group, attr):
-                                if group.is_haptic:
-                                    group_info += f" {attr}={getattr(group, attr)}"
-                        if group.metals is not None:
-                            group_info += f" connected_metals={[m.atom_site_label for m in group.metals]} "
-                        # if group.closest_metal is not None:
-                        #     group_info += f" closest_metal.label={group.closest_metal.label}"
-                        print(group_info)
-
-
-######################################################
-def print_unique_species(cell):
-    unique_species = getattr(cell, "unique_species", None)
-    if not unique_species:
-        print("\nNo unique species found in the cell object.")
-        return
-
-    print(f"\nUnique Species in {cell.subtype}:")
-    for specie in unique_species:
-        parts = [f"{specie.unique_index=}", f"{specie.formula}", f"({specie.subtype})"]
-
-        if specie.subtype == "metal":
-            parts.append(f"{specie.coord_sphere_formula=}")
-            if getattr(specie, "charge", None) is not None:
-                parts.append(f"{specie.charge=}")
-        elif specie.subtype == "ligand":
-            parts.append(f"{specie.denticity=}")
-            if specie.is_haptic:
-                parts.append(f"{specie.haptic_type=}")
-            if getattr(specie, "smiles", None) is not None:
-                parts.append(f"{specie.smiles=}")
-            if getattr(specie, "totcharge", None) is not None:
-                parts.append(f"{specie.totcharge=}")
-            if getattr(specie, "groups", None) is not None:
-                parts.append(f"groups={[group.formula for group in specie.groups]}")
-        else:
-            if getattr(specie, "smiles", None) is not None:
-                parts.append(f"{specie.smiles=}")
-            if getattr(specie, "totcharge", None) is not None:
-                parts.append(f"{specie.totcharge=}")
-
-        print("\t" + " ".join(parts))
-
-
-######################################################
-def print_possible_charges(cell, debug=0):
+def write_possible_charges(cell, file=None):
     """
-    Print the possible charges for each species in the cell object.
+    Write the possible charges for each species in the cell object.
+
+    Args:
+        cell: Cell object containing species_list.
+        file: File-like object (e.g., opened file). Defaults to None (console).
     """
     if cell.species_list is not None:
-        print(f"\nPossible charges of species in {cell.subtype}:")
+        print(f"\nPossible charges of species in {cell.subtype}:", file=file)
+
         for specie in cell.species_list:
-            if specie.possible_cs is not None:
+            # Base species information
+            info = f"\tunique_index={specie.unique_index} {specie.formula} ({specie.subtype})"
+
+            # Add coordination sphere for metals
+            if specie.subtype == "metal":
+                info += f" coord_sphere_formula={getattr(specie, 'coord_sphere_formula', 'N/A')}"
+
+            # Add charge state information
+            if getattr(specie, "possible_cs", None) is not None:
                 if specie.subtype == "metal":
-                    print(
-                        f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} {specie.possible_cs=}"
-                    )
+                    info += f" possible_cs={specie.possible_cs}"
                 else:
-                    print(
-                        f"\t{specie.unique_index=} {specie.formula} ({specie.subtype})\n\t{specie.possible_cs=}"
-                    )
+                    # Non-metals use a new line for charge states as per original logic
+                    info += f"\n\tpossible_cs={specie.possible_cs}"
             else:
-                if specie.subtype == "metal":
-                    print(
-                        f"\t{specie.unique_index=} {specie.formula} ({specie.subtype}) {specie.coord_sphere_formula=} No possible cs"
-                    )
-                else:
-                    print(
-                        f"\t{specie.unique_index=} {specie.formula}, {specie.subtype}  No possible cs"
-                    )  # [p.subtype for p in specie.parents])
+                info += " No possible cs"
+
+            print(info, file=file)
     else:
-        print("\nNo species list found in the cell object.")
-    print("")
+        print("\nNo species list found in the cell object.", file=file)
+    print("", file=file)
 
 
-######################################################
-def print_moleclist(cell):
-    if cell.moleclist is not None:
-        print(f"\nMolecules in {cell.subtype}:")
-        for i, mol in enumerate(cell.moleclist):
-            if mol.totcharge is not None:
-                if mol.iscomplex:
-                    print(
-                        f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (TM complex)"
-                    )
-                elif mol.has_IA_IIA:
-                    print(
-                        f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex with Alkali or Alkaline metals)"
-                    )
-                elif mol.has_post_transition_metal:
-                    print(
-                        f"Unitcell Molecule {i}: {mol.formula} {mol.totcharge=} (Complex with Post-Transition metals)"
-                    )
-                else:
-                    if mol.smiles is not None:
-                        print(
-                            f"Unitcell Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex) {mol.smiles=}"
-                        )
-                    else:
-                        print(
-                            f"Unitcell Molecule {i} : {mol.formula} {mol.totcharge=} (Non-complex)"
-                        )
-            else:
-                if mol.iscomplex:
-                    print(f"Unitcell Molecule {i}: {mol.formula} (TM complex)")
-                elif mol.has_IA_IIA:
-                    print(
-                        f"Unitcell Molecule {i}: {mol.formula} (Complex with Alkali or Alkaline metals)"
-                    )
-                elif mol.has_post_transition_metal:
-                    print(
-                        f"Unitcell Molecule {i}: {mol.formula} (Complex with Post-Transition metals)"
-                    )
-                else:
-                    print(f"Unitcell Molecule {i} : {mol.formula} (Non-complex)")
+def write_possible_and_selected_cs(newcell, refcell, file=None):
+    """
+    Write possible charge states and selected charge state for unique species.
 
-            if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
-                for met in mol.metals:
-                    met_info = f"\t{met.formula} ({met.subtype}) atom_site_label={met.atom_site_label}"
+    Args:
+        newcell: Unit cell object.
+        refcell: Reference cell object.
+        file: File-like object. Defaults to None.
+    """
 
-                    if met.charge is not None:
-                        met_info += f" metal_OS={met.charge}"
-                    elif met.possible_cs is not None:
-                        met_info += f" metal_possible_OS={met.possible_cs}"
-                    print(met_info)
+    print(
+        "\nPossible charge states and charge of selected charge state for unique species:",
+        file=file,
+    )
 
-                    for attr in ["coord_sphere_formula"]:
-                        if hasattr(met, attr):
-                            print(
-                                f"\t|--Coordination information {attr}={getattr(met, attr)}"
-                            )
+    # Check unique species and their selected charge states
+    for idx, (specie, select) in enumerate(
+        zip(refcell.unique_species, refcell.selected_cs)
+    ):
+        print(
+            f"Unique unique_index={specie.unique_index} formula={specie.formula}",
+            file=file,
+        )
+        print(
+            f"charge of selected charge state={select}\npossible_cs={specie.possible_cs}\n",
+            file=file,
+        )
 
-                    if all(
-                        hasattr(met, attr)
-                        for attr in ["coord_nr", "coord_geometry", "geom_deviation"]
-                    ):
-                        print(
-                            f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}"
-                        )
+    # Reference cell species vs unique index mapping
+    print("Species list in the reference and their unique indices:", file=file)
+    for specie, idx in zip(refcell.species_list, refcell.unique_indices):
+        print(
+            f"\tformula={specie.formula} unique_index={specie.unique_index}", file=file
+        )
+        if idx != specie.unique_index:
+            print(
+                f"\tWARNING: formula={specie.formula} unique_index={specie.unique_index} "
+                f"differs from refcell unique indices {idx=}",
+                file=file,
+            )
 
-                    if all(
-                        hasattr(met, attr)
-                        for attr in [
-                            "coord_nr_with_metal_bonds",
-                            "coord_geometry_with_metal_bonds",
-                            "geom_deviation_with_metal_bonds",
-                            "metals",
-                        ]
-                    ):
-                        bonded_metals = [m.label for m in met.metals]
-                        if len(bonded_metals) > 0:
-                            print(
-                                f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}"
-                            )
-                print("")
-
-                for lig in mol.ligands:
-                    lig_info = f"\t{lig.formula} ({lig.subtype})"
-                    for attr in ["smiles", "denticity", "totcharge"]:
-                        if hasattr(lig, attr):
-                            lig_info += f" {attr}={getattr(lig, attr)}"
-                    print(lig_info)
-                    if lig.groups is not None:
-                        for group in lig.groups:
-                            group_info = f"\t|--(group){group.labels}"
-                            for attr in ["denticity"]:
-                                if hasattr(group, attr):
-                                    group_info += f" {attr}={getattr(group, attr)}"
-                            for attr in ["is_haptic", "haptic_type"]:
-                                if hasattr(group, attr):
-                                    if group.is_haptic:
-                                        group_info += f" {attr}={getattr(group, attr)}"
-                            if group.metals is not None:
-                                group_info += f" connected_metals={[m.atom_site_label for m in group.metals]}"
-                            # if group.closest_metal is not None:
-                            #     group_info += f" closest_metal.label={group.closest_metal.label}"
-                            print(group_info)
-
-                            # Optional: print group-metals connectivity
-                            # for met in group.metals:
-                            #     print(f"\t|--(group.metals){met.label} {met.mconnec=}")
-    else:
-        print("\nNo molecules found in the cell object.")
-
-
-######################################################
-def print_molecule(mol):
-    if mol is not None:
-        print("\nMolecule:")
-        if mol.totcharge is not None:
-            if mol.iscomplex:
-                print(f"{mol.formula} {mol.totcharge=} (TM complex)")
-            elif mol.has_IA_IIA:
-                print(
-                    f"{mol.formula} {mol.totcharge=} (Complex with Alkali or Alkaline metals)"
-                )
-            elif mol.has_post_transition_metal:
-                print(
-                    f"{mol.formula} {mol.totcharge=} (Complex with Post-Transition metals)"
-                )
-            else:
-                if mol.smiles is not None:
-                    print(f"{mol.formula} {mol.totcharge=} (Non-complex) {mol.smiles=}")
-                else:
-                    print(f"{mol.formula} {mol.totcharge=} (Non-complex)")
-        else:
-            if mol.iscomplex:
-                print(f"{mol.formula} (TM complex)")
-            elif mol.has_IA_IIA:
-                print(f"{mol.formula} (Complex with Alkali or Alkaline metals)")
-            elif mol.has_post_transition_metal:
-                print(f"{mol.formula} (Complex with Post-Transition metals)")
-            else:
-                print(f"{mol.formula} (Non-complex)")
-
-        if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
-            for met in mol.metals:
-                met_info = f"\t{met.formula} ({met.subtype}) atom_site_label={met.atom_site_label}"
-
-                if met.charge is not None:
-                    met_info += f" metal_OS={met.charge}"
-                elif met.possible_cs is not None:
-                    met_info += f" metal_possible_OS={met.possible_cs}"
-                print(met_info)
-
-                for attr in ["coord_sphere_formula"]:
-                    if hasattr(met, attr):
-                        print(
-                            f"\t|--Coordination information {attr}={getattr(met, attr)}"
-                        )
-
-                if all(
-                    hasattr(met, attr)
-                    for attr in ["coord_nr", "coord_geometry", "geom_deviation"]
-                ):
-                    print(
-                        f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}"
-                    )
-
-                if all(
-                    hasattr(met, attr)
-                    for attr in [
-                        "coord_nr_with_metal_bonds",
-                        "coord_geometry_with_metal_bonds",
-                        "geom_deviation_with_metal_bonds",
-                        "metals",
-                    ]
-                ):
-                    bonded_metals = [m.label for m in met.metals]
-                    if len(bonded_metals) > 0:
-                        print(
-                            f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} coord_geometry_with_metal_bonds={met.coord_geometry_with_metal_bonds} geom_deviation_with_metal_bonds={met.geom_deviation_with_metal_bonds}"
-                        )
-            print("")
-
-            for lig in mol.ligands:
-                lig_info = f"\t{lig.formula} ({lig.subtype})"
-                for attr in ["smiles", "denticity", "totcharge"]:
-                    if hasattr(lig, attr):
-                        lig_info += f" {attr}={getattr(lig, attr)}"
-                print(lig_info)
-                if lig.groups is not None:
-                    for group in lig.groups:
-                        group_info = f"\t|--(group){group.labels}"
-                        for attr in ["denticity"]:
-                            if hasattr(group, attr):
-                                group_info += f" {attr}={getattr(group, attr)}"
-                        for attr in ["is_haptic", "haptic_type"]:
-                            if hasattr(group, attr):
-                                if group.is_haptic:
-                                    group_info += f" {attr}={getattr(group, attr)}"
-                        if group.metals is not None:
-                            group_info += f" connected_metals={[m.atom_site_label for m in group.metals]}"
-
-                        print(group_info)
-    else:
-        print("\nNo molecule object.")
+    # Unit cell species vs unique index mapping
+    print("Species list in the unit cell and their unique indices:", file=file)
+    for specie, idx in zip(newcell.species_list, newcell.unique_indices):
+        print(
+            f"\tformula={specie.formula} unique_index={specie.unique_index}", file=file
+        )
+        if idx != specie.unique_index:
+            print(
+                f"\tWARNING: formula={specie.formula} unique_index={specie.unique_index} "
+                f"differs from newcell unique indices {idx=}",
+                file=file,
+            )
 
 
 def handle_error(case: int):
@@ -778,27 +559,59 @@ def handle_error(case: int):
         logger.info("No valid possible charge distribution found")
     if case == 8:
         logger.info("Error while creating bonds for molecule or ligand")
-
     if case == 0:
         logger.info("No errors Found")
-    # sys.exit(1)
 
 
-def setup_logger(log_file: str | None = None):
-    logger = logging.getLogger(__name__)
+def log_charge_state_details(newcell, refcell) -> None:
+    """
+    Logs the available charge candidates for unique species and validates
+    consistency between species objects and the unique_indices mapping.
+    """
 
-    logger.setLevel(logging.INFO)
-    logger.propagate = False
+    logger.debug("#### Charge State & Index Validation ####")
 
-    formatter = logging.Formatter("[%(levelname)s] %(name)s: %(message)s")
+    # --- 1. Log Charge Options for Unique Species ---
+    if hasattr(refcell, "selected_cs") and refcell.selected_cs:
+        for specie, options in zip(refcell.unique_species, refcell.selected_cs):
+            logger.debug(
+                "Unique Specie %s (Formula: %s):", specie.unique_index, specie.formula
+            )
+            logger.debug("  > Extracted Charge Options: %s", options)
+            # logger.debug("  > Full Possible States:     %s", specie.possible_cs)
+    else:
+        logger.warning("RefCell has no 'selected_cs' populated to display.")
 
-    stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
+    # --- 2. Validate Indices in Reference and Unit Cells ---
+    _validate_species_indices(refcell, "Reference Cell")
+    _validate_species_indices(newcell, "Unit Cell")
 
-    if log_file is not None:
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
 
-    return logger
+def _validate_species_indices(cell, label: str) -> None:
+    """Helper to check consistency between species objects and cell mapping lists."""
+    logger.debug("--- Validating %s Indices ---", label)
+
+    if not hasattr(cell, "species_list") or not hasattr(cell, "unique_indices"):
+        logger.warning(
+            "Skipping validation: %s missing species list or indices.", label
+        )
+        return
+
+    for i, (specie, mapped_idx) in enumerate(
+        zip(cell.species_list, cell.unique_indices)
+    ):
+        # Check consistency: The index stored in the list must match the specie's internal ID
+        if mapped_idx != specie.unique_index:
+            logger.warning(
+                "MISMATCH at list index %d: Species %s claims UniqueID %s, "
+                "but mapping list has %s.",
+                i,
+                specie.formula,
+                specie.unique_index,
+                mapped_idx,
+            )
+        else:
+            # Verbose logging only if needed
+            logger.debug(
+                "\t[OK] %s (UniqueID: %s)", specie.formula, specie.unique_index
+            )
