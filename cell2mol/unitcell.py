@@ -2,33 +2,29 @@
 
 import os
 import logging
+import copy
 from ase.io import read
+from cell2mol.utils import config
 from cell2mol.args import parsing_arguments
-from cell2mol.refcell import process_refcell
-from cell2mol.unitcell_reconstruction import reconstruct_unitcell
-
-# from cell2mol.final_c2m_module import cell2mol_mode
+from cell2mol.reference import process_reference
+from cell2mol.construction import construct_unitcell
+from cell2mol.charge.charge_balancer import balance_unitcell_charge
 from cell2mol.read_cif import get_cell_parameters
 from cell2mol.write_results import (
-    write_refmoleclist,
+    write_cell_molecules_info,
     write_unique_species,
+    write_possible_charges,
     get_reference_error_message,
+    get_unitcell_error_message,
 )
-import copy
-from cell2mol.utils import config
 
 logger = logging.getLogger(__name__)
-
-# Constants
-VERSION = "2.0"
-COV_FACTOR = 1.0
-METAL_FACTOR = 1.0
 
 
 # -----------------------------------------------------------------------------
 # Core function
 # -----------------------------------------------------------------------------
-def process_unitcell(input_path, name, current_dir):
+def interpret_unitcell(input_path, name, current_dir):
     """
     Process the molecules from a CIF file and generate a unit cell object.
     Args:
@@ -48,43 +44,41 @@ def process_unitcell(input_path, name, current_dir):
 
     # Process reference cell
     logger.info("Starting the cell2mol process for reference (Wyckoff sites)")
-    cells = process_refcell(input_path, name, current_dir)
+    cells = process_reference(input_path, name, current_dir)
     refcell = cells.reference
+    unitcell = cells.unitcell
 
     if refcell.error_case != 0:
         logging.error("Error encountered while processing the reference cell")
         return cells
-    if (
-        refcell.disagree_with_cif_formula is not None
-        and refcell.disagree_with_cif_formula
-    ):
-        logger.info("Discrepancies found between refcell and CIF.")
-        logger.info("This will cause errors in the charge prediction!")
 
-    unitcell = cells.unitcell
-    unitcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
-    unitcell.has_isolated_H = refcell.has_isolated_H
-    unitcell.has_missing_H = refcell.has_missing_H
-    unitcell.error_get_poscharges = refcell.error_get_poscharges
+    # Process unit cell
     logger.info("Starting the cell2mol process for the unit cell")
 
-    if refcell.error_case == 0:
-        # Step-by-step molecule reconstruction and error assessment
-        unitcell = reconstruct_unitcell(refcell, unitcell, sym_ops)
-        unitcell.assess_errors(mode="reconstruction")
-        logger.info(f"Unitcell error case: {unitcell.error_case}")
+    # Unit cell construction and error assessment
+    unitcell = construct_unitcell(refcell, unitcell, sym_ops)
+    unitcell.assess_errors(mode="reconstruction")
+    logger.info(f"Unitcell error case: {unitcell.error_case}")
 
-        # if unitcell.error_case == 0:
-        #     mode = "charge_assignment"
-        #     cell2mol_mode(unitcell, refcell, sym_ops, mode, debug)
-        #     unitcell.assess_errors(mode=mode)
-    else:
-        logger.info(
-            f"Error occurred in processing refcell: error case {refcell.error_case}"
-        )
+    # Charge assignment
+    refcell.get_selected_cs()
+    refcell, unitcell = balance_unitcell_charge(refcell, unitcell)
+    refcell.assign_charges()
+
+    unitcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
+    unitcell.unique_species = copy.deepcopy(refcell.unique_species)
+
+    unitcell.assign_charges()
+    unitcell.check_charge_neutrality()
+    unitcell.assess_errors(mode="charge_assignment")
+    logger.info(f"Unitcell error case after charge assignment: {unitcell.error_case}")
+
+    refcell.assign_spin()
+    unitcell.assign_spin()
 
     refcell.save(ref_cell_fname)
     unitcell.save(cell_fname)
+
     cells.reference = refcell
     cells.unitcell = unitcell
 
@@ -95,9 +89,17 @@ def process_unitcell(input_path, name, current_dir):
     summary_fname = os.path.join(current_dir, "reference_summary.out")
     with open(summary_fname, "w") as f:
         print(name, file=f)
-        write_refmoleclist(refcell, file=f)
+        write_cell_molecules_info(refcell, file=f)
         write_unique_species(refcell, file=f)
+        write_possible_charges(refcell, file=f)
         print(get_reference_error_message(refcell.error_case), file=f)
+
+    # Summary of unit cell
+    summary_unitcell_fname = os.path.join(current_dir, "unitcell_summary.out")
+    with open(summary_unitcell_fname, "w") as f:
+        print(name, file=f)
+        write_cell_molecules_info(unitcell, file=f)
+        print(get_unitcell_error_message(unitcell.error_case), file=f)
 
     return cells
 
@@ -118,7 +120,7 @@ def _main():
     if ext != ".cif":
         raise ValueError("Invalid input file format. Only .cif files are supported.")
 
-    process_unitcell(
+    interpret_unitcell(
         input_path=input_path,
         name=name,
         current_dir=os.getcwd(),
