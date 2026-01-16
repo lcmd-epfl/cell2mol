@@ -189,8 +189,6 @@ def extract_from_list(entrylist: list, old_array: list, dimension: int = 2) -> l
         entrylist (list): indices to extract
         old_array (list): source list
         dimension (int): 2 for 2D extraction, 1 for 1D extraction
-        debug (int): debug verbosity level
-
     Returns:
         list: extracted sub list
     """
@@ -205,6 +203,28 @@ def extract_from_list(entrylist: list, old_array: list, dimension: int = 2) -> l
         for idx, val in enumerate(entrylist):
             new_array[idx] = old_array[val]
     return list(new_array)
+
+
+def get_moiety_indices_from_labels(atom_site_labels, moiety_list):
+    flat_list = [atom for moiety in moiety_list for atom in moiety]
+
+    atom_site_labels = np.array(atom_site_labels)  # ensure it's a numpy array
+    moiety_indices = [
+        np.where(np.isin(atom_site_labels, moiety))[0].tolist()
+        for moiety in moiety_list
+    ]
+    for i, atom in enumerate(atom_site_labels):
+        if atom not in flat_list:
+            moiety_indices.append([i])
+
+    return moiety_indices
+
+
+def reorder_element(lst: list, old_idx: int, new_idx: int) -> list:
+    """Moves an element from old_idx to new_idx and returns a new list."""
+    new_lst = list(lst)
+    new_lst.insert(new_idx, new_lst.pop(old_idx))
+    return new_lst
 
 
 def additem(item, vector):
@@ -293,8 +313,15 @@ def get_angle(vec1, vec2) -> float:
     factor = dotprod / (norm1 * norm2)
     angle = np.arccos(factor)
     if np.isnan(angle):
-        print("GET_ANGLE nan Problem", norm1, norm2, dotprod, factor, angle)
-        print("GET_ANGLE nan Problem, vecs:", vec1, vec2)
+        logger.error(
+            "GET_ANGLE nan Problem %s %s %s %s %s",
+            norm1,
+            norm2,
+            dotprod,
+            factor,
+            angle,
+        )
+        logger.error("GET_ANGLE nan Problem, vecs: %s %s", vec1, vec2)
     return float(angle)
 
 
