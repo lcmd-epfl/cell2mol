@@ -5,9 +5,9 @@ import logging
 from cell2mol.utils import config
 
 from cell2mol.args import parsing_arguments
-from cell2mol.refcell import process_refcell
-from cell2mol.unitcell import process_unitcell
-from cell2mol.molecule import process_molecule
+from cell2mol.reference import process_reference
+from cell2mol.unitcell import interpret_unitcell
+from cell2mol.process_xyz import interpret_molecule
 from cell2mol.read_cif import prefilter_cif
 from cell2mol.write_results import exit_with_error_input, exit_with_error_exception
 import warnings
@@ -19,7 +19,6 @@ warnings.filterwarnings(
 )
 
 logger = logging.getLogger(__name__)
-VERSION = "2.0"
 
 
 def main():
@@ -78,7 +77,7 @@ def handle_cif_file(
     try:
         if system_type == "reference":
             logger.info("Processing reference (Wyckoff sites)")
-            process_refcell(
+            process_reference(
                 input_path=input_path,
                 name=name,
                 current_dir=current_dir,
@@ -86,7 +85,7 @@ def handle_cif_file(
 
         elif system_type == "unitcell":
             logger.info("Processing unit cell")
-            process_unitcell(
+            interpret_unitcell(
                 input_path=input_path,
                 name=name,
                 current_dir=current_dir,
@@ -112,7 +111,7 @@ def handle_xyz_file(
     logger.info("Processing XYZ file: %s", input_path)
     try:
         if system_type == "molecule":
-            process_molecule(
+            interpret_molecule(
                 input_path=input_path,
                 name=name,
                 input_charge=input_charge,
