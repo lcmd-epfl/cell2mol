@@ -396,7 +396,7 @@ def correct_valence_violation(adjmat, madjmat, labels, pos, radii):
         warning (bool): True if any valence violations were found and corrected,
             False otherwise.
     """
-    from cell2mol.xyz2mol import atomic_valence
+    from cell2mol.charge.xyz2mol import atomic_valence
 
     natoms = len(labels)
     warning = False
@@ -650,6 +650,8 @@ def split_species(
             if atomlistperm[i] == b + 1:
                 atlist.append(indices[i])
         blocklist.append(atlist)
+    if use_bond_info:
+        return blocklist
 
     if apply_graph:
         new_blocklist = apply_graph_to_blocklist(
@@ -786,9 +788,9 @@ def apply_graph_to_blocklist(
     """Split a list of atoms into blocks of connected atoms."""
 
     new_blocklist = []
-
+    logger.debug("Applying graph analysis to blocklist: %s", blocklist)
     for b in blocklist:
-        logger.debug("block=%s", b)
+        # logger.debug("block=%s", b)
 
         gr_labels = extract_from_list(b, conn_labels, dimension=1)
         gr_coord = extract_from_list(b, conn_coord, dimension=1)
@@ -904,6 +906,8 @@ def log_blocklist_diff(blocklist, new_blocklist):
 def is_single_ring(labels, coord):
     """Check if the group is a ring"""
     adjmat = build_adjacency(labels, coord)
+    if adjmat is None:
+        return False
     G = nx.from_numpy_array(np.array(adjmat))
 
     # Check if the graph is connected
@@ -945,8 +949,8 @@ def add_atom(
 
     newlab.append(str(element))  # one atom will be added
 
-    logger.debug("number of ligand atoms=%d", len(ligand.atoms))
-    logger.debug("target site=%d (%s)", site, ligand.atoms[site].label)
+    # logger.debug("number of ligand atoms=%d", len(ligand.atoms))
+    # logger.debug("target site=%d (%s)", site, ligand.atoms[site].label)
 
     for idx, atom in enumerate(ligand.atoms):
         if idx != site:
@@ -956,7 +960,7 @@ def add_atom(
         tgt = atom.get_closest_metal()
         metal_idx = tgt.get_parent_index("molecule")
 
-        logger.debug("Evaluating atom at %s with closest metal at %s", apos, tgt.coord)
+        # logger.debug("Evaluating atom at %s with closest metal at %s", apos, tgt.coord)
 
         idealdist = atom.radii + elemdatabase.CovalentRadius3[element]
         added_coords = point_along_vector(apos, tgt.coord, idealdist)
@@ -971,7 +975,7 @@ def add_atom(
         )
 
         tmpconnec = tmpconmat.sum(axis=1)
-        logger.debug("tmpconnec at added position=%d", int(tmpconnec[posadded]))
+        # logger.debug("tmpconnec at added position=%d", int(tmpconnec[posadded]))
 
         # newlab_with_metal = newlab + [tgt.label]
         # newcoord_with_metal = newcoord + [tgt.coord]
@@ -989,12 +993,12 @@ def add_atom(
         # Case 2: acceptable connectivity
         elif tmpconnec[posadded] <= 1:
             isadded = True
-            logger.debug(
-                "Chosen metal index %d. %s added at site %d",
-                metal_idx,
-                element,
-                site,
-            )
+            # logger.debug(
+            #     "Chosen metal index %d. %s added at site %d",
+            #     metal_idx,
+            #     element,
+            #     site,
+            # )
 
         # Case 3: excessive connectivity but some atoms were removed
         elif (
@@ -1012,16 +1016,16 @@ def add_atom(
 
             remaining = list(connected - removed)
 
-            logger.debug("remaining connections after removal=%s", remaining)
+            # logger.debug("remaining connections after removal=%s", remaining)
 
             if len(remaining) <= 1:
                 isadded = True
-                logger.debug(
-                    "%s added at site %d after removal of %s",
-                    element,
-                    site,
-                    removed_idx,
-                )
+                # logger.debug(
+                #     "%s added at site %d after removal of %s",
+                #     element,
+                #     site,
+                #     removed_idx,
+                # )
             else:
                 logger.info(
                     "%s reset at site %d due to connectivity=%d",
