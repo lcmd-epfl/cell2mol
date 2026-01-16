@@ -83,7 +83,7 @@ def interpret_unitcell(input_path, name, current_dir):
     cells.unitcell = unitcell
 
     cells.save(os.path.join(current_dir, f"Cells_{name}.json"), format="json")
-    # cells.save(os.path.join(current_dir, f"Cells_{name}.cell"), format="pickle")
+    cells.save(os.path.join(current_dir, f"Cells_{name}.cell"), format="pickle")
 
     # Summary
     summary_fname = os.path.join(current_dir, "reference_summary.out")
