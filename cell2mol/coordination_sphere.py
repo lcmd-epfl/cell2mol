@@ -441,6 +441,10 @@ def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = No
                             atom.label,
                             ligand_idx,
                         )
+                        conn_idx.append(idx)
+                        final_ligand_indices.append(atom.get_parent_index("ligand"))
+                        good_atoms.append(atom)
+                        conn_idx_by_metal[jdx].append(idx)
                     else:
                         isadded, newlab, newcoord = add_atom(
                             lig.labels,
@@ -504,6 +508,10 @@ def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = No
     for k, v in final_ligand_indices_by_metal.items():
         grouped[tuple(v)].append(k)
     group_metals_indices = [v for v in grouped.values()]
+    logger.debug("Final group: %s", [a.label for a in group.atoms])
+    logger.debug("Final group indices: %s", final_group_indices)
+    logger.debug("Final ligand indices by metal: %s", final_ligand_indices_by_metal)
+    logger.debug("Group metals indices: %s", group_metals_indices)
 
     return (
         group,
@@ -561,6 +569,8 @@ def handle_haptic_coordination(group: object, use_bond_info: bool | None = None)
                         met.atom_site_label,
                         jdx,
                     )
+                conn_idx.append(idx)
+                conn_idx_by_metal[jdx].append(idx)
 
     conn_idx = sorted(list(set(conn_idx)))
     split_groups = []
