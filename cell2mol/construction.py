@@ -13,21 +13,17 @@ logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 
-def reconstruct_unitcell(refcell, unitcell, sym_ops):
+def construct_unitcell(refcell, unitcell, sym_ops):
     """
-    Reconstruct a unit cell based on a reference cell and symmetry operations.
+    Construct a unit cell based on a reference cell and symmetry operations.
 
     Args:
         refcell (object):
             Reference cell containing reference molecules.
         unitcell (object):
-            Unit cell to be reconstructed.
+            Unit cell to be constructed.
         sym_ops (tuple):
             Symmetry operations (rotations, translations).
-
-    Returns:
-        list:
-            List of all reconstructed molecules.
     """
     refmoleclist = refcell.refmoleclist
     sym_atoms_list = apply_symmetry_operations(refcell, sym_ops)
@@ -64,7 +60,7 @@ def reconstruct_unitcell(refcell, unitcell, sym_ops):
         found_atom_indices,
         remaining_fragments_by_reference,
     ):
-        generate_unitcell_molecules(refcell, unitcell, all_molecules)
+        generate_unitcell_molecules(unitcell, refcell, all_molecules)
         assign_unitcell_species(unitcell, refcell.species_list)
         return unitcell
 
@@ -486,7 +482,7 @@ def is_reconstruction_complete(
 # of the unit cell, assign unique indices and species list
 # ===============================================================
 def generate_unitcell_molecules(
-    refcell, unitcell, all_molecules, use_bond_info: bool | None = None
+    unitcell, refcell, all_molecules, use_bond_info: bool | None = None
 ):
     """
     Build the molecular list of a reconstructed unit cell
