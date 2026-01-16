@@ -1,17 +1,19 @@
 import numpy as np
 import pickle
+import joblib
 import os
 from cell2mol import __file__
 from cell2mol.coordination_sphere import shape_structure_references_simplified
 from cell2mol.elementdata import ElementData
+import logging
 
+logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 
-#######################################################
-def predict_ox_state(metal: object, debug: int = 0) -> None:
+def predict_ox_state(metal: object) -> None:
     model = ""
-    feature = generate_feature_vector(metal, target_prop="m_ox", debug=debug)
+    feature = generate_feature_vector(metal, target_prop="m_ox")
     path_rf = os.path.join(os.path.abspath(os.path.dirname(__file__)), model)
     ramdom_forest = pickle.load(open(path_rf, "rb"))
     predictions = ramdom_forest.predict(feature)
@@ -19,8 +21,7 @@ def predict_ox_state(metal: object, debug: int = 0) -> None:
     return m_ox_rf
 
 
-#######################################################
-def assign_spin_metal(metal: object, debug: int = 0) -> None:
+def assign_spin_metal(metal: object) -> None:
     """Assigns spin multiplicity of the transition metal."""
     valence_elec = metal.get_valence_elec(metal.charge)
     period = elemdatabase.elementperiod[metal.label]
@@ -37,27 +38,36 @@ def assign_spin_metal(metal: object, debug: int = 0) -> None:
         ):
             if metal.coord_geometry is not None and metal.coord_geometry != "Undefined":
                 # Predict spin multiplicity of metal based on Random Forest model
-                feature = generate_feature_vector(
-                    metal, target_prop="spin", debug=debug
-                )
+                feature = generate_feature_vector(metal, target_prop="spin")
+                # path_rf = os.path.join(
+                #     os.path.dirname(os.path.abspath(__file__)),
+                #     "models",
+                #     "TM-GSspin_RandomForest.pkl",
+                # )
+                # ramdom_forest = pickle.load(open(path_rf, "rb"))
                 path_rf = os.path.join(
-                    os.path.abspath(os.path.dirname(__file__)), "total_spin_3131.pkl"
+                    os.path.dirname(os.path.abspath(__file__)),
+                    "models",
+                    "TM-GSspinPlus_RandomForest.joblib",
                 )
-                ramdom_forest = pickle.load(open(path_rf, "rb"))
+                ramdom_forest = joblib.load(path_rf)
                 predictions = ramdom_forest.predict(feature)
                 spin_rf = predictions[0]
-                print(
-                    f"ASSIGN_SPIN_METAL: Spin multiplicity of the metal {metal.label} is predicted as {spin_rf} using Random Forest model"
+                logger.info(
+                    "ASSIGN_SPIN_METAL: Spin multiplicity of the metal %s is predicted as %s using Random Forest model",
+                    metal.label,
+                    spin_rf,
                 )
                 return spin_rf
             else:
-                print(
-                    "ASSIGN_SPIN_METAL: Error! Coordination geometry of the metal is not defined."
+                logger.error(
+                    "Cannot assign spin multiplicity! Coordination geometry of the metal %s is not defined.",
+                    metal.label,
                 )
                 return None
         else:
-            print(
-                "ASSIGN_SPIN_METAL: Error! Spin multiplicity could not be assigned to the metal with valence electrons: ",
+            logger.error(
+                "Cannot assign spin multiplicity! valence electrons of metal: %s",
                 valence_elec,
             )
             return None
@@ -70,19 +80,17 @@ def assign_spin_metal(metal: object, debug: int = 0) -> None:
         return None
 
 
-#######################################################
-def assign_spin_complexes(mol: object, debug: int = 0) -> None:
+def assign_spin_complexes(mol: object) -> None:
     """Assigns spin multiplicity of the transition metal complexes."""
     for metal in mol.metals:
         if metal.spin is None and (elemdatabase.elementblock[metal.label] == "d"):
-            metal.get_spin(debug=debug)
+            metal.get_spin()
     for ligand in mol.ligands:
         if ligand.is_nitrosyl is None:
             ligand.evaluate_as_nitrosyl()
 
     metals_spin = [metal.spin for metal in mol.metals if metal.spin is not None]
-    if debug >= 2:
-        print(f"ASSIGN_SPIN_COMPLEXES: {metals_spin=}")
+    logger.info("Spin multiplicity of metals: %s", metals_spin)
 
     if any([ligand.is_nitrosyl for ligand in mol.ligands]):
         return None
@@ -103,10 +111,7 @@ def assign_spin_complexes(mol: object, debug: int = 0) -> None:
                 return None
 
 
-#######################################################
-def generate_feature_vector(
-    metal: object, target_prop: str, debug: int = 0
-) -> np.ndarray:
+def generate_feature_vector(metal: object, target_prop: str) -> np.ndarray:
     """Generate feature vector for a given transition metal coordination complex
     Args:
         metal (obj): metal atom object
@@ -114,12 +119,9 @@ def generate_feature_vector(
     Returns:
         feature (np.ndarray): feature vector
     """
-    if debug >= 1:
-        print(f"GENERATE_feature_vector: {metal.label}")
-
     elem_nr = elemdatabase.elementnr[metal.label]
 
-    coord_group = metal.get_connected_groups(debug=debug)
+    coord_group = metal.get_connected_groups()
     coord_nr = metal.coord_nr
     geom_nr = make_geom_list()[metal.coord_geometry]
     rel_metal_radius = metal.rel_metal_radius
@@ -132,8 +134,7 @@ def generate_feature_vector(
 
     if target_prop == "m_ox":
         feature = np.array([[elem_nr, coord_nr, geom_nr, rel_metal_radius, hapticity]])
-        if debug >= 1:
-            print(f"GENERATE_feature_vector: {feature=}")
+        logger.info("feature_vector: %s", feature)
     elif target_prop == "spin":
         m_ox = metal.charge
         valence_elec = metal.get_valence_elec(metal.charge)
@@ -150,22 +151,16 @@ def generate_feature_vector(
                 ]
             ]
         )
-        if debug >= 1:
-            print(f"GENERATE_feature_vector: {feature=}")
+        logger.info("feature_vector: %s", feature)
 
     return feature
 
 
-#######################################################
 def make_geom_list():
     geom_list = {}
     count = 0
     for i in shape_structure_references_simplified.values():
-        #     print(np.array(i)[:,3])
         for geom in np.array(i)[:, 3]:
             geom_list[geom] = count
             count += 1
     return geom_list
-
-
-#######################################################
