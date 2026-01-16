@@ -137,7 +137,7 @@ class Group(Specie):
                 tmp_adjnum = tmp_adjmat.sum(axis=1)
                 if any(tmp_adjnum) > 0:
                     self.metals.append(met)
-                    logger.debug("%s is is connected to %s", self.formula, met.label)
+                    logger.debug("Group %s is connected to %s", self.formula, met.label)
 
         return self.metals
 

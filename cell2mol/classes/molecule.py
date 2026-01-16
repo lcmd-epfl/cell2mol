@@ -6,27 +6,21 @@ from cell2mol.classes.metal import Metal
 from cell2mol.classes.ligand import Ligand
 from cell2mol.classes.specie import Specie
 from cell2mol.connectivity import split_species
-
 from cell2mol.element_utils import (
     labels2formula,
     get_metal_idxs,
     get_non_transition_metal_idxs,
     get_alkali_alkaline_earth_metal_idxs,
+    POST_TRANSITION_METALS,
 )
 from cell2mol.compare import compare_species, compare_metals
-from cell2mol.charge_assignment import correct_smiles_ligand
-from cell2mol.new_charge_assignment import (
-    set_charge_state,
-    prepare_mol,
-    balance_charge,
-    assign_charge_to_specie,
-)
-from cell2mol.new_charge_assignment import (
+from cell2mol.charge.specie_assigner import set_charge_state, prepare_mol
+from cell2mol.charge.smiles_handler import (
     create_bonds_specie,
     create_metal_ligand_bonds,
     create_metal_metal_bonds,
+    correct_smiles_ligand,
 )
-from cell2mol.element_utils import POST_TRANSITION_METALS
 from cell2mol.spin import assign_spin_complexes
 from cell2mol.operations import extract_from_list
 from cell2mol.elementdata import ElementData
@@ -70,6 +64,8 @@ class Molecule(Specie):
     error_multiple_distrib: bool = False
     error_empty_distrib: bool = False
     error_create_bonds: bool = False
+    # Error assessment
+    error_case: int | None = None
 
     @classmethod
     @deprecated("Use molecule() with the keyword arguments instead.")
@@ -141,7 +137,10 @@ class Molecule(Specie):
         # Non-complex shortcut
         # If the molecule is not a complex and does not contain IA/IIA metals,
         # there is nothing to split.
-        if not self.iscomplex and not self.has_IA_IIA:
+        if self.is_non_complex_molecule:
+            logger.debug(
+                "Molecule %s is not a complex. No splitting needed.", self.formula
+            )
             self.ligands = None
             self.metals = None
             return self.ligands, self.metals
@@ -159,7 +158,6 @@ class Molecule(Specie):
         # ============================================================
         # Identify metal indices (GLOBAL index space: self.indices)
         # ============================================================
-
         if post_tms:
             logger.debug(
                 "post_tms enabled: using ONLY post-transition metals as metal centers"
@@ -198,7 +196,7 @@ class Molecule(Specie):
         rest_indices = extract_from_list(rest_idx, self.indices, dimension=1)
         rest_radii = extract_from_list(rest_idx, self.radii, dimension=1)
         rest_atoms = extract_from_list(rest_idx, self.atoms, dimension=1)
-        logger.debug("Remaining atom indices: %s", rest_idx)
+        # logger.debug("Remaining atom indices: %s", rest_idx)
 
         rest_frac = (
             extract_from_list(rest_idx, self.frac_coord, dimension=1)
@@ -237,7 +235,7 @@ class Molecule(Specie):
         )
 
         logger.info("Received %d ligand blocks", len(blocklist))
-        logger.debug("Blocks: %s", blocklist)
+        # logger.debug("Blocks: %s", blocklist)
 
         for block in blocklist:
             lig_indices = extract_from_list(block, rest_indices, dimension=1)
@@ -344,7 +342,7 @@ class Molecule(Specie):
         ):
             found = False
             for ldx, typ in enumerate(typelist_mols):
-                issame = compare_species(self, typ[0], debug=0)
+                issame = compare_species(self, typ[0])
                 if issame:
                     found = True
                     kdx = typ[1]
@@ -396,7 +394,7 @@ class Molecule(Specie):
                             and lig.haptic_type == typ[0].haptic_type
                         ):
                             # if lig.haptic_type == typ[0].haptic_type:
-                            issame = compare_species(lig, typ[0], debug=0)
+                            issame = compare_species(lig, typ[0])
                         else:
                             issame = False
 
@@ -423,7 +421,7 @@ class Molecule(Specie):
             for jdx, met in enumerate(self.metals):
                 found = False
                 for ldx, typ in enumerate(typelist_mets):
-                    issame = compare_metals(met, typ[0], debug=0)
+                    issame = compare_metals(met, typ[0])
                     if issame:
                         found = True
                         kdx = typ[1]
@@ -454,7 +452,7 @@ class Molecule(Specie):
         self.selected_cs = []
         for unique_specie in self.unique_species:
             logger.info(
-                "Get possible charge states for unique specie", unique_specie.formula
+                "Get possible charge states for unique specie %s", unique_specie.formula
             )
             tmp = unique_specie.get_possible_cs()
             if tmp is None:
@@ -489,103 +487,24 @@ class Molecule(Specie):
         else:
             self.error_get_poscharges = False
 
-    def balance_charges_for_molecules(
-        self, input_charge: int = None, second_try: bool = False, debug: int = 0
-    ):
-        if not self.unique_species is not None:
-            self.get_unique_species()
-        if not self.selected_cs is not None:
-            self.get_selected_cs()
-
-        if None in self.selected_cs:
-            self.error_get_poscharges = True
-        else:
-            self.error_get_poscharges = False
-
-        unique_indices = [specie.unique_index for specie in self.species_list]
-
-        final_charge_distribution, final_charges = balance_charge(
-            unique_indices,
-            self.unique_species,
-            input_charge=input_charge,
-            debug=debug,
-        )
-        print(f"{len(final_charge_distribution)=} {final_charge_distribution=}")
-        # Handle multiple or no charge distributions
-        dist_count = len(final_charge_distribution)
-        self.error_multiple_distrib = dist_count > 1
-        self.error_empty_distrib = dist_count == 0
-
-        if dist_count != 1 and second_try:
-            # Attempt to balance charges again with more specific conditions
-            if self.error_multiple_distrib:
-                print("More than one possible distribution found.")
-                second_final_charge_distribution, second_final_charges = balance_charge(
-                    unique_indices,
-                    self.unique_species,
-                    input_charge=input_charge,
-                    aromatic=True,
-                    debug=debug,
-                )
-            if self.error_empty_distrib:
-                print("No valid distribution found.")
-                second_final_charge_distribution, second_final_charges = balance_charge(
-                    unique_indices,
-                    self.unique_species,
-                    input_charge=input_charge,
-                    rare=True,
-                    debug=debug,
-                )
-            second_dist_count = len(second_final_charge_distribution)
-            self.error_multiple_distrib = second_dist_count > 1
-            self.error_empty_distrib = second_dist_count == 0
-
-            if second_dist_count == 1:
-                final_charge_distribution = second_final_charge_distribution
-                final_charges = second_final_charges
-                print("Using the second distribution found.")
-
-        # If any error was flagged, report failure
-        if any(
-            [
-                self.error_get_poscharges,
-                self.error_multiple_distrib,
-                self.error_empty_distrib,
-            ]
-        ):
-            print("Charge Assignment Failed.")
-            return
-
-        # Assign charges to unique species in the molecules
-        for specie, charge in zip(self.unique_species, final_charges[0]):
-            assign_charge_to_specie(specie, charge, debug=debug)
-            for refspecie in self.species_list:
-                if specie.unique_index == refspecie.unique_index:
-                    assign_charge_to_specie(refspecie, charge, debug=debug)
-
-    #######################################################
-    def assign_charges_for_molecule(self, debug: int = 0):
-        print(f"ASSIGN_CHARGES_FOR_MOLECULE {self.formula}")
-
+    def assign_charges(self):
+        logger.info("Assigning charges for molecule: %s", self.formula)
         for specie in self.unique_species:
             if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
                 for jdx, lig in enumerate(self.ligands):
-                    print(lig.unique_index)
-                    print(specie.unique_index)
                     if lig.unique_index == specie.unique_index:
-                        set_charge_state(specie, lig, mode=1, debug=debug)
+                        set_charge_state(specie, lig, mode=1)
                 for kdx, met in enumerate(self.metals):
                     if met.unique_index == specie.unique_index:
                         met.set_charge(specie.charge)
             else:
                 if self.unique_index == specie.unique_index:
-                    set_charge_state(specie, self, mode=1, debug=debug)
-
+                    set_charge_state(specie, self, mode=1)
         temp = []
-        self.create_bonds(debug=debug)
+        self.create_bonds()
         temp.append(self.error_create_bonds)
         if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
-            prepare_mol(self, debug=debug)
+            prepare_mol(self)
 
         if any(temp):
             self.error_create_bonds = True
@@ -593,37 +512,34 @@ class Molecule(Specie):
             self.error_create_bonds = False
 
         if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
-            prepare_mol(self, debug=debug)
-            print("Complex", self.formula, self.totcharge)
+            prepare_mol(self)
+            logger.info("Complex %s %s", self.formula, self.totcharge)
             for jdx, lig in enumerate(self.ligands):
-                print("    Ligand", jdx, lig.formula, lig.totcharge, lig.smiles)
+                logger.info(
+                    "    Ligand %d %s %s %s",
+                    jdx,
+                    lig.formula,
+                    lig.totcharge,
+                    lig.smiles,
+                )
             for kdx, met in enumerate(self.metals):
-                print("    Metal", kdx, met.formula, met.charge)
+                logger.info("    Metal %d %s %s", kdx, met.formula, met.charge)
         else:
-            print("Non-Complex", self.formula, self.totcharge, self.smiles)
+            logger.info(
+                "Non-Complex %s %s %s", self.formula, self.totcharge, self.smiles
+            )
 
-    #######################################################
-    def create_bonds(self, debug: int = 0):
+    def create_bonds(self):
         # First part: Non-complex molecule
-        if (
-            not self.iscomplex
-            and not self.has_IA_IIA
-            and not self.has_post_transition_metal
-        ):
+        if self.is_non_complex_molecule:
             # Creates bonds between molecule.atoms using the molecule.rdkit_object
-            result = create_bonds_specie(self, debug=debug)
+            result = create_bonds_specie(self)
             if not result:
-                if debug >= 1:
-                    print(
-                        f"MOLECULE.CREATE_BONDS: error creating bonds for non-complex molecule {self.formula}"
-                    )
+                logger.error("Error for non-complex molecule %s", self.formula)
                 self.error_create_bonds = True
                 return  # Exit the function entirely if creating bonds fails
             else:
-                if debug > 2:
-                    print(
-                        f"MOLECULE.CREATE_BONDS: Bonds created for non-complex molecule {self.formula}"
-                    )
+                logger.debug("Bonds created for non-complex molecule %s", self.formula)
 
         # Second part: Complex molecule, add bonds for ligands
         if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
@@ -633,36 +549,24 @@ class Molecule(Specie):
 
             for lig in self.ligands:
                 # Creates bonds between ligand.atoms, using the ligand.rdkit_object
-                result = create_bonds_specie(lig, debug=debug)
+                result = create_bonds_specie(lig)
                 if not result:
-                    if debug >= 1:
-                        print(
-                            f"MOLECULE.CREATE_BONDS: error creating bonds for ligand {lig.formula}"
-                        )
+                    logger.error("Error for ligand %s", lig.formula)
+
                     self.error_create_bonds = True
                     return  # Exit the function entirely if creating bonds fails for any ligand
 
-                if debug > 1:
-                    print(
-                        f"MOLECULE.CREATE_BONDS: Bonds created for ligand {lig.formula}"
-                    )
-                if debug > 1:
-                    print(
-                        f"MOLECULE.CREATE_BONDS: Correcting Smiles for ligand {lig.formula}"
-                    )
-                result, fix_zwitterions = correct_smiles_ligand(lig, debug=debug)
+                logger.debug("Bonds created for ligand %s", lig.formula)
+                logger.debug("Correcting Smiles for ligand %s", lig.formula)
+                result, fix_zwitterions = correct_smiles_ligand(lig)
                 if not result:
-                    if debug > 1:
-                        print(
-                            f"MOLECULE.CREATE_BONDS: error correcting smiles for ligand {lig.formula}"
-                        )
+                    logger.error(
+                        "Error for ligand %s in correcting smiles", lig.formula
+                    )
                     self.error_create_bonds = True
                     return  # Exit the function entirely
 
-                if debug > 1:
-                    print(
-                        f"MOLECULE.CREATE_BONDS: Smiles corrected for ligand {lig.formula}"
-                    )
+                logger.debug("Smiles corrected for ligand %s", lig.formula)
                 if fix_zwitterions:
                     fix_zwitterions_ligands.append(lig)
                 else:
@@ -671,27 +575,43 @@ class Molecule(Specie):
             for lig in fix_zwitterions_ligands:
                 for atom in lig.atoms:
                     atom.bonds = []
-                if debug >= 1:
-                    print(
-                        f"MOLECULE.CREATE_BONDS: Re-running create_bonds_specie for ligand {lig.formula} due to zwitterion correction."
+
+                    logger.debug(
+                        "Re-running create_bonds_specie for ligand %s due to zwitterion correction.",
+                        lig.formula,
                     )
-                result = create_bonds_specie(lig, debug=debug)
+                result = create_bonds_specie(lig)
                 if not result:
-                    if debug >= 1:
-                        print(
-                            f"MOLECULE.CREATE_BONDS: error re-creating bonds for ligand {lig.formula}"
-                        )
+                    logger.error(
+                        "Error for ligand %s in re-creating bonds", lig.formula
+                    )
                     self.error_create_bonds = True
                     return
-                if debug >= 1:
-                    print(
-                        f"MOLECULE.CREATE_BONDS: Bonds re-created for ligand {lig.formula} after zwitterion correction."
-                    )
+
+                logger.debug(
+                    "Bonds re-created for ligand %s after zwitterion correction.",
+                    lig.formula,
+                )
                 self.ligand_smiles.append(lig.smiles)
 
         # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
         if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
-            create_metal_ligand_bonds(self, debug=debug)
-            create_metal_metal_bonds(self, debug=debug)
+            create_metal_ligand_bonds(self)
+            create_metal_metal_bonds(self)
 
         self.error_create_bonds = False
+
+    def assess_errors(self):
+        logger.info("Check Errors in molecule")
+        if self.error_get_poscharges:
+            case = 5
+        elif self.error_multiple_distrib:
+            case = 6
+        elif self.error_empty_distrib:
+            case = 7
+        elif self.error_create_bonds:
+            case = 8
+        else:
+            case = 0
+
+        self.error_case = case

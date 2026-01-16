@@ -6,7 +6,7 @@ import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
 from cell2mol.classes.atom import Atom
-from cell2mol.charge_assignment import get_metal_poscharges
+from cell2mol.charge.charge_state_resolver import get_metal_poscharges
 from cell2mol.spin import assign_spin_metal, predict_ox_state
 from cell2mol.operations import compute_centroid, get_dist
 from cell2mol.elementdata import ElementData

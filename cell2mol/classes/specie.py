@@ -6,8 +6,8 @@ import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
 
-from cell2mol.protonation_enumerator import enumerate_protonation_states
-from cell2mol.charge_state_resolver import enumerate_charge_states
+from cell2mol.charge.protonation_enumerator import enumerate_protonation_states
+from cell2mol.charge.charge_state_resolver import enumerate_possible_charge_states
 from cell2mol.classes.atom import Atom
 from cell2mol.classes.charge_state import ChargeState
 from cell2mol.classes.metal import Metal
@@ -44,8 +44,8 @@ class Specie(BaseModel):
     # Optional arguments - parents is a cross-reference to parent Species
     parents: RefList[Specie] = Field(default_factory=list)
     parents_indices: list[list[int]] = Field(default_factory=list)
-    cov_factor: float = Field(default=1.3)
-    metal_factor: float = Field(default=1.0)
+    cov_factor: float = Field(default=config.COV_FACTOR)
+    metal_factor: float = Field(default=config.METAL_FACTOR)
 
     # Defined in other methods
     adj_types: NDArray | None = None  # TOFIX romaingrx: NDarray not pydantic compatible
@@ -214,7 +214,7 @@ class Specie(BaseModel):
             self.frac_centroid = compute_centroid(np.array(self.frac_coord))
         return self.centroid
 
-    def set_fractional_coord(self, frac_coord: list, debug: int = 0) -> None:
+    def set_fractional_coord(self, frac_coord: list) -> None:
         assert len(frac_coord) == len(self.coord)
         self.frac_coord = frac_coord
 
@@ -441,14 +441,14 @@ class Specie(BaseModel):
 
         if self.protonation_states is None:
             self.get_protonation_states()
-            logger.debug(
-                "Obtained protonation states for %s: %s",
-                self.formula,
-                self.protonation_states,
-            )
+            # logger.debug(
+            #     "Obtained protonation states for %s: %s",
+            #     self.formula,
+            #     self.protonation_states,
+            # )
         logger.debug("Enumerating charge states for %s", self.formula)
 
-        self.possible_cs = enumerate_charge_states(self)
+        self.possible_cs = enumerate_possible_charge_states(self)
         return self.possible_cs
 
     def set_charges(
