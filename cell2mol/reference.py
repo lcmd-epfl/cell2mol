@@ -3,31 +3,29 @@
 import os
 import logging
 from ase.io import read
+from cell2mol.utils import config
 from cell2mol.args import parsing_arguments
 from cell2mol.classes import Cell, Cells
 from cell2mol.operations import frac2cart_fromparam
-from cell2mol.elementdata import ElementData
 from cell2mol.read_cif import (
     get_cell_atoms,
     get_cell_parameters,
     get_wyckoff_positions,
     get_geom_bond,
     extract_info_from_cif,
-    compare_reference_with_cif,
+    compare_cif_with_reference,
 )
 from cell2mol.write_results import (
     extract_refmoleclist_xyz,
-    write_refmoleclist,
+    write_cell_molecules_info,
     write_unique_species,
     get_reference_error_message,
 )
-from cell2mol.utils import config
 
 logger = logging.getLogger(__name__)
-elemdatabase = ElementData()
 
 
-def process_refcell(input_path, name, current_dir):
+def process_reference(input_path, name, current_dir):
     """
     Process the reference molecules from a CIF file and generate a reference cell object.
     Args:
@@ -68,6 +66,8 @@ def process_refcell(input_path, name, current_dir):
         name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param
     )
     unitcell.set_subtype("unitcell")
+    unitcell.has_isolated_H = refcell.has_isolated_H
+    unitcell.has_missing_H = refcell.has_missing_H
 
     cells = Cells(
         name=name,
@@ -82,7 +82,7 @@ def process_refcell(input_path, name, current_dir):
     summary_fname = os.path.join(current_dir, "reference_summary.out")
     with open(summary_fname, "w") as f:
         print(name, file=f)
-        write_refmoleclist(refcell, file=f)
+        write_cell_molecules_info(refcell, file=f)
         write_unique_species(refcell, file=f)
         print(get_reference_error_message(refcell.error_case), file=f)
 
@@ -129,7 +129,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
 
     chemical_name, reported_metal_os, moiety_dicts = extract_info_from_cif(input_path)
     refcell.set_additional_cif_info(chemical_name, reported_metal_os, moiety_dicts)
-    compare_reference_with_cif(refcell)
+    compare_cif_with_reference(refcell)
     refcell.check_hydrogens()
     refcell.assess_errors(mode="hydrogens")
 
@@ -154,7 +154,7 @@ def _main():
     if ext != ".cif":
         raise ValueError("Invalid input file format. Only .cif files are supported.")
 
-    process_refcell(
+    process_reference(
         input_path=input_path,
         name=name,
         current_dir=os.getcwd(),
