@@ -152,7 +152,7 @@ def check_missing_hydrogens(reference_molecules):
     coord_water_exceptions = {"Re", "V", "Mo", "W", "Fe", "Tc"}
     fullerenes = {"C60", "C72", "C80"}
 
-    logger.info("Checking hydrogen consistency")
+    logger.info("Checking any missing hydrogens in reference molecules...")
 
     for mol_idx, ref in enumerate(reference_molecules):
         if (
@@ -371,12 +371,12 @@ def place_hydrogens(
 
 def add_hydrogens(
     labels: list,
-    coords: list,
+    coords: np.ndarray,
     site: int,
     ligand: object,
     num_hydrogens: int,
     element: str = "H",
-) -> Tuple[bool, list, list]:
+) -> Tuple[bool, list, np.ndarray]:
     """Add hydrogens to a given atom site."""
 
     isadded = True
@@ -403,7 +403,7 @@ def add_hydrogens(
             bonded_atom_labels.append(n_label)
 
         logger.debug(
-            "ADD_HYDROGENS: atom=%s site=%s adjacency=%s bonded_labels=%s num_hydrogens=%d",
+            "atom=%s site=%s adjacency=%s bonded_labels=%s num_hydrogens=%d",
             atom.label,
             atom.atom_site_label,
             atom.adjacency,
@@ -419,7 +419,7 @@ def add_hydrogens(
                 bonded_atom_labels,
             )
             logger.debug(
-                "ADD_HYDROGENS: detect_missing_hydrogens -> %s, %s, %d",
+                "detect_missing_hydrogens -> %s, %s, %d",
                 ismissingH,
                 report,
                 num_missingH,
@@ -454,11 +454,11 @@ def add_hydrogens(
 
         if Hs is not None and Hs.shape[0] == num_hydrogens:
             for h in Hs:
-                newcoord.append(h)
+                newcoord = np.vstack([newcoord, h])
                 newlab.append(str(element))
 
             logger.debug(
-                "ADD_HYDROGENS: Added %d %s atoms to site=%d (%s, %s)",
+                "Added %d %s atoms to site=%d (%s, %s)",
                 num_hydrogens,
                 element,
                 site,
