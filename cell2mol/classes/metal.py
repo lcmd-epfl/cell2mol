@@ -124,12 +124,12 @@ class Metal(Atom):
                 final_connected_groups.append(group)
         self.groups = final_connected_groups
 
-        logger.info(
-            "Metal %s%s connected to groups %s",
-            self.label,
-            f" ({self.atom_site_label})" if self.atom_site_label else "",
-            [g.formula for g in self.groups],
-        )
+        # logger.debug(
+        #     "Metal %s%s connected to groups %s",
+        #     self.label,
+        #     f" ({self.atom_site_label})" if self.atom_site_label else "",
+        #     [g.formula for g in self.groups],
+        # )
         return self.groups
 
     def get_relative_metal_radius(self):
@@ -158,13 +158,19 @@ class Metal(Atom):
                 diff_list.append(diff)
         average = round(float(np.average(diff_list)), 3)
 
-        logger.debug(f"{diff_list=}")
-        logger.debug(f"{average=}")
+        logger.debug("diff_list(distance-covalent_radius)=%s", diff_list)
+        logger.debug("average=%s", average)
 
         self.rel_metal_radius = round(
             average / elemdatabase.CovalentRadius3[self.label], 3
         )
 
+        logger.info(
+            "rel_metal_radius=%s for Metal %s%s",
+            self.rel_metal_radius,
+            self.label,
+            f" ({self.atom_site_label})" if self.atom_site_label else "",
+        )
         return self.rel_metal_radius
 
     def get_connected_metals(self, use_bond_info: bool | None = None):
@@ -211,21 +217,19 @@ class Metal(Atom):
                 if all(tmp_adjnum[1:]):
                     self.metals.append(met)
                     logger.debug(
-                        "%s (%s) is is connected to %s (%s)",
+                        "Metal %s%s is connected to Metal %s%s",
                         self.label,
-                        self.atom_site_label,
+                        f" ({self.atom_site_label})" if self.atom_site_label else "",
                         met.label,
-                        met.atom_site_label,
+                        f" ({met.atom_site_label})" if met.atom_site_label else "",
                     )
         return self.metals
 
     def get_coordination_geometry(self: object):
         logger.debug(
-            "Metal %s%s",
+            "Define coordination geometry of Metal %s%s",
             self.label,
-            f" ({self.atom_site_label})"
-            if self.atom_site_label
-            else " (no site label)",
+            f" ({self.atom_site_label})" if self.atom_site_label else "",
         )
 
         coord_group = self.get_connected_groups()
@@ -235,7 +239,6 @@ class Metal(Atom):
         )
 
         self.rel_metal_radius = self.get_relative_metal_radius()
-        logger.debug(f"{self.rel_metal_radius=}")
 
         if self.metals is None:
             self.get_connected_metals()
