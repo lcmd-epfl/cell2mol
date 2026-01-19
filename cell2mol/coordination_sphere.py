@@ -169,7 +169,6 @@ def define_coordination_geometry(metal: object, coord_group: list) -> object:
     symbols.append(metal.label)
     positions.append(metal.coord)
 
-    logger.info("Define the coordination geometry %s %s", metal.label, metal.coord)
     logger.debug("coord_group formula %s", [group.formula for group in coord_group])
     logger.debug(
         "coord_group hapticity %s",
@@ -427,11 +426,10 @@ def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = No
                 tmp_adjnum = tmp_adjmat.sum(axis=1)
                 if any(tmp_adjnum) > 0:
                     logger.debug(
-                        "Atom %s (ligand index %s) is connected to metal %s (%s, metal index %s)",
+                        "Atom %s (ligand index %s) is connected to metal %s (metal index %s)",
                         atom.label,
                         ligand_idx,
                         met.label,
-                        met.atom_site_label,
                         jdx,
                     )
                     if use_bond_info:
@@ -485,11 +483,14 @@ def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = No
         metal = group.metals[jdx]
         if indices:
             logger.debug(
-                "metal %s %s (%s) connected to %s",
+                "metal %s%s (index %s) connected to %s",
                 metal.label,
-                metal.atom_site_label,
+                f" ({metal.atom_site_label})" if metal.atom_site_label else "",
                 jdx,
-                [group.atoms[i].atom_site_label for i in indices],
+                [
+                    atom.atom_site_label if atom.atom_site_label else atom.label
+                    for atom in (group.atoms[i] for i in indices)
+                ],
             )
             new_group = [i for i in indices]
             split_groups.append(new_group)
@@ -508,10 +509,10 @@ def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = No
     for k, v in final_ligand_indices_by_metal.items():
         grouped[tuple(v)].append(k)
     group_metals_indices = [v for v in grouped.values()]
-    logger.debug("Final group: %s", [a.label for a in group.atoms])
-    logger.debug("Final group indices: %s", final_group_indices)
-    logger.debug("Final ligand indices by metal: %s", final_ligand_indices_by_metal)
-    logger.debug("Group metals indices: %s", group_metals_indices)
+    # logger.debug("Final group: %s", [a.label for a in group.atoms])
+    # logger.debug("Final group indices: %s", final_group_indices)
+    # logger.debug("Final ligand indices by metal: %s", final_ligand_indices_by_metal)
+    # logger.debug("Group metals indices: %s", group_metals_indices)
 
     return (
         group,
@@ -562,15 +563,14 @@ def handle_haptic_coordination(group: object, use_bond_info: bool | None = None)
                 tmp_adjnum = tmp_adjmat.sum(axis=1)
                 if any(tmp_adjnum) > 0:
                     logger.debug(
-                        "Atom %s (ligand index %s) is connected to metal %s (%s, metal index %s)",
+                        "Atom %s (ligand index %s) is connected to metal %s (metal index %s)",
                         atom.label,
                         ligand_idx,
                         met.label,
-                        met.atom_site_label,
                         jdx,
                     )
-                conn_idx.append(idx)
-                conn_idx_by_metal[jdx].append(idx)
+                    conn_idx.append(idx)
+                    conn_idx_by_metal[jdx].append(idx)
 
     conn_idx = sorted(list(set(conn_idx)))
     split_groups = []
@@ -580,11 +580,14 @@ def handle_haptic_coordination(group: object, use_bond_info: bool | None = None)
         metal = group.metals[jdx]
         if indices:
             logger.debug(
-                "metal %s %s (%s) connected to %s",
+                "metal %s%s (index %s) connected to %s",
                 metal.label,
-                metal.atom_site_label,
+                f" ({metal.atom_site_label})" if metal.atom_site_label else "",
                 jdx,
-                [group.atoms[i].atom_site_label for i in indices],
+                [
+                    atom.atom_site_label if atom.atom_site_label else atom.label
+                    for atom in (group.atoms[i] for i in indices)
+                ],
             )
             new_group = [i for i in indices]
             split_groups.append(new_group)
