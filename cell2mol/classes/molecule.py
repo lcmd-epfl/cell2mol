@@ -50,8 +50,6 @@ class Molecule(Specie):
 
     ligand_smiles: str | list[str] | None = None
     ligand_smiles_with_H: list[str] | None = None
-    error_create_bonds: bool = False
-
     subtype: SubType = Field(default="molecule")
 
     # Needed in get_molecule in xyz_molecule.py
@@ -60,11 +58,14 @@ class Molecule(Specie):
     unique_indices: list[int] | None = None
     species_list: list[Specie] | None = None
     selected_cs: list[object] | None = None
-    error_get_poscharges: bool = False
-    error_multiple_distrib: bool = False
-    error_empty_distrib: bool = False
-    error_create_bonds: bool = False
+
     # Error assessment
+    error_get_poscharges: bool | None = None
+    error_multiple_distrib: bool | None = None
+    error_empty_distrib: bool | None = None
+    error_assign_charge: bool | None = None
+    error_create_bonds: bool | None = None
+    error_get_spin: bool | None = None
     error_case: int | None = None
 
     @classmethod
@@ -89,18 +90,33 @@ class Molecule(Specie):
         return to_print
 
     def get_spin(self):
-        if self.iscomplex:
-            self.spin = assign_spin_complexes(self)
-        else:
-            if (self.eleccount - self.totcharge) % 2 == 0:
-                self.spin = 1
+        """
+        Assign and return spin multiplicity for this molecule.
+        Sets mol.error_get_spin on failure and raises an exception.
+        """
+        self.error_get_spin = False
+
+        try:
+            if self.iscomplex:
+                self.spin = assign_spin_complexes(self)
             else:
-                self.spin = 2
-        logger.info(
-            "Spin multiplicity of the complex %s is assigned as %s",
+                if (self.eleccount - self.totcharge) % 2 == 0:
+                    self.spin = 1
+                else:
+                    self.spin = 2
+
+        except Exception as e:
+            self.error_get_spin = True
+            raise RuntimeError(
+                f"Spin assignment failed for molecule {self.formula}"
+            ) from e
+
+        logger.debug(
+            "Assigned spin multiplicity | molecule=%s | spin=%d",
             self.formula,
             self.spin,
         )
+
         return self.spin
 
     def reset_charge(self):
@@ -346,7 +362,7 @@ class Molecule(Specie):
                 if issame:
                     found = True
                     kdx = typ[1]
-                    logger.debug("Molecule is the same as type %s", ldx)
+                    logger.debug("molecule is the same as type %s", ldx)
 
             if not found:
                 specs_found += 1
@@ -354,7 +370,7 @@ class Molecule(Specie):
                 typelist_mols.append([self, kdx])
                 self.unique_species.append(self)
                 logger.debug(
-                    "New molecule found: formula=%s, added at position %d",
+                    "New molecule found: formula=%s, added at specie type %d",
                     self.formula,
                     kdx,
                 )
@@ -402,7 +418,10 @@ class Molecule(Specie):
                         found = True
                         kdx = typ[1]
                         logger.debug(
-                            "ligand %d is the same with %d in typelist", jdx, ldx
+                            "ligand %s (%d) is the same with type %d in typelist",
+                            lig.formula,
+                            jdx,
+                            ldx,
                         )
                 if not found:
                     specs_found += 1
@@ -410,7 +429,9 @@ class Molecule(Specie):
                     typelist_ligs.append([lig, kdx])
                     self.unique_species.append(lig)
                     logger.debug(
-                        "New ligand found: %s, added at position %d", lig.formula, kdx
+                        "New ligand found: %s, added at specie type %d",
+                        lig.formula,
+                        kdx,
                     )
 
                 self.unique_indices.append(kdx)
@@ -426,7 +447,10 @@ class Molecule(Specie):
                         found = True
                         kdx = typ[1]
                         logger.debug(
-                            "Metal %d is the same with %d in typelist", jdx, ldx
+                            "metal %s (%d) is the same with type %d in typelist",
+                            met.formula,
+                            jdx,
+                            ldx,
                         )
                 if not found:
                     specs_found += 1
@@ -434,8 +458,8 @@ class Molecule(Specie):
                     typelist_mets.append([met, kdx])
                     self.unique_species.append(met)
                     logger.debug(
-                        "New metal center found: label=%s, added at position %d",
-                        met.label,
+                        "New metal found: formula=%s, added at specie type %d",
+                        met.formula,
                         kdx,
                     )
 
@@ -602,15 +626,18 @@ class Molecule(Specie):
         self.error_create_bonds = False
 
     def assess_errors(self):
-        logger.info("Check Errors in molecule")
         if self.error_get_poscharges:
             case = 5
         elif self.error_multiple_distrib:
             case = 6
         elif self.error_empty_distrib:
             case = 7
-        elif self.error_create_bonds:
+        elif self.error_assign_charge:
             case = 8
+        elif self.error_create_bonds:
+            case = 9
+        elif self.error_get_spin:
+            case = 10
         else:
             case = 0
 

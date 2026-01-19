@@ -7,7 +7,12 @@ from ase.io import read
 from cell2mol.classes import Molecule
 from cell2mol.element_utils import labels2formula
 from cell2mol.connectivity import split_species
-from cell2mol.write_results import get_molecule_error_message, write_molecule_info
+from cell2mol.write_results import (
+    get_molecule_error_message,
+    write_molecule_info,
+    write_unique_species,
+    write_possible_charges,
+)
 from cell2mol.charge.charge_balancer import balance_molecule_charge
 from cell2mol.utils import config
 
@@ -29,122 +34,138 @@ METAL_FACTOR = config.METAL_FACTOR
 # -----------------------------------------------------------------------------
 def interpret_molecule(input_path, name, input_charge, current_dir):
     molec_fname = os.path.join(current_dir, f"Molecule_{name}.mol")
+    summary_molecule_fname = os.path.join(current_dir, "molecule_summary.out")
 
     logger.info("cell2mol version %s", config.VERSION)
     logger.info("Input XYZ: %s", input_path)
+    newmolec = None
 
-    structure = read(input_path)
-    labels = structure.get_chemical_symbols()
-    coords = structure.get_positions()
+    try:
+        structure = read(input_path)
+        labels = structure.get_chemical_symbols()
+        coords = structure.get_positions()
 
-    blocklist = split_species(
-        labels, coords, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR
-    )
-    logger.info("Number of molecules in xyz: %d", len(blocklist))
-
-    # --- sanity checks ---
-    if not blocklist:
-        logger.error("No molecule found in the input file.")
-        return None
-
-    if len(blocklist) > 1:
-        logger.error("Input file includes more than one molecule. Stopping.")
-        if logger.isEnabledFor(logging.DEBUG):
-            for i, block in enumerate(blocklist):
-                block_labels = [labels[j] for j in block]
-                logger.debug(
-                    "Found block %d: %s (%d atoms)",
-                    i,
-                    labels2formula(block_labels),
-                    len(block_labels),
-                )
-        return None
-
-    # --- build molecule ---
-    newmolec = Molecule.from_positional(labels, coords)
-    newmolec.set_adjacency_parameters(cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR)
-    newmolec.set_atoms(create_adjacencies=True)
-
-    # --- split complexes ---
-    if newmolec.iscomplex or newmolec.has_IA_IIA:
-        logger.debug("Splitting complex: %s", newmolec.formula)
-        newmolec.split_complex()
-    elif newmolec.has_post_transition_metal:
-        logger.debug("Splitting post-transition metal complex: %s", newmolec.formula)
-        newmolec.split_complex(post_tms=True)
-    else:
-        newmolec.add_parent(newmolec, indices=list(range(newmolec.natoms)))
-
-    # --- classification logging ---
-    if newmolec.iscomplex:
-        logger.info("Has transition metals: %s", newmolec.formula)
-        newmolec.get_hapticity()
-        if not newmolec.ligands:
-            logger.debug("Metal cluster detected")
-
-    elif newmolec.has_IA_IIA:
-        logger.info("Has alkali or alkaline earth metals: %s", newmolec.formula)
-
-    elif newmolec.has_post_transition_metal:
-        logger.info("Has post-transition metals: %s", newmolec.formula)
-        logger.debug("metals=%s", [m.label for m in newmolec.metals])
-        logger.debug("ligands=%s", [l.formula for l in newmolec.ligands])
-
-    else:
-        logger.info(
-            "Non-complex molecule: %s (non-complex=%s)",
-            newmolec.formula,
-            newmolec.is_non_complex_molecule,
+        blocklist = split_species(
+            labels, coords, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR
         )
+        logger.info("Number of molecules in xyz: %d", len(blocklist))
 
-    # --- common analysis ---
-    for lig in newmolec.ligands:
-        lig.get_denticity()
+        # --- sanity checks ---
+        if not blocklist:
+            logger.error("No molecule found in the input file.")
+            return None
 
-    for met in newmolec.metals:
-        met.get_connected_metals()
-        met.get_coordination_geometry()
-        met.get_coord_sphere_formula()
+        if len(blocklist) > 1:
+            logger.error("Input file includes more than one molecule. Stopping.")
+            if logger.isEnabledFor(logging.DEBUG):
+                for i, block in enumerate(blocklist):
+                    block_labels = [labels[j] for j in block]
+                    logger.debug(
+                        "Found block %d: %s (%d atoms)",
+                        i,
+                        labels2formula(block_labels),
+                        len(block_labels),
+                    )
+            return None
 
-    # --- charge assignment ---
-    newmolec.input_charge = input_charge
-    if input_charge is None:
-        logger.info("No input charge provided.")
+        # --- build molecule ---
+        newmolec = Molecule.from_positional(labels, coords)
+        newmolec.set_adjacency_parameters(
+            cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR
+        )
+        newmolec.set_atoms(create_adjacencies=True)
+
+        # --- split complexes ---
+        if newmolec.iscomplex or newmolec.has_IA_IIA:
+            logger.debug("Splitting complex: %s", newmolec.formula)
+            newmolec.split_complex()
+        elif newmolec.has_post_transition_metal:
+            logger.debug(
+                "Splitting post-transition metal complex: %s", newmolec.formula
+            )
+            newmolec.split_complex(post_tms=True)
+        else:
+            newmolec.add_parent(newmolec, indices=list(range(newmolec.natoms)))
+
+        # --- classification logging ---
+        if newmolec.iscomplex:
+            logger.info("Has transition metals: %s", newmolec.formula)
+            newmolec.get_hapticity()
+            if not newmolec.ligands:
+                logger.debug("Metal cluster detected")
+
+        elif newmolec.has_IA_IIA:
+            logger.info("Has alkali or alkaline earth metals: %s", newmolec.formula)
+
+        elif newmolec.has_post_transition_metal:
+            logger.info("Has post-transition metals: %s", newmolec.formula)
+            logger.debug("metals=%s", [m.label for m in newmolec.metals])
+            logger.debug("ligands=%s", [l.formula for l in newmolec.ligands])
+
+        else:
+            logger.info(
+                "Non-complex molecule: %s (non-complex=%s)",
+                newmolec.formula,
+                newmolec.is_non_complex_molecule,
+            )
+
+        # --- common analysis ---
+        for lig in newmolec.ligands:
+            lig.get_denticity()
+
+        for met in newmolec.metals:
+            met.get_connected_metals()
+            met.get_coordination_geometry()
+            met.get_coord_sphere_formula()
+
+        # --- charge assignment ---
+        newmolec.input_charge = input_charge
+        if input_charge is None:
+            logger.info("No input charge provided.")
+            return newmolec
+
+        logger.info("Assigning total charge: %d", input_charge)
+        newmolec.get_unique_species()
+        newmolec.get_selected_cs()
+        newmolec = balance_molecule_charge(newmolec, input_charge=input_charge)
+        newmolec.assess_errors()
+        if newmolec.error_case != 0:
+            logger.error("Error while balancing charges in the molecule.")
+            return newmolec
+
+        newmolec.assign_charges()
+        newmolec.create_bonds()
+        newmolec.assess_errors()
+        if newmolec.error_case != 0:
+            logger.error("Error while assigning charges in the molecule.")
+            return newmolec
+
+        newmolec.get_spin()
+        newmolec.assess_errors()
+
         return newmolec
 
-    logger.info("Assigning total charge: %d", input_charge)
-    newmolec.get_unique_species()
-    newmolec.get_selected_cs()
-    newmolec = balance_molecule_charge(newmolec, input_charge=input_charge)
-    newmolec.assess_errors()
-
-    if newmolec.error_case != 0:
-        logger.error("Charge assignment failed.")
-        newmolec.save(molec_fname)
+    except Exception as err:
+        logger.error("interpret_molecule failed: %s", err)
+        logger.debug("Exception details", exc_info=True)
         return newmolec
 
-    newmolec.assign_charges()
-    newmolec.create_bonds()
-    newmolec.assess_errors()
+    finally:
+        # --- always save molecule ---
+        if newmolec is not None:
+            newmolec.save(molec_fname)
+            logger.info("Molecule saved to %s", molec_fname)
 
-    if newmolec.error_case != 0:
-        logger.error("Bond creation failed.")
-        newmolec.save(molec_fname)
-        return newmolec
-
-    newmolec.get_spin()
-    newmolec.assess_errors()
-    newmolec.save(molec_fname)
-    logger.info("Molecule saved to %s", molec_fname)
-
-    # Summary of molecule
-    summary_molecule_fname = os.path.join(current_dir, "molecule_summary.out")
-    with open(summary_molecule_fname, "w") as f:
-        print(name, file=f)
-        write_molecule_info(newmolec, file=f)
-        print(get_molecule_error_message(newmolec.error_case), file=f)
-
-    return newmolec
+            # --- summary ---
+            with open(summary_molecule_fname, "w") as f:
+                print(name, file=f)
+                write_molecule_info(newmolec, file=f)
+                write_unique_species(newmolec, file=f)
+                write_possible_charges(newmolec, file=f)
+                print(
+                    get_molecule_error_message(newmolec.error_case),
+                    file=f,
+                )
 
 
 # -----------------------------------------------------------------------------
