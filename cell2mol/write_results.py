@@ -6,8 +6,8 @@ import os
 import traceback
 from collections import Counter
 from ase.io import read
-from contextlib import redirect_stdout
 from cell2mol.elementdata import ElementData
+from cell2mol.element_utils import HAPTIC_PRETTY
 import logging
 
 elemdatabase = ElementData()
@@ -167,25 +167,31 @@ def get_reference_error_message(error_case):
         return "No errors found"
 
     elif error_case == 1:
-        return "Isolated Hydrogens found"
+        return "Isolated hydrogens found"
 
     elif error_case == 2:
-        return "Missing Hydrogens in Water Molecules"
+        return "Missing hydrogens in water molecules"
 
     elif error_case == 3:
-        return "Missing Hydrogens in Coordinated Water Molecules"
+        return "Missing hydrogens in coordinated water molecules"
 
     elif error_case == 4:
-        return "Missing Hydrogens in Coordinated Carbon Atoms"
+        return "Missing hydrogens in coordinated carbon atoms"
 
     elif error_case == 5:
-        return "Error in list of possible charges received for molecule or ligand"
+        return "Some unique species have no possible charge states"
 
     elif error_case == 8:
-        return "Error in Creating Bonds"
+        return "Error in assigning charges"
 
-    elif error_case == "X":
-        return "Empty Reference Molecules list"
+    elif error_case == 9:
+        return "Error in creating bonds"
+
+    elif error_case == 10:
+        return "Error in assigning spin multiplicity"
+
+    elif error_case == -1:
+        return "Empty reference molecules list"
 
     else:
         return f"Unhandled error case: {error_case}"
@@ -201,10 +207,10 @@ def get_unitcell_error_message(error_case):
         return "No errors found"
 
     elif error_case == 1:
-        return "Isolated Hydrogens found"
+        return "Isolated hydrogens found"
 
     elif error_case == 2:
-        return "Missing Hydrogens"
+        return "Missing hydrogens"
 
     elif error_case == 3:
         return "Error in reconstructing fragments"
@@ -213,16 +219,22 @@ def get_unitcell_error_message(error_case):
         return "Error in unit cell construction"
 
     elif error_case == 5:
-        return "Error in list of possible charges received for molecule or ligand"
+        return "Some unique species have no possible charge states"
 
     elif error_case == 6:
-        return "More than one valid possible charge distribution found"
+        return "Multiple valid charge distributions detected"
 
     elif error_case == 7:
-        return "No valid possible charge distribution found"
+        return "No valid charge distribution detected"
 
     elif error_case == 8:
-        return "Error in Creating Bonds"
+        return "Error in assigning charges"
+
+    elif error_case == 9:
+        return "Error in creating bonds"
+
+    elif error_case == 10:
+        return "Error in assigning spin multiplicity"
 
     else:
         return f"Unhandled error case: {error_case}"
@@ -238,16 +250,22 @@ def get_molecule_error_message(error_case):
         return "No errors found"
 
     elif error_case == 5:
-        return "Error in list of possible charges received for molecule or ligand"
+        return "Some unique species have no possible charge states"
 
     elif error_case == 6:
-        return "More than one valid possible charge distribution found"
+        return "Multiple valid charge distributions detected"
 
     elif error_case == 7:
-        return "No valid possible charge distribution found"
+        return "No valid charge distribution detected"
 
     elif error_case == 8:
-        return "Error in Creating Bonds"
+        return "Error in assigning charges"
+
+    elif error_case == 9:
+        return "Error in creating bonds"
+
+    elif error_case == 10:
+        return "Error in assigning spin multiplicity"
 
     else:
         return f"Unhandled error case: {error_case}"
@@ -305,7 +323,7 @@ def write_molecule_info(mol, file=None, index=None):
     if getattr(mol, "totcharge_cif", None) is not None:
         mol_info_parts.append(f"totcharge_cif={mol.totcharge_cif}")
     if getattr(mol, "spin", None) is not None:
-        mol_info_parts.append(f"spin={mol.spin}")
+        mol_info_parts.append(f"spin_multiplicity={mol.spin}")
     if mol.smiles is not None:
         mol_info_parts.append(f"smiles={mol.smiles}")
 
@@ -363,7 +381,6 @@ def write_molecule_info(mol, file=None, index=None):
     # Ligands
     # --------------------
     if not mol.is_non_complex_molecule and getattr(mol, "ligands", None):
-        print("", file=file)  # Spacing before ligands
         for lig in mol.ligands:
             lig_info = f"\t{lig.formula} ({lig.subtype})"
             for attr in ("smiles", "denticity", "totcharge"):
@@ -386,7 +403,7 @@ def write_molecule_info(mol, file=None, index=None):
                     if hasattr(group, "denticity"):
                         group_info += f" denticity={group.denticity}"
                     if getattr(group, "is_haptic", False):
-                        group_info += f" haptic_type={group.haptic_type}"
+                        group_info += f" haptic_type={[HAPTIC_PRETTY.get(ht, ht) for ht in group.haptic_type]}"
 
                     if getattr(group, "metals", None):
                         labels = [
@@ -397,21 +414,21 @@ def write_molecule_info(mol, file=None, index=None):
                     print(group_info, file=file)
 
 
-def write_unique_species(cell, file):
+def write_unique_species(object, file):
     """
     Write unique species information to a file-like object.
 
     Args:
-        cell: Cell object containing unique_species.
+        object: Object containing unique_species.
         file: File-like object opened for writing.
     """
 
-    unique_species = getattr(cell, "unique_species", None)
+    unique_species = getattr(object, "unique_species", None)
     if not unique_species:
-        print("\nNo unique species found in the cell object.", file=file)
+        print(f"\nNo unique species found in the {object.subtype} object.", file=file)
         return
 
-    print(f"\nUnique Species in {cell.subtype}:", file=file)
+    print(f"\nUnique Species in {object.subtype}:", file=file)
 
     for specie in unique_species:
         parts = [
@@ -428,7 +445,9 @@ def write_unique_species(cell, file):
         elif specie.subtype == "ligand":
             parts.append(f"denticity={specie.denticity}")
             if specie.is_haptic:
-                parts.append(f"haptic_type={specie.haptic_type}")
+                parts.append(
+                    f"haptic_type={[HAPTIC_PRETTY.get(ht, ht) for ht in specie.haptic_type]}"
+                )
             if getattr(specie, "smiles", None) is not None:
                 parts.append(f"smiles={specie.smiles}")
             if getattr(specie, "totcharge", None) is not None:
@@ -445,18 +464,17 @@ def write_unique_species(cell, file):
         print("\t" + " ".join(parts), file=file)
 
 
-def write_possible_charges(cell, file=None):
+def write_possible_charges(object, file=None):
     """
-    Write the possible charges for each species in the cell object.
+    Write the possible charges for each species in the object.
 
     Args:
-        cell: Cell object containing species_list.
+        object: Object containing species_list.
         file: File-like object (e.g., opened file). Defaults to None (console).
     """
-    if cell.species_list is not None:
-        print(f"\nPossible charges of species in {cell.subtype}:", file=file)
-
-        for specie in cell.species_list:
+    if object.species_list is not None:
+        print(f"\nPossible charges of species in {object.subtype}:", file=file)
+        for specie in object.species_list:
             # Base species information
             info = f"\tunique_index={specie.unique_index} {specie.formula} ({specie.subtype})"
 
@@ -554,7 +572,7 @@ def handle_error(case: int):
     if case == 5:
         logger.info("Error in list of possible charges received for molecule or ligand")
     if case == 6:
-        logger.info("More than one valid possible charge distribution found")
+        logger.info("Multiple valid charge distributions detected")
     if case == 7:
         logger.info("No valid possible charge distribution found")
     if case == 8:
@@ -577,7 +595,7 @@ def log_charge_state_details(newcell, refcell) -> None:
             logger.debug(
                 "Unique Specie %s (Formula: %s):", specie.unique_index, specie.formula
             )
-            logger.debug("  > Extracted Charge Options: %s", options)
+            logger.debug("  > Possible Charge Options: %s", options)
             # logger.debug("  > Full Possible States:     %s", specie.possible_cs)
     else:
         logger.warning("RefCell has no 'selected_cs' populated to display.")
