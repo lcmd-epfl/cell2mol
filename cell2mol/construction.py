@@ -179,7 +179,7 @@ def generate_initial_fragments(
 
     logger.debug("Number of matched atoms so far: %d", len(matched_atom_indices))
     if len(matched_atom_indices) == len(unitcell.coord):
-        logger.info("All atoms have been matched in the cell.")
+        logger.debug("All atoms have been matched in the cell.")
 
     if not updated_cell_indices:
         return []
@@ -372,12 +372,14 @@ def reconstruct_fragments(
         small_set = set(merged.ref_indices)
         if small_set.issubset(target_ref):
             if sorted(small_set) == target_ref:
+                merged.set_subtype("molecule")
                 reconstructed_molecules.append(merged)
             elif merged.natoms == 1 and (merged.labels[0] in ["H", "D"]):
                 merged.set_subtype("fragment")
-                logger.debug("Hydrogen found", merged.formula)
+                logger.debug("Hydrogen found: %s", merged.formula)
                 remaining_fragments.append(merged)
             else:
+                merged.set_subtype("fragment")
                 remaining_fragments.append(merged)
 
     return reconstructed_molecules, remaining_fragments
@@ -574,21 +576,14 @@ def assign_unitcell_species(unitcell, reference_species_list):
     ref_molecules = [
         ref
         for ref in reference_species_list
-        if ref.subtype == "molecule"
-        and not ref.iscomplex
-        and not ref.has_IA_IIA
-        and not ref.has_post_transition_metal
+        if ref.subtype == "molecule" and ref.is_non_complex_molecule
     ]
     ref_ligands = [ref for ref in reference_species_list if ref.subtype == "ligand"]
     ref_metals = [ref for ref in reference_species_list if ref.subtype == "metal"]
 
     for mol in unitcell.moleclist:
         # Case 1: non-complex molecule
-        if (
-            not mol.iscomplex
-            and not mol.has_IA_IIA
-            and not mol.has_post_transition_metal
-        ):
+        if mol.is_non_complex_molecule:
             for ref in ref_molecules:
                 if compare_reference_indices(ref, mol):
                     mol.unique_index = ref.unique_index
@@ -827,17 +822,13 @@ def _merge_fragments_iterative(
                 continue
             if frag_i.natoms + frag_j.natoms > len(target_ref):
                 continue
-            if frag_i.subtype == "Rec. Molecule" or frag_j.subtype == "Rec. Molecule":
-                continue
             if set(frag_i.ref_indices) & set(frag_j.ref_indices):
                 continue
 
             logger.debug(
-                "Fragments TO BE MERGED %s %s (%d, %d)",
+                "Fragments to be merged %s %s",
                 [frag_i.formula, frag_j.formula],
                 [frag_i.subtype, frag_j.subtype],
-                i,
-                j,
             )
 
             merged = _merge_fragment_pair(
@@ -956,6 +947,7 @@ def _merge_fragment_pair(
 
         # --- successful merge ---
         merged = Molecule.from_positional(merged_labels, merged_coord, merged_fracs)
+        merged.set_subtype("fragment")
         merged.set_origin("_merge_fragment_pair")
         merged.add_parent(refcell, indices=merged_ref_indices)
 
