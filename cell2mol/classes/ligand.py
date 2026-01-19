@@ -312,12 +312,12 @@ class Ligand(Specie):
                 conn_idx = final_group_indices[0]
                 group_metals = [newgroup.metals[kdx] for kdx in group_metals_indices[0]]
                 if len(conn_idx) == len(newgroup.atoms):
-                    logger.debug("  LIGAND.SPLIT_LIGAND: new group is found")
+                    logger.debug("  Found GROUP %s with %s", newgroup.formula, conn_idx)
                     newgroup.get_denticity()
                     # Top-down hierarchy
                     self.groups.append(newgroup)
                 elif len(conn_idx) == 0:
-                    logger.debug("  LIGAND.SPLIT_LIGAND: no group is found")
+                    logger.debug("  No group is found")
                     continue
                 else:
                     logger.debug(
@@ -333,7 +333,11 @@ class Ligand(Specie):
                     )
                     for g in splitted_groups:
                         self.groups.append(g)
-        logger.info("  Found groups %s", [group.formula for group in self.groups])
+        logger.info(
+            "Ligand %s has Groups %s",
+            self.formula,
+            [group.formula for group in self.groups],
+        )
 
         return self.groups
 
