@@ -761,13 +761,31 @@ def compare_cif_with_reference(refcell):
                     cif_totals, ref_totals, atol=1e-9
                 )
                 if not all_match:
-                    logger.info(
-                        f"Element totals differ between refcell and CIF:\n{df_compare}"
+                    logger.info("Element totals differ between refcell and CIF")
+
+                    # logger.debug(
+                    #     "Element comparison table:\n%s", df_compare.to_string()
+                    # )
+                    logger.debug("Element comparison (CIF vs refcell):")
+                    logger.debug("  Element    CIF   Refcell   Delta   OK")
+                    logger.debug("  --------------------------------------")
+
+                    for _, row in df_compare.iterrows():
+                        logger.debug(
+                            "  %-8s %6.1f %9.1f %7.1f   %s",
+                            row["Element"],
+                            row["CIF_total"],
+                            row["Refcell_total"],
+                            row["Delta (CIF-Ref)"],
+                            row["OK"],
+                        )
+
+                    logger.debug("Possible causes of discrepancies:")
+                    logger.debug(
+                        "  - Missing atoms in the crystal structure (CIF moiety mismatch)"
                     )
-                    logger.info("Possible causes:")
-                    logger.info(
-                        "- Missing atoms in the crystal structure (mismatch with CIF moiety).",
-                        "- Different adjacency matrix in refcell changed connectivity.",
+                    logger.debug(
+                        "  - Connectivity changes due to different adjacency matrices"
                     )
         except:
             logger.warning(

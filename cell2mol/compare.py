@@ -84,7 +84,6 @@ def compare_species(mol1, mol2, check_coordinates: bool = False):
         if elem != mol2.element_count[kdx]:
             logger.debug("FALSE, different %s count", elem)
             return False
-    # writexyz(os.getcwd(), f"reordered.xyz", mol1.labels, mol1.coord)
     # 4) the number of adjacencies between each pair of element types
     if mol1.adj_types is None:
         mol1.set_adj_types()
@@ -92,7 +91,6 @@ def compare_species(mol1, mol2, check_coordinates: bool = False):
         mol2.set_adj_types()
 
     count = 0
-    logger.debug("COMPARE_SPECIES. kdx ldx elem1 - elem2 : reordered - reference")
     for kdx, (elem, row1) in enumerate(zip(elems, mol1.adj_types)):
         for ldx, (elem2, val1) in enumerate(zip(elems, row1)):
             val2 = mol2.adj_types[kdx, ldx]
