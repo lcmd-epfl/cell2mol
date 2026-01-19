@@ -81,6 +81,24 @@ POST_TRANSITION_METALS = {"Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"}
 
 METALLOIDS = {"B", "Si", "Ge", "As", "Sb", "Te"}
 
+HAPTIC_PRETTY = {
+    # eta2
+    "eta2(C,C)": "η²-C,C",
+    # eta3
+    "eta3(C,C,C)": "η³-C,C,C",
+    # eta4
+    "eta4(C,C,C,C)": "η⁴-C₄",
+    "eta4(C,C,C,O)": "η⁴-C₃O",
+    # eta5
+    "eta5(Cp)": "η⁵-Cp",
+    "eta5(AsCp)": "η⁵-AsCp",
+    "eta5(P5)": "η⁵-P₅",
+    # eta6+
+    "eta6(C6)": "η⁶-C₆",
+    "eta7(C7)": "η⁷-C₇",
+    "eta8(C8)": "η⁸-C₈",
+}
+
 
 def labels2formula(labels: list):
     elems = elemdatabase.elementnr.keys()
