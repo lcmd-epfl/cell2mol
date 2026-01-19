@@ -37,7 +37,7 @@ def parsing_arguments():
         type=str,
         choices=["reference", "unitcell", "molecule"],
         required=True,
-        help="Type of information in the input file",
+        help="Type of system to interpret: reference (Wyckoff sites), unitcell, or molecule",
     )
 
     parser.add_argument(
@@ -99,17 +99,14 @@ def parsing_arguments():
     # ----------------------------
 
     # FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-30s:%(funcName)-30s | %(message)s"
-    # FORMAT = "%(levelname)-8s | %(name)-30s:%(funcName)-30s | %(message)s"
     # FORMAT = "%(funcName)-30s | %(message)s"
-    # logging.basicConfig(
-    #     level=getattr(logging, args.log_level),
-    #     format=FORMAT,
-    # )
+    FORMAT = "%(levelname)-9s %(name)-40s %(funcName)-40s | %(message)s"
     logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(levelname)-7s %(name)-30s %(funcName)-30s | %(message)s",
+        level=getattr(logging, args.log_level),
+        format=FORMAT,
         filename="cell2mol.out",
         filemode="w",
+        force=True,
     )
     return args
 
