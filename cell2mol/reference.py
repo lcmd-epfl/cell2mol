@@ -37,54 +37,93 @@ def process_reference(input_path, name, current_dir):
     """
 
     ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
+    cells_json = os.path.join(current_dir, f"Cells_{name}.json")
 
     logger.info("cell2mol version %s", config.VERSION)
     logger.info("Input CIF: %s", input_path)
     logger.info("Use CIF bond information: %s", config.USE_BOND_INFO)
 
-    structure = read(input_path)
-    cell_labels, cell_pos, cell_fracs = get_cell_atoms(structure)
-    cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
+    refcell = None
+    unitcell = None
+    cells = None
 
-    # Reference cell
-    refcell = create_reference(input_path, name, cell_vector, cell_param)
+    try:
+        structure = read(input_path)
 
-    if refcell.error_case == 0:
-        refcell.get_unique_species()
-    else:
-        logger.error(
-            "Error occurred while processing reference cell: error case %d",
-            refcell.error_case,
+        cell_labels, cell_pos, cell_fracs = get_cell_atoms(structure)
+        cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
+
+        # Reference cell
+        refcell = create_reference(input_path, name, cell_vector, cell_param)
+
+        if refcell.error_case == 0:
+            refcell.get_unique_species()
+        else:
+            logger.error(
+                "Error occurred while processing reference cell: error case %d",
+                refcell.error_case,
+            )
+
+        # Unit cell (always constructed)
+        unitcell = Cell.from_positional(
+            name,
+            cell_labels,
+            cell_pos,
+            cell_fracs,
+            cell_vector,
+            cell_param,
+        )
+        unitcell.set_subtype("unitcell")
+
+        if refcell is not None:
+            unitcell.has_isolated_H = refcell.has_isolated_H
+            unitcell.has_missing_H = refcell.has_missing_H
+
+        cells = Cells(
+            name=name,
+            reference=refcell,
+            unitcell=unitcell,
+            cell_vector=cell_vector,
+            cell_param=cell_param,
         )
 
-    refcell.save(ref_cell_fname)
-    if logger.isEnabledFor(logging.DEBUG):
-        extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
+    except Exception as exc:
+        logger.exception(
+            "Unhandled exception while processing reference for %s: %s",
+            name,
+            exc,
+        )
 
-    # Unit cell
-    unitcell = Cell.from_positional(
-        name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param
-    )
-    unitcell.set_subtype("unitcell")
-    unitcell.has_isolated_H = refcell.has_isolated_H
-    unitcell.has_missing_H = refcell.has_missing_H
+    finally:
+        # Always save what exists
+        if refcell is not None:
+            try:
+                refcell.save(ref_cell_fname)
+                if logger.isEnabledFor(logging.DEBUG):
+                    extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
+            except Exception:
+                logger.exception("Failed to save reference cell")
 
-    cells = Cells(
-        name=name,
-        reference=refcell,
-        unitcell=unitcell,
-        cell_vector=cell_vector,
-        cell_param=cell_param,
-    )
-    cells.save(os.path.join(current_dir, f"Cells_{name}.json"), format="json")
+        if cells is not None:
+            try:
+                cells.save(cells_json, format="json")
+            except Exception:
+                logger.exception("Failed to save Cells JSON")
 
-    # Summary
-    summary_fname = os.path.join(current_dir, "reference_summary.out")
-    with open(summary_fname, "w") as f:
-        print(name, file=f)
-        write_cell_molecules_info(refcell, file=f)
-        write_unique_species(refcell, file=f)
-        print(get_reference_error_message(refcell.error_case), file=f)
+        # Summary (only if reference exists)
+        if refcell is not None:
+            try:
+                summary_fname = os.path.join(current_dir, "reference_summary.out")
+                with open(summary_fname, "w") as f:
+                    print(name, file=f)
+                    write_cell_molecules_info(refcell, file=f)
+                    write_unique_species(refcell, file=f)
+                    print(
+                        get_reference_error_message(refcell.error_case),
+                        file=f,
+                    )
+            except Exception:
+                logger.exception("Failed to write reference summary")
 
     return cells
 
@@ -123,7 +162,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
     refcell.get_reference_molecules()
 
     if not refcell.refmoleclist:
-        refcell.error_case = "X"
+        refcell.error_case = -1
         logger.warning("No reference molecules found in the CIF file")
         return refcell
 
