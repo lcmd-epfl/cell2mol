@@ -311,22 +311,22 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     # --------------------------------------------------
     # Cp-like rings
     # --------------------------------------------------
-    if "h5-Cp" in g.haptic_type and not selected:
+    if "eta5(Cp)" in g.haptic_type and not selected:
         selected = True
         _assign_protonation_sites(1)
 
-    elif "h7-Cycloheptatrienyl" in g.haptic_type and not selected:
+    elif "eta7(C7)" in g.haptic_type and not selected:
         selected = True
         _assign_protonation_sites(1)
 
-    elif "h8-Cyclooctatetraenyl" in g.haptic_type and not selected:
+    elif "eta8(C8)" in g.haptic_type and not selected:
         selected = True
         _assign_protonation_sites(1)
 
     # --------------------------------------------------
     # AsCp / Pentaphosphole (substitution dependent)
     # --------------------------------------------------
-    elif "h5-AsCp" in g.haptic_type and not selected:
+    elif "eta5(AsCp)" in g.haptic_type and not selected:
         selected = True
         issubstituted = False
         for idx in parent_indices:
@@ -338,7 +338,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
         _assign_protonation_sites(0 if issubstituted else 1)
 
     # e.g. IMUCAX
-    elif "h5-Pentaphosphole" in g.haptic_type and not selected:
+    elif "eta5(P5)" in g.haptic_type and not selected:
         selected = True
         issubstituted = False
         for idx in parent_indices:
@@ -349,44 +349,29 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                         issubstituted = True
         _assign_protonation_sites(0 if issubstituted else 1)
 
-    # --------------------------------------------------
-    # Allyl / h3-Cp
-    # --------------------------------------------------
-    elif any(sub in g.haptic_type for sub in ["h3-Allyl", "h3-Cp"]) and not selected:
+    elif "eta3(Cp)" in g.haptic_type and not selected:
         selected = True
         _assign_protonation_sites(1)
 
-    # --------------------------------------------------
-    # Other hapticities
-    # --------------------------------------------------
-    elif (
-        any(sub in g.haptic_type for sub in ["h4-Butadiene", "h4-Benzene"])
-        and not selected
-    ):
+    elif "eta4(C,C,C,C)" in g.haptic_type and not selected:
         selected = True
         for idx in parent_indices:
             if ligand.atoms[idx].mconnec == 1:
                 block.append(idx)
 
-    elif (
-        any(
-            sub in g.haptic_type
-            for sub in ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]
-        )
-        and not selected
-    ):
+    elif "eta2(C,C)" in g.haptic_type and not selected:
         selected = True
         for idx in parent_indices:
             if ligand.atoms[idx].mconnec == 1:
                 block.append(idx)
 
-    elif "h4-Enone" in g.haptic_type and not selected:
+    elif "eta4(C,C,C,O)" in g.haptic_type and not selected:
         selected = True
         for idx in parent_indices:
             if ligand.atoms[idx].mconnec == 1:
                 block.append(idx)
 
-    elif "h6-Benzene" in g.haptic_type and not selected:
+    elif "eta6(C6)" in g.haptic_type and not selected:
         selected = True
         for idx in parent_indices:
             if ligand.atoms[idx].mconnec == 1:
@@ -396,7 +381,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     # Fallback: unrecognized hapticity
     # --------------------------------------------------
     elif not selected:
-        if len(g.haptic_type) == 1 and g.haptic_type[0] == "5-ring C4-N":
+        if len(g.haptic_type) == 1 and g.haptic_type[0] == "eta5(C4-N)":
             _assign_protonation_sites(1)
 
         logger.info("Haptic group not recognized, using fallback. %s", g.haptic_type)

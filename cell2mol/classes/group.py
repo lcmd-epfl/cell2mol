@@ -142,60 +142,121 @@ class Group(Specie):
         return self.metals
 
     def get_hapticity(self):
+        """
+        Determine haptic coordination mode(s) of the ligand.
+
+        Returns:
+        list[str]: List of internal haptic mode keys, e.g. ["eta2(C,C)"]
+        """
         if self.atoms is None:
             self.set_atoms()
-        self.is_haptic = False  ## old self.hapticity
-        self.haptic_type = []  ## old self.hapttype
-        totnum = len(self.labels)
-        # Carbon is the most common connected atom in ligands with hapticity
-        numC = self.labels.count("C")
-        # a Cp with As instead of C (VENNEH, Fe dataset)
-        numAs = self.labels.count("As")
-        numP = self.labels.count("P")
-        # For h4-Enone
-        numO = self.labels.count("O")
-        # numN = self.labels.count("N")
 
-        ## Carbon-based Haptic Ligands
-        if numC == 2 and totnum == 2:
-            self.haptic_type = ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]
+        self.is_haptic = False
+        self.haptic_type = []
+
+        totnum = len(self.labels)
+
+        counts = {
+            "C": self.labels.count("C"),
+            "As": self.labels.count("As"),
+            "P": self.labels.count("P"),
+            "O": self.labels.count("O"),
+        }
+
+        # (numC, numAs, numP, numO, total_atoms) → haptic modes
+        HAPTIC_RULES = {
+            # eta2
+            (2, 0, 0, 0, 2): ["eta2(C,C)"],
+            # eta3
+            (3, 0, 0, 0, 3): ["eta3(C,C,C)"],
+            # eta4
+            (3, 0, 0, 1, 4): ["eta4(C,C,C,O)"],
+            (4, 0, 0, 0, 4): ["eta4(C,C,C,C)"],
+            # eta5
+            (5, 0, 0, 0, 5): ["eta5(Cp)"],
+            (0, 5, 0, 0, 5): ["eta5(AsCp)"],
+            (0, 0, 5, 0, 5): ["eta5(P5)"],
+            # eta6+
+            (6, 0, 0, 0, 6): ["eta6(C6)"],
+            (7, 0, 0, 0, 7): ["eta7(C7)"],
+            (8, 0, 0, 0, 8): ["eta8(C8)"],
+        }
+
+        key = (
+            counts["C"],
+            counts["As"],
+            counts["P"],
+            counts["O"],
+            totnum,
+        )
+
+        if key in HAPTIC_RULES:
+            self.haptic_type = HAPTIC_RULES[key]
             self.is_haptic = True
-        elif numC == 3 and numO == 0 and totnum == 3:
-            self.haptic_type = ["h3-Allyl", "h3-Cp"]
-            self.is_haptic = True
-        elif numC == 3 and numO == 1 and totnum == 4:
-            self.haptic_type = ["h4-Enone"]
-            self.is_haptic = True
-        elif numC == 4 and totnum == 4:
-            self.haptic_type = ["h4-Butadiene", "h4-Benzene"]
-            self.is_haptic = True
-        elif numC == 5 and totnum == 5:
-            self.haptic_type = ["h5-Cp"]
-            self.is_haptic = True
-        elif numC == 6 and totnum == 6:
-            self.haptic_type = ["h6-Benzene"]
-            self.is_haptic = True
-        elif numC == 7 and totnum == 7:
-            self.haptic_type = ["h7-Cycloheptatrienyl"]
-            self.is_haptic = True
-        elif numC == 8 and totnum == 8:
-            self.haptic_type = ["h8-Cyclooctatetraenyl"]
-            self.is_haptic = True
-        # Other less common types of haptic ligands
-        elif numC == 0 and numAs == 5 and totnum == 5:
-            self.haptic_type = ["h5-AsCp"]
-            self.is_haptic = True
-        elif numC == 0 and numP == 5 and totnum == 5:
-            self.haptic_type = ["h5-Pentaphosphole"]
-            self.is_haptic = True
-        # elif numC == 1 and numP == 1 and totnum == 2:
-        #     self.haptic_type = ["h2-P=C"]
-        #     self.is_haptic = True
+
+        # Fallback: generic single-ring hapticity
         elif is_single_ring(self.labels, self.coord):
-            self.haptic_type = [f"{len(self.labels)}-ring {self.formula}"]
+            mode = f"eta{totnum}({self.formula})"
+            self.haptic_type = [mode]
             self.is_haptic = True
 
         return self.haptic_type
+
+    # def get_hapticity(self):
+    #     if self.atoms is None:
+    #         self.set_atoms()
+    #     self.is_haptic = False  ## old self.hapticity
+    #     self.haptic_type = []  ## old self.hapttype
+    #     totnum = len(self.labels)
+    #     # Carbon is the most common connected atom in ligands with hapticity
+    #     numC = self.labels.count("C")
+    #     # a Cp with As instead of C (VENNEH, Fe dataset)
+    #     numAs = self.labels.count("As")
+    #     numP = self.labels.count("P")
+    #     # For h4-Enone
+    #     numO = self.labels.count("O")
+    #     # numN = self.labels.count("N")
+
+    #     ## Carbon-based Haptic Ligands
+    #     if numC == 2 and totnum == 2:
+    #         self.haptic_type = ["h2-Benzene", "h2-Butadiene", "h2-ethylene"]
+    #         self.is_haptic = True
+    #     elif numC == 3 and numO == 0 and totnum == 3:
+    #         self.haptic_type = ["h3-Allyl", "h3-Cp"]
+    #         self.is_haptic = True
+    #     elif numC == 3 and numO == 1 and totnum == 4:
+    #         self.haptic_type = ["h4-Enone"]
+    #         self.is_haptic = True
+    #     elif numC == 4 and totnum == 4:
+    #         self.haptic_type = ["h4-Butadiene", "h4-Benzene"]
+    #         self.is_haptic = True
+    #     elif numC == 5 and totnum == 5:
+    #         self.haptic_type = ["h5-Cp"]
+    #         self.is_haptic = True
+    #     elif numC == 6 and totnum == 6:
+    #         self.haptic_type = ["h6-Benzene"]
+    #         self.is_haptic = True
+    #     elif numC == 7 and totnum == 7:
+    #         self.haptic_type = ["h7-Cycloheptatrienyl"]
+    #         self.is_haptic = True
+    #     elif numC == 8 and totnum == 8:
+    #         self.haptic_type = ["h8-Cyclooctatetraenyl"]
+    #         self.is_haptic = True
+    #     # Other less common types of haptic ligands
+    #     elif numC == 0 and numAs == 5 and totnum == 5:
+    #         self.haptic_type = ["h5-AsCp"]
+    #         self.is_haptic = True
+    #     elif numC == 0 and numP == 5 and totnum == 5:
+    #         self.haptic_type = ["h5-Pentaphosphole"]
+    #         self.is_haptic = True
+    #     # elif numC == 1 and numP == 1 and totnum == 2:
+    #     #     self.haptic_type = ["h2-P=C"]
+    #     #     self.is_haptic = True
+    #     elif is_single_ring(self.labels, self.coord):
+    #         self.haptic_type = [f"{len(self.labels)}-ring {self.formula}"]
+    #         self.is_haptic = True
+
+    #     return self.haptic_type
 
     def check_coordination(self, use_bond_info: bool | None = None):
         if use_bond_info is None:
