@@ -57,31 +57,28 @@ class Cell(BaseModel):
     species_list: list[Specie | Metal] | None = None
 
     # Missing H related attributes
+    has_isolated_H: bool | None = None
     missing_H_in_Carbon: bool | None = None
     missing_H_in_CoordWater: bool | None = None
     missing_H_in_Water: bool | None = None
     has_missing_H: bool | None = None
-    has_isolated_H: bool | None = None
 
     # Molecule lists
     refmoleclist: list[Molecule] | None = None
     moleclist: list[Molecule] | None = None
 
     # Reconstruction related attributes
-    is_fragmented: bool | None = None
     error_get_fragments: bool | None = None
     error_reconstruction: bool | None = None
 
     # Charge assignment related attributes
-    error_empty_poscharges: bool | None = None
+    selected_cs: list[list[int]] | None = None
+    error_get_poscharges: bool | None = None
     error_multiple_distrib: bool | None = None
     error_empty_distrib: bool | None = None
-    error_prepare_mols: bool | None = None
-    error_get_poscharges: bool | None = None
-    selected_cs: list[list[int]] | None = None
-
-    # Bond creation related attributes
+    error_assign_charge: bool | None = None
     error_create_bonds: bool | None = None
+    error_get_spin: bool | None = None
 
     # Charge neutrality
     is_neutral: bool | None = None
@@ -307,7 +304,7 @@ class Cell(BaseModel):
         else:
             moleclist = self.moleclist
         for idx, mol in enumerate(moleclist):
-            logger.debug("Molecule %d formula=%s", idx, mol.formula)
+            logger.debug("Molecule (%d) formula=%s", idx, mol.formula)
             if mol.is_non_complex_molecule:  # Non-complex molecules
                 found = False
                 for ldx, typ in enumerate(typelist_mols):
@@ -316,7 +313,10 @@ class Cell(BaseModel):
                         found = True
                         kdx = typ[1]
                         logger.debug(
-                            "Molecule %d is the same with %d in typelist", idx, ldx
+                            "molecule %s (%d) is the same with type %d in type list",
+                            mol.formula,
+                            idx,
+                            ldx,
                         )
                 if not found:
                     specs_found += 1
@@ -324,7 +324,7 @@ class Cell(BaseModel):
                     typelist_mols.append(list([mol, kdx]))
                     self.unique_species.append(mol)
                     logger.debug(
-                        "New molecule found with: formula=%s and added in position %d",
+                        "New molecule found with: formula=%s and added in specie type %d",
                         mol.formula,
                         kdx,
                     )
@@ -374,7 +374,10 @@ class Cell(BaseModel):
                             found = True
                             kdx = typ[1]
                             logger.debug(
-                                "ligand %d is the same with %d in typelist", jdx, ldx
+                                "ligand %s (%d) is the same with type %d in type list",
+                                lig.formula,
+                                jdx,
+                                ldx,
                             )
                     if not found:
                         specs_found += 1
@@ -382,7 +385,7 @@ class Cell(BaseModel):
                         typelist_ligs.append(list([lig, kdx]))
                         self.unique_species.append(lig)
                         logger.debug(
-                            "New ligand found with: formula=%s added in position %d",
+                            "New ligand found with: formula=%s added in specie type %d",
                             lig.formula,
                             kdx,
                         )
@@ -398,7 +401,10 @@ class Cell(BaseModel):
                             found = True
                             kdx = typ[1]
                             logger.debug(
-                                "Metal %d is the same with %d in typelist", jdx, ldx
+                                "Metal %s (%d) is the same with type %d in type list",
+                                met.formula,
+                                jdx,
+                                ldx,
                             )
                     if not found:
                         specs_found += 1
@@ -406,8 +412,8 @@ class Cell(BaseModel):
                         typelist_mets.append(list([met, kdx]))
                         self.unique_species.append(met)
                         logger.debug(
-                            "New Metal Center found with: labels %s and added in position %d",
-                            met.label,
+                            "New metal found with: formula=%s and added in specie type %d",
+                            met.formula,
                             kdx,
                         )
                     self.unique_indices.append(kdx)
@@ -424,9 +430,9 @@ class Cell(BaseModel):
         Get selected (valid) charge states for unique species and species list.
         Updates self.selected_cs and sets error flags if any None is found.
         """
-        if self.subtype != "reference":
-            logger.error("get_selected_cs should only be called on reference cells")
-            return
+        assert self.subtype == "reference", (
+            "get_selected_cs should only be called on reference"
+        )
 
         if self.unique_species is None:
             self.get_unique_species()
@@ -460,41 +466,55 @@ class Cell(BaseModel):
         self.error_get_poscharges = None in self.selected_cs
 
     def check_charge_neutrality(self):
-        """Check if the total charge of the cell is neutral."""
-        if self.subtype == "reference":
-            moleclist = self.refmoleclist
-        else:
-            moleclist = self.moleclist
+        """
+        Check whether the total charge of the unit cell is neutral.
 
-        if moleclist is None:
-            raise ValueError("TO CHECK: Molecule list is None")
+        Sets:
+            self.is_neutral:
+                - True  : total charge == 0
+                - False : total charge != 0
+                - None  : charges not fully assigned
+        """
 
-        totcharge_list = []
-        for mol in moleclist:
+        assert self.subtype == "unitcell", (
+            "check_charge_neutrality should only be called on unitcell"
+        )
+
+        if self.moleclist is None:
+            raise ValueError("Molecule list is None")
+
+        total_charge = 0
+        unassigned = []
+
+        for mol in self.moleclist:
             if mol.totcharge is None:
-                logger.warning("Charges not assigned yet")
-                self.is_neutral = None
+                unassigned.append(mol.formula)
             else:
-                totcharge_list.append(mol.totcharge)
+                total_charge += mol.totcharge
 
-        if len(totcharge_list) != 0:
-            logger.info(
-                "Total Charge of the Cell (%s) (%s): %d %s",
-                self.subtype,
-                self.subtype,
-                sum(totcharge_list),
-                totcharge_list,
+        if unassigned:
+            logger.warning(
+                "Charges not assigned for %d molecule(s): %s",
+                len(unassigned),
+                unassigned,
             )
-            if sum(totcharge_list) == 0:
-                self.is_neutral = True
-            else:
-                self.is_neutral = False
+            self.is_neutral = None
+            return
+
+        logger.info(
+            "Total charge of the unit cell: %d",
+            total_charge,
+        )
+
+        self.is_neutral = total_charge == 0
 
     def assign_charges(self):
         """
         Master function to assign charges, create bonds, and log results.
         """
-
+        logger.info("#########################################")
+        logger.info("        Assigning Charges        ")
+        logger.info("#########################################")
         if self.subtype == "reference":
             molecule_list = self.refmoleclist
             self._map_charges_to_refcell()
@@ -510,38 +530,76 @@ class Cell(BaseModel):
 
     def _map_charges_to_refcell(self):
         """Logic: Propagate charges from Unique Species to Reference Molecules."""
+        self.error_assign_charge = False
+
         for specie in self.unique_species:
             for ref in self.refmoleclist:
-                if ref.is_non_complex_molecule:
-                    if ref.unique_index == specie.unique_index:
-                        set_charge_state(specie, ref, mode=1)
-                else:
-                    # Match Ligands
-                    for lig in ref.ligands:
-                        if lig.unique_index == specie.unique_index:
-                            set_charge_state(specie, lig, mode=1)
-                    # Match Metals
-                    for met in ref.metals:
-                        if met.unique_index == specie.unique_index:
-                            met.set_charge(specie.charge)
+                try:
+                    if ref.is_non_complex_molecule:
+                        # Direct match for simple molecules
+                        if ref.unique_index == specie.unique_index:
+                            set_charge_state(specie, ref, mode=1)
+                    else:
+                        # Attempt to match all Ligands
+                        for lig in ref.ligands:
+                            if lig.unique_index == specie.unique_index:
+                                try:
+                                    set_charge_state(specie, lig, mode=1)
+                                except Exception:
+                                    self.error_assign_charge = True
+
+                        # Attempt to match all Metals
+                        for met in ref.metals:
+                            if met.unique_index == specie.unique_index:
+                                try:
+                                    met.set_charge(specie.charge)
+                                except Exception:
+                                    self.error_assign_charge = True
+
+                except Exception as e:
+                    # Catch-all for unexpected logic errors in the outer ref loop
+                    self.error_assign_charge = True
+                    logger.error(
+                        "Error mapping charge for Specie %s: %s", specie.unique_index, e
+                    )
 
     def _map_charges_to_unitcell(self):
         """Logic: Propagate charges from Reference Molecules to Unit Cell Molecules."""
+        self.error_assign_charge = False
+
         for mol in self.moleclist:
-            if mol.is_non_complex_molecule:
-                logger.info("Mapping charges for Non-Complex Molecule: %s", mol.formula)
-                for ref in self.refmoleclist:
-                    if ref.is_non_complex_molecule and (
-                        mol.unique_index == ref.unique_index
-                    ):
-                        if compare_reference_indices(ref, mol):
-                            set_charge_state(ref, mol, mode=2)
-            else:
-                logger.info("Mapping charges for Complex Molecule: %s", mol.formula)
-                for ref in self.refmoleclist:
-                    # Complex Molecule Match by Formula
-                    if not ref.is_non_complex_molecule and (mol.formula == ref.formula):
-                        self._map_complex_components(mol, ref)
+            try:
+                if mol.is_non_complex_molecule:
+                    logger.info(
+                        "Mapping charges for Non-Complex Molecule: %s", mol.formula
+                    )
+                    for ref in self.refmoleclist:
+                        if ref.is_non_complex_molecule and (
+                            mol.unique_index == ref.unique_index
+                        ):
+                            if compare_reference_indices(ref, mol):
+                                try:
+                                    set_charge_state(ref, mol, mode=2)
+                                except Exception as e:
+                                    logger.error(
+                                        "Charge assignment failed for %s: %s",
+                                        mol.formula,
+                                        e,
+                                    )
+                                    self.error_assign_charge = True
+                else:
+                    logger.info("Mapping charges for Complex Molecule: %s", mol.formula)
+                    for ref in self.refmoleclist:
+                        # Complex Molecule Match by Formula
+                        if not ref.is_non_complex_molecule and (
+                            mol.formula == ref.formula
+                        ):
+                            self._map_complex_components(mol, ref)
+            except Exception as e:
+                logger.error(
+                    "Unexpected error in unit cell mapping for %s: %s", mol.formula, e
+                )
+                self.error_assign_charge = True
 
     def _map_complex_components(self, mol, ref):
         """Helper to map ligands and metals within a complex."""
@@ -549,30 +607,56 @@ class Cell(BaseModel):
         for lig in mol.ligands:
             for ref_lig in ref.ligands:
                 if lig.formula == ref_lig.formula:
-                    if compare_reference_indices(ref_lig, lig):
-                        set_charge_state(ref_lig, lig, mode=2)
+                    try:
+                        if compare_reference_indices(ref_lig, lig):
+                            set_charge_state(ref_lig, lig, mode=2)
+                    except Exception as e:
+                        logger.error("Ligand charge mapping failed: %s", e)
+                        self.error_assign_charge = True
 
         # Map Metals
         for met in mol.metals:
             for ref_met in ref.metals:
                 if met.formula == ref_met.formula:
-                    # Compare parent indices to ensure correct metal center
-                    p_idx_ref = ref_met.get_parent_index("reference")
-                    p_idx_mol = met.get_parent_index("reference")
-                    if p_idx_ref == p_idx_mol:
-                        met.set_charge(ref_met.charge)
+                    try:
+                        p_idx_ref = ref_met.get_parent_index("reference")
+                        p_idx_mol = met.get_parent_index("reference")
+                        if p_idx_ref == p_idx_mol:
+                            met.set_charge(ref_met.charge)
+                    except Exception as e:
+                        logger.error("Metal charge mapping failed: %s", e)
+                        self.error_assign_charge = True
 
     def _finalize_bonds_and_prepare(self, molecule_list):
-        """Shared logic to create bonds and prepare complex structures."""
-        errors = []
+        """
+        Shared logic to finalize bonding and prepare complex molecules.
+        Only prepares molecules if bonding was successful.
+        """
+        overall_error = False
+
         for mol in molecule_list:
-            mol.create_bonds()
-            errors.append(mol.error_create_bonds)
+            # Create Bonds
+            try:
+                mol.create_bonds()
+            except Exception as e:
+                mol.error_create_bonds = True
+                logger.error("Bonding failed for %s: %s", mol, e)
 
-            if not mol.is_non_complex_molecule:
-                prepare_mol(mol)
+            # Update overall error state if any create_bonds failed
+            if mol.error_create_bonds:
+                overall_error = True
 
-        self.error_create_bonds = any(errors)
+            #  Prepare Complex Molecules (if bonding succeeded)
+            if not mol.is_non_complex_molecule and not mol.error_create_bonds:
+                try:
+                    prepare_mol(mol)
+                except Exception as e:
+                    # We flag the error state here as well
+                    mol.error_create_bonds = True
+                    overall_error = True
+                    logger.error("Preparation failed for %s: %s", mol, e)
+
+        self.error_create_bonds = overall_error
 
     def _log_charge_results(self, molecule_list, label: str):
         """Shared logic to log the final state of molecules."""
@@ -601,49 +685,48 @@ class Cell(BaseModel):
                 for kdx, met in enumerate(mol.metals):
                     logger.info("  Metal %d: %s %d", kdx, met.formula, met.charge)
 
-    def create_bonds(self):
-        """Create bonds for all molecules in the cell."""
-        if self.subtype == "reference":
-            moleclist = self.refmoleclist
-        else:
-            moleclist = self.moleclist
-
-        if moleclist is None:
-            raise ValueError("TO CHECK: Molecule list is None")
-
-        temp = []
-        for mol in moleclist:
-            logger.info("Creating Bonds for molecule %s", mol.formula)
-            mol.create_bonds()
-            temp.append(mol.error_create_bonds)
-
-        if any(temp):
-            self.error_create_bonds = True
-        else:
-            self.error_create_bonds = False
-
     def assign_spin(self):
-        """Assign spin multiplicity for all molecules in the cell."""
+        """
+        Assign spin multiplicity for all molecules in the cell.
+        Attempts spin assignment for all molecules and records
+        whether any failures occurred.
+        """
         logger.info("#########################################")
         logger.info("       Assigning Spin multiplicity       ")
         logger.info("#########################################")
 
+        overall_error = False
+
         if self.subtype == "reference":
             moleclist = self.refmoleclist
         else:
             moleclist = self.moleclist
 
         if moleclist is None:
-            raise ValueError("TO CHECK:Molecule list is None")
+            raise ValueError(
+                "Molecule list is None before spin assignment (invalid state)"
+            )
 
         for mol in moleclist:
-            if mol.iscomplex:
-                for metal in mol.metals:
-                    if metal.coord_nr is None:
-                        metal.get_coordination_geometry()
-                        metal.get_coord_sphere_formula()
-                    metal.get_spin()
-            mol.get_spin()
+            mol.error_get_spin = False
+
+            try:
+                if mol.iscomplex:
+                    for metal in mol.metals:
+                        if metal.coord_nr is None:
+                            metal.get_coordination_geometry()
+                            metal.get_coord_sphere_formula()
+                        metal.get_spin()
+
+                mol.get_spin()
+
+            except Exception as e:
+                mol.error_get_spin = True
+                overall_error = True
+                logger.error("Spin assignment failed for %s: %s", mol, e)
+                logger.debug("Exception details", exc_info=True)
+
+        self.error_get_spin = overall_error
 
     def predict_metal_ox(self):
         """Predict oxidation states for metals in all molecules in the cell."""
@@ -664,66 +747,57 @@ class Cell(BaseModel):
                     metal.predict_charge()
 
     def assess_errors(self, mode):
-        ### This function might be called to print the possible errors found in the unit cell, during reconstruction, and charge/spin assignment
+        """
+        Assess possible error conditions and assign an error case
+        depending on the processing mode.
 
-        if mode == "hydrogens":
-            logger.info("Check Errors in hydrogens")
-            if self.has_isolated_H:
-                case = 1
-            elif self.missing_H_in_Water:
-                case = 2
-            elif self.missing_H_in_CoordWater:
-                case = 3
-            elif self.missing_H_in_Carbon:
-                case = 4
-            else:
-                case = 0
-        elif mode == "possible_charges":
-            logger.info("Check Errors in possible charges")
-            if self.has_isolated_H:
-                case = 1
-            elif self.missing_H_in_Water:
-                case = 2
-            elif self.missing_H_in_CoordWater:
-                case = 3
-            elif self.missing_H_in_Carbon:
-                case = 4
-            elif self.error_get_poscharges:
-                case = 5
-            else:
-                case = 0
-        elif mode == "reconstruction":
-            logger.info("Check Errors in reconstruction")
-            if self.has_isolated_H:
-                case = 1
-            elif self.has_missing_H:
-                case = 2
-            elif self.error_get_fragments:
-                case = 3
-            elif self.error_reconstruction:
-                case = 4
-            else:
-                case = 0
-        elif mode == "charge_assignment":
-            logger.info("Check Errors in charge assignment")
-            if self.has_isolated_H:
-                case = 1
-            elif self.has_missing_H:
-                case = 2
-            elif self.error_get_fragments:
-                case = 3
-            elif self.error_reconstruction:
-                case = 4
-            elif self.error_get_poscharges:
-                case = 5
-            elif self.error_multiple_distrib:
-                case = 6
-            elif self.error_empty_distrib:
-                case = 7
-            else:
-                case = 0
+        Design:
+        - First error wins (do not overwrite error_case)
+        - Each mode only checks its own responsibility
+        """
 
-        self.error_case = case
+        error_map = {
+            "hydrogens": [
+                ("has_isolated_H", 1),
+                ("missing_H_in_Water", 2),
+                ("missing_H_in_CoordWater", 3),
+                ("missing_H_in_Carbon", 4),
+            ],
+            "possible_charges": [
+                ("error_get_poscharges", 5),
+            ],
+            "reconstruction": [
+                ("error_get_fragments", 3),
+                ("error_reconstruction", 4),
+            ],
+            "balance_charges": [
+                ("error_multiple_distrib", 6),
+                ("error_empty_distrib", 7),
+            ],
+            "charge_assignment": [
+                ("error_assign_charge", 8),
+                ("error_create_bonds", 9),
+            ],
+            "spin_assignment": [
+                ("error_get_spin", 10),
+            ],
+        }
+
+        if mode not in error_map:
+            raise ValueError(f"Unknown error assessment mode {mode} for {self.subtype}")
+
+        for attr, code in error_map[mode]:
+            logger.debug(
+                "Checking %s for error assessment in %s... %s",
+                attr,
+                self.subtype,
+                getattr(self, attr),
+            )
+            if getattr(self, attr):
+                self.error_case = code
+                return
+
+        self.error_case = 0
 
     def save(self, path):
         """Save the Cell object to a file using pickle."""
