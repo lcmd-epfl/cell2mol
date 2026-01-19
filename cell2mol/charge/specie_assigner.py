@@ -37,10 +37,10 @@ def prepare_mol(mol):
 
 def assign_charge_to_specie(specie: object, final_charge: int):
     """
-    Assigns the final charge to a specific species object.
+    Assigns the final charge to a specie object.
 
     Args:
-        specie: The species object to update.
+        specie: The specie object to update.
         final_charge: The integer charge to assign.
     """
     logger.debug(
@@ -106,12 +106,12 @@ def set_charge_state(reference, target, mode: int):
     """
     final_charge = reference.totcharge
 
-    logger.debug(
-        "SET_CHARGE_STATE: Mode=%d | Target=%s | RefCharge=%s",
-        mode,
-        target.formula,
-        final_charge,
-    )
+    # logger.debug(
+    #     "SET_CHARGE_STATE: Mode=%d | Target=%s | RefCharge=%s",
+    #     mode,
+    #     target.formula,
+    #     final_charge,
+    # )
 
     if mode == 1:
         _apply_precalculated_state(target, final_charge)

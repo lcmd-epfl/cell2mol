@@ -17,14 +17,14 @@ def balance_unitcell_charge(refcell, unitcell):
 
     # check error flags
     if unitcell.error_reconstruction:
-        logger.warning(" due to reconstruction error.")
-        return refcell, unitcell
-    if refcell.error_get_poscharges:
-        unitcell.error_get_poscharges = True
-        logger.error("No charge states for some species.")
+        logger.warning(" Not proceed due to reconstruction error.")
         return refcell, unitcell
 
-    unitcell.error_get_poscharges = False
+    unitcell.error_get_poscharges = refcell.error_get_poscharges
+    if unitcell.error_get_poscharges:
+        logger.error(" Not proceed due to no charge states for some unique species.")
+        return refcell, unitcell
+
     unitcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
     unitcell.unique_species = copy.deepcopy(refcell.unique_species)
     log_charge_state_details(unitcell, refcell)
@@ -39,55 +39,53 @@ def balance_unitcell_charge(refcell, unitcell):
     unitcell.error_empty_distrib = dist_count == 0
 
     # If the primary attempt failed (too many or empty results), try heuristics.
-    if dist_count != 1:
-        retry_expanded, retry_charges = [], []
-        if unitcell.error_multiple_distrib:
-            logger.info(
-                "Ambiguity found (%d distributions). Retrying with Aromaticity preference ...",
-                dist_count,
-            )
-            retry_expanded, retry_charges = resolve_charge_distributions(
-                unitcell.unique_indices,
-                refcell.unique_species,
-                aromatic=True,
-            )
-        elif unitcell.error_empty_distrib:
-            logger.info(
-                "No valid distribution found. Retrying with Rare Metal Oxidation States...",
-                dist_count,
-            )
-            retry_expanded, retry_charges = resolve_charge_distributions(
-                unitcell.unique_indices,
-                refcell.unique_species,
-                rare=True,
-            )
+    # if dist_count != 1:
+    #     retry_expanded, retry_charges = [], []
+    #     if unitcell.error_multiple_distrib:
+    #         logger.info(
+    #             "Ambiguity found (%d distributions). Retrying with Aromaticity preference ...",
+    #             dist_count,
+    #         )
+    #         retry_expanded, retry_charges = resolve_charge_distributions(
+    #             unitcell.unique_indices,
+    #             refcell.unique_species,
+    #             aromatic=True,
+    #         )
+    #     elif unitcell.error_empty_distrib:
+    #         logger.info(
+    #             "No valid distribution found. Retrying with Rare Metal Oxidation States...",
+    #             dist_count,
+    #         )
+    #         retry_expanded, retry_charges = resolve_charge_distributions(
+    #             unitcell.unique_indices,
+    #             refcell.unique_species,
+    #             rare=True,
+    #         )
 
-        # Evaluate retry results
-        retry_count = len(retry_expanded)
-        if len(retry_expanded) == 1:
-            logger.info("Retry success. Valid distribution found.")
-            expanded_species_charges = retry_expanded
-            unique_species_charges = retry_charges
-            unitcell.error_multiple_distrib = False
-            unitcell.error_empty_distrib = False
-        else:
-            # Update flags based on retry failure (e.g., still multiple or still empty)
-            unitcell.error_multiple_distrib = retry_count > 1
-            unitcell.error_empty_distrib = retry_count == 0
+    #     # Evaluate retry results
+    #     retry_count = len(retry_expanded)
+    #     if len(retry_expanded) == 1:
+    #         logger.info("Retry success. Valid distribution found.")
+    #         expanded_species_charges = retry_expanded
+    #         unique_species_charges = retry_charges
+    #         unitcell.error_multiple_distrib = False
+    #         unitcell.error_empty_distrib = False
+    #     else:
+    #         # Update flags based on retry failure (e.g., still multiple or still empty)
+    #         unitcell.error_multiple_distrib = retry_count > 1
+    #         unitcell.error_empty_distrib = retry_count == 0
 
     # Final Error Check
     if unitcell.error_multiple_distrib or unitcell.error_empty_distrib:
         logger.error(
-            "Charge Assignment Failed. Errors: PosCharges=%s, Multiple=%s, Empty=%s",
-            unitcell.error_get_poscharges,
+            "Balance charges failed. Error in distribution: Multiple=%s, Empty=%s",
             unitcell.error_multiple_distrib,
             unitcell.error_empty_distrib,
         )
         return refcell, unitcell
 
-    # Apply Charges to Reference
-    # We apply charges to the refcell first. The corresponding unique_charges
-    # match the order of refcell.unique_species.
+    # Assign charges to the unique species only.
+    # Then propagate to refcell.refmoleclist later by refcell.assign_charges()
     final_charges = unique_species_charges[0]
     for specie, charge in zip(refcell.unique_species, final_charges):
         assign_charge_to_specie(specie, charge)
@@ -117,29 +115,29 @@ def balance_molecule_charge(molecule, input_charge: int = 0, second_try: bool = 
     )
 
     # Refinement for the retry logic inside balance_molecule_charge
-    if len(expanded_species_charges) != 1 and second_try:
-        logger.info("Retrying with fallbacks...")
+    # if len(expanded_species_charges) != 1 and second_try:
+    #     logger.info("Retrying with fallbacks...")
 
-        # Capture the retry results
-        res_expanded, res_unique = [], []
-        if len(expanded_species_charges) > 1:
-            res_expanded, res_unique = resolve_charge_distributions(
-                unique_indices,
-                molecule.unique_species,
-                input_charge=input_charge,
-                aromatic=True,
-            )
-        elif len(expanded_species_charges) == 0:
-            res_expanded, res_unique = resolve_charge_distributions(
-                unique_indices,
-                molecule.unique_species,
-                input_charge=input_charge,
-                rare=True,
-            )
+    #     # Capture the retry results
+    #     res_expanded, res_unique = [], []
+    #     if len(expanded_species_charges) > 1:
+    #         res_expanded, res_unique = resolve_charge_distributions(
+    #             unique_indices,
+    #             molecule.unique_species,
+    #             input_charge=input_charge,
+    #             aromatic=True,
+    #         )
+    #     elif len(expanded_species_charges) == 0:
+    #         res_expanded, res_unique = resolve_charge_distributions(
+    #             unique_indices,
+    #             molecule.unique_species,
+    #             input_charge=input_charge,
+    #             rare=True,
+    #         )
 
-        # If the retry found a unique solution, update the main variables
-        if len(res_expanded) == 1:
-            expanded_species_charges, unique_species_charges = res_expanded, res_unique
+    #     # If the retry found a unique solution, update the main variables
+    #     if len(res_expanded) == 1:
+    #         expanded_species_charges, unique_species_charges = res_expanded, res_unique
 
     # Update state flags based on final results
     dist_count = len(expanded_species_charges)
@@ -148,7 +146,7 @@ def balance_molecule_charge(molecule, input_charge: int = 0, second_try: bool = 
 
     if molecule.error_multiple_distrib or molecule.error_empty_distrib:
         logger.error(
-            "Charge Assignment Failed: Multiple=%s, Empty=%s",
+            "Balance charges failed. Error in distribution: Multiple=%s, Empty=%s",
             molecule.error_multiple_distrib,
             molecule.error_empty_distrib,
         )
