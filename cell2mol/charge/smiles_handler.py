@@ -93,13 +93,13 @@ def correct_smiles_ligand(ligand: object) -> Tuple[bool, bool]:
 
     # --- zwitterion correction ---
     temp_obj = rwlig.GetMol()
-    logger.debug(
-        "Ligand structure before zwitterion fix: %s", Chem.MolToSmiles(temp_obj)
-    )
+    # logger.debug(
+    #     "Ligand structure before zwitterion fix: %s", Chem.MolToSmiles(temp_obj)
+    # )
 
-    obj, fix_zwitterions = fix_zwitterions_in_adjacent_atoms(temp_obj)
+    obj, fixed = fix_zwitterions(temp_obj)
 
-    if fix_zwitterions:
+    if fixed:
         logger.debug("Zwitterions fixed. Updated SMILES: %s", Chem.MolToSmiles(obj))
 
     try:
@@ -115,29 +115,32 @@ def correct_smiles_ligand(ligand: object) -> Tuple[bool, bool]:
         Chem.AssignAtomChiralTagsFromStructure(obj, -1)
 
         final_smiles = Chem.MolToSmiles(obj)
-        logger.debug(
-            "Ligand %s: Original [%s] -> Corrected [%s]",
-            ligand.formula,
-            ligand.smiles,
-            final_smiles,
-        )
+
+        if ligand.smiles == final_smiles:
+            logger.debug(
+                "Ligand %s SMILES unchanged: %s", ligand.formula, ligand.smiles
+            )
+        else:
+            logger.debug("Ligand %s", ligand.formula)
+            logger.debug("  Original SMILES: %s", ligand.smiles)
+            logger.debug("  Corrected SMILES: %s", final_smiles)
 
         ligand.smiles = final_smiles
         ligand.rdkit_obj = obj
 
-        if fix_zwitterions:
+        if fixed:
             ligand.set_charges(
                 atomic_charges=[a.GetFormalCharge() for a in obj.GetAtoms()]
             )
 
-        return True, fix_zwitterions
+        return True, fixed
 
     except Exception as e:
         logger.error("RDKit processing failed for ligand %s: %s", ligand.formula, e)
         return False, fix_zwitterions
 
 
-def fix_zwitterions_in_adjacent_atoms(mol):
+def fix_zwitterions(mol):
     """
     Fixes zwitterionic artifacts by adjusting formal charges between adjacent atoms
     with opposite charges in an RDKit molecule object.
@@ -149,7 +152,7 @@ def fix_zwitterions_in_adjacent_atoms(mol):
         tuple: (Corrected Chem.Mol, bool indicating if changes were made).
     """
     rw_mol = Chem.RWMol(mol)
-    fix_zwitterions = False
+    fixed = False
 
     for atom in rw_mol.GetAtoms():
         fcharge = atom.GetFormalCharge()
@@ -161,7 +164,7 @@ def fix_zwitterions_in_adjacent_atoms(mol):
             neighbors = atom.GetNeighbors()
 
             logger.debug(
-                "Checking positive atom: %s (idx=%d, charge=%d)",
+                "A positive atom: %s (idx=%d, charge=%d)",
                 atom_label,
                 atom_idx,
                 fcharge,
@@ -213,7 +216,7 @@ def fix_zwitterions_in_adjacent_atoms(mol):
                     # Minimize zwitterion only if a bond exists and is currently a DOUBLE bond
                     # (This logic implies converting a charged double bond to a neutral single bond)
                     if bond and bond.GetBondTypeAsDouble() == 2.0:
-                        fix_zwitterions = True
+                        fixed = True
                         logger.debug(
                             "\tFixing adjacent charges between %s and %s",
                             atom_label,
@@ -268,14 +271,16 @@ def fix_zwitterions_in_adjacent_atoms(mol):
                             )
                         continue
 
-    return rw_mol.GetMol(), fix_zwitterions
+    return rw_mol.GetMol(), fixed
 
 
 def generate_tmc_rdkit_obj_smiles(mol: object):
     all_metals_indices = [met.get_parent_index("molecule") for met in mol.metals]
     logger.debug(
-        "Found metals %s %s",
-        [met.atom_site_label for met in mol.metals],
+        "Found metals %s with indices %s",
+        [met.atom_site_label for met in mol.metals]
+        if getattr(mol.metals[0], "atom_site_label", None) is not None
+        else [met.label for met in mol.metals],
         all_metals_indices,
     )
     temp_mol = Chem.RWMol()
@@ -288,7 +293,9 @@ def generate_tmc_rdkit_obj_smiles(mol: object):
             a.SetProp("__atom_site_label", met.atom_site_label)
 
         idx = temp_mol.AddAtom(a)
-        logger.debug("Add metal atom %s", Chem.MolToSmiles(temp_mol))
+        logger.debug(
+            "Add metal atom %s to rdkit molecule object", Chem.MolToSmiles(temp_mol)
+        )
 
     for lig in mol.ligands:
         # lig_atom : atom object from cell2mol
@@ -300,7 +307,11 @@ def generate_tmc_rdkit_obj_smiles(mol: object):
             if getattr(lig_atom, "atom_site_label", None) is not None:
                 a.SetProp("__atom_site_label", lig_atom.atom_site_label)
 
-        logger.debug("Add ligand with %s %s", lig.formula, lig.totcharge)
+        logger.debug(
+            "Add ligand with %s (Q=%s) to rdkit molecule object",
+            lig.formula,
+            lig.totcharge,
+        )
 
         temp_mol = Chem.CombineMols(temp_mol, lig.rdkit_obj)
 
@@ -330,9 +341,9 @@ def generate_tmc_rdkit_obj_smiles(mol: object):
             atom.get_parent_index("molecule") for atom in met.coord_sphere
         ]
         logger.debug(
-            "%s (%s) coordinates to %s %s",
+            "%s%s coordinates to %s %s",
             met.label,
-            met.atom_site_label,
+            f" ({met.atom_site_label})" if met.atom_site_label else "",
             coordinating_atoms_labels,
             coordinating_atoms_indices,
         )
@@ -385,9 +396,9 @@ def generate_tmc_rdkit_obj_smiles(mol: object):
 def create_bonds_specie(specie, rdkit_obj: object = None):
     from cell2mol.classes import Bond
 
-    logger.debug(
-        "CREATE_bonds_specie: %s %s %s", specie.formula, specie.subtype, specie.smiles
-    )
+    # logger.debug(
+    #     "CREATE_bonds_specie: %s %s %s", specie.formula, specie.subtype, specie.smiles
+    # )
     n_atoms = specie.natoms  # e.g. 9
     if rdkit_obj is not None:
         rdkit_obj = rdkit_obj
