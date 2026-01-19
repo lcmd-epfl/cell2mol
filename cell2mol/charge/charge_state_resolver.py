@@ -64,8 +64,7 @@ def enumerate_possible_charge_states(spec: object):
     is_haptic_c8 = (
         spec.subtype == "ligand"
         and len(spec.groups) == 1
-        and spec.groups[0].is_haptic
-        and "h8-Cyclooctatetraenyl" in spec.groups[0].haptic_type
+        and spec.groups[0].haptic_type == ["eta8(C8)"]
     )
     if is_haptic_c8:
         ch_state = generate_charge_state(-1, spec.protonation_states[0])
