@@ -6,7 +6,11 @@ from ase.io import read
 from cell2mol.utils import config
 from cell2mol.args import parsing_arguments
 from cell2mol.classes import Cell, Cells
-from cell2mol.operations import frac2cart_fromparam, is_over_metal_limit
+from cell2mol.operations import (
+    frac2cart_fromparam,
+    is_polynuclear_over_limit,
+    has_mixed_metal_types,
+)
 from cell2mol.read_cif import (
     get_cell_atoms,
     get_cell_parameters,
@@ -20,6 +24,7 @@ from cell2mol.write_results import (
     write_cell_molecules_info,
     write_unique_species,
     get_reference_error_message,
+    get_reference_warning_messages,
 )
 
 logger = logging.getLogger(__name__)
@@ -95,12 +100,44 @@ def process_reference(input_path, name, current_dir):
         )
 
     finally:
-        # Always save what exists
+        # --- Summary (skip if error_case == -1 or refcell is None) ---
+        if refcell is None or refcell.error_case == -1:
+            return
+
+        try:
+            summary_fname = os.path.join(current_dir, "reference_summary.out")
+            error_message = get_reference_error_message(refcell.error_case)
+            warnings = get_reference_warning_messages(refcell)
+
+            with open(summary_fname, "w") as f:
+                print(name, file=f)
+                write_cell_molecules_info(refcell, file=f)
+                write_unique_species(refcell, file=f)
+                print("ERROR: " + error_message, file=f)
+                for msg in warnings:
+                    print("WARNING: " + msg, file=f)
+
+            # --- Log error and warnings ---
+            logger.info("Reference Summary:")
+            logger.info("%s", error_message)
+            if not warnings:
+                logger.info("No potential issues detected.")
+            else:
+                logger.warning("Potential issues detected:")
+                for msg in warnings:
+                    logger.warning("  - %s", msg)
+
+        except Exception:
+            logger.exception("Failed to write reference summary")
+
+        # --- Always save what exists ---
         if refcell is not None:
             try:
                 refcell.save(ref_cell_fname)
+
                 if refcell.error_case != -1 and logger.isEnabledFor(logging.DEBUG):
                     extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
+
             except Exception:
                 logger.exception("Failed to save reference cell")
 
@@ -109,21 +146,6 @@ def process_reference(input_path, name, current_dir):
                 cells.save(cells_json, format="json")
             except Exception:
                 logger.exception("Failed to save Cells JSON")
-
-        # --- Summary (skip if error_case == -1) ---
-        if refcell is not None and refcell.error_case != -1:
-            try:
-                summary_fname = os.path.join(current_dir, "reference_summary.out")
-                with open(summary_fname, "w") as f:
-                    print(name, file=f)
-                    write_cell_molecules_info(refcell, file=f)
-                    write_unique_species(refcell, file=f)
-                    print(
-                        get_reference_error_message(refcell.error_case),
-                        file=f,
-                    )
-            except Exception:
-                logger.exception("Failed to write reference summary")
 
     return cells
 
@@ -166,23 +188,26 @@ def create_reference(input_path, name, cell_vector, cell_param):
         logger.warning("No reference molecules found in the CIF file")
         return refcell
 
+    # Extract additional CIF information
     chemical_name, reported_metal_os, moiety_dicts = extract_info_from_cif(input_path)
     refcell.set_additional_cif_info(chemical_name, reported_metal_os, moiety_dicts)
-    compare_cif_with_reference(refcell)
+
+    # Check for potential warnings
+    cif_mismatch = compare_cif_with_reference(moiety_dicts, refcell.refmoleclist)
+    over_polynuclear_limit = any(
+        is_polynuclear_over_limit(ref.labels, max_metal_centers=config.MAX_METALS)
+        for ref in refcell.refmoleclist
+    )
+    mixed_metals = any(
+        has_mixed_metal_types(ref.labels) for ref in refcell.refmoleclist
+    )
+    refcell.set_potential_warning(cif_mismatch, over_polynuclear_limit, mixed_metals)
+
+    # Check missing hydrogens and assess errors
     refcell.check_hydrogens()
     refcell.assess_errors(mode="hydrogens")
-
     logger.info("Reference molecules generated")
-    logger.info("Number of reference molecules found: %d", len(refcell.refmoleclist))
 
-    not_processed = []
-    for ref in refcell.refmoleclist:
-        not_processed.append(
-            is_over_metal_limit(ref.labels, max_metal_centers=config.MAX_METALS)
-        )
-    if any(not_processed):
-        refcell.error_case = 6
-        logger.warning("One or more reference molecules exceed the metal center limit")
     return refcell
 
 

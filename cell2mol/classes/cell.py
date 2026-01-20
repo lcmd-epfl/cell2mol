@@ -86,12 +86,14 @@ class Cell(BaseModel):
     # Error assessment
     error_case: int | None = None
 
-    # TOFIX @choglass: See if we keep here, it's assigned in refcell.py#146
+    # TOFIX @choglass: See if we keep here, it's assigned in reference.py#146
     # KEEP IT FOR NOW
     chemical_name: str | None = None
     reported_metal_os: list[tuple[str, int]] | None = None
     moiety_dicts: list[dict] | None = None
     disagree_with_cif_formula: bool | None = None
+    is_polynuclear_over_limit: bool | None = None
+    has_mixed_metal_types: bool | None = None
 
     # Frozen fields
     version: str = Field(default="2.0", frozen=True)
@@ -130,6 +132,12 @@ class Cell(BaseModel):
         self.chemical_name = chemical_name
         self.reported_metal_os = reported_metal_os
         self.moiety_dicts = moiety_dicts
+
+    def set_potential_warning(self, cif_mismatch, over_polynuclear_limit, mixed_metals):
+        """Set potential warning flags based on CIF mismatch, polynuclear limit, and mixed metals."""
+        self.disagree_with_cif_formula = cif_mismatch
+        self.is_polynuclear_over_limit = over_polynuclear_limit
+        self.has_mixed_metal_types = mixed_metals
 
     def get_reference_molecules(
         self,
