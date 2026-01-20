@@ -556,12 +556,7 @@ def get_moiety_indices_from_labels(atom_site_labels, moiety_list):
     return moiety_indices
 
 
-def is_over_metal_limit(labels: list[str], max_metal_centers: int = 6) -> bool:
-    """
-    Check whether a complex exceeds the metal center limit.
-    Logs details if the limit is exceeded or if non-transition metals are present.
-    """
-
+def count_metals(labels: list[str]) -> dict[str, int]:
     metal_counts = {
         "tm": 0,
         "f_block": 0,
@@ -582,6 +577,17 @@ def is_over_metal_limit(labels: list[str], max_metal_centers: int = 6) -> bool:
         elif label in METALLOIDS:
             metal_counts["metalloid"] += 1
 
+    return metal_counts
+
+
+def is_polynuclear_over_limit(labels: list[str], max_metal_centers: int = 6) -> bool:
+    """
+    Check whether a complex exceeds the metal center limit.
+    Logs details if the limit is exceeded or if non-transition metals are present.
+    """
+
+    metal_counts = count_metals(labels)
+
     total_metal_count = (
         metal_counts["tm"]
         + metal_counts["f_block"]
@@ -592,7 +598,7 @@ def is_over_metal_limit(labels: list[str], max_metal_centers: int = 6) -> bool:
     log_map = {
         "Transition metals": metal_counts["tm"],
         "Lanthanides/Actinides": metal_counts["f_block"],
-        "Alkali and alkaline earth metals": metal_counts["alkali_alkaline"],
+        "Alkali/Alkaline earth metals": metal_counts["alkali_alkaline"],
         "Post-transition metals": metal_counts["post_tm"],
         "Metalloids": metal_counts["metalloid"],
     }
@@ -603,19 +609,38 @@ def is_over_metal_limit(labels: list[str], max_metal_centers: int = 6) -> bool:
             max_metal_centers,
             labels2formula(labels),
         )
-        for name, count in log_map.items():
-            if count > 0:
-                logger.debug("  %s: %d", name, count)
+        logger.debug("Total metal counts: %d", total_metal_count)
+        logger.debug("Metal type counts: %s", log_map)
+        # for name, count in log_map.items():
+        #     if count > 0:
+        #         logger.debug("  %s: %d", name, count)
         return True
 
-    elif total_metal_count > metal_counts["tm"]:
-        logger.warning(
-            "Complex contains metals other than transition metals: %s",
+    return False
+
+
+def has_mixed_metal_types(labels: list[str]) -> bool:
+    metal_counts = count_metals(labels)
+
+    tm_count = metal_counts["tm"]
+    total_metal_count = (
+        tm_count
+        + metal_counts["f_block"]
+        + metal_counts["alkali_alkaline"]
+        + metal_counts["post_tm"]
+    )
+
+    # No metals → not mixed
+    if total_metal_count == 0:
+        return False
+
+    # Only transition metals → not mixed
+    if total_metal_count == tm_count:
+        logger.info(
+            "TM-only complex detected: %s",
             labels2formula(labels),
         )
-        for name, count in log_map.items():
-            if count > 0:
-                logger.debug("  %s: %d", name, count)
+        return False
 
-    logger.info("Processed: %s", labels2formula(labels))
-    return False
+    # Mixed metal types detected
+    return True
