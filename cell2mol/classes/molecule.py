@@ -9,9 +9,10 @@ from cell2mol.connectivity import split_species
 from cell2mol.element_utils import (
     labels2formula,
     get_metal_idxs,
-    get_non_transition_metal_idxs,
     get_alkali_alkaline_earth_metal_idxs,
+    get_post_transition_metal_idxs,
     POST_TRANSITION_METALS,
+    METALLOIDS,
 )
 from cell2mol.compare import compare_species, compare_metals
 from cell2mol.charge.specie_assigner import set_charge_state, prepare_mol
@@ -175,13 +176,11 @@ class Molecule(Specie):
         # Identify metal indices (GLOBAL index space: self.indices)
         # ============================================================
         if post_tms:
-            logger.debug(
-                "post_tms enabled: using ONLY post-transition metals as metal centers"
+            logger.info(
+                "post_tms enabled: ONLY post-transition metals exist as metals."
             )
             metal_idx: set[int] = {
-                self.indices[i]
-                for i, label in enumerate(self.labels)
-                if label in POST_TRANSITION_METALS
+                self.indices[i] for i in get_post_transition_metal_idxs(self.labels)
             }
         else:
             metal_idx: set[int] = {self.indices[i] for i in get_metal_idxs(self.labels)}
@@ -190,16 +189,16 @@ class Molecule(Specie):
                 for i in get_alkali_alkaline_earth_metal_idxs(self.labels)
             )
 
-        # Non-transition metals (reported only, not included)
-        non_transition_metal_idx = {
-            self.indices[i] for i in get_non_transition_metal_idxs(self.labels)
-        }
-
-        if non_transition_metal_idx:
-            logger.debug(
-                "Non-transition metals found: %s",
-                [self.labels[self.indices.index(i)] for i in non_transition_metal_idx],
+        post_tm_found = [
+            label for label in self.labels if label in POST_TRANSITION_METALS
+        ]
+        metalloid_found = [label for label in self.labels if label in METALLOIDS]
+        if post_tm_found:
+            logger.info(
+                "Post-transition metals found: %s %s ", self.formula, post_tm_found
             )
+        if metalloid_found:
+            logger.info("Metalloids found: %s %s", self.formula, metalloid_found)
 
         # ============================================================
         # Remaining atoms → ligands
@@ -353,7 +352,7 @@ class Molecule(Specie):
         # Case 1: simple molecule (not complex, not IA/IIA)
         if (
             not self.iscomplex
-            and not self.has_IA_IIA
+            and not self.has_ia_iia
             and not self.has_post_transition_metal
         ):
             found = False
@@ -382,7 +381,7 @@ class Molecule(Specie):
         else:
             # Ensure ligands and metals are available
             if not self.ligands is not None:
-                if self.iscomplex or self.has_IA_IIA:
+                if self.iscomplex or self.has_ia_iia:
                     self.split_complex()
                 elif self.has_post_transition_metal:
                     self.split_complex(post_tms=True)
@@ -514,7 +513,7 @@ class Molecule(Specie):
     def assign_charges(self):
         logger.info("Assigning charges for molecule: %s", self.formula)
         for specie in self.unique_species:
-            if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
+            if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
                 for jdx, lig in enumerate(self.ligands):
                     if lig.unique_index == specie.unique_index:
                         set_charge_state(specie, lig, mode=1)
@@ -527,7 +526,7 @@ class Molecule(Specie):
         temp = []
         self.create_bonds()
         temp.append(self.error_create_bonds)
-        if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
+        if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
             prepare_mol(self)
 
         if any(temp):
@@ -535,7 +534,7 @@ class Molecule(Specie):
         else:
             self.error_create_bonds = False
 
-        if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
+        if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
             prepare_mol(self)
             logger.info("Complex %s %s", self.formula, self.totcharge)
             for jdx, lig in enumerate(self.ligands):
@@ -566,7 +565,7 @@ class Molecule(Specie):
                 logger.debug("Bonds created for non-complex molecule %s", self.formula)
 
         # Second part: Complex molecule, add bonds for ligands
-        if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
+        if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
             self.ligand_smiles_with_H = [lig.smiles for lig in self.ligands]
             self.ligand_smiles = []
             fix_zwitterions_ligands = []
@@ -619,7 +618,7 @@ class Molecule(Specie):
                 self.ligand_smiles.append(lig.smiles)
 
         # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
-        if self.iscomplex or self.has_IA_IIA or self.has_post_transition_metal:
+        if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
             create_metal_ligand_bonds(self)
             create_metal_metal_bonds(self)
 

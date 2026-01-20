@@ -515,7 +515,7 @@ def generate_unitcell_molecules(
             atom.add_parent(unitcell, index=idx)
         for atom, idx in zip(newmolec.atoms, mol.ref_indices):
             atom.add_parent(refcell, index=idx)
-        if newmolec.iscomplex or newmolec.has_IA_IIA:
+        if newmolec.iscomplex or newmolec.has_ia_iia:
             logger.debug("Is complex: %s", newmolec.formula)
             logger.debug("Splitting complex: %s", newmolec.formula)
             newmolec.split_complex()
@@ -533,7 +533,7 @@ def generate_unitcell_molecules(
             if not mol.ligands:
                 logger.debug("A metal cluster found")
 
-        elif mol.has_IA_IIA:
+        elif mol.has_ia_iia:
             logger.info("Has alkali or alkaline earth metals: %s", mol.formula)
 
         elif mol.has_post_transition_metal:

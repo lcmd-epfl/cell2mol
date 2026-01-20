@@ -181,7 +181,6 @@ class Cell(BaseModel):
             if self.moiety_indices is not None:
                 logger.info("CIF bond/moiety information is available but not used")
 
-        # logger.debug(f"blocklist={blocklist}")
         if blocklist is None:
             logger.warning("No blocklist found")
             return []
@@ -206,7 +205,7 @@ class Cell(BaseModel):
             for atom, idx in zip(newmolec.atoms, b):
                 atom.add_parent(self, index=idx)
 
-            if newmolec.iscomplex or newmolec.has_IA_IIA:
+            if newmolec.iscomplex or newmolec.has_ia_iia:
                 logger.debug("Is complex: %s", newmolec.formula)
                 logger.debug("Splitting complex: %s", newmolec.formula)
                 newmolec.split_complex()
@@ -242,7 +241,7 @@ class Cell(BaseModel):
                 if not ref.ligands:
                     logger.debug("A metal cluster found")
 
-            elif ref.has_IA_IIA:
+            elif ref.has_ia_iia:
                 logger.info("Has alkali or alkaline earth metals: %s", ref.formula)
 
             elif ref.has_post_transition_metal:
@@ -335,8 +334,8 @@ class Cell(BaseModel):
                 if mol.ligands is None:
                     if mol.iscomplex:
                         mol.split_complex()
-                    elif mol.has_IA_IIA:
-                        mol.split_IA_IIA()
+                    elif mol.has_ia_iia:
+                        mol.split_ia_iia()
                     elif mol.has_post_transition_metal:
                         mol.split_post_transition_metal()
                 # ligands

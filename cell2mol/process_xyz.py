@@ -76,7 +76,7 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
         newmolec.set_atoms(create_adjacencies=True)
 
         # --- split complexes ---
-        if newmolec.iscomplex or newmolec.has_IA_IIA:
+        if newmolec.iscomplex or newmolec.has_ia_iia:
             logger.debug("Splitting complex: %s", newmolec.formula)
             newmolec.split_complex()
         elif newmolec.has_post_transition_metal:
@@ -94,7 +94,7 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
             if not newmolec.ligands:
                 logger.debug("Metal cluster detected")
 
-        elif newmolec.has_IA_IIA:
+        elif newmolec.has_ia_iia:
             logger.info("Has alkali or alkaline earth metals: %s", newmolec.formula)
 
         elif newmolec.has_post_transition_metal:
