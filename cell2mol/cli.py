@@ -5,8 +5,8 @@ import logging
 import warnings
 from cell2mol.utils import config
 from cell2mol.args import parsing_arguments
-from cell2mol.reference import process_reference
-from cell2mol.unitcell import interpret_unitcell
+from cell2mol.process_reference import interpret_reference
+from cell2mol.process_unitcell import interpret_unitcell
 from cell2mol.process_xyz import interpret_molecule
 from cell2mol.read_cif import prefilter_cif
 from cell2mol.write_results import exit_with_error_input, exit_with_error_exception
@@ -81,7 +81,7 @@ def handle_cif_file(
     try:
         if system_type == "reference":
             logger.info("Processing reference (Wyckoff sites)")
-            process_reference(
+            interpret_reference(
                 input_path=input_path,
                 name=name,
                 current_dir=current_dir,

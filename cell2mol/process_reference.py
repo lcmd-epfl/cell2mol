@@ -5,14 +5,13 @@ import logging
 from ase.io import read
 from cell2mol.utils import config
 from cell2mol.args import parsing_arguments
-from cell2mol.classes import Cell, Cells
+from cell2mol.classes import Reference, Cells
 from cell2mol.operations import (
     frac2cart_fromparam,
     is_polynuclear_over_limit,
     has_mixed_metal_types,
 )
 from cell2mol.read_cif import (
-    get_cell_atoms,
     get_cell_parameters,
     get_wyckoff_positions,
     get_geom_bond,
@@ -30,7 +29,7 @@ from cell2mol.write_results import (
 logger = logging.getLogger(__name__)
 
 
-def process_reference(input_path, name, current_dir):
+def interpret_reference(input_path, name, current_dir):
     """
     Process the reference molecules from a CIF file and generate a reference cell object.
     Args:
@@ -40,112 +39,36 @@ def process_reference(input_path, name, current_dir):
     Returns:
         cells (object): Cells object containing reference and unit cell information.
     """
-
-    ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
-    cells_json = os.path.join(current_dir, f"Cells_{name}.json")
-
     logger.info("cell2mol version %s", config.VERSION)
     logger.info("Input CIF: %s", input_path)
-    logger.info("Use CIF bond information: %s", config.USE_BOND_INFO)
 
-    refcell = None
-    unitcell = None
     cells = None
+    refcell = None
 
     try:
         structure = read(input_path)
-
-        cell_labels, cell_pos, cell_fracs = get_cell_atoms(structure)
-        cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
-
-        # Reference cell
+        cell_vector, cell_param, _ = get_cell_parameters(structure)
         refcell = create_reference(input_path, name, cell_vector, cell_param)
 
-        if refcell.error_case == 0:
-            refcell.get_unique_species()
-        else:
-            logger.error(
-                "Error occurred while processing reference cell: error case %d",
-                refcell.error_case,
-            )
+        if refcell.has_error():
+            logger.error("Error in reference cell: case %d", refcell.error_case)
+            return None
 
-        # Unit cell (always constructed)
-        unitcell = Cell.from_positional(
-            name,
-            cell_labels,
-            cell_pos,
-            cell_fracs,
-            cell_vector,
-            cell_param,
-        )
-        unitcell.set_subtype("unitcell")
-
-        if refcell is not None:
-            unitcell.has_isolated_H = refcell.has_isolated_H
-            unitcell.has_missing_H = refcell.has_missing_H
+        refcell.get_unique_species()
 
         cells = Cells(
             name=name,
             reference=refcell,
-            unitcell=unitcell,
+            unitcell=None,
             cell_vector=cell_vector,
             cell_param=cell_param,
         )
 
     except Exception as exc:
-        logger.exception(
-            "Unhandled exception while processing reference for %s: %s",
-            name,
-            exc,
-        )
+        logger.exception("Unhandled exception processing %s: %s", name, exc)
 
     finally:
-        # --- Summary (skip if error_case == -1 or refcell is None) ---
-        if refcell is None or refcell.error_case == -1:
-            return
-
-        try:
-            summary_fname = os.path.join(current_dir, "reference_summary.out")
-            error_message = get_reference_error_message(refcell.error_case)
-            warnings = get_reference_warning_messages(refcell)
-
-            with open(summary_fname, "w") as f:
-                print(name, file=f)
-                write_cell_molecules_info(refcell, file=f)
-                write_unique_species(refcell, file=f)
-                print("ERROR: " + error_message, file=f)
-                for msg in warnings:
-                    print("WARNING: " + msg, file=f)
-
-            # --- Log error and warnings ---
-            logger.info("Reference Summary:")
-            logger.info("%s", error_message)
-            if not warnings:
-                logger.info("No potential issues detected.")
-            else:
-                logger.warning("Potential issues detected:")
-                for msg in warnings:
-                    logger.warning("  - %s", msg)
-
-        except Exception:
-            logger.exception("Failed to write reference summary")
-
-        # --- Always save what exists ---
-        if refcell is not None:
-            try:
-                refcell.save(ref_cell_fname)
-
-                if refcell.error_case != -1 and logger.isEnabledFor(logging.DEBUG):
-                    extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
-
-            except Exception:
-                logger.exception("Failed to save reference cell")
-
-        if cells is not None:
-            try:
-                cells.save(cells_json, format="json")
-            except Exception:
-                logger.exception("Failed to save Cells JSON")
+        _handle_reference_outputs(name, current_dir, cells, refcell)
 
     return cells
 
@@ -165,7 +88,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
     atom_site_labels, ref_labels, ref_fracs = get_wyckoff_positions(input_path)
     ref_pos = frac2cart_fromparam(ref_fracs, cell_param)
 
-    refcell = Cell.from_positional(
+    refcell = Reference.from_positional(
         name=name,
         labels=ref_labels,
         pos=ref_pos,
@@ -211,6 +134,68 @@ def create_reference(input_path, name, cell_vector, cell_param):
     return refcell
 
 
+def _handle_reference_outputs(name, current_dir, cells, refcell):
+    """Manages saving files and writing summaries."""
+    if refcell is None or refcell.error_case == -1:
+        return
+
+    # 1. Write the .out summary file
+    summary_path = os.path.join(current_dir, "reference_summary.out")
+    _safe_run(
+        lambda: _write_ref_detailed_summary(name, refcell, summary_path),
+        "Failed to write reference summary",
+    )
+
+    # 2. Save the refcell object (.cell)
+    ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
+
+    def save_ref():
+        refcell.save(ref_cell_fname)
+        if logger.isEnabledFor(logging.DEBUG):
+            extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
+
+    _safe_run(save_ref, "Failed to save reference cell")
+
+    # 3. Save the Cells container (.json)
+    if cells:
+        cells_json = os.path.join(current_dir, f"Cells_{name}.json")
+        _safe_run(
+            lambda: cells.save(cells_json, format="json"), "Failed to save Cells JSON"
+        )
+
+
+def _write_ref_detailed_summary(name, refcell, summary_path):
+    """Writes the molecules info, species, errors, and warnings to file and log."""
+    error_message = get_reference_error_message(refcell.error_case)
+    warnings = get_reference_warning_messages(refcell)
+
+    # Write to File
+    with open(summary_path, "w") as f:
+        print(name, file=f)
+        write_cell_molecules_info(refcell, file=f)
+        write_unique_species(refcell, file=f)
+        print(f"ERROR: {error_message}", file=f)
+        for msg in warnings:
+            print(f"WARNING: {msg}", file=f)
+
+    # Write to Logger
+    logger.info("Reference Summary: %s", error_message)
+    if not warnings:
+        logger.info("No potential issues detected.")
+    else:
+        logger.warning("Potential issues detected:")
+        for msg in warnings:
+            logger.warning("  - %s", msg)
+
+
+def _safe_run(func, error_msg):
+    """Utility to wrap save operations in try-except."""
+    try:
+        func()
+    except Exception:
+        logger.exception(error_msg)
+
+
 def _main():
     args = parsing_arguments()
     if args.cif_bond_info:
@@ -227,7 +212,7 @@ def _main():
     if ext != ".cif":
         raise ValueError("Invalid input file format. Only .cif files are supported.")
 
-    process_reference(
+    interpret_reference(
         input_path=input_path,
         name=name,
         current_dir=os.getcwd(),
