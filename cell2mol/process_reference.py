@@ -157,11 +157,11 @@ def _handle_reference_outputs(name, current_dir, cells, refcell):
     _safe_run(save_ref, "Failed to save reference cell")
 
     # 3. Save the Cells container (.json)
-    if cells:
-        cells_json = os.path.join(current_dir, f"Cells_{name}.json")
-        _safe_run(
-            lambda: cells.save(cells_json, format="json"), "Failed to save Cells JSON"
-        )
+    # if cells:
+    #     cells_json = os.path.join(current_dir, f"Cells_{name}.json")
+    #     _safe_run(
+    #         lambda: cells.save(cells_json, format="json"), "Failed to save Cells JSON"
+    #     )
 
 
 def _write_ref_detailed_summary(name, refcell, summary_path):

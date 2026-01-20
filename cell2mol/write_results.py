@@ -223,11 +223,11 @@ def get_unitcell_error_message(error_case):
     if error_case == 0:
         return "No errors found"
 
-    elif error_case == 1:
-        return "Isolated hydrogens found"
+    # elif error_case == 1:
+    #     return "Isolated hydrogens found"
 
-    elif error_case == 2:
-        return "Missing hydrogens"
+    # elif error_case == 2:
+    #     return "Missing hydrogens"
 
     elif error_case == 3:
         return "Error in reconstructing fragments"
@@ -235,8 +235,8 @@ def get_unitcell_error_message(error_case):
     elif error_case == 4:
         return "Error in unit cell construction"
 
-    elif error_case == 5:
-        return "Some unique species have no possible charge states"
+    # elif error_case == 5:
+    #     return "Some unique species have no possible charge states"
 
     elif error_case == 6:
         return "Multiple valid charge distributions detected"

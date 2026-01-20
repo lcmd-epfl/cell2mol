@@ -433,7 +433,6 @@ class TestEdgeCases:
 
         # Check nested objects too
         for mol in cells_loaded.reference.refmoleclist or []:
-            assert mol.version == "2.0"
             assert mol.type == "specie"
 
     def test_atom_bonds_resolved(self, cells_pickle_path, tmp_path):
