@@ -53,14 +53,12 @@ class Molecule(Specie):
     ligand_smiles_with_H: list[str] | None = None
     subtype: SubType = Field(default="molecule")
 
-    # Needed in get_molecule in xyz_molecule.py
+    # Needed in interpret_molecule in process_xyz.py
     input_charge: int | None = None
     unique_species: list[Specie] | None = None
     unique_indices: list[int] | None = None
     species_list: list[Specie] | None = None
     selected_cs: list[object] | None = None
-
-    # Error assessment
     error_get_poscharges: bool | None = None
     error_multiple_distrib: bool | None = None
     error_empty_distrib: bool | None = None

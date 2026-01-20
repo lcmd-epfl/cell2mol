@@ -72,7 +72,6 @@ class Specie(BaseModel):
 
     # Frozen fields
     type: str = Field(default="specie", frozen=True)
-    version: str = Field(default="2.0", frozen=True)
 
     @property
     def formula(self) -> str:
@@ -510,7 +509,6 @@ class Specie(BaseModel):
         to_print = ""
         if not indirect:
             to_print += "------------- Cell2mol SPECIE Object --------------\n"
-        to_print += f" Version                      = {self.version}\n"
         to_print += f" Type                         = {self.type}\n"
         if self.subtype is not None:
             to_print += f" Sub-Type                     = {self.subtype}\n"

@@ -6,7 +6,7 @@ with circular references using a central object store pattern.
 JSON Format:
     {
         "_format": "cell2mol-store",
-        "_version": "3.0",
+        "_version": "2.0",
         "objects": {
             "uuid-1": {"_type": "Metal", "label": "Re", ...},
             "uuid-2": {"_type": "Ligand", "metals": ["uuid-1"], ...}
@@ -185,7 +185,7 @@ class BaseModel(pydantic.BaseModel, ABC):
 
         Returns a dict with:
         - "_format": "cell2mol-store"
-        - "_version": "3.0"
+        - "_version": "2.0"
         - "objects": dict mapping UUID -> serialized object data
         - "root": UUID of the root object
 
@@ -200,7 +200,7 @@ class BaseModel(pydantic.BaseModel, ABC):
 
         return {
             "_format": "cell2mol-store",
-            "_version": "3.0",
+            "_version": "2.0",
             "objects": store.to_dict(),
             "root": root_id,
         }
