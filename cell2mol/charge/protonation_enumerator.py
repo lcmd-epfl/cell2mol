@@ -5,7 +5,8 @@ import networkx as nx
 from cell2mol.connectivity import add_atom
 from cell2mol.element_utils import (
     get_alkali_alkaline_earth_metal_idxs,
-    get_non_transition_metal_idxs,
+    get_post_transition_metal_idxs,
+    get_metalloid_idxs,
 )
 from dataclasses import dataclass
 from typing import Dict, List
@@ -57,13 +58,14 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     if specie.formula in manual_assign or specie.formula in fullerene:
         return get_empty_protonation_state(specie)
 
-    # All non-transition-metal species
-    if len(get_non_transition_metal_idxs(specie.labels)) == specie.natoms:
+    num_post_tm = len(get_post_transition_metal_idxs(specie.labels))
+    num_metalloids = len(get_metalloid_idxs(specie.labels))
+    if (num_post_tm + num_metalloids) == specie.natoms:
         return get_empty_protonation_state(specie)
 
     if specie.subtype == "ligand":
         parent = specie.get_parent("molecule")
-        if parent.has_IA_IIA and not parent.iscomplex:
+        if parent.has_ia_iia and not parent.iscomplex:
             return get_empty_protonation_state(specie)
 
     # ============================================================
@@ -96,14 +98,14 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     for g in ligand.groups:
         parent_indices = g.get_parent_indices("ligand")
 
-        IA_IIA = get_alkali_alkaline_earth_metal_idxs(
+        ia_iia = get_alkali_alkaline_earth_metal_idxs(
             [metal.label for metal in g.metals]
         )
 
         # --------------------------------------------------------
         # Alkali / alkaline-earth only coordination
         # --------------------------------------------------------
-        if len(IA_IIA) == len(g.metals):
+        if len(ia_iia) == len(g.metals):
             for idx in parent_indices:
                 block[idx] = 1
             continue

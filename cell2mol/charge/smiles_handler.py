@@ -596,7 +596,7 @@ def create_metal_ligand_bonds(mol: object):
     # Adds Metal-Ligand Bonds, with a zero order:
     from cell2mol.classes import Bond
 
-    if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
+    if mol.iscomplex or mol.has_ia_iia or mol.has_post_transition_metal:
         for lig in mol.ligands:
             for at in lig.atoms:
                 count = 0
@@ -628,7 +628,7 @@ def create_metal_metal_bonds(mol: object):
     from cell2mol.classes import Bond
 
     # Adds Metal-Metal Bonds, with a zero order:
-    if mol.iscomplex or mol.has_IA_IIA or mol.has_post_transition_metal:
+    if mol.iscomplex or mol.has_ia_iia or mol.has_post_transition_metal:
         if len(mol.metals) > 1:
             logger.debug("Creating Metal-Metal Bonds for molecule %s", mol.formula)
             for idx, met1 in enumerate(mol.metals):

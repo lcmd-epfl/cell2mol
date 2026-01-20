@@ -101,12 +101,12 @@ class Specie(BaseModel):
         return (
             self.subtype == "molecule"
             and not self.iscomplex
-            and not self.has_IA_IIA
+            and not self.has_ia_iia
             and not self.has_post_transition_metal
         )
 
     @property
-    def has_IA_IIA(self) -> bool:
+    def has_ia_iia(self) -> bool:
         """True if the structure contains Group 1 or Group 2 metals (excluding H/D)."""
         return bool(get_alkali_alkaline_earth_metal_idxs(self.labels))
 
@@ -115,7 +115,7 @@ class Specie(BaseModel):
         """True if the structure contains post-transition metals only."""
         return (
             not self.iscomplex
-            and not self.has_IA_IIA
+            and not self.has_ia_iia
             and bool(get_post_transition_metal_idxs(self.labels))
         )
 

@@ -226,7 +226,7 @@ def _construct_state_from_topology(reference, target, final_charge):
     elif (
         target.subtype == "molecule"
         and not target.iscomplex
-        and not target.has_IA_IIA
+        and not target.has_ia_iia
         and not target.has_post_transition_metal
     ):
         logger.debug("Mode 3: Creating Empty PROTONATION for %s", target.formula)
