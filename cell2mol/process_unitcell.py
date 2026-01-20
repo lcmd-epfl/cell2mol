@@ -197,10 +197,8 @@ def _write_unit_summary(name: str, unitcell, summary_path: str):
     with open(summary_path, "w") as f:
         print(name, file=f)
         write_cell_molecules_info(unitcell, file=f)
-
-        # Append error messages if any exist
-        error_msg = get_unitcell_error_message(unitcell.error_case)
-        print(error_msg, file=f)
+        error_message = get_unitcell_error_message(unitcell.error_case)
+        print(f"ERROR: {error_message}", file=f)
 
 
 def _safe_run(func, error_msg):
