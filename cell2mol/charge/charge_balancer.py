@@ -1,4 +1,3 @@
-import copy
 import logging
 import itertools
 from typing import List
@@ -13,15 +12,16 @@ def balance_unitcell_charge(refcell, unitcell):
     """
     Resolves and assigns charges to unique species to ensure unit cell neutrality.
     """
-    logger.info("#### Get Unique Species and Balance Charges ####")
+    logger.info("=" * 40)
+    logger.info(" Get Unique Species and Balance Charges ")
+    logger.info("=" * 40)
 
     # check error flags
     if unitcell.error_reconstruction:
         logger.warning(" Not proceed due to reconstruction error.")
         return refcell, unitcell
 
-    unitcell.error_get_poscharges = refcell.error_get_poscharges
-    if unitcell.error_get_poscharges:
+    if refcell.error_get_poscharges:
         logger.error(" Not proceed due to no charge states for some unique species.")
         return refcell, unitcell
     log_charge_state_details(unitcell, refcell)
