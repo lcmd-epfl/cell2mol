@@ -11,6 +11,7 @@ from typing_extensions import deprecated
 from cell2mol.classes.cell import Cell
 from cell2mol.my_types import Format, NDArray, Type
 from cell2mol.utils import BaseModel
+from cell2mol.utils import config
 
 ###############
 #### CELLS ####
@@ -25,12 +26,12 @@ class Cells(BaseModel):
     # Required constructor parameters
     name: str
     reference: Cell
-    unitcell: Cell
+    unitcell: Cell | None = None
     cell_vector: NDArray
     cell_param: NDArray
 
     # Frozen fields
-    version: str = Field(default="2.0", frozen=True)
+    version: str = Field(default=config.VERSION, frozen=True)
     type: Type = Field(default="cells")
 
     #######################################################

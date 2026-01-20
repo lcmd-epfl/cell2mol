@@ -3,6 +3,8 @@ from .molecule import Molecule
 from .ligand import Ligand
 from .metal import Metal
 from .cell import Cell
+from .reference import Reference
+from .unitcell import UnitCell
 from .cells import Cells
 from .bond import Bond
 from .specie import Specie
@@ -16,6 +18,8 @@ __all__ = [
     "Ligand",
     "Metal",
     "Cell",
+    "Reference",
+    "UnitCell",
     "Cells",
     "Bond",
     "Specie",
@@ -34,6 +38,8 @@ Molecule.model_rebuild()
 Ligand.model_rebuild()
 Group.model_rebuild()
 Cell.model_rebuild()
+Reference.model_rebuild()
+UnitCell.model_rebuild()
 Cells.model_rebuild()
 Bond.model_rebuild()
 Protonation.model_rebuild()
