@@ -181,9 +181,6 @@ def get_reference_error_message(error_case):
     elif error_case == 5:
         return "Some unique species have no possible charge states"
 
-    elif error_case == 6:
-        return "One or more reference molecules exceed the metal center limit"
-
     elif error_case == 8:
         return "Error in assigning charges"
 
@@ -198,6 +195,23 @@ def get_reference_error_message(error_case):
 
     else:
         return f"Unhandled error case: {error_case}"
+
+
+def get_reference_warning_messages(refcell):
+    """Return a list of warning messages based on refcell flags."""
+
+    messages = []
+
+    if refcell.disagree_with_cif_formula is True:
+        messages.append("CIF formula mismatch detected")
+
+    if refcell.is_polynuclear_over_limit:
+        messages.append("Polynuclear complex exceeds metal center limit")
+
+    if refcell.has_mixed_metal_types:
+        messages.append("Mixed metal types detected")
+
+    return messages
 
 
 def get_unitcell_error_message(error_case):
