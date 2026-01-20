@@ -4,6 +4,15 @@ import numpy as np
 import itertools
 import logging
 from cell2mol.elementdata import ElementData
+from cell2mol.element_utils import (
+    TRANSITION_METALS,
+    ALKALI_AND_ALKALINE_EARTH_METALS,
+    LANTHANIDES,
+    ACTINIDES,
+    POST_TRANSITION_METALS,
+    METALLOIDS,
+    labels2formula,
+)
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
@@ -203,21 +212,6 @@ def extract_from_list(entrylist: list, old_array: list, dimension: int = 2) -> l
         for idx, val in enumerate(entrylist):
             new_array[idx] = old_array[val]
     return list(new_array)
-
-
-def get_moiety_indices_from_labels(atom_site_labels, moiety_list):
-    flat_list = [atom for moiety in moiety_list for atom in moiety]
-
-    atom_site_labels = np.array(atom_site_labels)  # ensure it's a numpy array
-    moiety_indices = [
-        np.where(np.isin(atom_site_labels, moiety))[0].tolist()
-        for moiety in moiety_list
-    ]
-    for i, atom in enumerate(atom_site_labels):
-        if atom not in flat_list:
-            moiety_indices.append([i])
-
-    return moiety_indices
 
 
 def reorder_element(lst: list, old_idx: int, new_idx: int) -> list:
@@ -545,3 +539,83 @@ def perp_unit(u):
         if nv < 1e-12:
             raise ValueError("Cannot construct a perpendicular direction.")
     return v / nv
+
+
+def get_moiety_indices_from_labels(atom_site_labels, moiety_list):
+    flat_list = [atom for moiety in moiety_list for atom in moiety]
+
+    atom_site_labels = np.array(atom_site_labels)  # ensure it's a numpy array
+    moiety_indices = [
+        np.where(np.isin(atom_site_labels, moiety))[0].tolist()
+        for moiety in moiety_list
+    ]
+    for i, atom in enumerate(atom_site_labels):
+        if atom not in flat_list:
+            moiety_indices.append([i])
+
+    return moiety_indices
+
+
+def is_over_metal_limit(labels: list[str], max_metal_centers: int = 6) -> bool:
+    """
+    Check whether a complex exceeds the metal center limit.
+    Logs details if the limit is exceeded or if non-transition metals are present.
+    """
+
+    metal_counts = {
+        "tm": 0,
+        "f_block": 0,
+        "alkali_alkaline": 0,
+        "post_tm": 0,
+        "metalloid": 0,
+    }
+
+    for label in labels:
+        if label in TRANSITION_METALS:
+            metal_counts["tm"] += 1
+        elif label in LANTHANIDES or label in ACTINIDES:
+            metal_counts["f_block"] += 1
+        elif label in ALKALI_AND_ALKALINE_EARTH_METALS:
+            metal_counts["alkali_alkaline"] += 1
+        elif label in POST_TRANSITION_METALS:
+            metal_counts["post_tm"] += 1
+        elif label in METALLOIDS:
+            metal_counts["metalloid"] += 1
+
+    total_metal_count = (
+        metal_counts["tm"]
+        + metal_counts["f_block"]
+        + metal_counts["alkali_alkaline"]
+        + metal_counts["post_tm"]
+    )
+
+    log_map = {
+        "Transition metals": metal_counts["tm"],
+        "Lanthanides/Actinides": metal_counts["f_block"],
+        "Alkali and alkaline earth metals": metal_counts["alkali_alkaline"],
+        "Post-transition metals": metal_counts["post_tm"],
+        "Metalloids": metal_counts["metalloid"],
+    }
+
+    if total_metal_count > max_metal_centers:
+        logger.warning(
+            "Detected polynuclear complex exceeding metal center limit (%d): %s",
+            max_metal_centers,
+            labels2formula(labels),
+        )
+        for name, count in log_map.items():
+            if count > 0:
+                logger.debug("  %s: %d", name, count)
+        return True
+
+    elif total_metal_count > metal_counts["tm"]:
+        logger.warning(
+            "Complex contains metals other than transition metals: %s",
+            labels2formula(labels),
+        )
+        for name, count in log_map.items():
+            if count > 0:
+                logger.debug("  %s: %d", name, count)
+
+    logger.info("Processed: %s", labels2formula(labels))
+    return False

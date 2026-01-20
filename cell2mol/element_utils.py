@@ -139,6 +139,19 @@ def get_metal_idxs(labels: list[str]) -> list[int]:
     return [i for i, label in enumerate(labels) if label in d_f_metals]
 
 
+def get_transition_metal_idxs(labels: list[str]) -> list[int]:
+    """Transition metals."""
+    return [i for i, label in enumerate(labels) if label in TRANSITION_METALS]
+
+
+def get_lanthanide_actinide_idxs(labels: list[str]) -> list[int]:
+    """Lanthanides and actinides."""
+    lanthanide_actinide_elements = LANTHANIDES | ACTINIDES
+    return [
+        i for i, label in enumerate(labels) if label in lanthanide_actinide_elements
+    ]
+
+
 def get_alkali_alkaline_earth_metal_idxs(labels: list[str]) -> list[int]:
     """Alkali metals (Group 1) and alkaline earth metals (Group 2)."""
     return [
@@ -146,16 +159,14 @@ def get_alkali_alkaline_earth_metal_idxs(labels: list[str]) -> list[int]:
     ]
 
 
-def get_non_transition_metal_idxs(labels: list[str]) -> list[int]:
-    """Post-transition metals and metalloids."""
-    non_transition_metals = POST_TRANSITION_METALS | METALLOIDS
-
-    return [i for i, label in enumerate(labels) if label in non_transition_metals]
-
-
 def get_post_transition_metal_idxs(labels: list[str]) -> list[int]:
     """Post-transition metals."""
     return [i for i, label in enumerate(labels) if label in POST_TRANSITION_METALS]
+
+
+def get_metalloid_idxs(labels: list[str]) -> list[int]:
+    """Metalloids."""
+    return [i for i, label in enumerate(labels) if label in METALLOIDS]
 
 
 def get_radii(labels: list):
