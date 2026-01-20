@@ -6,7 +6,7 @@ from ase.io import read
 from cell2mol.utils import config
 from cell2mol.args import parsing_arguments
 from cell2mol.classes import Cell, Cells
-from cell2mol.operations import frac2cart_fromparam
+from cell2mol.operations import frac2cart_fromparam, is_over_metal_limit
 from cell2mol.read_cif import (
     get_cell_atoms,
     get_cell_parameters,
@@ -99,7 +99,7 @@ def process_reference(input_path, name, current_dir):
         if refcell is not None:
             try:
                 refcell.save(ref_cell_fname)
-                if logger.isEnabledFor(logging.DEBUG):
+                if refcell.error_case != -1 and logger.isEnabledFor(logging.DEBUG):
                     extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
             except Exception:
                 logger.exception("Failed to save reference cell")
@@ -110,8 +110,8 @@ def process_reference(input_path, name, current_dir):
             except Exception:
                 logger.exception("Failed to save Cells JSON")
 
-        # Summary (only if reference exists)
-        if refcell is not None:
+        # --- Summary (skip if error_case == -1) ---
+        if refcell is not None and refcell.error_case != -1:
             try:
                 summary_fname = os.path.join(current_dir, "reference_summary.out")
                 with open(summary_fname, "w") as f:
@@ -173,7 +173,16 @@ def create_reference(input_path, name, cell_vector, cell_param):
     refcell.assess_errors(mode="hydrogens")
 
     logger.info("Reference molecules generated")
+    logger.info("Number of reference molecules found: %d", len(refcell.refmoleclist))
 
+    not_processed = []
+    for ref in refcell.refmoleclist:
+        not_processed.append(
+            is_over_metal_limit(ref.labels, max_metal_centers=config.MAX_METALS)
+        )
+    if any(not_processed):
+        refcell.error_case = 6
+        logger.warning("One or more reference molecules exceed the metal center limit")
     return refcell
 
 
