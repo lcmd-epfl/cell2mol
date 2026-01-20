@@ -48,7 +48,6 @@ class Protonation(BaseModel):
     adjnum: NDArray | None = None
 
     # Frozen fields
-    version: str = Field(default="2.0", frozen=True)
     type: Type = Field(default="protonation")
 
     # NOTE: Removed custom model_serializer that was returning "{}" string.

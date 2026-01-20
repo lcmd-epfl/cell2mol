@@ -23,10 +23,7 @@ class Bond(BaseModel):
     atom1: Atom
     atom2: Atom
     order: float = Field(default=1, alias="bond_order")
-
     distance: float | None = None
-
-    version: str = Field(default="2.0", frozen=True)
     type: Type = Field(default="bond")
 
     def model_post_init(self, __context: Any) -> None:
@@ -46,7 +43,6 @@ class Bond(BaseModel):
     def __repr__(self):
         to_print = ""
         to_print += "------------- Cell2mol BOND Object --------------\n"
-        to_print += f" Version                  = {self.version}\n"
         to_print += f" Type                     = {self.type}\n"
         idx1 = self.atom1.get_parent_index("molecule")
         idx2 = self.atom2.get_parent_index("molecule")

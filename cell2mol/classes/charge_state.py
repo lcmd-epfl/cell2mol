@@ -54,7 +54,6 @@ class ChargeState(BaseModel):
     corr_zwitt: bool | None = None
 
     # Frozen fields
-    version: str = Field(default="2.0", frozen=True)
     type: str = Field(default="charge_state", frozen=True)
 
     def model_post_init(self, __context: Any) -> None:

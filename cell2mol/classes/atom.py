@@ -42,7 +42,6 @@ class Atom(BaseModel):
     # Cross-references to Bond objects
     bonds: RefList["Bond"] = Field(default_factory=list)
 
-    version: str = Field(default="2.0", frozen=True)
     type: str = Field(default="atom", frozen=True)
     # Originally atom does not have a subtype, but we add it for consistency with other classes
     subtype: str = Field(default="atom")
@@ -188,7 +187,6 @@ class Atom(BaseModel):
         to_print = ""
         if not indirect:
             to_print += "------------- Cell2mol ATOM Object ----------------\n"
-        to_print += f" Version                      = {self.version}\n"
         to_print += f" Type                         = {self.type}\n"
         if self.subtype is not None:
             to_print += f" Sub-Type                     = {self.subtype}\n"
