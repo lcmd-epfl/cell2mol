@@ -12,6 +12,7 @@ COV_FACTOR = DEFAULT_COV_FACTOR
 METAL_FACTOR = DEFAULT_METAL_FACTOR
 
 USE_BOND_INFO = False
+MAX_METALS = 6
 
 
 def dump():
@@ -23,5 +24,6 @@ def dump():
         f"  CUTOFF          = {CUTOFF}",
         f"  COV_FACTOR      = {COV_FACTOR}",
         f"  METAL_FACTOR    = {METAL_FACTOR}",
+        f"  MAX_METALS      = {MAX_METALS}",
     ]
     return "\n".join(lines)

@@ -181,6 +181,9 @@ def get_reference_error_message(error_case):
     elif error_case == 5:
         return "Some unique species have no possible charge states"
 
+    elif error_case == 6:
+        return "One or more reference molecules exceed the metal center limit"
+
     elif error_case == 8:
         return "Error in assigning charges"
 
@@ -310,7 +313,7 @@ def write_molecule_info(mol, file=None, index=None):
     # Append classification tags
     if mol.iscomplex:
         mol_info_parts.append("(TM Complex)")
-    if mol.has_IA_IIA:
+    if mol.has_ia_iia:
         mol_info_parts.append("(Complex with Alkali or Alkaline metals)")
     if mol.has_post_transition_metal:
         mol_info_parts.append("(Complex with Post-Transition metals)")
@@ -551,34 +554,6 @@ def write_possible_and_selected_cs(newcell, refcell, file=None):
                 f"differs from newcell unique indices {idx=}",
                 file=file,
             )
-
-
-def handle_error(case: int):
-    logger.info("cell2mol terminated with error case %d", case)
-    if case == 1:
-        logger.info(
-            "The cell object has isolated H atoms in the reference molecules list. This typically indicates an error. STOPPING"
-        )
-    if case == 2:
-        logger.info(
-            "We detected that H atoms are likely missing. This will cause errors in the charge prediction, so STOPPING pre-emptively."
-        )
-    if case == 3:
-        logger.info("We failed to get fragments. STOPPING pre-emptively.")
-    if case == 4:
-        logger.info(
-            "After reconstruction of the unit cell, we still detected some fragments. STOPPING pre-emptively."
-        )
-    if case == 5:
-        logger.info("Error in list of possible charges received for molecule or ligand")
-    if case == 6:
-        logger.info("Multiple valid charge distributions detected")
-    if case == 7:
-        logger.info("No valid possible charge distribution found")
-    if case == 8:
-        logger.info("Error while creating bonds for molecule or ligand")
-    if case == 0:
-        logger.info("No errors Found")
 
 
 def log_charge_state_details(newcell, refcell) -> None:
