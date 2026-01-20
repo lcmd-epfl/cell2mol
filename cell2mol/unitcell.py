@@ -61,13 +61,15 @@ def interpret_unitcell(input_path, name, current_dir):
             return cells
 
         logger.info("Starting the cell2mol process for the unit cell")
+
+        # Construct Unit Cell
         unitcell = construct_unitcell(refcell, unitcell, sym_ops)
         unitcell.assess_errors(mode="reconstruction")
-
         if unitcell.error_case != 0:
             logger.error("Error while unit cell reconstruction")
             return cells
 
+        # Retrieve possible charge states for unique species
         refcell.get_selected_cs()
         refcell.assess_errors(mode="possible_charges")
         if refcell.error_case != 0:
@@ -76,21 +78,30 @@ def interpret_unitcell(input_path, name, current_dir):
             )
             return cells
 
+        # Balance unit cell charge
         refcell, unitcell = balance_unitcell_charge(refcell, unitcell)
         unitcell.assess_errors(mode="balance_charges")
-
         if unitcell.error_case != 0:
             logger.error("Error while balancing charges in the unit cell")
             return cells
 
+        # Assign charges and spins to reference cell
         refcell.assign_charges()
         refcell.assess_errors(mode="charge_assignment")
         if refcell.error_case != 0:
             logger.error("Error while assigning charges in the reference cell")
             return cells
+        refcell.assign_spin()
+        refcell.assess_errors(mode="spin_assignment")
+        if refcell.error_case != 0:
+            logger.error("Error while assigning spins in the reference cell")
+            return cells
 
+        # Deep copy reference molecule list and unique species to unit cell
         unitcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
         unitcell.unique_species = copy.deepcopy(refcell.unique_species)
+
+        # Assign charges and spins to unit cell
         unitcell.assign_charges()
         unitcell.assess_errors(mode="charge_assignment")
         if unitcell.error_case != 0:
@@ -98,11 +109,11 @@ def interpret_unitcell(input_path, name, current_dir):
             return cells
 
         unitcell.check_charge_neutrality()
-
-        refcell.assign_spin()
         unitcell.assign_spin()
-        refcell.assess_errors(mode="spin_assignment")
         unitcell.assess_errors(mode="spin_assignment")
+        if unitcell.error_case != 0:
+            logger.error("Error while assigning spins in the unit cell")
+            return cells
 
     except Exception as exc:
         logger.exception(f"Unhandled exception while processing {name}: {exc}")

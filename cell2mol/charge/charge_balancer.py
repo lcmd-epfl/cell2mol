@@ -24,9 +24,6 @@ def balance_unitcell_charge(refcell, unitcell):
     if unitcell.error_get_poscharges:
         logger.error(" Not proceed due to no charge states for some unique species.")
         return refcell, unitcell
-
-    unitcell.refmoleclist = copy.deepcopy(refcell.refmoleclist)
-    unitcell.unique_species = copy.deepcopy(refcell.unique_species)
     log_charge_state_details(unitcell, refcell)
 
     # Charge Balancing
