@@ -2,19 +2,23 @@
 
 import os
 import logging
+import warnings
 from cell2mol.utils import config
-
 from cell2mol.args import parsing_arguments
 from cell2mol.reference import process_reference
 from cell2mol.unitcell import interpret_unitcell
 from cell2mol.process_xyz import interpret_molecule
 from cell2mol.read_cif import prefilter_cif
 from cell2mol.write_results import exit_with_error_input, exit_with_error_exception
-import warnings
 
 warnings.filterwarnings(
     "ignore",
     message="crystal system .* is not interpreted for space group",
+    category=UserWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="scaled_positions .* are equivalent",
     category=UserWarning,
 )
 
