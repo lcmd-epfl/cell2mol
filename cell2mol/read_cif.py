@@ -681,17 +681,21 @@ def get_cell_parameters(structure):
     return cell_vector, cell_param, sym_ops
 
 
-def compare_cif_with_reference(refcell):
+def compare_cif_with_reference(moiety_dicts, refmoleclist):
     """Compare reference molecules with chemical name,
     metal oxidation state, and moiety information extracted from the CIF file."""
 
-    moiety_dicts = getattr(refcell, "moiety_dicts", None)
-
-    formulas_from_refcell = [ref.formula for ref in refcell.refmoleclist]
+    # Default value
+    disagree_with_cif_formula = None
 
     if not moiety_dicts:
         logger.info("No _chemical_formula_moiety information found in the CIF file.")
-        return
+        return disagree_with_cif_formula
+    if not refmoleclist:
+        logger.info("No reference molecules found in the refcell.")
+        return disagree_with_cif_formula
+
+    formulas_from_refcell = [ref.formula for ref in refmoleclist]
 
     formulas_from_cif = [
         labels2formula(cifformula_to_list(moiety["formula"])) for moiety in moiety_dicts
@@ -707,25 +711,21 @@ def compare_cif_with_reference(refcell):
 
     disagree_with_cif = []
     for ref_idx, info in matches.items():
-        ref = refcell.refmoleclist[ref_idx]
+        ref = refmoleclist[ref_idx]
 
         if len(info["diff_dict"]) == 0:
             logger.debug(
                 "%s %s: Exact match found. %s", ref_idx, info["ref"], info["match"]
             )
-
-            # Find the index of the matched formula in the CIF formulas list
             try:
                 cif_idx = formulas_from_cif.index(info["match"])
                 ref.totcharge_cif = charges_from_cif[cif_idx]
-
             except ValueError:
                 logger.warning(
-                    "  Failed to Assign charge to refcell molecule %s matched with CIF %s",
+                    "Failed to assign charge to refcell molecule %s matched with CIF %s",
                     info["ref"],
                     info["match"],
                 )
-
         else:
             logger.debug(
                 "%s %s: Closest match found. %s with difference of %s",
@@ -734,66 +734,57 @@ def compare_cif_with_reference(refcell):
                 info["match"],
                 info["diff_dict"],
             )
-            alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(
+            alkali_idxs = get_alkali_alkaline_earth_metal_idxs(
                 list(info["diff_dict"].keys())
             )
-            if len(alkali_alkaline_earth_metal_idxs) > 0:
+            if alkali_idxs:
                 logger.warning(
-                    "%s %s: Discrepancy found due to covalent radius of alkali/alkaline earth metals.",
+                    "%s %s: Discrepancy due to alkali/alkaline earth metals.",
                     ref_idx,
                     info["ref"],
                 )
-                logger.warning(
-                    "This will cause errors in unit cell reconstruction. Set --cif_bond_info as True and re-run.",
-                )
             disagree_with_cif.append(ref_idx)
 
-    if len(disagree_with_cif) > 0:
+    if disagree_with_cif:
         logger.info("Discrepancies found between refcell and CIF")
         logger.info("This will cause errors in the charge prediction!")
-        refcell.disagree_with_cif_formula = True
+        disagree_with_cif_formula = True
+
         try:
             cif_totals = combine_formulas(formulas_from_cif, ratios_from_cif)
             if cif_totals is not None:
-                logger.info(f"Element totals from CIF: {cif_totals}")
                 ref_totals = combine_formulas(formulas_from_refcell)
                 df_compare, all_match = compare_totals(
                     cif_totals, ref_totals, atol=1e-9
                 )
                 if not all_match:
                     logger.info("Element totals differ between refcell and CIF")
-
-                    # logger.debug(
-                    #     "Element comparison table:\n%s", df_compare.to_string()
-                    # )
+                    # logger.debug("Element comparison table:\n%s", df_compare.to_string())
                     logger.debug("Element comparison (CIF vs refcell):")
-                    logger.debug("  Element    CIF   Refcell   Delta   OK")
-                    logger.debug("  --------------------------------------")
-
+                    logger.debug(" Element     CIF   Refcell   Delta    OK")
+                    logger.debug(" ---------------------------------------")
                     for _, row in df_compare.iterrows():
                         logger.debug(
-                            "  %-8s %6.1f %9.1f %7.1f   %s",
+                            " %-8s %6.1f %9.1f %7.1f %s",
                             row["Element"],
                             row["CIF_total"],
                             row["Refcell_total"],
                             row["Delta (CIF-Ref)"],
                             row["OK"],
                         )
-
                     logger.debug("Possible causes of discrepancies:")
                     logger.debug(
-                        "  - Missing atoms in the crystal structure (CIF moiety mismatch)"
+                        " - Missing atoms in the crystal structure (CIF moiety mismatch)"
                     )
                     logger.debug(
-                        "  - Connectivity changes due to different adjacency matrices"
+                        " - Connectivity changes due to different adjacency matrices"
                     )
-        except:
+        except Exception:
             logger.warning(
                 "Can not calculate element totals from CIF. This may be due to non-float ratios in moieties in CIF."
             )
-            return
     else:
         logger.info("No discrepancies found between formulas from refcell and CIF.")
-        refcell.disagree_with_cif_formula = False
+        disagree_with_cif_formula = False
 
-    return
+    return disagree_with_cif_formula
