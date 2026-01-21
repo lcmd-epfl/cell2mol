@@ -285,8 +285,10 @@ class Cell(BaseModel):
         """Return a string representation of the Cell object."""
         return self.__repr__()
 
-    def __repr__(self):
-        to_print = "------------- Cell2mol CELL Object ----------------\n"
+    def __repr__(self, indirect: bool = False):
+        to_print = ""
+        if not indirect:
+            to_print = "------------- Cell2mol CELL Object ----------------\n"
         to_print += f" Version               = {self.version}\n"
         to_print += f" Type                  = {self.type}\n"
         if self.subtype is not None:

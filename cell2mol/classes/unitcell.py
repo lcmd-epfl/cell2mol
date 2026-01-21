@@ -203,7 +203,7 @@ class UnitCell(Cell):
             to_print += " with Formula:                               \n"
             for idx, m in enumerate(self.moleclist):
                 to_print += f"    {idx}: {m.formula} \n"
-        to_print += "---------------------------------------------------\n"
+            to_print += "---------------------------------------------------\n"
         return to_print
 
     @classmethod
