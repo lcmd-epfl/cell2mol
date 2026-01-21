@@ -25,6 +25,10 @@ def construct_unitcell(refcell, unitcell, sym_ops):
         sym_ops (tuple):
             Symmetry operations (rotations, translations).
     """
+    logger.info("=" * 40)
+    logger.info(" Constructing unit cell from reference ")
+    logger.info("=" * 40)
+
     refmoleclist = refcell.refmoleclist
     sym_atoms_list = apply_symmetry_operations(refcell, sym_ops)
 
