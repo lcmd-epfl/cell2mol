@@ -22,21 +22,23 @@ def exit_with_error_input(message):
     sys.exit(message)
 
 
-def exit_with_error_exception(e):
-    """Logs the error details to a file and exits the program."""
-    error_details = traceback.format_exc()
-    error_log_path = os.path.join(os.getcwd(), f"error_{type(e).__name__}.out")
+def exit_with_error_exception(exc):
+    exc_type = type(exc).__name__
+    error_log_path = os.path.join(os.getcwd(), f"error_{exc_type}.out")
 
-    # Write the full error details to the log file
+    tb = traceback.format_exc()
+
     with open(error_log_path, "w") as error_log:
-        error_log.write(f"Error message: {type(e).__name__} - {str(e)}\n")
-        error_log.write(f"Error details:\n{error_details}")
+        error_log.write(f"{exc_type}: {exc}\n\n")
+        error_log.write(tb)
 
-    # Print the error details to the console
-    logger.error("An error occurred. Details have been logged to  %s", error_log_path)
-    logger.error("Error details:\n%s", error_details)
+    logger.error(
+        "Unhandled exception (%s). Details written to %s",
+        exc_type,
+        error_log_path,
+    )
 
-    sys.exit(e)
+    raise
 
 
 def compare_formula_xyz_vs_cif(xyzfile: str, formula_str_from_cif: str) -> dict:

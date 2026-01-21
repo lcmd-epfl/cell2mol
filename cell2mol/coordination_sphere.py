@@ -526,7 +526,16 @@ def handle_haptic_coordination(group: object, use_bond_info: bool | None = None)
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
 
-    single_ring = is_single_ring(group.labels, group.coord)
+    refcell = group.get_parent("reference")
+    bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+
+    single_ring = is_single_ring(
+        labels=group.labels,
+        positions=group.coord,
+        atom_site_labels=group.atom_site_labels,
+        bond_data=bond_data,
+        use_bond_info=use_bond_info,
+    )
     logger.debug("Is single ring: %s", single_ring)
 
     conn_idx = []

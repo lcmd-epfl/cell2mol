@@ -26,6 +26,7 @@ from cell2mol.write_results import (
     get_reference_warning_messages,
 )
 from cell2mol.connectivity import is_mismatch_adjacency
+from cell2mol.write_results import exit_with_error_exception
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ def interpret_reference(input_path, name, current_dir):
         )
 
     except Exception as exc:
-        logger.exception("Unhandled exception processing %s: %s", name, exc)
+        exit_with_error_exception(exc)
 
     finally:
         _handle_reference_outputs(name, current_dir, cells, refcell)

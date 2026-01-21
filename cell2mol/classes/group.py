@@ -105,7 +105,6 @@ class Group(Specie):
         bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
         cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
         metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
-
         lig = self.get_parent("ligand")
 
         if lig.metals is None:
@@ -137,17 +136,23 @@ class Group(Specie):
                 tmp_adjnum = tmp_adjmat.sum(axis=1)
                 if any(tmp_adjnum) > 0:
                     self.metals.append(met)
-                    logger.debug("Group %s is connected to %s", self.formula, met.label)
-
+                    logger.debug(
+                        "Group %s %s is connected to %s (%s)",
+                        self.formula,
+                        [atom.atom_site_label for atom in self.atoms],
+                        met.label,
+                        met.atom_site_label,
+                    )
         return self.metals
 
-    def get_hapticity(self):
+    def get_hapticity(self, use_bond_info: bool | None = None):
         """
         Determine haptic coordination mode(s) of the ligand.
 
         Returns:
         list[str]: List of internal haptic mode keys, e.g. ["eta2(C,C)"]
         """
+
         if self.atoms is None:
             self.set_atoms()
 
@@ -194,11 +199,25 @@ class Group(Specie):
             self.haptic_type = HAPTIC_RULES[key]
             self.is_haptic = True
 
-        # Fallback: generic single-ring hapticity
-        elif is_single_ring(self.labels, self.coord):
-            mode = f"eta{totnum}({self.formula})"
-            self.haptic_type = [mode]
-            self.is_haptic = True
+        else:
+            if use_bond_info is None:
+                use_bond_info = config.USE_BOND_INFO
+            refcell = self.get_parent("reference")
+            bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+
+            # Fallback: generic single-ring hapticity
+            single_ring = is_single_ring(
+                labels=self.labels,
+                positions=self.coord,
+                atom_site_labels=self.atom_site_labels,
+                bond_data=bond_data,
+                use_bond_info=use_bond_info,
+            )
+
+            if single_ring:
+                mode = f"eta{totnum}({self.formula})"
+                self.haptic_type = [mode]
+                self.is_haptic = True
 
         return self.haptic_type
 
