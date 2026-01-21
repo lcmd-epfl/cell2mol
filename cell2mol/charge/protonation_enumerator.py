@@ -1,7 +1,6 @@
 import numpy as np
 import itertools
 import networkx as nx
-
 from cell2mol.connectivity import add_atom
 from cell2mol.element_utils import (
     get_alkali_alkaline_earth_metal_idxs,
@@ -61,7 +60,14 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     num_post_tm = len(get_post_transition_metal_idxs(specie.labels))
     num_metalloids = len(get_metalloid_idxs(specie.labels))
     if (num_post_tm + num_metalloids) == specie.natoms:
-        return get_empty_protonation_state(specie)
+        logger.info(
+            "Specie %s (%s) consists only of metalloids/post-transition metals. ",
+            specie.formula,
+            specie.subtype,
+        )
+        logger.info("Skipping protonation enumeration.")
+        return None
+        # return get_empty_protonation_state(specie)
 
     if specie.subtype == "ligand":
         parent = specie.get_parent("molecule")

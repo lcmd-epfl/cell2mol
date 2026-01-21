@@ -251,7 +251,7 @@ class Specie(BaseModel):
             cov_factor=cov_factor,
             metal_factor=metal_factor,
             metal_only=metal_only,
-            warn_on_mismatch=True,
+            warn_on_mismatch=False,
             detail=False,
         )
 
