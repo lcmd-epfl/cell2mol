@@ -25,6 +25,7 @@ from cell2mol.write_results import (
     get_reference_error_message,
     get_reference_warning_messages,
 )
+from cell2mol.connectivity import is_mismatch_adjacency
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,11 @@ def interpret_reference(input_path, name, current_dir):
     refcell = None
 
     try:
-        structure = read(input_path)
+        try:
+            structure = read(input_path, format="cif")
+        except (AssertionError, Exception) as e:
+            logger.error(f"ASE failed to parse {input_path}: {e}")
+            raise
         cell_vector, cell_param, _ = get_cell_parameters(structure)
         refcell = create_reference(input_path, name, cell_vector, cell_param)
 
@@ -124,7 +129,12 @@ def create_reference(input_path, name, cell_vector, cell_param):
     mixed_metals = any(
         has_mixed_metal_types(ref.labels) for ref in refcell.refmoleclist
     )
-    refcell.set_potential_warning(cif_mismatch, over_polynuclear_limit, mixed_metals)
+    is_mismatch_adj = is_mismatch_adjacency(
+        ref_labels, ref_pos, atom_site_labels, geom_bond_cif
+    )
+    refcell.set_potential_warning(
+        cif_mismatch, over_polynuclear_limit, mixed_metals, is_mismatch_adj
+    )
 
     # Check missing hydrogens and assess errors
     refcell.check_hydrogens()
@@ -151,8 +161,8 @@ def _handle_reference_outputs(name, current_dir, cells, refcell):
 
     def save_ref():
         refcell.save(ref_cell_fname)
-        if logger.isEnabledFor(logging.DEBUG):
-            extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
+        # if logger.isEnabledFor(logging.DEBUG):
+        #     extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
 
     _safe_run(save_ref, "Failed to save reference cell")
 
