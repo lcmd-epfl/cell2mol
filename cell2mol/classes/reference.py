@@ -489,7 +489,7 @@ class Reference(Cell):
             to_print += " with Formula:                                  \n"
             for idx, ref in enumerate(self.refmoleclist):
                 to_print += f"    {idx}: {ref.formula} \n"
-        to_print += "---------------------------------------------------\n"
+            to_print += "---------------------------------------------------\n"
         return to_print
 
     @classmethod
