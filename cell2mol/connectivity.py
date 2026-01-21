@@ -121,15 +121,17 @@ def build_adjacency(
 
     canonical = "bond_info" if use_bond_info else "distance"
 
-    # --- distance-based adjacency (always built) ---
-    isgood, adj_dist, warning = get_adjmatrix(
-        labels,
-        positions,
-        cutoff=cutoff,
-        cov_factor=cov_factor,
-        metal_factor=metal_factor,
-        metal_only=metal_only,
-    )
+    adj_dist = None
+    # --- distance-based adjacency (default) ---
+    if canonical == "distance" or warn_on_mismatch:
+        isgood, adj_dist, warning = get_adjmatrix(
+            labels,
+            positions,
+            cutoff=cutoff,
+            cov_factor=cov_factor,
+            metal_factor=metal_factor,
+            metal_only=metal_only,
+        )
 
     # --- connectivity-based adjacency (optional) ---
     adj_conn = None
@@ -448,13 +450,6 @@ def get_adjmatrix(
         return isgood, madjmat, warning
     return isgood, adjmat, warning
 
-    # adjnum = adjmat.sum(axis=1)
-    # madjnum = madjmat.sum(axis=1)
-
-    # if metal_only:
-    #     return isgood, madjmat, madjnum, warning
-    # return isgood, adjmat, adjnum, warning
-
 
 def correct_valence_violation(adjmat, madjmat, labels, pos, radii):
     """Detect and correct valence violations in an adjacency matrix.
@@ -573,7 +568,7 @@ def get_adjmatrix_from_cif_bonds(
     adjmat = np.zeros((natoms, natoms), dtype=int)
 
     metal_idxs = set(get_metal_idxs(labels))
-    alkali_idxs = set(get_alkali_alkaline_earth_metal_idxs(labels))
+    alkali_alkaline_earth_metal_idxs = set(get_alkali_alkaline_earth_metal_idxs(labels))
 
     for atom1, atom2, bond_dist in bond_data:
         if atom1 not in indices or atom2 not in indices:
@@ -588,14 +583,14 @@ def get_adjmatrix_from_cif_bonds(
         if abs(dist - bond_dist) > tol:
             continue
 
-        if metal_only and not includes_metal(i, j, labels, metal_idxs, alkali_idxs):
+        if metal_only and not includes_metal(
+            i, j, labels, metal_idxs, alkali_alkaline_earth_metal_idxs
+        ):
             continue
 
         adjmat[i, j] = adjmat[j, i] = 1
-    return adjmat
-    # adjnum = adjmat.sum(axis=1)
 
-    # return adjmat, adjnum
+    return adjmat
 
 
 def get_adjacency_types(label: list, conmat: np.ndarray) -> np.ndarray:
@@ -981,9 +976,27 @@ def log_blocklist_diff(blocklist, new_blocklist):
             logger.debug("  %s", list(b))
 
 
-def is_single_ring(labels, coord):
+def is_single_ring(
+    labels: list[str],
+    positions: np.ndarray,
+    atom_site_labels: list[str] | None = None,
+    bond_data: list[tuple[str, str, float]] | None = None,
+    use_bond_info: bool | None = None,
+):
     """Check if the group is a ring"""
-    adjmat = build_adjacency(labels, coord)
+    if use_bond_info is None:
+        use_bond_info = config.USE_BOND_INFO
+    logger.debug("Checking if group is a single ring...")
+    logger.debug("Labels: %s", labels)
+    logger.debug("Positions: %s", positions)
+    logger.debug("Atom site labels: %s", atom_site_labels)
+    adjmat = build_adjacency(
+        labels=labels,
+        positions=positions,
+        atom_site_labels=atom_site_labels,
+        bond_data=bond_data,
+        use_bond_info=use_bond_info,
+    )
     if adjmat is None:
         return False
     G = nx.from_numpy_array(np.array(adjmat))

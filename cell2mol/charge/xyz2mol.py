@@ -77,9 +77,14 @@ def get_atomic_valences(k):
         return [6, 5, 3]  # [5,4,3]
     if k == 52:  # Te
         return [2, 4, 6]
-    if group == 17:  # F, Cl, Br, I
+    if k == 53:  # I
+        return [1, 3, 5]
+    if k == 82:  # Pb
+        return [2, 4, 6]
+    if k == 83:  # Bi
+        return [3, 5, 6, 7, 8]
+    if group == 17:  # F, Cl, Br, At
         return [1]
-        # return [1, 2]   # Cl [1, 7]
     if block == "s" and period == 1:
         av = 2 - ave
     elif group == 1 and period != 1:
