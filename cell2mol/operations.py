@@ -577,7 +577,14 @@ def count_metals(labels: list[str]) -> dict[str, int]:
         elif label in METALLOIDS:
             metal_counts["metalloid"] += 1
 
-    return metal_counts
+    log_map = {
+        "Transition metals": metal_counts["tm"],
+        "Lanthanides/Actinides": metal_counts["f_block"],
+        "Alkali/Alkaline earth metals": metal_counts["alkali_alkaline"],
+        "Post-transition metals": metal_counts["post_tm"],
+        "Metalloids": metal_counts["metalloid"],
+    }
+    return metal_counts, log_map
 
 
 def is_polynuclear_over_limit(labels: list[str], max_metal_centers: int = 6) -> bool:
@@ -586,7 +593,7 @@ def is_polynuclear_over_limit(labels: list[str], max_metal_centers: int = 6) -> 
     Logs details if the limit is exceeded or if non-transition metals are present.
     """
 
-    metal_counts = count_metals(labels)
+    metal_counts, log_map = count_metals(labels)
 
     total_metal_count = (
         metal_counts["tm"]
@@ -594,14 +601,6 @@ def is_polynuclear_over_limit(labels: list[str], max_metal_centers: int = 6) -> 
         + metal_counts["alkali_alkaline"]
         + metal_counts["post_tm"]
     )
-
-    log_map = {
-        "Transition metals": metal_counts["tm"],
-        "Lanthanides/Actinides": metal_counts["f_block"],
-        "Alkali/Alkaline earth metals": metal_counts["alkali_alkaline"],
-        "Post-transition metals": metal_counts["post_tm"],
-        "Metalloids": metal_counts["metalloid"],
-    }
 
     if total_metal_count > max_metal_centers:
         logger.warning(
@@ -620,11 +619,11 @@ def is_polynuclear_over_limit(labels: list[str], max_metal_centers: int = 6) -> 
 
 
 def has_mixed_metal_types(labels: list[str]) -> bool:
-    metal_counts = count_metals(labels)
+    metal_counts, log_map = count_metals(labels)
 
     tm_count = metal_counts["tm"]
     total_metal_count = (
-        tm_count
+        metal_counts["tm"]
         + metal_counts["f_block"]
         + metal_counts["alkali_alkaline"]
         + metal_counts["post_tm"]
@@ -641,6 +640,8 @@ def has_mixed_metal_types(labels: list[str]) -> bool:
             labels2formula(labels),
         )
         return False
-
+    logger.warning("Mixed metal types detected in complex: %s", labels2formula(labels))
+    logger.debug("Total metal counts: %d", total_metal_count)
+    logger.debug("Metal type counts: %s", log_map)
     # Mixed metal types detected
     return True
