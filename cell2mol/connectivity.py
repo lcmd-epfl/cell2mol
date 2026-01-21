@@ -9,6 +9,7 @@ from cell2mol.element_utils import (
     get_metal_idxs,
     get_post_transition_metal_idxs,
     get_alkali_alkaline_earth_metal_idxs,
+    labels2formula,
 )
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
@@ -33,6 +34,62 @@ def get_scaled_radii(radii, metal_idxs, alkali_idxs, metal_factor, cov_factor):
     return scaled_radii
 
 
+def is_mismatch_adjacency(
+    labels: list[str],
+    positions: np.ndarray,
+    atom_site_labels: list[str] | None = None,
+    bond_data: list[tuple[str, str, float]] | None = None,
+    cutoff: float | None = None,
+    cov_factor: float | None = None,
+    metal_factor: float | None = None,
+    metal_only: bool = False,
+) -> bool | None:
+    """
+    Checks for discrepancies between distance-based and CIF-bond-based adjacency matrices.
+
+    Returns:
+        True:  Mismatch detected (Inconsistent connectivity).
+        False: Matrices are identical (Consistent connectivity).
+        None:  CIF bond data is missing (Comparison not possible).
+    """
+    # Use global config if specific parameters are not provided
+    cutoff = cutoff if cutoff is not None else config.CUTOFF
+    cov_factor = cov_factor if cov_factor is not None else config.COV_FACTOR
+    metal_factor = metal_factor if metal_factor is not None else config.METAL_FACTOR
+
+    # 1. Build distance-based matrix (Geometric Baseline)
+    _, adj_dist, _ = get_adjmatrix(
+        labels,
+        positions,
+        cutoff=cutoff,
+        cov_factor=cov_factor,
+        metal_factor=metal_factor,
+        metal_only=metal_only,
+    )
+
+    # 2. Build CIF-based matrix (Metadata Reference)
+    adj_conn = None
+    if bond_data and atom_site_labels:
+        adj_conn = get_adjmatrix_from_cif_bonds(
+            labels,
+            positions,
+            atom_site_labels=atom_site_labels,
+            bond_data=bond_data,
+            metal_only=metal_only,
+        )
+
+    # 3. Handle the 'None' case: Comparison cannot be performed
+    if adj_conn is None:
+        return None
+
+    # 4. Handle Case: Structural Mismatch (Different atom counts or shapes)
+    if adj_dist is None or adj_dist.shape != adj_conn.shape:
+        return True
+
+    # 5. Handle Numerical Mismatch: True if NOT identical
+    return not np.allclose(adj_dist, adj_conn)
+
+
 def build_adjacency(
     labels: list[str],
     positions: np.ndarray,
@@ -43,7 +100,7 @@ def build_adjacency(
     cov_factor: float | None = None,
     metal_factor: float | None = None,
     metal_only: bool = False,
-    warn_on_mismatch: bool = True,
+    warn_on_mismatch: bool = False,
     detail: bool = False,
 ) -> np.ndarray:
     """
@@ -87,6 +144,22 @@ def build_adjacency(
             bond_data=bond_data,
             metal_only=metal_only,
         )
+    if warn_on_mismatch and adj_dist is not None and adj_conn is not None:
+        logger.debug(
+            "Sum of Formula: %s adj_dist.shape: %s adj_conn.shape: %s",
+            labels2formula(labels),
+            adj_dist.shape,
+            adj_conn.shape,
+        )
+        is_consistent = np.allclose(adj_dist, adj_conn)
+        if not is_consistent:
+            logger.info(
+                "Discrepancy detected: The distance-based and CIF-bond-based adjacency matrices are not identical."
+            )
+        else:
+            logger.info(
+                "The distance-based and CIF-bond-based adjacency matrices are identical."
+            )
 
     # --- choose canonical ---
     if canonical == "distance":
@@ -590,6 +663,7 @@ def split_species(
     use_bond_info: bool | None = None,
     cov_factor: float | None = None,
     metal_factor: float | None = None,
+    warn_on_mismatch: bool = False,
     count_species_only: bool = False,
     apply_graph: bool = False,
 ):
@@ -612,7 +686,11 @@ def split_species(
         use_bond_info=use_bond_info,
         cov_factor=cov_factor,
         metal_factor=metal_factor,
+        warn_on_mismatch=warn_on_mismatch,
     )
+    if adjmat is None:
+        logger.warning("Adjacency matrix is None. Returning empty blocklist.")
+        return []
     adjnum = adjmat.sum(axis=1)
 
     degree = np.diag(adjnum)
@@ -809,7 +887,7 @@ def apply_graph_to_blocklist(
             use_bond_info=use_bond_info,
             cov_factor=cov_factor,
             metal_factor=metal_factor,
-            warn_on_mismatch=True,
+            warn_on_mismatch=False,
             detail=False,
         )
 
@@ -860,7 +938,7 @@ def apply_graph_to_blocklist(
             use_bond_info=use_bond_info,
             cov_factor=cov_factor,
             metal_factor=metal_factor,
-            warn_on_mismatch=True,
+            warn_on_mismatch=False,
             detail=False,
         )
 
