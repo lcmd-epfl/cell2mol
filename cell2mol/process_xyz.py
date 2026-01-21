@@ -41,7 +41,11 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
     newmolec = None
 
     try:
-        structure = read(input_path)
+        try:
+            structure = read(input_path, format="xyz")
+        except (AssertionError, Exception) as e:
+            logger.error(f"ASE failed to parse {input_path}: {e}")
+            raise
         labels = structure.get_chemical_symbols()
         coords = structure.get_positions()
 
