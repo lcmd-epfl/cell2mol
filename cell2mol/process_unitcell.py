@@ -60,7 +60,11 @@ def _initialize_cells(input_path, name, current_dir):
     cells: Cells = interpret_reference(input_path, name, current_dir)
     refcell: Reference = cells.reference
 
-    structure = read(input_path)
+    try:
+        structure = read(input_path, format="cif")
+    except (AssertionError, Exception) as e:
+        logger.error(f"ASE failed to parse {input_path}: {e}")
+        raise
     cell_labels, cell_pos, cell_fracs = get_cell_atoms(structure)
     cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
 
@@ -181,15 +185,6 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
         print(f"ERROR: {error_message}", file=f)
         for msg in warnings:
             print(f"WARNING: {msg}", file=f)
-
-    # Write to Logger
-    logger.info("Reference Summary: %s", error_message)
-    if not warnings:
-        logger.info("No potential issues detected.")
-    else:
-        logger.warning("Potential issues detected:")
-        for msg in warnings:
-            logger.warning("  - %s", msg)
 
 
 def _write_unit_summary(name: str, unitcell, summary_path: str):
