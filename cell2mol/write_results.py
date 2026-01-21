@@ -47,7 +47,7 @@ def compare_formula_xyz_vs_cif(xyzfile: str, formula_str_from_cif: str) -> dict:
     parsed_formula_cif = dict()
     for element, count in re.findall(element_pattern, formula_str_from_cif):
         parsed_formula_cif[element] = int(count) if count else 1
-    mol = read(xyzfile)
+    mol = read(xyzfile, format="xyz")
     element_list = mol.get_chemical_symbols()
     element_list_count = dict(Counter(element_list))
     comparison_result = {
@@ -210,6 +210,11 @@ def get_reference_warning_messages(refcell):
 
     if refcell.has_mixed_metal_types:
         messages.append("Mixed metal types detected")
+
+    if refcell.is_mismatch_adjacency is True:
+        messages.append(
+            "Distance-based adjacency matrix does not match the bond connectivity defined in the CIF."
+        )
 
     return messages
 

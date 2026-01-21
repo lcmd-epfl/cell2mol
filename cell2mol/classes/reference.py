@@ -59,6 +59,7 @@ class Reference(Cell):
     disagree_with_cif_formula: bool | None = None
     is_polynuclear_over_limit: bool | None = None
     has_mixed_metal_types: bool | None = None
+    is_mismatch_adjacency: bool | None = None
 
     # Frozen fields
     subtype: SubType = Field(default="reference")
@@ -89,11 +90,17 @@ class Reference(Cell):
         self.reported_metal_os = reported_metal_os
         self.moiety_dicts = moiety_dicts
 
-    def set_potential_warning(self, cif_mismatch, over_polynuclear_limit, mixed_metals):
-        """Set potential warning flags based on CIF mismatch, polynuclear limit, and mixed metals."""
+    def set_potential_warning(
+        self, cif_mismatch, over_polynuclear_limit, mixed_metals, is_mismatch_adj
+    ):
+        """
+        Set potential warning flags based on CIF mismatch, polynuclear limit,
+        mixed metals, and adjacency mismatch.
+        """
         self.disagree_with_cif_formula = cif_mismatch
         self.is_polynuclear_over_limit = over_polynuclear_limit
         self.has_mixed_metal_types = mixed_metals
+        self.is_mismatch_adjacency = is_mismatch_adj
 
     def get_reference_molecules(
         self,
@@ -131,6 +138,7 @@ class Reference(Cell):
         ref_fracs = self.frac_coord
         ref_pos = self.coord
         atom_site_labels = self.atom_site_labels
+        bond_data = getattr(self, "geom_bond_cif", None)
 
         # Determine blocklist
         if use_bond_info:
@@ -140,12 +148,20 @@ class Reference(Cell):
                 logger.error("CIF moiety indices are not available")
                 return []
         else:
-            blocklist = split_species(ref_labels, ref_pos, cov_factor=cov_factor)
+            blocklist = split_species(
+                ref_labels,
+                ref_pos,
+                atom_site_labels=atom_site_labels,
+                bond_data=bond_data,
+                cov_factor=cov_factor,
+                metal_factor=metal_factor,
+                warn_on_mismatch=True,
+            )
             logger.info("Using distance-based species splitting for blocklist")
             if self.moiety_indices is not None:
                 logger.info("CIF bond/moiety information is available but not used")
 
-        if blocklist is None:
+        if not blocklist:
             logger.warning("No blocklist found")
             return []
 
