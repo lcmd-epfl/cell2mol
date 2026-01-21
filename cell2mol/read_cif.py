@@ -138,6 +138,14 @@ def get_geom_bond(cif_file_path):
         geom_bond_data = None
     if moiety_list == []:
         moiety_list = None
+    if geom_bond_data is None and moiety_list is None:
+        logger.info("No _geom_bond information found in CIF file.")
+    else:
+        logger.info(
+            "_geom_bond information found in CIF: %d bonds, %d moieties",
+            len(geom_bond_data) if geom_bond_data else 0,
+            len(moiety_list) if moiety_list else 0,
+        )
     return geom_bond_data, moiety_list
 
 
@@ -197,17 +205,55 @@ def get_wyckoff_positions(cif_file_path):
     ref_labels = [entry[1] for entry in atom_site_data]
     ref_fracs = [[entry[2], entry[3], entry[4]] for entry in atom_site_data]
 
-    if any("?" in label for label in atom_site_labels):
-        logger.warning("Disorder atoms found in Wyckoff positions.")
-        atom_site_labels, ref_labels, ref_fracs = remove_disorder_atoms(
+    UNSPECIFIED_MARKERS = ("?", "*")
+
+    if any(
+        marker in (label or "")
+        for label in atom_site_labels
+        for marker in UNSPECIFIED_MARKERS
+    ):
+        logger.warning("Unspecified atoms found in Wyckoff positions.")
+        atom_site_labels, ref_labels, ref_fracs = remove_unspecified_atoms(
             atom_site_labels, ref_labels, ref_fracs
         )
+
     return atom_site_labels, ref_labels, ref_fracs
 
 
-def remove_disorder_atoms(atom_site_labels, ref_labels, ref_fracs):
+def remove_unspecified_atoms(atom_site_labels, ref_labels, ref_fracs):
     """
-    Remove atoms with disorder from the Wyckoff positions.
+    Remove atoms with unspecified positions from the Wyckoff sites.
+    """
+
+    if not (len(atom_site_labels) == len(ref_labels) == len(ref_fracs)):
+        raise ValueError("Input lists must have the same length")
+
+    UNSPECIFIED_MARKERS = ("?", "*")
+
+    new_atom_site_labels = []
+    new_ref_labels = []
+    new_ref_fracs = []
+
+    for atom_site_label, ref_label, ref_frac in zip(
+        atom_site_labels, ref_labels, ref_fracs
+    ):
+        if any(marker in atom_site_label for marker in UNSPECIFIED_MARKERS):
+            logger.info(
+                "Removing unspecified atom: %s (%s)",
+                atom_site_label,
+                ref_label,
+            )
+        else:
+            new_atom_site_labels.append(atom_site_label)
+            new_ref_labels.append(ref_label)
+            new_ref_fracs.append(ref_frac)
+
+    return new_atom_site_labels, new_ref_labels, new_ref_fracs
+
+
+def remove_unspecified_atoms(atom_site_labels, ref_labels, ref_fracs):
+    """
+    Remove atoms with unspecified positions from the Wyckoff sites.
     Args:
         atom_site_labels (list): List of atom site labels
             (e.g. ["O1", "H1", "H2"]).
@@ -219,7 +265,7 @@ def remove_disorder_atoms(atom_site_labels, ref_labels, ref_fracs):
             reference labels, and fractional coordinates.
     """
 
-    substring_to_remove = "?"
+    substring_to_remove = ["?", "*"]
 
     # Build new filtered lists
     new_atom_site_labels = []
@@ -229,12 +275,12 @@ def remove_disorder_atoms(atom_site_labels, ref_labels, ref_fracs):
     for atom_site_label, ref_label, ref_frac in zip(
         atom_site_labels, ref_labels, ref_fracs
     ):
-        if substring_to_remove not in atom_site_label:
+        if any(sub in atom_site_label for sub in substring_to_remove):
+            logger.info("  Removing unspecified atom: %s", atom_site_label)
+        else:
             new_atom_site_labels.append(atom_site_label)
             new_ref_labels.append(ref_label)
             new_ref_fracs.append(ref_frac)
-        else:
-            logger.info(f"Removing disorder atom: {atom_site_label}")
 
     # Optionally overwrite originals
     atom_site_labels = new_atom_site_labels
@@ -638,12 +684,23 @@ def extract_info_from_cif(cif_file_path):
     """Extract chemical name, metal oxidation state, and moiety information from the CIF file."""
 
     chemical_name = extract_chemical_name(cif_file_path)
-    reported_metal_os = extract_metal_oxidation_state(chemical_name)
-    moiety_dicts = extract_moiety(cif_file_path)
+    if chemical_name is None:
+        reported_metal_os = None
+        logger.info("No _chemical_name_systematic found in CIF")
+        logger.info("No metal oxidation state reported in CIF")
+    else:
+        reported_metal_os = extract_metal_oxidation_state(chemical_name)
+        logger.info("_chemical_name_systematic in CIF: %s", chemical_name)
+        logger.info("Reported oxidation states in CIF: %s", reported_metal_os)
 
-    logger.info(f"_chemical_name_systematic in CIF: {chemical_name}")
-    logger.info(f"Reported oxidation states in CIF: {reported_metal_os}")
-    logger.info(f"Moiety dictionaries: {moiety_dicts}")
+    moiety_dicts = extract_moiety(cif_file_path)
+    logger.info(
+        "Number of moieties extracted from CIF: %d",
+        len(moiety_dicts) if moiety_dicts else 0,
+    )
+    logger.debug("Moiety dictionaries:")
+    for i, moiety in enumerate(moiety_dicts):
+        logger.debug("  %d: %s", i, moiety)
 
     return chemical_name, reported_metal_os, moiety_dicts
 
