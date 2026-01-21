@@ -109,16 +109,17 @@ def create_reference(input_path, name, cell_vector, cell_param):
     refcell.set_cif_bond_moiety(geom_bond_cif, moiety_list_cif)
     logger.info("CIF has bond moiety information: %s", refcell.exist_cif_bond_moiety)
 
+    # Extract additional CIF information
+    chemical_name, reported_metal_os, moiety_dicts = extract_info_from_cif(input_path)
+    refcell.set_additional_cif_info(chemical_name, reported_metal_os, moiety_dicts)
+
+    # Generate reference molecules
     refcell.get_reference_molecules()
 
     if not refcell.refmoleclist:
         refcell.error_case = -1
         logger.warning("No reference molecules found in the CIF file")
         return refcell
-
-    # Extract additional CIF information
-    chemical_name, reported_metal_os, moiety_dicts = extract_info_from_cif(input_path)
-    refcell.set_additional_cif_info(chemical_name, reported_metal_os, moiety_dicts)
 
     # Check for potential warnings
     cif_mismatch = compare_cif_with_reference(moiety_dicts, refcell.refmoleclist)
@@ -146,7 +147,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
 
 def _handle_reference_outputs(name, current_dir, cells, refcell):
     """Manages saving files and writing summaries."""
-    if refcell is None or refcell.error_case == -1:
+    if refcell is None:
         return
 
     # 1. Write the .out summary file
@@ -161,12 +162,12 @@ def _handle_reference_outputs(name, current_dir, cells, refcell):
 
     def save_ref():
         refcell.save(ref_cell_fname)
-        # if logger.isEnabledFor(logging.DEBUG):
+        # if logger.isEnabledFor(logging.DEBUG) and not refcell.error_case == -1:
         #     extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
 
     _safe_run(save_ref, "Failed to save reference cell")
 
-    # 3. Save the Cells container (.json)
+    # # 3. Save the Cells container (.json)
     # if cells:
     #     cells_json = os.path.join(current_dir, f"Cells_{name}.json")
     #     _safe_run(
