@@ -209,10 +209,18 @@ class Atom(BaseModel):
         return to_print
 
     def reset_mconnec(self, met, diff: int = -1):
-        logger.info("Reset mconnec: atom=%s diff=%d", self.label, diff)
+        logger.info(
+            "Reset mconnec: atom=%s%s diff=%d to metal=%s%s",
+            self.label,
+            f" ({self.atom_site_label})" if self.atom_site_label is not None else "",
+            diff,
+            met.label,
+            f" ({met.atom_site_label})" if met.atom_site_label is not None else "",
+        )
 
         logger.debug(
-            "Initial atom: connec=%d mconnec=%d adj=%s madj=%s",
+            "Initial atom connectivity: mol_idx=%s connec=%d mconnec=%d adj=%s madj=%s",
+            self.get_parent_index("molecule"),
             self.connec,
             self.mconnec,
             self.adjacency,
@@ -220,11 +228,12 @@ class Atom(BaseModel):
         )
 
         # Update atom
-        self.mconnec += diff
-        self.connec += diff
+        # self.mconnec += diff
+        # self.connec += diff
 
         logger.debug(
-            "Initial metal: connec=%d mconnec=%d adj=%s madj=%s",
+            "Initial metal connectivity: mol_idx=%s connec=%d mconnec=%d adj=%s madj=%s",
+            met.get_parent_index("molecule"),
             met.connec,
             met.mconnec,
             met.adjacency,
@@ -232,37 +241,20 @@ class Atom(BaseModel):
         )
 
         # Update metal
-        met.mconnec += diff
-        met.connec += diff
+        # met.mconnec += diff
+        # met.connec += diff
 
-        # ---------- Ligand ----------
         if self.check_parent("ligand"):
             lig = self.get_parent("ligand")
-            lig_idx = self.get_parent_index("ligand")
-
-            logger.info("Updating ligand: atom=%s ligand_idx=%d", self.label, lig_idx)
-            logger.info("Ligand before: adjnum=%s madjnum=%s", lig.adjnum, lig.madjnum)
-
-            lig.madjnum[lig_idx] += diff
-            lig.adjnum[lig_idx] += diff
-
-            lig.atoms[lig_idx].set_adjacencies(
-                lig.adjmat[lig_idx],
-                lig.madjmat[lig_idx],
-                lig.adjnum[lig_idx],
-                lig.madjnum[lig_idx],
-            )
-
-            logger.info(
-                "Ligand after: atom connec=%d mconnec=%d adj=%s madj=%s",
-                lig.atoms[lig_idx].connec,
-                lig.atoms[lig_idx].mconnec,
-                lig.atoms[lig_idx].adjacency,
-                lig.atoms[lig_idx].metal_adjacency,
-            )
 
             lig.get_connected_idx()
+            logger.debug("Ligand connected indices (before): %s", lig.connected_idx)
             lig.get_connected_atoms()
+            logger.debug(
+                "Ligand connected atoms (before): %s%s",
+                [atom.label for atom in lig.connected_atoms],
+                [atom.atom_site_label for atom in lig.connected_atoms],
+            )
 
         # ---------- Molecule ----------
         if self.check_parent("molecule"):
@@ -321,3 +313,61 @@ class Atom(BaseModel):
                 met.adjacency,
                 met.metal_adjacency,
             )
+
+        # ---------- Ligand ----------
+        if self.check_parent("ligand"):
+            lig = self.get_parent("ligand")
+            lig_idx = self.get_parent_index("ligand")
+
+            logger.info(
+                "Updating ligand: atom=%s%s ligand_idx=%d",
+                self.label,
+                f" ({self.atom_site_label})"
+                if self.atom_site_label is not None
+                else "",
+                lig_idx,
+            )
+            logger.info("Ligand adjnum (before): %s", lig.adjnum[lig_idx])
+            logger.info("Ligand madjnum (before): %s", lig.madjnum[lig_idx])
+
+            lig.madjnum[lig_idx] += diff
+            lig.adjnum[lig_idx] += diff
+
+            logger.info("Ligand adjnum (after): %s", lig.adjnum[lig_idx])
+            logger.info("Ligand madjnum (after): %s", lig.madjnum[lig_idx])
+
+            lig.get_connected_idx()
+            logger.debug("Ligand connected indices (after): %s", lig.connected_idx)
+            lig.get_connected_atoms()
+            logger.debug(
+                "Ligand connected atoms (after): %s%s",
+                [atom.label for atom in lig.connected_atoms],
+                [atom.atom_site_label for atom in lig.connected_atoms],
+            )
+
+        logger.info(
+            "Final: atom=%s%s diff=%d to metal=%s%s",
+            self.label,
+            f" ({self.atom_site_label})" if self.atom_site_label is not None else "",
+            diff,
+            met.label,
+            f" ({met.atom_site_label})" if met.atom_site_label is not None else "",
+        )
+
+        logger.debug(
+            "Final atom connectivity: mol_idx=%s connec=%d mconnec=%d adj=%s madj=%s",
+            self.get_parent_index("molecule"),
+            self.connec,
+            self.mconnec,
+            self.adjacency,
+            self.metal_adjacency,
+        )
+
+        logger.debug(
+            "Final metal connectivity: mol_idx=%s connec=%d mconnec=%d adj=%s madj=%s",
+            met.get_parent_index("molecule"),
+            met.connec,
+            met.mconnec,
+            met.adjacency,
+            met.metal_adjacency,
+        )
