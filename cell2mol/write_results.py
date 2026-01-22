@@ -361,9 +361,9 @@ def write_molecule_info(mol, file=None, index=None):
         for met in mol.metals:
             met_info = f"\t{met.formula} ({met.subtype})"
 
-            labels = getattr(met, "atom_site_labels", None)
+            labels = getattr(met, "atom_site_label", None)
             if labels:
-                met_info += f" atom_site_labels={labels}"
+                met_info += f" atom_site_label={labels}"
 
             # Oxidation state
             if met.charge is not None:
@@ -425,6 +425,13 @@ def write_molecule_info(mol, file=None, index=None):
             if getattr(lig, "groups", None):
                 for group in lig.groups:
                     group_info = f"\t|--(group) {group.labels}"
+                    group_atom_site_labels = [
+                        a.atom_site_label
+                        for a in group.atoms
+                        if a.atom_site_label is not None
+                    ]
+                    if group_atom_site_labels:
+                        group_info += f" atom_site_labels={group_atom_site_labels}"
                     if hasattr(group, "denticity"):
                         group_info += f" denticity={group.denticity}"
                     if getattr(group, "is_haptic", False):
