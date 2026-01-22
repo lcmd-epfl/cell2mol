@@ -10,7 +10,10 @@ from cell2mol.process_unitcell import interpret_unitcell
 from cell2mol.process_xyz import interpret_molecule
 from cell2mol.read_cif import prefilter_cif
 from cell2mol.write_results import exit_with_error_input, exit_with_error_exception
+from rdkit import RDLogger
 
+RDLogger.DisableLog("rdApp.warning")
+RDLogger.DisableLog("rdApp.error")
 warnings.filterwarnings(
     "ignore",
     message="crystal system .* is not interpreted for space group",
