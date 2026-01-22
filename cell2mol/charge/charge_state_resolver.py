@@ -330,7 +330,7 @@ def get_candidate_charges(prot: object) -> list:
     # Quick returns for simple cases
     if formula in {"C-O", "H2-O", "C-N", "C-S", "C-Se", "C-Te", "C-P", "C-As", "C-Sb"}:
         return [0]
-    if formula in {"F", "Cl", "Br", "I", "H"}:
+    if formula in {"F", "Cl", "Br", "I"}:
         return [-1]
 
     logger.debug(
@@ -392,6 +392,7 @@ def generate_manual_charge_state(spec):
         "I4": (None, "I[I-][I-]I", -2),
         "I5": (None, "II[I-]II", -1),
         "I6": (None, "I[I-]II[I-]I", -2),
+        "H": (None, "[H-]", -1),
     }
 
     formula = spec.formula
