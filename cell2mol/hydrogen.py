@@ -148,7 +148,8 @@ def check_missing_hydrogens(reference_molecules):
     missing_h_in_water = False
     missing_h_in_coordinated_water = False
     missing_h_detected = False
-
+    # coord_water_exceptions = {}
+    # coord_water_exceptions = {"Re", "V", "Mo", "W", "Fe", "Tc", "Os", "Cr", "Nb", "U"}
     coord_water_exceptions = {"Re", "V", "Mo", "W", "Fe", "Tc"}
     fullerenes = {"C60", "C72", "C80"}
 
