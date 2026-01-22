@@ -1074,7 +1074,7 @@ def add_atom(
         # Case 1: unconditional addition
         if unconditional:
             isadded = True
-            logger.info(
+            logger.debug(
                 "%s added unconditionally at site %d of ligand %s",
                 element,
                 site,

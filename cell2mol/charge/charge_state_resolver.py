@@ -87,13 +87,21 @@ def enumerate_possible_charge_states(spec: object):
             if charge_state:
                 valid_charge_states.append(charge_state)
                 logger.debug(
-                    "    [Success] %s | Charge: %d | SMILES: %s",
+                    "    [Success] %s | Protonation: %s | Charge: %d | Added atoms: %d | SMILES: %s",
                     spec.formula,
+                    prot.formula,
                     charge,
+                    prot.added_atoms,
                     charge_state.smiles,
                 )
             else:
-                logger.debug("    [Failed]  %s | Charge: %d", spec.formula, charge)
+                logger.debug(
+                    "    [Failed]  %s | Protonation: %s | Charge: %d  | Added atoms: %d",
+                    spec.formula,
+                    prot.formula,
+                    charge,
+                    prot.added_atoms,
+                )
 
     # 4. Final Selection / Filtering
     best_candidates = identify_best_charge_states(valid_charge_states)
