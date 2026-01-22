@@ -22,9 +22,10 @@ def exit_with_error_input(message):
     sys.exit(message)
 
 
-def exit_with_error_exception(exc):
+def exit_with_error_exception(exc, error_log_path=None):
     exc_type = type(exc).__name__
-    error_log_path = os.path.join(os.getcwd(), f"error_{exc_type}.out")
+    if error_log_path is None:
+        error_log_path = os.path.join(os.getcwd(), f"error_{exc_type}.out")
 
     tb = traceback.format_exc()
 

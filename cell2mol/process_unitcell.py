@@ -18,6 +18,7 @@ from cell2mol.write_results import (
     get_reference_error_message,
     get_reference_warning_messages,
     get_unitcell_error_message,
+    exit_with_error_exception,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
             return cells
 
     except Exception as exc:
-        logger.exception(f"Unhandled exception while processing {name}: {exc}")
+        exit_with_error_exception(exc)
     finally:
         # 3. Handle Saving and Summaries (Always runs even on error)
         _save_cell_outputs(name, current_dir, cells, refcell, unitcell)
