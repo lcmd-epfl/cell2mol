@@ -125,7 +125,6 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
             result = _handle_haptic_group(ligand, g, parent_indices)
         else:  # NON-HAPTIC GROUPS
             result = _handle_non_haptic_group(ligand, g, parent_indices)
-
         # --------------------------------------------------
         # Merge results (THIS IS THE IMPORTANT PART)
         # --------------------------------------------------
@@ -501,14 +500,14 @@ def _handle_non_haptic_group(
                 block.append(idx)
 
         # -----------------------------------------
-        # Hydrides
+        # Hydrides (handle manually)
         # -----------------------------------------
-        elif a.label == "H":
-            if a.connec <= 1:
-                addedlist[idx] = 1
-                elemlist[idx] = "Cl"
-            else:
-                block.append(idx)
+        # elif a.label == "H":
+        #     if len(adj_labels) <= 1:
+        #         addedlist[idx] = 1
+        #         elemlist[idx] = "Cl"
+        #     else:
+        #         block.append(idx)
 
         # -----------------------------------------
         # Nitrogen

@@ -1,7 +1,7 @@
 # Fullerene species that require special handling
 FULLERENES = {"C60", "C72", "C80"}
 # Ligand or molecules requiring manual charge assignment
-MANUAL_CHARGE_ASSIGN_SPECIES = {"O4-Cl", "N3", "N2", "N-O", "I3", "I4", "I5", "I6"}
+MANUAL_CHARGE_ASSIGN_SPECIES = {"O4-Cl", "N3", "N2", "N-O", "I3", "I4", "I5", "I6", "H"}
 
 
 # Plausible oxidation states by atomic symbol
