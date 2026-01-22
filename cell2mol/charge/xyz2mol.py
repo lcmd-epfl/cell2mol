@@ -682,34 +682,32 @@ def AC2BO(
             possible_valence = [3]
         if len(possible_valence) == 0:
             element = elemdatabase.elementsym[atomicNum]
-            if (
-                elemdatabase.elementgroup[element] == 1
-                or elemdatabase.elementgroup[element] == 2
-            ):  # Alkali and Alkaline earth metals
+            max_valence = max(atomic_valence[atomicNum])
+
+            if elemdatabase.elementgroup[element] in (1, 2):
+                # Alkali and alkaline earth metals
                 logger.warning(
-                    "Valence of atom",
+                    "Atom %s (index %d) has valence %d, which exceeds the allowed maximum (%d) "
+                    "for group %d elements. Stopping.",
                     element,
                     i,
-                    "is",
                     valence,
-                    "which is bigger than allowed max",
-                    max(atomic_valence[atomicNum]),
-                    ". Stopping",
+                    max_valence,
+                    elemdatabase.elementgroup[element],
                 )
                 possible_valence.append(valence)
-            elif elemdatabase.elementperiod[element] < 3:  # e.g. HOLMOK
+
+            elif elemdatabase.elementperiod[element] < 3:
+                # e.g. F in  HOLMOK
                 logger.warning(
-                    "Valence of atom",
+                    "Atom %s (index %d) has valence %d, which exceeds the allowed maximum (%d) "
+                    "for period %d elements. Stopping.",
                     element,
                     i,
-                    "is",
                     valence,
-                    "which bigger than allowed max",
-                    max(atomic_valence[atomicNum]),
-                    ". Stopping",
+                    max_valence,
+                    elemdatabase.elementperiod[element],
                 )
-                possible_valence.append(valence)
-                # wrong += 1
             else:
                 possible_valence.append(valence)
             # sys.exit()

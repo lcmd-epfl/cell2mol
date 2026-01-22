@@ -278,10 +278,11 @@ class Reference(Cell):
         typelist_mets = []  # temporary variable
 
         specs_found = -1
-        if self.subtype == "reference":
-            moleclist = self.refmoleclist
-        else:
-            moleclist = self.moleclist
+        if not self.refmoleclist:  # None or empty
+            logger.error("Reference molecule list is None")
+            return
+        moleclist = self.refmoleclist
+
         for idx, mol in enumerate(moleclist):
             logger.debug("Molecule (%d) formula=%s", idx, mol.formula)
             if mol.is_non_complex_molecule:  # Non-complex molecules
@@ -402,8 +403,6 @@ class Reference(Cell):
         logger.info("Unique species: %s", [s.formula for s in self.unique_species])
         logger.info("Unique indices: %s", self.unique_indices)
         logger.info("Species list: %s", [s.formula for s in self.species_list])
-
-        return self.unique_species
 
     def get_selected_cs(self) -> None:
         """
