@@ -207,8 +207,17 @@ class Reference(Cell):
                 label = ref.atoms[0].label
                 if label in {"H", "D"}:
                     has_isolated_h = True
+                    logger.warning(
+                        "  Isolated hydrogen found %s (%s)",
+                        ref.labels[0],
+                        ref.atom_site_labels[0] if ref.atom_site_labels else "N/A",
+                    )
                 else:
-                    logger.warning("Isolated atom found %s", ref.labels)
+                    logger.warning(
+                        "  Isolated atom found %s (%s)",
+                        ref.labels[0],
+                        ref.atom_site_labels[0] if ref.atom_site_labels else "N/A",
+                    )
 
         self.has_isolated_H = has_isolated_h
         logger.info("Has isolated hydrogen: %s", self.has_isolated_H)
