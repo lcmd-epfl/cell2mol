@@ -986,10 +986,10 @@ def is_single_ring(
     """Check if the group is a ring"""
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
-    logger.debug("Checking if group is a single ring...")
-    logger.debug("Labels: %s", labels)
-    logger.debug("Positions: %s", positions)
-    logger.debug("Atom site labels: %s", atom_site_labels)
+    # logger.debug("Checking if group is a single ring...")
+    # logger.debug("Labels: %s", labels)
+    # logger.debug("Positions: %s", positions)
+    # logger.debug("Atom site labels: %s", atom_site_labels)
     adjmat = build_adjacency(
         labels=labels,
         positions=positions,
@@ -1024,6 +1024,7 @@ def add_atom(
     site: int,
     ligand: object,
     element: str = "H",
+    metal: object | None = None,
     removed_idx: list | None = None,
     unconditional: bool = False,
 ) -> Tuple[bool, list, list]:
@@ -1038,7 +1039,7 @@ def add_atom(
     newlab = list(labels)
     newcoord = list(coords)
 
-    newlab.append(str(element))  # one atom will be added
+    newlab.append(element)  # one atom will be added
 
     # logger.debug("number of ligand atoms=%d", len(ligand.atoms))
     # logger.debug("target site=%d (%s)", site, ligand.atoms[site].label)
@@ -1048,8 +1049,13 @@ def add_atom(
             continue
 
         apos = np.array(atom.coord, copy=True)
-        tgt = atom.get_closest_metal()
-        metal_idx = tgt.get_parent_index("molecule")
+        if metal is not None:
+            tgt = metal
+
+        else:
+            tgt = atom.get_closest_metal()
+
+        # metal_idx = tgt.get_parent_index("molecule")
 
         # logger.debug("Evaluating atom at %s with closest metal at %s", apos, tgt.coord)
 
@@ -1099,10 +1105,18 @@ def add_atom(
             removed = set(removed_idx)
 
             logger.debug(
-                "%s connected to indices %s; previously removed %s",
+                "Dummy %s attached to atom %s %s %s %s connected to indices %s %s %s; previously removed indices%s %s %s",
                 element,
+                atom.label,
+                atom.atom_site_label,
+                apos,
+                atom.frac_coord,
                 connected,
+                [labels[i] for i in connected],
+                [ligand.atom_site_labels[i] for i in connected],
                 removed,
+                [labels[i] for i in removed],
+                [ligand.atom_site_labels[i] for i in removed],
             )
 
             remaining = list(connected - removed)
@@ -1119,9 +1133,11 @@ def add_atom(
                 # )
             else:
                 logger.info(
-                    "%s reset at site %d due to connectivity=%d",
-                    element,
+                    "Reset at site (ligand index: %d) of atom %s %s due to dummy %s connectivity=%d",
                     site,
+                    atom.label,
+                    atom.atom_site_label,
+                    element,
                     tmpconnec[posadded],
                 )
                 # import os
