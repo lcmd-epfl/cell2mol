@@ -70,13 +70,24 @@ def interpret_reference(input_path, name, current_dir):
             cell_param=cell_param,
         )
 
+        # --- Possible charge analysis ---
+        refcell.get_selected_cs()
+        refcell.assess_errors(mode="possible_charges")
+
+        if refcell.has_error():
+            logger.error(
+                "Error retrieving possible charges (error_case=%s)",
+                refcell.error_case,
+            )
+
+        return cells
+
     except Exception as exc:
         exit_with_error_exception(exc)
+        return None
 
     finally:
         _handle_reference_outputs(name, current_dir, cells, refcell)
-
-    return cells
 
 
 def create_reference(input_path, name, cell_vector, cell_param):
