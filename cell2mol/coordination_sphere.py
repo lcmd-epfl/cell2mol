@@ -397,6 +397,8 @@ def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = No
                 continue
             lig = group.get_parent("ligand")
             ligand_idx = atom.get_parent_index("ligand")
+            atom_mol_idx = atom.get_parent_index("molecule")
+            met_mol_idx = met.get_parent_index("molecule")
 
             tmplabels = [atom.label, met.label]
             tmpcoord = [atom.coord, met.coord]
@@ -426,18 +428,25 @@ def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = No
                 tmp_adjnum = tmp_adjmat.sum(axis=1)
                 if any(tmp_adjnum) > 0:
                     logger.debug(
-                        "Atom %s (ligand index %s) is connected to metal %s (metal index %s)",
+                        "Atom %s%s (ligand_idx %s, atom_mol_idx %s) is connected to metal %s%s (met_mol_idx %s)",
                         atom.label,
+                        f" ({atom.atom_site_label})" if atom.atom_site_label else "",
                         ligand_idx,
+                        atom_mol_idx,
                         met.label,
-                        jdx,
+                        f" ({met.atom_site_label})" if met.atom_site_label else "",
+                        met_mol_idx,
                     )
                     if use_bond_info:
                         isadded = True
                         logger.debug(
-                            "Connectivity verified for atom %s with ligand index %s based on CIF bonds",
+                            "Connectivity verified for atom %s%s with ligand_idx %s, atom_mol_idx %s based on CIF bonds",
                             atom.label,
+                            f" ({atom.atom_site_label})"
+                            if atom.atom_site_label
+                            else "",
                             ligand_idx,
+                            atom_mol_idx,
                         )
                         conn_idx.append(idx)
                         final_ligand_indices.append(atom.get_parent_index("ligand"))
@@ -450,13 +459,18 @@ def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = No
                             ligand_idx,
                             lig,
                             "H",
-                            removed_idx,
+                            removed_idx=removed_idx,
+                            metal=met,
                         )
                         if isadded:
                             logger.debug(
-                                "Connectivity verified for atom %s with ligand index %s",
+                                "Connectivity verified for atom %s%s with ligand_idx %s, atom_mol_idx %s",
                                 atom.label,
+                                f" ({atom.atom_site_label})"
+                                if atom.atom_site_label
+                                else "",
                                 ligand_idx,
+                                atom_mol_idx,
                             )
                             conn_idx.append(idx)
                             final_ligand_indices.append(atom.get_parent_index("ligand"))
@@ -464,12 +478,26 @@ def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = No
                             conn_idx_by_metal[jdx].append(idx)
                         else:
                             logger.debug(
-                                "Correct mconnec of atom %s with ligand index %s",
+                                "Correct mconnec of atom %s%s with ligand_idx %s, atom_mol_idx %s",
                                 atom.label,
+                                f" ({atom.atom_site_label})"
+                                if atom.atom_site_label
+                                else "",
                                 ligand_idx,
+                                atom_mol_idx,
                             )
                             isremoved = True
                             removed_idx.append(ligand_idx)
+                            logger.debug(
+                                "Atom %s%s with ligand_idx %s, atom_mol_idx %s removed from coordination sphere",
+                                atom.label,
+                                f" ({atom.atom_site_label})"
+                                if atom.atom_site_label
+                                else "",
+                                ligand_idx,
+                                atom_mol_idx,
+                            )
+                            logger.debug("removed_idx: %s", removed_idx)
                             ### Reset Connectivity of the atom and the parents
                             atom.reset_mconnec(met)
                             met.get_coord_sphere()
