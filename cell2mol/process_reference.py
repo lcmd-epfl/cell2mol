@@ -22,6 +22,7 @@ from cell2mol.write_results import (
     extract_refmoleclist_xyz,
     write_cell_molecules_info,
     write_unique_species,
+    write_possible_charges,
     get_reference_error_message,
     get_reference_warning_messages,
 )
@@ -197,6 +198,7 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
         print(name, file=f)
         write_cell_molecules_info(refcell, file=f)
         write_unique_species(refcell, file=f)
+        write_possible_charges(refcell, file=f)
         print(f"ERROR: {error_message}", file=f)
         for msg in warnings:
             print(f"WARNING: {msg}", file=f)
