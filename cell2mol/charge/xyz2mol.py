@@ -414,10 +414,6 @@ def set_atomic_radicals(
     mol, atoms, atomic_valence_electrons, BO_valences, use_atom_maps=False
 ):
     """The number of radical electrons = absolute atomic charge."""
-    # logger.debug(f"{atoms=}, {BO_valences=}")
-    # logger.debug(f"{atomic_valence[8]=}")
-    # logger.debug(f"{atomic_valence[7]=}")
-    # logger.debug(f"{atomic_valence[6]=}")
 
     for i, atom in enumerate(atoms):
         a = mol.GetAtomWithIdx(i)
@@ -654,11 +650,10 @@ def AC2BO(
         # valence can't be smaller than number of neighbours
         if len(atomic_valence[atomicNum]) == 0:
             logger.warning(
-                "In AC2BO",
+                "AC2BO: atom index %d (atomic number %d) has no possible valences "
+                "defined in the database.",
                 i,
-                "Atomic number",
                 atomicNum,
-                "Has no possible valences assigned in database",
             )
         possible_valence = [x for x in atomic_valence[atomicNum] if x >= valence]
 
@@ -721,9 +716,6 @@ def AC2BO(
 
     count = 0
     max_count = min(len(sorted_valences_list), 50)
-    # if formula in ["C-S", "C-Se", "C-Te"]:
-    # logger.debug(f"{sorted_valences_list=} {AC=} {AC_valence=}")
-    # logger.debug(f"{formula=} {len(sorted_valences_list)=} {max_count=}")
 
     for valences in sorted_valences_list:  # valences_list:
         UA, DU_from_AC = get_UA(valences, AC_valence)
@@ -747,12 +739,7 @@ def AC2BO(
 
         if check_len and check_bo:
             logger.info("return AC %s charge %d count %d", formula, charge, count)
-            # logger.info(
-            #     f"{formula=} return AC",
-            #     check_len,
-            #     check_bo,
-            #     f"{charge=} {count=}",
-            # )
+
             return AC, atomic_valence_electrons
 
         UA_pairs_list = get_UA_pairs(UA, AC, use_graph=use_graph)
@@ -780,22 +767,15 @@ def AC2BO(
                 allow_charged_fragments=allow_charged_fragments,
                 allow_carbenes=allow_carbenes,
             )
-            if formula in ["C-S", "C-Se", "C-Te"]:
-                mol = BO2mol(
-                    get_proto_mol(atoms),
-                    BO,
-                    atoms,
-                    atomic_valence_electrons,
-                    charge,
-                    allow_charged_fragments=allow_charged_fragments,
-                )
-                smi = Chem.MolToSmiles(mol)
-                # logger.debug(
-                #     f"CHECK {formula=} {status=} {charge=} {count=} {int(BO.sum())=} valences_not_too_large={valences_not_too_large(BO, valences)} {charge_OK=} SMILES={smi}"
-                # )
 
             if status:
-                logger.info(f"{formula=} {status=} {charge=} {count=}")
+                logger.debug(
+                    "formula=%s status=%s charge=%s count=%s",
+                    formula,
+                    status,
+                    charge,
+                    count,
+                )
                 return BO, atomic_valence_electrons
             elif (
                 BO.sum() >= best_BO.sum()
@@ -806,12 +786,9 @@ def AC2BO(
 
             count += 1
             if count > max_count:
-                logger.info(
+                logger.debug(
                     "reached max count %s (charge=%d) count: %d", formula, charge, count
                 )
-                # logger.warning(
-                #     f"Over maximum counts AC2BO: {formula=} {charge=} {count=}"
-                # )
                 return best_BO, atomic_valence_electrons
 
     return best_BO, atomic_valence_electrons
@@ -933,7 +910,7 @@ def chiral_stereo_check(mol):
             return True
 
         except rdkit.Chem.rdchem.AtomValenceException as e:
-            logger.warning(f"Failed to process molecule: {e}")
+            logger.warning("Failed to process molecule: %s", e)
             return False
 
 

@@ -96,6 +96,8 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     non_local_groups_indices: list[int] = []
     reset_H_indices: list[int] = []
 
+    limit_of_nonlocal_sites = 4  # Arbitrary limit to avoid combinatorial explosion
+
     logger.info("Processing %s (%s):", specie.formula, specie.subtype)
 
     # ============================================================
@@ -145,6 +147,23 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
         if result.needs_nonlocal:
             non_local_groups_indices.extend(result.non_local_indices)
 
+    # ============================================================
+    # Check non_local_groups_indices for decision
+    # ============================================================
+    logger.debug("    non_local_groups_indices: %s", non_local_groups_indices)
+    if len(non_local_groups_indices) > limit_of_nonlocal_sites:
+        logger.info(
+            "  %d non-local protonation sites detected (more than the limit of %d). ",
+            len(non_local_groups_indices),
+            limit_of_nonlocal_sites,
+        )
+        combinations = list(
+            itertools.product([0, 1], repeat=len(non_local_groups_indices))
+        )
+        logger.info("  Total combinations to evaluate: %d. ", len(combinations))
+        # logger.info("  Skipping protonation enumeration for %s.", specie.formula)
+        logger.info("  Generating empty protonation state only for %s.", specie.formula)
+        return get_empty_protonation_state(specie)
     # ============================================================
     # LOCAL ATOM ADDITION
     # ============================================================
