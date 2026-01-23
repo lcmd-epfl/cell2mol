@@ -264,7 +264,7 @@ class Metal(Atom):
     def get_spin(self):
         self.spin = assign_spin_metal(self)
         logger.info(
-            "Spin multiplicity of the metal %s is assigned as %d", self.label, self.spin
+            "Spin multiplicity of the metal %s is assigned as %s", self.label, self.spin
         )
 
     def predict_charge(self):
