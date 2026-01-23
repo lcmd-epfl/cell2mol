@@ -12,6 +12,14 @@ from cell2mol.read_cif import prefilter_cif
 from cell2mol.write_results import exit_with_error_input, exit_with_error_exception
 from rdkit import RDLogger
 
+try:
+    from cell2mol.utils.limits import set_memory_limit
+except ImportError:
+    # Fallback if the file doesn't exist yet, to prevent import errors
+    def set_memory_limit(gb):
+        pass
+
+
 RDLogger.DisableLog("rdApp.warning")
 RDLogger.DisableLog("rdApp.error")
 warnings.filterwarnings(
@@ -30,6 +38,13 @@ logger = logging.getLogger(__name__)
 
 def main():
     args = parsing_arguments()
+
+    # --- set memory limit ---
+    try:
+        set_memory_limit(config.MAX_MEM_GB)
+        logger.info(f"System memory limit set to {config.MAX_MEM_GB} GB")
+    except Exception as e:
+        logger.warning(f"Could not set memory limit: {e}")
 
     # --- set global runtime config ---
     if args.cif_bond_info:
