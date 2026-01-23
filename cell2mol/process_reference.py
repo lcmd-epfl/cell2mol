@@ -5,7 +5,7 @@ import logging
 from ase.io import read
 from cell2mol.utils import config
 from cell2mol.args import parsing_arguments
-from cell2mol.classes import Reference, Cells
+from cell2mol.classes import Reference
 from cell2mol.operations import (
     frac2cart_fromparam,
     is_polynuclear_over_limit,
@@ -19,7 +19,6 @@ from cell2mol.read_cif import (
     compare_cif_with_reference,
 )
 from cell2mol.write_results import (
-    extract_refmoleclist_xyz,
     write_cell_molecules_info,
     write_unique_species,
     write_possible_charges,
@@ -28,67 +27,108 @@ from cell2mol.write_results import (
 )
 from cell2mol.connectivity import is_mismatch_adjacency
 from cell2mol.write_results import exit_with_error_exception
+from cell2mol.utils.limits import ProcessingTimeoutError, set_time_limit
+import sys
+import gc
 
 logger = logging.getLogger(__name__)
 
+# Error Codes
+ERR_MEMORY = config.ERR_MEMORY
+ERR_TIMEOUT = config.ERR_TIMEOUT
+ERR_GENERAL = config.ERR_GENERAL
 
-def interpret_reference(input_path, name, current_dir):
+
+def interpret_reference(input_path, name, current_dir):  # Added timeout arg
     """
-    Process the reference molecules from a CIF file and generate a reference cell object.
-    Args:
-        input_path (str): Path to the CIF file (downloaded from CSD).
-        name (str): CSD refcode.
-        current_dir (str): Current working directory.
-    Returns:
-        cells (object): Cells object containing reference and unit cell information.
+    Process the reference molecules from a CIF file.
     """
     logger.info("cell2mol version %s", config.VERSION)
     logger.info("Input CIF: %s", input_path)
+    logger.debug("Timeout set to %d seconds", config.TIMEOUT)
 
-    cells = None
     refcell = None
+    exit_code = 0
 
     try:
-        try:
-            structure = read(input_path, format="cif")
-        except (AssertionError, Exception) as e:
-            logger.error(f"ASE failed to parse {input_path}: {e}")
-            raise
-        cell_vector, cell_param, _ = get_cell_parameters(structure)
-        refcell = create_reference(input_path, name, cell_vector, cell_param)
+        # Enforce timeout on the heavy lifting
+        with set_time_limit(config.TIMEOUT):
+            try:
+                structure = read(input_path, format="cif")
+            except (AssertionError, Exception) as e:
+                logger.error(f"ASE failed to parse {input_path}: {e}")
+                raise  # Re-raise to be caught by the outer Exception block
 
-        if refcell.has_error():
-            logger.error("Error in reference cell: case %d", refcell.error_case)
-            return None
+            cell_vector, cell_param, _ = get_cell_parameters(structure)
+            refcell = create_reference(input_path, name, cell_vector, cell_param)
 
-        refcell.get_unique_species()
+            # Check missing hydrogens and assess errors
+            refcell.check_hydrogens()
+            refcell.assess_errors(mode="hydrogens")
+            if refcell.has_error():
+                logger.error(
+                    f"Error generating reference molecules (case={refcell.error_case})"
+                )
 
-        cells = Cells(
-            name=name,
-            reference=refcell,
-            unitcell=None,
-            cell_vector=cell_vector,
-            cell_param=cell_param,
-        )
+            refcell.get_unique_species()
 
-        # --- Possible charge analysis ---
-        refcell.get_selected_cs()
-        refcell.assess_errors(mode="possible_charges")
+            # Save intermediate success
+            _handle_reference_outputs(name, current_dir, refcell, mode="hydrogens")
 
-        if refcell.has_error():
-            logger.error(
-                "Error retrieving possible charges (error_case=%s)",
-                refcell.error_case,
-            )
+            # --- Possible charge analysis ---
+            refcell.get_selected_cs()
+            refcell.assess_errors(mode="possible_charges")
 
-        return cells
+            if refcell.has_error():
+                logger.error(
+                    f"Error retrieving possible charges (case={refcell.error_case})"
+                )
 
-    except Exception as exc:
+    # 1. Handle Memory Errors First
+    except MemoryError as exc:
+        # CRITICAL: Delete large objects and force GC *before* doing anything else
+        if "structure" in locals():
+            del structure
+        gc.collect()
+
+        logger.error("Memory limit reached. RAM cleared.")
+
+        if refcell is not None:
+            refcell.error_case = ERR_MEMORY
+
+        # Now it is safe(r) to call the exit helper
         exit_with_error_exception(exc)
-        return None
+        exit_code = ERR_MEMORY
+
+    # 2. Handle Timeout Errors Second
+    except ProcessingTimeoutError as exc:
+        logger.error(f"Processing timed out after {config.TIMEOUT} seconds.")
+
+        if refcell is not None:
+            refcell.error_case = ERR_TIMEOUT
+
+        exit_with_error_exception(exc)
+        exit_code = ERR_TIMEOUT
+
+    # 3. Handle All Other Errors
+    except Exception as exc:
+        logger.error(f"Unhandled error: {exc}")
+        if refcell is not None:
+            refcell.error_case = ERR_GENERAL
+
+        exit_with_error_exception(exc)
+        exit_code = ERR_GENERAL
 
     finally:
-        _handle_reference_outputs(name, current_dir, cells, refcell)
+        logger.info("Executing final output handling...")
+        # Ensure we try to save whatever valid data we have (refcell might be None)
+        _handle_reference_outputs(name, current_dir, refcell, mode="possible_charges")
+
+        if exit_code != 0:
+            logger.info(f"Process exiting with code {exit_code}")
+            sys.exit(exit_code)
+
+    return refcell
 
 
 def create_reference(input_path, name, cell_vector, cell_param):
@@ -149,16 +189,10 @@ def create_reference(input_path, name, cell_vector, cell_param):
     refcell.set_potential_warning(
         cif_mismatch, over_polynuclear_limit, mixed_metals, is_mismatch_adj
     )
-
-    # Check missing hydrogens and assess errors
-    refcell.check_hydrogens()
-    refcell.assess_errors(mode="hydrogens")
-    logger.info("Reference molecules generated")
-
     return refcell
 
 
-def _handle_reference_outputs(name, current_dir, cells, refcell):
+def _handle_reference_outputs(name, current_dir, refcell, mode=None):
     """Manages saving files and writing summaries."""
     if refcell is None:
         return
@@ -166,7 +200,7 @@ def _handle_reference_outputs(name, current_dir, cells, refcell):
     # 1. Write the .out summary file
     summary_path = os.path.join(current_dir, "reference_summary.out")
     _safe_run(
-        lambda: _write_ref_detailed_summary(name, refcell, summary_path),
+        lambda: _write_ref_detailed_summary(name, refcell, summary_path, mode=mode),
         "Failed to write reference summary",
     )
 
@@ -175,20 +209,14 @@ def _handle_reference_outputs(name, current_dir, cells, refcell):
 
     def save_ref():
         refcell.save(ref_cell_fname)
+        # from cell2mol.write_results import extract_refmoleclist_xyz
         # if logger.isEnabledFor(logging.DEBUG) and not refcell.error_case == -1:
         #     extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
 
     _safe_run(save_ref, "Failed to save reference cell")
 
-    # # 3. Save the Cells container (.json)
-    # if cells:
-    #     cells_json = os.path.join(current_dir, f"Cells_{name}.json")
-    #     _safe_run(
-    #         lambda: cells.save(cells_json, format="json"), "Failed to save Cells JSON"
-    #     )
 
-
-def _write_ref_detailed_summary(name, refcell, summary_path):
+def _write_ref_detailed_summary(name, refcell, summary_path, mode=None):
     """Writes the molecules info, species, errors, and warnings to file and log."""
     error_message = get_reference_error_message(refcell.error_case)
     warnings = get_reference_warning_messages(refcell)
@@ -198,13 +226,14 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
         print(name, file=f)
         write_cell_molecules_info(refcell, file=f)
         write_unique_species(refcell, file=f)
-        write_possible_charges(refcell, file=f)
+        if mode == "possible_charges":
+            write_possible_charges(refcell, file=f)
         print(f"ERROR: {error_message}", file=f)
         for msg in warnings:
             print(f"WARNING: {msg}", file=f)
 
     # Write to Logger
-    logger.info("Reference Summary: %s", error_message)
+    logger.info("Reference Error (mode=%s): %s", mode, error_message)
     if not warnings:
         logger.info("No potential issues detected.")
     else:
