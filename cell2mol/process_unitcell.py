@@ -101,50 +101,45 @@ def _process_cell_logic(refcell, unitcell, sym_ops) -> bool:
 
     # Reconstruction
     unitcell = construct_unitcell(refcell, unitcell, sym_ops)
-    if _has_step_failed(
-        unitcell, "reconstruction", "Error while unit cell reconstruction"
-    ):
+    if _has_step_failed(unitcell, "reconstruction"):
         return False
 
     # Charge Balancing
     refcell, unitcell = balance_unitcell_charge(refcell, unitcell)
-    if _has_step_failed(unitcell, "balance_charges", "Error while balancing charges"):
+    if _has_step_failed(unitcell, "balance_charges"):
         return False
 
     # Reference Assignment
     refcell.assign_charges()
-    if _has_step_failed(
-        refcell, "charge_assignment", "Error assigning reference charges"
-    ):
+    if _has_step_failed(refcell, "charge_assignment"):
         return False
 
     refcell.assign_spin()
-    if _has_step_failed(refcell, "spin_assignment", "Error assigning reference spins"):
+    if _has_step_failed(refcell, "spin_assignment"):
         return False
 
     # Unit Cell Assignment
     unitcell.assign_charges(refmoleclist=refcell.refmoleclist)
     unitcell.check_charge_neutrality()
-    if _has_step_failed(
-        unitcell, "charge_assignment", "Error assigning unit cell charges"
-    ):
+    if _has_step_failed(unitcell, "charge_assignment"):
         return False
 
     unitcell.assign_spin()
-    return not _has_step_failed(
-        unitcell, "spin_assignment", "Error assigning unit cell spins"
-    )
+    return not _has_step_failed(unitcell, "spin_assignment")
 
 
-def _has_step_failed(obj, mode, error_msg):
+def _has_step_failed(obj, mode):
     """Helper to assess errors and log them."""
     obj.assess_errors(mode=mode)
+
     if obj.subtype == "reference":
-        logger.info("Reference Error (mode=%s): %s", mode, error_msg)
+        error_message = get_reference_error_message(obj.error_case)
+        logger.info("Reference Error (mode=%s): %s", mode, error_message)
     elif obj.subtype == "unitcell":
-        logger.info("UnitCell Error (mode=%s): %s", mode, error_msg)
+        error_message = get_unitcell_error_message(obj.error_case)
+        logger.info("UnitCell Error (mode=%s): %s", mode, error_message)
     if obj.has_error():
-        logger.error(error_msg)
+        logger.error(error_message)
         return True
     return False
 
