@@ -536,97 +536,68 @@ def get_UA_pairs(UA, AC, use_graph=True):
 
 
 def get_sorted_valences_list(valences_list_of_lists, atoms):
-    valences_list = itertools.product(*valences_list_of_lists)
-    O_valences = [
-        v_list
-        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
-        if atomicNum == 8
-    ]
-    N_valences = [
-        v_list
-        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
-        if atomicNum == 7
-    ]
-    C_valences = [
-        v_list
-        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
-        if atomicNum == 6
-    ]
-    P_valences = [
-        v_list
-        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
-        if atomicNum == 15
-    ]
-    S_valences = [
-        v_list
-        for v_list, atomicNum in zip(valences_list_of_lists, atoms)
-        if atomicNum == 16
-    ]
+    """
+    Memory-efficient generator for valence combinations.
+    Logs the nested structure of element groups before generating combinations.
+    """
+    priority_order = [8, 7, 6, 15, 16]  # O, N, C, P, S
+    groups = {num: [] for num in priority_order}
+    others = []
 
-    O_sums = []
-    for v_list in itertools.product(*O_valences):
-        O_sums.append(v_list)
-        # if sum(v_list) not in O_sums:
-        #    O_sums.append(v_list))
+    # 1. Group indices by atomic priority
+    for i, atomicNum in enumerate(atoms):
+        if atomicNum in groups:
+            groups[atomicNum].append(i)
+        else:
+            others.append(i)
 
-    N_sums = []
-    for v_list in itertools.product(*N_valences):
-        N_sums.append(v_list)
-        # if sum(v_list) not in N_sums:
-        #    N_sums.append(sum(v_list))
+    reordered_indices = []
+    nested_inputs = []
 
-    C_sums = []
-    for v_list in itertools.product(*C_valences):
-        C_sums.append(v_list)
-        # if sum(v_list) not in C_sums:
-        #    C_sums.append(sum(v_list))
+    # 2. Build and Log Nested Structure
+    logger.debug("--- Nested Valence Input Structure ---")
 
-    P_sums = []
-    for v_list in itertools.product(*P_valences):
-        P_sums.append(v_list)
+    for num in priority_order:
+        indices = groups[num]
+        if indices:
+            reordered_indices.extend(indices)
+            # Gather the valence choices for this specific atom group
+            group_valences = [valences_list_of_lists[i] for i in indices]
 
-    S_sums = []
-    for v_list in itertools.product(*S_valences):
-        S_sums.append(v_list)
+            # Log the group details
+            logger.debug(
+                f"Element {elemdatabase.elementsym[num]} : {len(indices)} atoms | Valences: {group_valences}"
+            )
 
-    order_dict = dict()
-    for i, v_list in enumerate(
-        itertools.product(*[O_sums, N_sums, C_sums, P_sums, S_sums])
-    ):
-        order_dict[v_list] = i
+            # Add to the product list
+            nested_inputs.append(itertools.product(*group_valences))
 
-    valence_order_list = []
-    for valence_list in valences_list:
-        C_sum = []
-        N_sum = []
-        O_sum = []
-        P_sum = []
-        S_sum = []
-        for v, atomicNum in zip(valence_list, atoms):
-            if atomicNum == 6:
-                C_sum.append(v)
-            if atomicNum == 7:
-                N_sum.append(v)
-            if atomicNum == 8:
-                O_sum.append(v)
-            if atomicNum == 15:
-                P_sum.append(v)
-            if atomicNum == 16:
-                S_sum.append(v)
-
-        order_idx = order_dict[
-            (tuple(O_sum), tuple(N_sum), tuple(C_sum), tuple(P_sum), tuple(S_sum))
-        ]
-        valence_order_list.append(order_idx)
-
-    sorted_valences_list = [
-        y
-        for x, y in sorted(
-            zip(valence_order_list, list(itertools.product(*valences_list_of_lists)))
+    if others:
+        reordered_indices.extend(others)
+        other_valences = [valences_list_of_lists[i] for i in others]
+        other_nums = [atoms[i] for i in others]
+        other_syms = [elemdatabase.elementsym[n] for n in other_nums]
+        logger.debug(
+            f"Element Others ({other_syms}): {len(others)} atoms | Valences: {other_valences}"
         )
-    ]
+        nested_inputs.append(itertools.product(*other_valences))
 
-    return sorted_valences_list
+    # 3. Restore Map Calculation
+    restore_map = [0] * len(atoms)
+    for sorted_pos, original_pos in enumerate(reordered_indices):
+        restore_map[original_pos] = sorted_pos
+
+    # 4. Generator with Flattening Logic
+    def valence_generator():
+        # itertools.product(*nested_inputs) creates a sorted stream
+        for combined in itertools.product(*nested_inputs):
+            # 'combined' is the nested tuple: e.g., ((O_v1, O_v2), (N_v1,), (C_v1...))
+            # Flattening to a single list
+            flat = [v for group in combined for v in group]
+            # Map back to original CIF atom order
+            yield tuple(flat[restore_map[i]] for i in range(len(atoms)))
+
+    return valence_generator()
 
 
 def AC2BO(
@@ -712,12 +683,21 @@ def AC2BO(
 
     best_BO = AC.copy()
     BO_is_OK_list = []
-    sorted_valences_list = get_sorted_valences_list(valences_list_of_lists, atoms)
+    # sorted_valences_list = get_sorted_valences_list(valences_list_of_lists, atoms)
+    # count = 0
+    # max_count = min(len(sorted_valences_list), 50)
+    # for valences in sorted_valences_list:  # valences_list:
 
+    # Get the generator (0 bytes consumed for combinations)
+    sorted_gen = get_sorted_valences_list(valences_list_of_lists, atoms)
+
+    # Use islice to safely take only the first 50 entries
+    # This prevents calculating millions of combinations you don't need
     count = 0
-    max_count = min(len(sorted_valences_list), 50)
+    max_count = 50
+    top_50_valences = list(itertools.islice(sorted_gen, max_count))
 
-    for valences in sorted_valences_list:  # valences_list:
+    for count, valences in enumerate(top_50_valences, 1):
         UA, DU_from_AC = get_UA(valences, AC_valence)
 
         check_len = len(UA) == 0
