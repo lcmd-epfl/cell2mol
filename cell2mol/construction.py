@@ -471,9 +471,16 @@ def is_reconstruction_complete(
 
     unitcell.error_get_fragments = False
 
-    num_remaining = sum(
-        len(fragments) for fragments in remaining_fragments_by_reference
-    )
+    num_remaining = 0
+    for item in remaining_fragments_by_reference:
+        if isinstance(item, list):
+            # Normal case: it's a list of fragments
+            num_remaining += len(item)
+        elif item is not None:
+            # Error case: it's a single Molecule object (causes the original crash)
+            # We count this as 1 (or more) remaining item(s)
+            num_remaining += 1
+
     if num_remaining == 0:
         logger.info("All fragments are reconstructed successfully.")
         unitcell.error_reconstruction = False
