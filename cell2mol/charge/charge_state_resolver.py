@@ -125,10 +125,13 @@ def generate_charge_state(
         allow_charged_fragments = False
 
     logger.debug(
-        "Protonation State: %s | Target Charge: %d | Allow charged fragments: %s",
+        "Protonation State: %s | Target Charge: %d | Allow charged fragments: %s | added atoms: %d | block: %s | metal electrons: %s",
         prot.formula,
         charge,
         allow_charged_fragments,
+        prot.added_atoms,
+        prot.block,
+        prot.metal_electrons,
     )
 
     # AC2mol returns a list of RDKit molecule objects and bond order (BO) matrix
@@ -175,6 +178,12 @@ def generate_charge_state(
     smiles = Chem.MolToSmiles(rdkit_obj)
     is_correct = check_rdkit_obj_connectivity(rdkit_obj, prot.natoms, charge)
 
+    logger.debug(
+        "Generated ChargeState | SMILES: %s | Total Charge: %d | Correct: %s",
+        smiles,
+        total_charge,
+        is_correct,
+    )
     charge_state = ChargeState.from_positional(
         status=is_correct,
         uncorr_total_charge=total_charge,
@@ -339,12 +348,6 @@ def get_candidate_charges(prot: object) -> list:
         spec.subtype,
         len(spec.protonation_states),
     )
-
-    # Quick check: if too many valence candidates, return neutral only
-    _, sorted_valences = _get_atomic_valence_candidates(spec.protonation_states[0])
-    if len(sorted_valences) > 10000:
-        return [0]
-
     # Determine max charge ranges
     if spec.subtype == "molecule" and spec.is_non_complex_molecule:
         maxcharge = 3
@@ -476,12 +479,12 @@ def get_metal_poscharges(metal: object) -> list:
 
 
 def _get_atomic_valence_candidates(
-    ligand: object, allow_carbenes: bool = False
+    prot: object, allow_carbenes: bool = False
 ) -> tuple[list, list]:
     """
     Determines potential valence states for each atom in a ligand based on connectivity.
     Args:
-        ligand: An object containing 'labels' (element symbols) and 'adjmat' (adjacency matrix).
+        prot: Protonation object containing 'labels' (element symbols) and 'adjmat' (adjacency matrix).
         allow_carbenes (bool): If False, excludes divalent Carbon states.
 
     Returns:
@@ -489,12 +492,13 @@ def _get_atomic_valence_candidates(
             - valences_list_of_lists: List of possible valence integers for each atom.
             - sorted_valences_list: A prioritized/combined list of valence configurations.
     """
+    import itertools
     from cell2mol.charge.xyz2mol import atomic_valence, get_sorted_valences_list
 
     # Convert element labels to atomic numbers
-    atomic_nums = [elemdatabase.elementnr[label] for label in ligand.labels]
+    atomic_nums = [elemdatabase.elementnr[label] for label in prot.labels]
     # Calculate current coordination number (sum of bonds for each atom)
-    current_valences = ligand.adjmat.sum(axis=1).astype(int)
+    current_valences = prot.adjmat.sum(axis=1).astype(int)
 
     valences_list_of_lists = []
     for atomic_num, curr_v in zip(atomic_nums, current_valences):
@@ -515,8 +519,19 @@ def _get_atomic_valence_candidates(
 
         valences_list_of_lists.append(candidates)
 
-    sorted_list = get_sorted_valences_list(valences_list_of_lists, atomic_nums)
-    return valences_list_of_lists, sorted_list
+    sorted_gen = get_sorted_valences_list(valences_list_of_lists, atomic_nums)
+
+    # Use islice to safely take only the first 50 entries
+    # This prevents calculating millions of combinations you don't need
+    first_valences = list(itertools.islice(sorted_gen, 1))[0]
+    logger.debug(
+        "Specie %s first entry of valences: %s",
+        prot.formula,
+        first_valences,
+    )
+    for label, valences in zip(prot.labels, first_valences):
+        logger.debug("  Atom %s valence: %s", label, valences)
+    return valences_list_of_lists, first_valences
 
 
 def identify_best_charge_states(charge_states: list) -> list:
