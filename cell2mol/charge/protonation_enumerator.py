@@ -167,24 +167,32 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     # LOCAL ATOM ADDITION
     # ============================================================
     for idx, a in enumerate(ligand.atoms):
-        if addedlist[idx] == 0 or block[idx] == 1:
+        if (addedlist[idx] - block[idx]) <= 0:
             continue
 
-        if addedlist[idx] == 1:
+        if (addedlist[idx] - block[idx]) == 1:
+            logger.debug("    Single addition for atom index %d", idx)
             isadded, newlab, newcoord = add_atom(
                 newlab, newcoord, idx, ligand, elemlist[idx], unconditional=True
             )
         else:
+            logger.debug(
+                "    Multiple additions (%d) for atom index %d",
+                (addedlist[idx] - block[idx]),
+                idx,
+            )
             if pos_carbenes[idx]:
                 reset_H_indices.extend(
-                    list(range(len(newlab), len(newlab) + addedlist[idx]))
+                    list(
+                        range(len(newlab), len(newlab) + (addedlist[idx] - block[idx]))
+                    )
                 )
             isadded, newlab, newcoord = add_hydrogens(
-                newlab, newcoord, idx, ligand, addedlist[idx]
+                newlab, newcoord, idx, ligand, (addedlist[idx] - block[idx])
             )
 
         if isadded:
-            added_atoms += addedlist[idx]
+            added_atoms += addedlist[idx] - block[idx]
             block[idx] = 1
         else:
             addedlist[idx] = 0

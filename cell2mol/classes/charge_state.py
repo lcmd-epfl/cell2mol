@@ -5,6 +5,9 @@ from cell2mol.my_types import RDKitObject
 from cell2mol.utils.pydantic import BaseModel
 from pydantic import Field
 from typing_extensions import deprecated
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def eval_chargelist(atom_charges: list[int]) -> Tuple[int, int, bool]:
@@ -43,6 +46,7 @@ class ChargeState(BaseModel):
     addedlist: list[int] | None = None
     metal_electrons: list[int] | None = None
     elemlist: list[str] | None = None
+    block: list[int] | None = None
 
     # Initialized attributes with defaults
     corr_total_charge: int = Field(default=0)
@@ -69,18 +73,44 @@ class ChargeState(BaseModel):
         self.addedlist = self.protonation.addedlist
         self.metal_electrons = self.protonation.metal_electrons
         self.elemlist = self.protonation.elemlist
+        self.block = self.protonation.block
 
+        # logger.debug(
+        #     "Initializing ChargeState | SMILES: %s | Uncorr Charge: %d | Charge Tried: %d",
+        #     self.smiles,
+        #     self.uncorr_total_charge,
+        #     self.charge_tried,
+        # )
+        # logger.debug("Added List: %s %d", self.addedlist, len(self.addedlist))
+        # logger.debug("block: %s %d", self.block, len(self.block))
+        # logger.debug(
+        #     "Metal Electrons: %s %d", self.metal_electrons, len(self.metal_electrons)
+        # )
+        # logger.debug("Element List: %s %d", self.elemlist, len(self.elemlist))
+        # logger.debug(
+        #     "Uncorrected Atom Charges: %s %s",
+        #     self.uncorr_atom_charges,
+        #     len(self.uncorr_atom_charges),
+        # )
         # Corrects the Charge of atoms with addedH
         count = 0
         if len(self.addedlist) > 0:
-            for idx, add in enumerate(
-                self.addedlist
-            ):  # Iterates over the original number of ligand atoms, thus without the added H
+            # Iterates over the original number of ligand atoms, thus without the added H
+            for idx, add in enumerate(self.addedlist):
                 if add != 0:
                     count += 1
+                    # logger.debug(
+                    #     "Correcting atom index %d | Original Charge: %d | Added: %d | block: %d | Metal Electrons: %d",
+                    #     idx,
+                    #     self.uncorr_atom_charges[idx],
+                    #     self.addedlist[idx],
+                    #     self.block[idx],
+                    #     self.metal_electrons[idx],
+                    # )
                     corrected = (
                         self.uncorr_atom_charges[idx]
                         - self.addedlist[idx]
+                        + self.block[idx]
                         + self.metal_electrons[idx]
                         - self.uncorr_atom_charges[len(self.addedlist) - 1 + count]
                     )
