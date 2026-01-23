@@ -2,7 +2,6 @@
 
 import os
 import logging
-import copy
 from ase.io import read
 from cell2mol.utils import config
 from cell2mol.args import parsing_arguments
@@ -22,6 +21,10 @@ from cell2mol.write_results import (
 )
 
 logger = logging.getLogger(__name__)
+# Error Codes
+ERR_MEMORY = config.ERR_MEMORY
+ERR_TIMEOUT = config.ERR_TIMEOUT
+ERR_GENERAL = config.ERR_GENERAL
 
 
 # -----------------------------------------------------------------------------
@@ -31,10 +34,9 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
     """Orchestrates the cell2mol process for a CIF file."""
     try:
         # 1. Initialize and Load Data
-        cells, refcell, unitcell, sym_ops = _initialize_cells(
-            input_path, name, current_dir
-        )
-        if not cells or not unitcell:
+        refcell, unitcell, sym_ops = _initialize_cells(input_path, name, current_dir)
+        if not refcell or not unitcell:
+            logger.error("Failed to initialize reference or unit cell.")
             return None
 
         # 2. Run the Processing Pipeline
@@ -42,15 +44,17 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
 
         # Update cells object with processed data
         if success:
-            cells.reference = refcell
-            cells.unitcell = unitcell
-            return cells
+            logger.info("cell2mol process completed successfully.")
+        else:
+            logger.error("cell2mol process encountered errors.")
+            logger.debug(" - Reference error case: %s", refcell.error_case)
+            logger.debug(" - Unit cell error case: %s", unitcell.error_case)
 
     except Exception as exc:
         exit_with_error_exception(exc)
     finally:
         # 3. Handle Saving and Summaries (Always runs even on error)
-        _save_cell_outputs(name, current_dir, cells, refcell, unitcell)
+        _save_cell_outputs(name, current_dir, refcell, unitcell)
 
     return None
 
@@ -58,8 +62,12 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
 def _initialize_cells(input_path, name, current_dir):
     """Handles file reading and initial object instantiation."""
     logger.info("Starting the cell2mol process for reference (Wyckoff sites)")
-    cells: Cells = interpret_reference(input_path, name, current_dir)
-    refcell: Reference = cells.reference
+
+    refcell: Reference = interpret_reference(input_path, name, current_dir)
+
+    if not refcell:
+        logger.error("Failed to create reference cell from CIF.")
+        return None, None, None
 
     try:
         structure = read(input_path, format="cif")
@@ -70,11 +78,17 @@ def _initialize_cells(input_path, name, current_dir):
     cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
 
     unitcell = UnitCell.from_positional(
-        name, cell_labels, cell_pos, cell_fracs, cell_vector, cell_param
+        name=name,
+        labels=cell_labels,
+        pos=cell_pos,
+        frac_coord=cell_fracs,
+        cell_vector=cell_vector,
+        cell_param=cell_param,
     )
+
     unitcell.set_subtype("unitcell")
 
-    return cells, refcell, unitcell, sym_ops
+    return refcell, unitcell, sym_ops
 
 
 def _process_cell_logic(refcell, unitcell, sym_ops) -> bool:
@@ -92,13 +106,7 @@ def _process_cell_logic(refcell, unitcell, sym_ops) -> bool:
     ):
         return False
 
-    # Charge Retrieval & Balancing
-    refcell.get_selected_cs()
-    if _has_step_failed(
-        refcell, "possible_charges", "Error retrieving possible charges"
-    ):
-        return False
-
+    # Charge Balancing
     refcell, unitcell = balance_unitcell_charge(refcell, unitcell)
     if _has_step_failed(unitcell, "balance_charges", "Error while balancing charges"):
         return False
@@ -131,13 +139,17 @@ def _process_cell_logic(refcell, unitcell, sym_ops) -> bool:
 def _has_step_failed(obj, mode, error_msg):
     """Helper to assess errors and log them."""
     obj.assess_errors(mode=mode)
+    if obj.subtype == "reference":
+        logger.info("Reference Error (mode=%s): %s", mode, error_msg)
+    elif obj.subtype == "unitcell":
+        logger.info("UnitCell Error (mode=%s): %s", mode, error_msg)
     if obj.has_error():
         logger.error(error_msg)
         return True
     return False
 
 
-def _save_cell_outputs(name, current_dir, cells, refcell, unitcell):
+def _save_cell_outputs(name, current_dir, refcell, unitcell):
     """Handles all file writing and summary generation."""
     paths = {
         "ref": os.path.join(current_dir, f"Ref_Cell_{name}.cell"),
@@ -161,6 +173,14 @@ def _save_cell_outputs(name, current_dir, cells, refcell, unitcell):
             lambda: _write_unit_summary(name, unitcell, paths["unit_sum"]),
             "Failed to write unit summary",
         )
+
+    cells = Cells.from_positional(
+        name=name,
+        reference=refcell,
+        unitcell=unitcell,
+        cell_vector=refcell.cell_vector,
+        cell_param=refcell.cell_param,
+    )
 
     if cells:
         _safe_run(

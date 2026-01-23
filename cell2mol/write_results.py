@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from cell2mol.utils import config
 import sys
 import re
 import os
@@ -27,19 +28,23 @@ def exit_with_error_exception(exc, error_log_path=None):
     if error_log_path is None:
         error_log_path = os.path.join(os.getcwd(), f"error_{exc_type}.out")
 
-    tb = traceback.format_exc()
+    try:
+        with open(error_log_path, "w") as error_log:
+            error_log.write(f"Error Type: {exc_type}\n")
 
-    with open(error_log_path, "w") as error_log:
-        error_log.write(f"{exc_type}: {exc}\n\n")
-        error_log.write(tb)
+            # Handle MemoryError specifically to avoid allocating traceback string
+            if isinstance(exc, MemoryError):
+                error_log.write(
+                    "Memory limit exceeded. Full traceback omitted to save RAM.\n"
+                )
+            else:
+                error_log.write(traceback.format_exc())
 
-    logger.error(
-        "Unhandled exception (%s). Details written to %s",
-        exc_type,
-        error_log_path,
-    )
-
-    raise
+    except (MemoryError, OSError):
+        # Fallback to stderr if file writing fails
+        sys.stderr.write(
+            f"FATAL: Could not write to {error_log_path} due to {exc_type}\n"
+        )
 
 
 def compare_formula_xyz_vs_cif(xyzfile: str, formula_str_from_cif: str) -> dict:
@@ -163,10 +168,20 @@ def extract_refmoleclist_xyz(fdir, refmoleclist, name: str):
 def get_reference_error_message(error_case):
     """
     Return an error message for a given error case.
-    If error_fname exists, print the message in the file instead.
     """
 
-    if error_case == 0:
+    # --- Critical System Errors ---
+    if error_case == config.ERR_MEMORY:
+        return "Process terminated: Memory limit exceeded"
+
+    elif error_case == config.ERR_TIMEOUT:
+        return f"Process terminated: Execution timed out (> {config.TIMEOUT}s)"
+
+    elif error_case == config.ERR_GENERAL:
+        return "Process terminated: General error occurred"
+
+    # --- Standard Processing Errors ---
+    elif error_case == 0:
         return "No errors found"
 
     elif error_case == 1:
@@ -225,10 +240,20 @@ def get_reference_warning_messages(refcell):
 def get_unitcell_error_message(error_case):
     """
     Return an error message for a given error case.
-    If error_fname exists, print the message in the file instead.
     """
 
-    if error_case == 0:
+    # --- Critical System Errors ---
+    if error_case == config.ERR_MEMORY:
+        return "Process terminated: Memory limit exceeded"
+
+    elif error_case == config.ERR_TIMEOUT:
+        return f"Process terminated: Execution timed out (> {config.TIMEOUT}s)"
+
+    elif error_case == config.ERR_GENERAL:
+        return "Process terminated: General error occurred"
+
+    # --- Standard Processing Errors ---
+    elif error_case == 0:
         return "No errors found"
 
     # elif error_case == 1:
@@ -268,10 +293,20 @@ def get_unitcell_error_message(error_case):
 def get_molecule_error_message(error_case):
     """
     Return an error message for a given error case.
-    If error_fname exists, print the message in the file instead.
     """
 
-    if error_case == 0:
+    # --- Critical System Errors ---
+    if error_case == config.ERR_MEMORY:
+        return "Process terminated: Memory limit exceeded"
+
+    elif error_case == config.ERR_TIMEOUT:
+        return f"Process terminated: Execution timed out (> {config.TIMEOUT}s)"
+
+    elif error_case == config.ERR_GENERAL:
+        return "Process terminated: General error occurred"
+
+    # --- Standard Processing Errors ---
+    elif error_case == 0:
         return "No errors found"
 
     elif error_case == 5:
