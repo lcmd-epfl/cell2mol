@@ -10,7 +10,10 @@ from cell2mol.charge.charge_state_resolver import get_metal_poscharges
 from cell2mol.spin import assign_spin_metal, predict_ox_state
 from cell2mol.operations import compute_centroid, get_dist
 from cell2mol.elementdata import ElementData
-from cell2mol.coordination_sphere import define_coordination_geometry
+from cell2mol.coordination_sphere import (
+    handle_metal_coordination,
+    define_coordination_geometry,
+)
 from cell2mol.my_types import RefList, Spin, SubType
 from cell2mol.connectivity import build_adjacency
 from cell2mol.element_utils import labels2formula
@@ -26,9 +29,10 @@ elemdatabase = ElementData()
 
 class Metal(Atom):
     # Cross-reference: points to other metals in parent Molecule
-    metals: RefList[Metal] = Field(default_factory=list)
-    # Cross-reference: points to groups in ligands
-    groups: RefList["Group"] = Field(default_factory=list)
+    metals: RefList[Metal] | None = Field(default=None)
+    connected_nonmetal_atoms: RefList[Atom] | None = Field(default=None)
+    # Cross-reference: points to Group objects
+    groups: RefList[Group] | None = Field(default=None)
     coord_nr: int | None = None
     coord_geometry: str | Literal["Undefined"] | None = None
     geom_deviation: float | Literal["Undefined"] | None = None
@@ -38,7 +42,7 @@ class Metal(Atom):
     geom_deviation_with_metal_bonds: float | Literal["Undefined"] | None = None
     metal_factor: float | None = None
     cov_factor: float | None = None
-    coord_sphere: list[Atom] | None = None
+    coord_sphere_atoms: list[Atom] | None = None
     coord_sphere_formula: str | None = None
     unique_index: int | None = None
     charge: int | None = None
@@ -66,71 +70,199 @@ class Metal(Atom):
 
         return self.valence_elec
 
-    def get_coord_sphere(self):
-        if not self.check_parent("molecule"):
-            return None
+    def get_connected_metals(self, use_bond_info: bool | None = None):
+        if getattr(self, "metals", None) is not None:
+            return self.metals
+
+        self.metals = []
         mol = self.get_parent("molecule")
-        pidx = self.get_parent_index("molecule")
+        self_mol_idx = self.get_parent_index("molecule")
+        if mol.madjmat is not None:
+            mol_madjmat = mol.madjmat
+            for met in mol.metals:
+                if met is self:
+                    continue
+                met_mol_idx = met.get_parent_index("molecule")
+                if mol_madjmat[self_mol_idx][met_mol_idx] >= 1:
+                    self.metals.append(met)
+                    logger.debug(
+                        "Metal %s%s is connected to Metal %s%s (existing mol.adjmat)",
+                        self.label,
+                        f" ({self.atom_site_label})" if self.atom_site_label else "",
+                        met.label,
+                        f" ({met.atom_site_label})" if met.atom_site_label else "",
+                    )
+            return self.metals
 
-        ## Cordination sphere defined as a collection of atoms
-        self.coord_sphere = []
-        for idx, at in enumerate(mol.adjmat[pidx]):
-            if at >= 1:
-                self.coord_sphere.append(mol.atoms[idx])
-        return self.coord_sphere
+        refcell = self.get_parent("reference")
+        bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
+        metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
 
-    def get_coord_sphere_formula(self):
-        if self.coord_sphere is None:
-            self.get_coord_sphere()
-        self.coord_sphere_formula = labels2formula(
-            list([at.label for at in self.coord_sphere])
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
+
+        for met in mol.metals:
+            if met is self:
+                continue
+
+            tmplabels = [self.label, met.label]
+            tmpcoord = [self.coord, met.coord]
+            atom_site_labels = [self.atom_site_label, met.atom_site_label]
+
+            tmp_adjmat = build_adjacency(
+                labels=tmplabels,
+                positions=tmpcoord,
+                atom_site_labels=atom_site_labels,
+                bond_data=bond_data,
+                use_bond_info=use_bond_info,
+                cov_factor=cov_factor,
+                metal_factor=metal_factor,
+                metal_only=True,
+            )
+            if tmp_adjmat is None:
+                continue
+            else:
+                if tmp_adjmat[0, 1] >= 1:
+                    self.metals.append(met)
+                    logger.debug(
+                        "Metal %s%s is connected to Metal %s%s (newly computed, use_bond_info=%s)",
+                        self.label,
+                        f" ({self.atom_site_label})" if self.atom_site_label else "",
+                        met.label,
+                        f" ({met.atom_site_label})" if met.atom_site_label else "",
+                        use_bond_info,
+                    )
+        return self.metals
+
+    def get_connected_nonmetal_atoms(self):
+        if getattr(self, "connected_nonmetal_atoms", None) is not None:
+            return self.connected_nonmetal_atoms
+
+        self.connected_nonmetal_atoms = []
+        if not self.check_parent("molecule"):
+            logger.debug("No parent molecule found, skipping atom connectivity check")
+            return self.connected_nonmetal_atoms
+
+        mol = self.get_parent("molecule")
+        self_mol_idx = self.get_parent_index("molecule")
+        if mol.madjmat is None:
+            logger.debug("No mol.madjmat found, skipping atom connectivity check")
+            return self.connected_nonmetal_atoms
+
+        mol_madjmat = mol.madjmat
+        for idx, val in enumerate(mol_madjmat[self_mol_idx]):
+            if idx == self_mol_idx or val < 1:
+                continue
+
+            atom = mol.atoms[idx]
+
+            if atom.subtype == "metal":
+                continue
+            self.connected_nonmetal_atoms.append(atom)
+            logger.debug(
+                "Metal %s%s is connected to Atom %s%s (existing mol.adjmat)",
+                self.label,
+                f" ({self.atom_site_label})" if self.atom_site_label else "",
+                atom.label,
+                f" ({atom.atom_site_label})" if atom.atom_site_label else "",
+            )
+        logger.debug(
+            "Total connected non-metal atoms: %s", len(self.connected_nonmetal_atoms)
         )
-        return self.coord_sphere_formula
+        return self.connected_nonmetal_atoms
 
     def get_connected_groups(self):
-        # metal.groups will be used for the calculation of the relative metal radius
-        # and define the coordination geometry of the metal /hapicitiy/ hapttype
+        """
+        Lazy load and Triggers the metal coordination refinement process
+        and stores the resulting list of coordinated Group objects.
+        """
         if not self.check_parent("molecule"):
             return None
 
-        mol = self.get_parent("molecule")
-        connected_groups = []
-        for lig in mol.ligands:
-            for group in lig.groups:
-                for met in group.metals:
-                    if self == met:
-                        connected_groups.append(group)
-                        logger.debug(
-                            "Metal %s%s connected to group %s%s",
-                            self.label,
-                            f" ({self.atom_site_label})"
-                            if self.atom_site_label
-                            else "",
-                            group.formula,
-                            f" ({[a.atom_site_label for a in group.atoms]})"
-                            if any(a.atom_site_label for a in group.atoms)
-                            else "",
-                        )
-        final_connected_groups = []
-        groups_atom_site_labels = [
-            [a.atom_site_label for a in g.atoms] for g in connected_groups
-        ]
-        # Remove duplicate groups based on atom_site_labels
-        for g_labels, group in zip(groups_atom_site_labels, connected_groups):
-            if not any(
-                set(g_labels).issubset(set(other)) and set(g_labels) != set(other)
-                for other in groups_atom_site_labels
-            ):
-                final_connected_groups.append(group)
-        self.groups = final_connected_groups
+        # Check if already computed
+        current_groups = getattr(self, "groups", None)
+        if current_groups is None:
+            # handle_metal_coordination returns a list of Group objects
+            result = handle_metal_coordination(self)
+            self.groups = result
 
-        # logger.debug(
-        #     "Metal %s%s connected to groups %s",
-        #     self.label,
-        #     f" ({self.atom_site_label})" if self.atom_site_label else "",
-        #     [g.formula for g in self.groups],
-        # )
         return self.groups
+
+    def get_coordination_geometry(self: object):
+        logger.debug(
+            "Define coordination geometry of Metal %s%s",
+            self.label,
+            f" ({self.atom_site_label})" if self.atom_site_label else "",
+        )
+
+        coord_groups = self.get_connected_groups()
+
+        (self.coord_nr, self.coord_geometry, self.geom_deviation) = (
+            define_coordination_geometry(self, coord_groups)
+        )
+
+        self.rel_metal_radius = self.get_relative_metal_radius()
+
+        if self.metals is None:
+            self.get_connected_metals()
+
+        if len(self.metals) > 0:
+            connected_metals = self.metals
+            whole_coord = coord_groups + connected_metals
+
+            logger.debug("Including metal-metal bonds for: %s", self.label)
+
+            (
+                self.coord_nr_with_metal_bonds,
+                self.coord_geometry_with_metal_bonds,
+                self.geom_deviation_with_metal_bonds,
+            ) = define_coordination_geometry(self, whole_coord)
+
+        return self.coord_geometry
+
+    def get_coord_sphere_atoms(self):
+        """
+        Identifies atoms in the first coordination sphere of the metal.
+        Uses the adjacency matrix from the parent molecule to find direct bonds.
+
+        Returns:
+            List[Atom]: A list of Atom objects directly bonded to this metal.
+        """
+        # Safety check: Ensure parent molecule existence
+        if not self.check_parent("molecule"):
+            logger.warning(f"Metal {self.label} has no parent molecule reference.")
+            return None
+
+        # Use cached value if exists, otherwise compute it
+        if getattr(self, "coord_sphere_atoms", None) is None:
+            mol = self.get_parent("molecule")
+            midx = self.get_parent_index("molecule")
+
+            # Extract atoms from adjacency matrix
+            self.coord_sphere_atoms = (
+                [mol.atoms[i] for i, val in enumerate(mol.adjmat[midx]) if val >= 1]
+                if mol
+                else []
+            )
+
+        return self.coord_sphere_atoms
+
+    def get_coord_sphere_formula(self):
+        """
+        Constructs the chemical formula for the first coordination sphere.
+        Returns:
+            str: The chemical formula of the coordination sphere.
+        """
+        # Ensure coordination atoms are identified first
+        if getattr(self, "coord_sphere_atoms", None) is None:
+            self.get_coord_sphere_atoms()
+
+        # Extract labels and generate the formula
+        atom_labels = [at.label for at in self.coord_sphere_atoms]
+        self.coord_sphere_formula = labels2formula(atom_labels)
+
+        return self.coord_sphere_formula
 
     def get_relative_metal_radius(self):
         if self.groups is None:
@@ -172,90 +304,6 @@ class Metal(Atom):
             f" ({self.atom_site_label})" if self.atom_site_label else "",
         )
         return self.rel_metal_radius
-
-    def get_connected_metals(self, use_bond_info: bool | None = None):
-        self.metals = []
-        refcell = self.get_parent("reference")
-        bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
-        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
-        metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
-        mol = self.get_parent("molecule")
-
-        if use_bond_info is None:
-            use_bond_info = config.USE_BOND_INFO
-
-        for met in mol.metals:
-            if met == self:
-                continue
-
-            tmplabels = []
-            tmpcoord = []
-            atom_site_labels = []
-
-            tmplabels.append(self.label)
-            tmpcoord.append(self.coord)
-            atom_site_labels.append(self.atom_site_label)
-
-            tmplabels.append(met.label)
-            tmpcoord.append(met.coord)
-            atom_site_labels.append(met.atom_site_label)
-
-            tmp_adjmat = build_adjacency(
-                labels=tmplabels,
-                positions=tmpcoord,
-                atom_site_labels=atom_site_labels,
-                bond_data=bond_data,
-                use_bond_info=use_bond_info,
-                cov_factor=cov_factor,
-                metal_factor=metal_factor,
-                metal_only=True,
-            )
-            if tmp_adjmat is None:
-                continue
-            else:
-                tmp_adjnum = tmp_adjmat.sum(axis=1)
-                if all(tmp_adjnum[1:]):
-                    self.metals.append(met)
-                    logger.debug(
-                        "Metal %s%s is connected to Metal %s%s",
-                        self.label,
-                        f" ({self.atom_site_label})" if self.atom_site_label else "",
-                        met.label,
-                        f" ({met.atom_site_label})" if met.atom_site_label else "",
-                    )
-        return self.metals
-
-    def get_coordination_geometry(self: object):
-        logger.debug(
-            "Define coordination geometry of Metal %s%s",
-            self.label,
-            f" ({self.atom_site_label})" if self.atom_site_label else "",
-        )
-
-        coord_group = self.get_connected_groups()
-
-        (self.coord_nr, self.coord_geometry, self.geom_deviation) = (
-            define_coordination_geometry(self, coord_group)
-        )
-
-        self.rel_metal_radius = self.get_relative_metal_radius()
-
-        if self.metals is None:
-            self.get_connected_metals()
-
-        if len(self.metals) > 0:
-            bonded_metals = self.metals
-            whole_coord = coord_group + bonded_metals
-
-            logger.debug("Including metal-metal bonds for: %s", self.label)
-
-            (
-                self.coord_nr_with_metal_bonds,
-                self.coord_geometry_with_metal_bonds,
-                self.geom_deviation_with_metal_bonds,
-            ) = define_coordination_geometry(self, whole_coord)
-
-        return self.coord_geometry
 
     def get_possible_cs(self):
         self.possible_cs = get_metal_poscharges(self)
