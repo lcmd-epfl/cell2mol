@@ -147,12 +147,7 @@ def build_adjacency(
             metal_only=metal_only,
         )
     if warn_on_mismatch and adj_dist is not None and adj_conn is not None:
-        logger.debug(
-            "Sum of Formula: %s adj_dist.shape: %s adj_conn.shape: %s",
-            labels2formula(labels),
-            adj_dist.shape,
-            adj_conn.shape,
-        )
+        logger.debug("Sum of Formula: %s", labels2formula(labels))
         is_consistent = np.allclose(adj_dist, adj_conn)
         if not is_consistent:
             logger.info(
@@ -976,20 +971,99 @@ def log_blocklist_diff(blocklist, new_blocklist):
             logger.debug("  %s", list(b))
 
 
-def is_single_ring(
-    labels: list[str],
-    positions: np.ndarray,
-    atom_site_labels: list[str] | None = None,
-    bond_data: list[tuple[str, str, float]] | None = None,
-    use_bond_info: bool | None = None,
-):
-    """Check if the group is a ring"""
+def identify_haptic_mode(atoms: list, use_bond_info: bool | None = None):
+    """
+    Determine haptic coordination mode(s) for a given atoms list.
+    Args:
+        atoms (list): List of Atom objects
+        use_bond_info (bool, optional): Whether to use bond information from CIF
+    Returns:
+        tuple: (is_haptic (bool), haptic_type (list of str))
+    """
+    labels = [atom.label for atom in atoms]
+    is_haptic = False  # old self.hapticity
+    haptic_type = []  # old self.hapttype
+
+    totnum = len(labels)
+
+    counts = {
+        "C": labels.count("C"),
+        "As": labels.count("As"),
+        "P": labels.count("P"),
+        "O": labels.count("O"),
+    }
+
+    # (numC, numAs, numP, numO, total_atoms) → haptic modes
+    HAPTIC_RULES = {
+        # eta2
+        (2, 0, 0, 0, 2): ["eta2(C,C)"],
+        # eta3
+        (3, 0, 0, 0, 3): ["eta3(C,C,C)"],
+        # eta4
+        (3, 0, 0, 1, 4): ["eta4(C,C,C,O)"],
+        (4, 0, 0, 0, 4): ["eta4(C,C,C,C)"],
+        # eta5
+        (5, 0, 0, 0, 5): ["eta5(Cp)"],
+        (0, 5, 0, 0, 5): ["eta5(AsCp)"],
+        (0, 0, 5, 0, 5): ["eta5(P5)"],
+        # eta6+
+        (6, 0, 0, 0, 6): ["eta6(C6)"],
+        (7, 0, 0, 0, 7): ["eta7(C7)"],
+        (8, 0, 0, 0, 8): ["eta8(C8)"],
+    }
+
+    key = (
+        counts["C"],
+        counts["As"],
+        counts["P"],
+        counts["O"],
+        totnum,
+    )
+
+    if key in HAPTIC_RULES:
+        haptic_type = HAPTIC_RULES[key]
+        is_haptic = True
+
+    else:
+        if use_bond_info is None:
+            use_bond_info = config.USE_BOND_INFO
+
+        # Fallback: generic single-ring hapticity
+        single_ring = is_single_ring(atoms, use_bond_info=use_bond_info)
+
+        if single_ring:
+            mode = f"eta{totnum}({labels2formula(labels)})"
+            haptic_type = [mode]
+            is_haptic = True
+    logger.debug(
+        "Identified haptic mode: is_haptic=%s, haptic_type=%s", is_haptic, haptic_type
+    )
+    return is_haptic, haptic_type
+
+
+def is_single_ring(atoms: list, use_bond_info: bool | None = None) -> bool:
+    """Check if a given list of atoms is a ring
+    Args:
+        atoms: list of Atom objects
+        use_bond_info: whether to use bond information from CIF data
+    Returns:
+        bool: True if the atoms form a single ring, False otherwise
+    """
+    labels = [atom.label for atom in atoms]
+    positions = [atom.coord for atom in atoms]
+    atom_site_labels = (
+        [atom.atom_site_label for atom in atoms] if atoms[0].atom_site_label else None
+    )
+    refcell = atoms[0].get_parent("reference")
+    bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
+
     # logger.debug("Checking if group is a single ring...")
     # logger.debug("Labels: %s", labels)
     # logger.debug("Positions: %s", positions)
     # logger.debug("Atom site labels: %s", atom_site_labels)
+
     adjmat = build_adjacency(
         labels=labels,
         positions=positions,
@@ -1087,6 +1161,30 @@ def add_atom(
                 ligand.formula,
             )
 
+            # The newly added atom is at the last index: posadded
+            # 1. Create a mask or manually reset the row and column for the new atom
+            # First, store the specific connection we want to keep
+            site_to_new_bond = tmpconmat[site, posadded]
+            logger.debug(
+                "site_to_new_bond between site %d and new atom at pos %d: %d",
+                site,
+                posadded,
+                site_to_new_bond,
+            )
+            # 2. Clear all connections for the new atom (row and column)
+            tmpconmat[posadded, :] = 0
+            tmpconmat[:, posadded] = 0
+
+            # 3. Restore ONLY the bond between the target site and the new atom
+            # We use 1 (or site_to_new_bond if you want to preserve the bond order/value)
+            tmpconmat[site, posadded] = 1
+            tmpconmat[posadded, site] = 1
+
+            logger.debug(
+                "%s added unconditionally at site %d. All other new adjacencies cleared.",
+                element,
+                site,
+            )
         # Case 2: acceptable connectivity
         elif tmpconnec[posadded] <= 1:
             isadded = True
