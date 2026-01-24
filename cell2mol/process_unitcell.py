@@ -240,22 +240,22 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell):
             "Failed to write unit summary",
         )
 
-    cells = Cells.from_positional(
-        name=name,
-        reference=refcell,
-        unitcell=unitcell,
-        cell_vector=refcell.cell_vector,
-        cell_param=refcell.cell_param,
-    )
+    # cells = Cells.from_positional(
+    #     name=name,
+    #     reference=refcell,
+    #     unitcell=unitcell,
+    #     cell_vector=refcell.cell_vector,
+    #     cell_param=refcell.cell_param,
+    # )
 
-    if cells:
-        _safe_run(
-            lambda: cells.save(paths["json"], format="json"), "Failed to save JSON"
-        )
-        _safe_run(
-            lambda: cells.save(paths["pickle"], format="pickle"),
-            "Failed to save pickle",
-        )
+    # if cells:
+    #     _safe_run(
+    #         lambda: cells.save(paths["json"], format="json"), "Failed to save JSON"
+    #     )
+    #     _safe_run(
+    #         lambda: cells.save(paths["pickle"], format="pickle"),
+    #         "Failed to save pickle",
+    #     )
 
 
 def _write_ref_detailed_summary(name, refcell, summary_path):
