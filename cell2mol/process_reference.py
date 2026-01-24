@@ -39,7 +39,7 @@ ERR_TIMEOUT = config.ERR_TIMEOUT
 ERR_GENERAL = config.ERR_GENERAL
 
 
-def interpret_reference(input_path, name, current_dir):  # Added timeout arg
+def interpret_reference(input_path, name, current_dir):
     """
     Process the reference molecules from a CIF file.
     """
@@ -133,14 +133,14 @@ def interpret_reference(input_path, name, current_dir):  # Added timeout arg
 
 def create_reference(input_path, name, cell_vector, cell_param):
     """
-    Create the Reference cell object.
+    Create the Reference Cell object.
     Args:
         input_path (str): Path to the CIF file.
         name (str): CSD refcode.
-        cell_vector (list): Cell vectors.
-        cell_param (list): Cell parameters.
+        cell_vector (np.ndarray): Cell vectors.
+        cell_param (np.ndarray): Cell parameters.
     Returns:
-        refcell (object): Reference cell object.
+        refcell (object): Reference Cell object.
     """
 
     atom_site_labels, ref_labels, ref_fracs = get_wyckoff_positions(input_path)

@@ -335,10 +335,10 @@ def generate_tmc_rdkit_obj_smiles(mol: object):
     for met in mol.metals:
         met_idx = met.get_parent_index("molecule")
 
-        coordinating_atoms_labels = [atom.label for atom in met.coord_sphere]
+        coordinating_atoms_labels = [atom.label for atom in met.coord_sphere_atoms]
 
         coordinating_atoms_indices = [
-            atom.get_parent_index("molecule") for atom in met.coord_sphere
+            atom.get_parent_index("molecule") for atom in met.coord_sphere_atoms
         ]
         logger.debug(
             "%s%s coordinates to %s %s",
