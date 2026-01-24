@@ -133,7 +133,7 @@ class Ligand(Specie):
 
         return self.NO_type
 
-    def get_connected_idx(self, debug: int = 0):
+    def get_connected_idx(self):
         # Remember madjmat should not be computed at the ligand level.
         # Since the metal is not there.
         # Operate at the molecular level.
@@ -161,189 +161,15 @@ class Ligand(Specie):
 
     def get_denticity(self):
         if self.groups is None:
-            self.split_ligand()
+            return None
         self.denticity = 0
         for g in self.groups:
             self.denticity += g.get_denticity()
         return self.denticity
 
-    def split_ligand(self, use_bond_info: bool | None = None):
-        """
-        Split a ligand into coordination groups.
-        """
-
-        def _is_single_sublist(lst):
-            return isinstance(lst, list) and len(lst) == 1 and isinstance(lst[0], list)
-
-        if use_bond_info is None:
-            use_bond_info = config.USE_BOND_INFO
-
-        # Reference / bond information
-        refcell = self.get_parent("reference")
-        bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
-        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
-
-        # Coordination groups
-        logger.info("Splitting Ligand %s into groups", self.formula)
-        self.groups = []
-
-        # Identify Connected and Unconnected atoms (to the metal)
-        if self.connected_idx is None:
-            self.get_connected_idx()
-        connected_idx = self.connected_idx
-
-        # logger.debug(f"Ligand indices: {self.indices=}")
-        # logger.debug(f"{connected_idx=}")
-
-        conn_labels = extract_from_list(connected_idx, self.labels, dimension=1)
-        conn_coord = extract_from_list(connected_idx, self.coord, dimension=1)
-        if self.frac_coord is not None:
-            conn_frac_coord = extract_from_list(
-                connected_idx, self.frac_coord, dimension=1
-            )
-        conn_radii = extract_from_list(connected_idx, self.radii, dimension=1)
-        conn_atoms = extract_from_list(connected_idx, self.atoms, dimension=1)
-        if self.atom_site_labels is not None:
-            conn_atom_site_labels = extract_from_list(
-                connected_idx, self.atom_site_labels, dimension=1
-            )
-        else:
-            conn_atom_site_labels = None
-
-        logger.debug(
-            "  coordinating atoms: %s %s",
-            conn_labels,
-            conn_atom_site_labels if conn_atom_site_labels else "",
-        )
-
-        blocklist = split_species(
-            labels=conn_labels,
-            positions=conn_coord,
-            radii=conn_radii,
-            indices=None,  # rest_indices
-            atom_site_labels=conn_atom_site_labels,
-            bond_data=bond_data,
-            use_bond_info=use_bond_info,
-            cov_factor=cov_factor,
-            apply_graph=True,
-        )
-
-        ## Arranges Groups
-        for b in blocklist:
-            gr_indices = extract_from_list(b, connected_idx, dimension=1)
-            gr_labels = extract_from_list(b, conn_labels, dimension=1)
-            gr_coord = extract_from_list(b, conn_coord, dimension=1)
-            if self.frac_coord is not None:
-                gr_frac_coord = extract_from_list(b, conn_frac_coord, dimension=1)
-            gr_radii = extract_from_list(b, conn_radii, dimension=1)
-            gr_atoms = extract_from_list(b, conn_atoms, dimension=1)
-            if self.atom_site_labels is not None:
-                gr_atom_site_labels = extract_from_list(
-                    b, conn_atom_site_labels, dimension=1
-                )
-            else:
-                gr_atom_site_labels = None
-            # Create Group Object
-            if self.frac_coord is not None:
-                newgroup = Group.from_positional(
-                    gr_labels, gr_coord, gr_frac_coord, radii=gr_radii
-                )
-            else:
-                newgroup = Group.from_positional(gr_labels, gr_coord, radii=gr_radii)
-
-            # For debugging
-            newgroup.origin = "split_ligand"
-            # Define the ligand as parent of the group. Bottom-Up hierarchy
-            newgroup.add_parent(self, indices=gr_indices)
-            # Pass the ligand atoms to the groud
-            newgroup.set_atoms(
-                atomlist=gr_atoms,
-                create_adjacencies=False,
-                atom_site_labels=gr_atom_site_labels,
-                use_bond_info=use_bond_info,
-            )
-            # Inherit the adjacencies from molecule
-            newgroup.set_inherit_adjmatrix("ligand")
-            # Associate the Groups with the Metals
-            newgroup.get_connected_metals()
-            newgroup.get_closest_metal()
-            newgroup.get_hapticity()
-
-            (
-                newgroup,
-                final_group_indices,
-                final_ligand_indices,
-                group_metals_indices,
-            ) = newgroup.check_coordination(use_bond_info=use_bond_info)
-
-            # atoms in new group are connected to different metals
-            if not _is_single_sublist(final_group_indices):
-                logger.debug(
-                    "Enterting SPLIT_GROUP for the GROUP  %s with %s %s",
-                    newgroup.formula,
-                    final_group_indices,
-                    [met.label for met in newgroup.metals],
-                )
-                for kdx, (conn_idx, metal_idx) in enumerate(
-                    zip(final_group_indices, group_metals_indices)
-                ):
-                    group_metals = [newgroup.metals[midx] for midx in metal_idx]
-                    logger.debug(
-                        "Enterting SPLIT_GROUP for the GROUP  %s with %s %s",
-                        newgroup.formula,
-                        final_group_indices,
-                        [met.label for met in newgroup.metals],
-                    )
-                    splitted_groups = split_group(
-                        newgroup,
-                        conn_idx,
-                        final_ligand_indices[kdx],
-                        group_metals,
-                    )
-                    for g in splitted_groups:
-                        self.groups.append(g)
-            else:
-                logger.debug(
-                    "GROUP %s with %s connected to %s",
-                    newgroup.formula,
-                    final_group_indices,
-                    [met.label for met in newgroup.metals],
-                )
-                conn_idx = final_group_indices[0]
-                group_metals = [newgroup.metals[kdx] for kdx in group_metals_indices[0]]
-                if len(conn_idx) == len(newgroup.atoms):
-                    logger.debug("  Found GROUP %s with %s", newgroup.formula, conn_idx)
-                    newgroup.get_denticity()
-                    # Top-down hierarchy
-                    self.groups.append(newgroup)
-                elif len(conn_idx) == 0:
-                    logger.debug("  No group is found")
-                    continue
-                else:
-                    logger.debug(
-                        "  Enterting SPLIT_GROUP for the GROUP %s with %s",
-                        newgroup.formula,
-                        conn_idx,
-                    )
-                    splitted_groups = split_group(
-                        newgroup,
-                        conn_idx,
-                        final_ligand_indices[0],
-                        group_metals,
-                    )
-                    for g in splitted_groups:
-                        self.groups.append(g)
-        logger.info(
-            "Ligand %s has Groups %s",
-            self.formula,
-            [group.formula for group in self.groups],
-        )
-
-        return self.groups
-
     def get_hapticity(self):
         if self.groups is None:
-            self.split_ligand()
+            return None
         self.is_haptic = False
         self.haptic_type = []
         for gr in self.groups:
