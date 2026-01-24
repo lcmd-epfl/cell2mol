@@ -21,6 +21,7 @@ _CHARGE_ERRORS = [("error_assign_charge", 8), ("error_create_bonds", 9)]
 _SPIN_ERRORS = [("error_get_spin", 10)]
 
 ERROR_MAPS = {
+    "no_ref_molecules": [("no_ref_molecules", -1)],
     "reference": {
         "hydrogens": [
             ("has_isolated_H", 1),
@@ -31,6 +32,9 @@ ERROR_MAPS = {
         "possible_charges": [("error_get_poscharges", 5)],
         "charge_assignment": _CHARGE_ERRORS,
         "spin_assignment": _SPIN_ERRORS,
+        "general": [("general_error", config.ERR_GENERAL)],
+        "timeout": [("timeout_error", config.ERR_TIMEOUT)],
+        "memory": [("memory_error", config.ERR_MEMORY)],
     },
     "unitcell": {
         "reconstruction": [
@@ -43,6 +47,9 @@ ERROR_MAPS = {
         ],
         "charge_assignment": _CHARGE_ERRORS,
         "spin_assignment": _SPIN_ERRORS,
+        "general": [("general_error", config.ERR_GENERAL)],
+        "timeout": [("timeout_error", config.ERR_TIMEOUT)],
+        "memory": [("memory_error", config.ERR_MEMORY)],
     },
 }
 
@@ -71,7 +78,8 @@ class Cell(BaseModel):
     error_assign_charge: bool | None = None
     error_create_bonds: bool | None = None
     error_get_spin: bool | None = None
-    error_case: int | None = None
+    # error_case: int | None = None
+    error_cases: dict[str, int] | None = None
 
     # Frozen fields
     version: str = Field(default=config.VERSION, frozen=True)
@@ -233,23 +241,19 @@ class Cell(BaseModel):
                     metal.predict_charge()
 
     def assess_errors(self, mode):
-        """
-        Assess error conditions based on subtype and mode.
-        First truthy attribute found sets the error_case and exits.
-        """
-        # 1. Get the map for the current subtype
+        """Assess error conditions for a specific processing mode."""
+        if getattr(self, "error_cases", None) is None:
+            self.error_cases = {}
+
         subtype_map = ERROR_MAPS.get(self.subtype)
         if not subtype_map:
             raise ValueError(f"Unknown Cell subtype: {self.subtype}")
 
-        # 2. Get the rules for the specific processing mode
         rules = subtype_map.get(mode)
         if rules is None:
             raise ValueError(f"Invalid mode '{mode}' for subtype '{self.subtype}'")
 
-        # 3. Check attributes
         for attr, code in rules:
-            # We use False as default so missing attributes don't trigger errors
             is_triggered = getattr(self, attr, False)
 
             logger.debug(
@@ -262,18 +266,63 @@ class Cell(BaseModel):
             )
 
             if is_triggered:
-                self.error_case = code
+                self.error_cases[mode] = code
                 return
 
-        # 4. Fallback if no errors triggered
-        self.error_case = 0
+        # No error in this mode
+        self.error_cases[mode] = 0
 
-    def has_error(self) -> bool:
+    # def assess_errors(self, mode):
+    #     """
+    #     Assess error conditions based on subtype and mode.
+    #     First truthy attribute found sets the error_case and exits.
+    #     """
+    #     # 1. Get the map for the current subtype
+    #     subtype_map = ERROR_MAPS.get(self.subtype)
+    #     if not subtype_map:
+    #         raise ValueError(f"Unknown Cell subtype: {self.subtype}")
+
+    #     # 2. Get the rules for the specific processing mode
+    #     rules = subtype_map.get(mode)
+    #     if rules is None:
+    #         raise ValueError(f"Invalid mode '{mode}' for subtype '{self.subtype}'")
+
+    #     # 3. Check attributes
+    #     for attr, code in rules:
+    #         # We use False as default so missing attributes don't trigger errors
+    #         is_triggered = getattr(self, attr, False)
+
+    #         logger.debug(
+    #             "Checking %s (Code %d) in %s:%s. Result: %s",
+    #             attr,
+    #             code,
+    #             self.subtype,
+    #             mode,
+    #             is_triggered,
+    #         )
+
+    #         if is_triggered:
+    #             self.error_case = code
+    #             return
+
+    #     # 4. Fallback if no errors triggered
+    #     self.error_case = 0
+
+    def has_error(self, mode: str | None = None) -> bool:
         """
-        Return True if the cell is in an error state.
-        error_case == 0 means no error.
+        Return True if an error exists.
+
+        If mode is provided, check only that processing mode.
+        If mode is None, check across all recorded modes.
         """
-        return self.error_case != 0
+        if getattr(self, "error_cases", None) is None:
+            return False
+
+        if mode is not None:
+            return self.error_cases.get(mode, 0) != 0
+
+        # Check all modes
+        return any(code != 0 for code in self.error_cases.values())
 
     def save(self, path):
         """Save the Cell object to a file using pickle."""

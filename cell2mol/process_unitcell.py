@@ -47,8 +47,8 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
             logger.info("cell2mol process completed successfully.")
         else:
             logger.error("cell2mol process encountered errors.")
-            logger.debug(" - Reference error case: %s", refcell.error_case)
-            logger.debug(" - Unit cell error case: %s", unitcell.error_case)
+            logger.debug(" - Reference error case: %s", refcell.error_cases)
+            logger.debug(" - Unit cell error case: %s", unitcell.error_cases)
 
     except Exception as exc:
         exit_with_error_exception(exc)
@@ -94,7 +94,9 @@ def _initialize_cells(input_path, name, current_dir):
 def _process_cell_logic(refcell, unitcell, sym_ops) -> bool:
     """Executes the scientific logic: reconstruction, charge balancing, and assignment."""
     if refcell.has_error():
-        logger.error("Error while processing the reference cell")
+        logger.error(
+            "Processing the reference cell failed. Aborting unit cell processing."
+        )
         return False
 
     logger.info("Starting the cell2mol process for the unit cell")
@@ -129,16 +131,20 @@ def _process_cell_logic(refcell, unitcell, sym_ops) -> bool:
 
 
 def _has_step_failed(obj, mode):
-    """Helper to assess errors and log them."""
+    """Assess errors for a specific processing step and log them."""
     obj.assess_errors(mode=mode)
 
     if obj.subtype == "reference":
-        error_message = get_reference_error_message(obj.error_case)
+        code = obj.error_cases.get(mode, 0)
+        error_message = get_reference_error_message(code)
         logger.info("Reference Error (mode=%s): %s", mode, error_message)
+
     elif obj.subtype == "unitcell":
-        error_message = get_unitcell_error_message(obj.error_case)
+        code = obj.error_cases.get(mode, 0)
+        error_message = get_unitcell_error_message(code)
         logger.info("UnitCell Error (mode=%s): %s", mode, error_message)
-    if obj.has_error():
+
+    if obj.has_error(mode):
         logger.error(error_message)
         return True
     return False
@@ -189,7 +195,6 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell):
 
 def _write_ref_detailed_summary(name, refcell, summary_path):
     """Writes the molecules info, species, errors, and warnings to file and log."""
-    error_message = get_reference_error_message(refcell.error_case)
     warnings = get_reference_warning_messages(refcell)
 
     # Write to File
@@ -198,7 +203,15 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
         write_cell_molecules_info(refcell, file=f)
         write_unique_species(refcell, file=f)
         write_possible_charges(refcell, file=f)
-        print(f"ERROR: {error_message}", file=f)
+
+        if refcell.error_cases is not None:
+            # Print step-specific reference errors
+            for err_mode in refcell.error_cases.keys():
+                code = refcell.error_cases.get(err_mode, 0)
+                msg = get_reference_error_message(code)
+                print(f"Reference Error (mode={err_mode}): {msg}", file=f)
+
+        # Warnings
         for msg in warnings:
             print(f"WARNING: {msg}", file=f)
 
@@ -208,8 +221,13 @@ def _write_unit_summary(name: str, unitcell, summary_path: str):
     with open(summary_path, "w") as f:
         print(name, file=f)
         write_cell_molecules_info(unitcell, file=f)
-        error_message = get_unitcell_error_message(unitcell.error_case)
-        print(f"ERROR: {error_message}", file=f)
+
+        if unitcell.error_cases is not None:
+            # Print step-specific unit cell errors
+            for err_mode in unitcell.error_cases.keys():
+                code = unitcell.error_cases.get(err_mode, 0)
+                msg = get_unitcell_error_message(code)
+                print(f"UnitCell Error (mode={err_mode}): {msg}", file=f)
 
 
 def _safe_run(func, error_msg):

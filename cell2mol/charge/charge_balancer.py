@@ -75,7 +75,7 @@ def balance_unitcell_charge(refcell, unitcell):
     # Final Error Check
     if unitcell.error_multiple_distrib or unitcell.error_empty_distrib:
         logger.error(
-            "Balance charges failed. Error in distribution: Multiple=%s, Empty=%s",
+            "Balance charges failed. Flags in distribution: Multiple=%s, Empty=%s",
             unitcell.error_multiple_distrib,
             unitcell.error_empty_distrib,
         )
