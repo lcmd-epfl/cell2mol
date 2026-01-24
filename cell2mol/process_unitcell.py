@@ -40,27 +40,55 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
 
     refcell = None
     unitcell = None
-    sym_ops = None
+    cells = None
+
     exit_code = 0
 
     try:
         # Enforce timeout on the heavy lifting
         with set_time_limit(config.TIMEOUT):
-            # -------------------------------
-            # Initialize and Load Data
-            # -------------------------------
-            refcell, unitcell, sym_ops = _initialize_cells(
-                input_path, name, current_dir
-            )
-            if not refcell or not unitcell:
-                logger.error("Failed to initialize reference or unit cell.")
+            # ------------------------------------------------------
+            # Run Reference Interpretation and Initialize Unit Cell
+            # ------------------------------------------------------
+            refcell: Reference = interpret_reference(input_path, name, current_dir)
+
+            if not refcell:
+                logger.error("Failed to create reference cell from CIF.")
                 exit_code = ERR_CELL2MOL
                 return None
+
+            try:
+                structure = read(input_path, format="cif")
+            except (AssertionError, Exception) as e:
+                logger.error(f"ASE failed to parse {input_path}: {e}")
+                raise
+            cell_labels, cell_pos, cell_fracs = get_cell_atoms(structure)
+            cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
+
+            unitcell = UnitCell.from_positional(
+                name=name,
+                labels=cell_labels,
+                pos=cell_pos,
+                frac_coord=cell_fracs,
+                cell_vector=cell_vector,
+                cell_param=cell_param,
+            )
+
+            unitcell.set_subtype("unitcell")
+
+            cells = Cells.from_positional(
+                name=name,
+                reference=refcell,
+                unitcell=unitcell,
+                cell_vector=cell_vector,
+                cell_param=cell_param,
+            )
             # -------------------------------
             # Run the Processing Pipeline
             # -------------------------------
             success = _process_cell_logic(refcell, unitcell, sym_ops)
-
+            cells.reference = refcell
+            cells.unitcell = unitcell
             # Update cells object with processed data
             if success:
                 logger.info("cell2mol process completed successfully.")
@@ -78,8 +106,12 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
         gc.collect()
 
         if refcell is not None:
+            if refcell.error_cases is None:
+                refcell.error_cases = {}
             refcell.error_cases["memory"] = ERR_MEMORY
         if unitcell is not None:
+            if unitcell.error_cases is None:
+                unitcell.error_cases = {}
             unitcell.error_cases["memory"] = ERR_MEMORY
 
         exit_with_error_exception(exc)
@@ -92,8 +124,12 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
         logger.error(f"Processing timed out after {config.TIMEOUT} seconds.")
 
         if refcell is not None:
+            if refcell.error_cases is None:
+                refcell.error_cases = {}
             refcell.error_cases["timeout"] = ERR_TIMEOUT
         if unitcell is not None:
+            if unitcell.error_cases is None:
+                unitcell.error_cases = {}
             unitcell.error_cases["timeout"] = ERR_TIMEOUT
 
         exit_with_error_exception(exc)
@@ -106,8 +142,12 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
         logger.error(f"Unhandled error: {exc}")
 
         if refcell is not None:
+            if refcell.error_cases is None:
+                refcell.error_cases = {}
             refcell.error_cases["general"] = ERR_GENERAL
         if unitcell is not None:
+            if unitcell.error_cases is None:
+                unitcell.error_cases = {}
             unitcell.error_cases["general"] = ERR_GENERAL
 
         exit_with_error_exception(exc)
@@ -115,7 +155,7 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
 
     finally:
         logger.info("Executing final output handling...")
-        _save_cell_outputs(name, current_dir, refcell, unitcell)
+        _save_cell_outputs(name, current_dir, refcell, unitcell, cells)
 
         if exit_code != 0:
             logger.info(f"Process exiting with code {exit_code}")
@@ -124,36 +164,36 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
     return unitcell
 
 
-def _initialize_cells(input_path, name, current_dir):
-    """Handles file reading and initial object instantiation."""
-    logger.info("Starting the cell2mol process for reference (Wyckoff sites)")
+# def _initialize_cells(input_path, name, current_dir):
+#     """Handles file reading and initial object instantiation."""
+#     logger.info("Starting the cell2mol process for reference (Wyckoff sites)")
 
-    refcell: Reference = interpret_reference(input_path, name, current_dir)
+#     refcell: Reference = interpret_reference(input_path, name, current_dir)
+#     print(refcell)
+#     if not refcell:
+#         logger.error("Failed to create reference cell from CIF.")
+#         return None, None, None
 
-    if not refcell:
-        logger.error("Failed to create reference cell from CIF.")
-        return None, None, None
+#     try:
+#         structure = read(input_path, format="cif")
+#     except (AssertionError, Exception) as e:
+#         logger.error(f"ASE failed to parse {input_path}: {e}")
+#         raise
+#     cell_labels, cell_pos, cell_fracs = get_cell_atoms(structure)
+#     cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
 
-    try:
-        structure = read(input_path, format="cif")
-    except (AssertionError, Exception) as e:
-        logger.error(f"ASE failed to parse {input_path}: {e}")
-        raise
-    cell_labels, cell_pos, cell_fracs = get_cell_atoms(structure)
-    cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
+#     unitcell = UnitCell.from_positional(
+#         name=name,
+#         labels=cell_labels,
+#         pos=cell_pos,
+#         frac_coord=cell_fracs,
+#         cell_vector=cell_vector,
+#         cell_param=cell_param,
+#     )
 
-    unitcell = UnitCell.from_positional(
-        name=name,
-        labels=cell_labels,
-        pos=cell_pos,
-        frac_coord=cell_fracs,
-        cell_vector=cell_vector,
-        cell_param=cell_param,
-    )
+#     unitcell.set_subtype("unitcell")
 
-    unitcell.set_subtype("unitcell")
-
-    return refcell, unitcell, sym_ops
+#     return refcell, unitcell, sym_ops
 
 
 def _process_cell_logic(refcell, unitcell, sym_ops) -> bool:
@@ -215,7 +255,7 @@ def _has_step_failed(obj, mode):
     return False
 
 
-def _save_cell_outputs(name, current_dir, refcell, unitcell):
+def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
     """Handles all file writing and summary generation."""
     paths = {
         "ref": os.path.join(current_dir, f"Ref_Cell_{name}.cell"),
@@ -239,14 +279,6 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell):
             lambda: _write_unit_summary(name, unitcell, paths["unit_sum"]),
             "Failed to write unit summary",
         )
-
-    # cells = Cells.from_positional(
-    #     name=name,
-    #     reference=refcell,
-    #     unitcell=unitcell,
-    #     cell_vector=refcell.cell_vector,
-    #     cell_param=refcell.cell_param,
-    # )
 
     # if cells:
     #     _safe_run(
