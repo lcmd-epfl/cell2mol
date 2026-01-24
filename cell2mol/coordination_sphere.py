@@ -28,17 +28,17 @@ import numpy as np
 import os
 from cell2mol import __file__
 import yaml
+from cell2mol.element_utils import labels2formula
 from cell2mol.operations import compute_centroid
 from cell2mol.connectivity import (
-    build_adjacency,
     is_single_ring,
     add_atom,
+    identify_haptic_mode,
 )
 from cell2mol.elementdata import ElementData
 from scipy.optimize import linear_sum_assignment  # Hungarian algorithm
 from scipy.stats import special_ortho_group
 from scipy.linalg import svd
-from collections import defaultdict
 from cell2mol.utils import config
 
 import logging
@@ -276,34 +276,6 @@ def shape_measure(symbols: list, positions: list) -> dict:
     return posgeom_dev
 
 
-# def shape_measure(symbols: list, positions: list) -> dict:
-#     """Shape measure calculation adapted from a set of coordinates"""
-#     # coordination number of metal center
-#     cn = len(symbols) - 1
-#     if cn == 0:
-#         posgeom_dev = {}
-#     elif cn == 1:
-#         posgeom_dev = {"Linear": 0.0}
-#     else:
-#         try:
-#             ref_geom = np.array(
-#                 shape_structure_references_simplified["{} Vertices".format(cn)],
-#                 dtype=object,
-#             )
-#             ideal_shapes = {}
-#             for idx, rg in enumerate(ref_geom[:, 0]):
-#                 geom = ref_geom[:, 3][idx]
-#                 ideal_shapes[geom] = ideal_shapes_from_cosymlib[rg]
-
-#             for geom, ideal_shape in ideal_shapes.items():
-#                 chsm = calc_cshm_fast(positions, ideal_shape)
-#                 posgeom_dev[geom] = round(float(chsm), 3)
-#             return posgeom_dev
-#         except:
-#             logger.warning("%s Vertices not found in shape_structure_references", cn)
-#             return {}
-
-
 def normalize_structure(coordinates):
     # center and normalize the structure for CShM calculations
     centered_coords = coordinates - np.mean(coordinates, axis=0)
@@ -313,7 +285,7 @@ def normalize_structure(coordinates):
 
 def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
     # faster Hungarian algorithm optimization
-    # check number of trials, if it is to low, it calculates the
+    # check number of trials, if it is too low, it calculates the
     # local and not the global minimum
     input_structure = normalize_structure(coordinates)
     ideal_sq_norms = np.sum(ideal_shape**2)
@@ -363,289 +335,354 @@ def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
     return min_cshm * 100
 
 
-def handle_nonhaptic_coordination(group: object, use_bond_info: bool | None = None):
-    if use_bond_info is None:
-        use_bond_info = config.USE_BOND_INFO
+def handle_metal_coordination(metal: object) -> list:
+    """
+    Determines the coordination environment of a metal center.
 
-    if group.metals is None:
-        group.get_connected_metals()
+    Process:
+    1. Identify which non-metal atoms are coordinating to the metal.
+    2. Map these atoms back to their parent ligands.
+    3. Refine the coordination sphere (validate connectivity and resolve hapticity).
+    4. Instantiate and return Group objects representing the coordination blocks.
 
-    # Pair each atom with its index in the original list
-    indexed_atoms = list(enumerate(group.atoms))
+    Returns:
+        List[Group]: A list of validated coordination Group objects.
+    """
+    from cell2mol.classes.group import Group
 
-    # Sort the indexed list of atoms, prioritizing hydrogen atoms
-    sorted_indexed_atoms = sorted(
-        indexed_atoms, key=lambda x: (x[1].label != "H", x[1].label)
+    # Format metal info for consistent logging
+    metal_info = (
+        f"{metal.label}{f' ({metal.atom_site_label})' if metal.atom_site_label else ''}"
     )
 
-    # Extract the sorted atoms and their original indices into separate lists
-    sorted_atoms = [atom[1] for atom in sorted_indexed_atoms]
-    original_indices = [atom[0] for atom in sorted_indexed_atoms]
+    # Ensure the metal has its connected atoms list initialized
+    if getattr(metal, "connected_nonmetal_atoms", None) is not None:
+        metal.get_connected_nonmetal_atoms()
 
-    ## First Correction (former verify_connectivity)
-    conn_idx = []
-    conn_idx_by_metal = {jdx: [] for jdx, met in enumerate(group.metals)}
-    final_ligand_indices = []
-    good_atoms = []
-    removed_idx = []
-    for idx, atom in zip(original_indices, sorted_atoms):
-        isremoved = False
+    if not metal.connected_nonmetal_atoms:
+        logger.info(f"No coordinating non-metal atoms found for metal {metal_info}")
+        return []
 
-        ## Now there is an extra loop for each metal of the group.
-        for jdx, met in enumerate(group.metals):
-            if isremoved:
-                continue
-            lig = group.get_parent("ligand")
-            ligand_idx = atom.get_parent_index("ligand")
-            atom_mol_idx = atom.get_parent_index("molecule")
-            met_mol_idx = met.get_parent_index("molecule")
+    mol = metal.get_parent("molecule")
+    ligands = mol.ligands
 
-            tmplabels = [atom.label, met.label]
-            tmpcoord = [atom.coord, met.coord]
-            if atom.atom_site_label is not None and met.atom_site_label is not None:
-                atom_site_labels = [atom.atom_site_label, met.atom_site_label]
-            else:
-                atom_site_labels = None
+    if not ligands:
+        logger.info(f"No ligands found for molecule {mol.formula}")
+        return []
 
-            refcell = atom.get_parent("reference")
-            bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
-            cov_factor = getattr(lig, "cov_factor", config.COV_FACTOR)
-            metal_factor = getattr(lig, "metal_factor", config.METAL_FACTOR)
+    # Initialize a mapping of ligand indices to their coordinating atom indices
+    conn_idx_by_ligands = {lig_idx: [] for lig_idx, _ in enumerate(ligands)}
 
-            tmp_adjmat = build_adjacency(
-                labels=tmplabels,
-                positions=tmpcoord,
-                atom_site_labels=atom_site_labels,
-                bond_data=bond_data,
-                use_bond_info=use_bond_info,
-                cov_factor=cov_factor,
-                metal_factor=metal_factor,
-                metal_only=True,
+    # Map the molecule-wide index of each atom in each ligand for fast lookup
+    lig_mol_indices = {
+        lig_idx: [atom.get_parent_index("molecule") for atom in lig.atoms]
+        for lig_idx, lig in enumerate(ligands)
+    }
+
+    # Group the metal's connected atoms by the ligand they belong to
+    for atom in metal.connected_nonmetal_atoms:
+        atom_mol_idx = atom.get_parent_index("molecule")
+        for lig_idx, indices in lig_mol_indices.items():
+            if atom_mol_idx in indices:
+                conn_idx_by_ligands[lig_idx].append(atom_mol_idx)
+                # detailed logging
+                atom_info = f"{atom.label}{f' ({atom.atom_site_label})' if atom.atom_site_label else ''}"
+                logger.debug(
+                    "Atom %s (mol_idx %d) is part of ligand %s (lig_idx %d) coordinating metal %s",
+                    atom_info,
+                    atom_mol_idx,
+                    ligands[lig_idx].formula,
+                    lig_idx,
+                    metal_info,
+                )
+                break
+
+    logger.debug(f"Initial indices mapped by ligands: {conn_idx_by_ligands}")
+
+    # Refine the coordination sphere:
+    # This validates geometry and re-evaluates hapticity if atoms are pruned.
+    final_refined_data = correct_coordination_sphere(
+        metal=metal,
+        ligands=ligands,
+        conn_idx_by_ligands=conn_idx_by_ligands,
+        mol=mol,
+    )
+
+    coordination_groups = []
+
+    # Iterate through refined results to create Group objects
+    for lig_idx, groups_list in final_refined_data.items():
+        current_lig_m_indices = lig_mol_indices[lig_idx]
+        for group_info in groups_list:
+            atoms = group_info["atoms"]
+
+            # 1. Create the Group instance using positional data to satisfy Pydantic
+            # group_obj = Group.from_positional(
+            #     labels=[a.label for a in atoms],
+            #     coord=[a.coord for a in atoms],
+            #     frac_coord=[a.frac_coord for a in atoms]
+            #     if atoms[0].frac_coord is not None
+            #     else None,
+            #     radii=[a.radii for a in atoms],
+            # )
+
+            # 1. Create the Group instance from atom list
+            group_obj = Group.from_atom_list(atoms)
+
+            # 2. Inject the actual Atom objects to maintain referential integrity
+            # object.__setattr__(group_obj, "atoms", atoms)
+
+            group_obj.origin = "handle_metal_coordination"
+
+            # 3. Analyze coordination mode
+            group_obj.get_hapticity()
+
+            # 4. Map indices
+            group_mol_indices = [a.get_parent_index("molecule") for a in atoms]
+            group_ligand_indices = [
+                current_lig_m_indices.index(m_idx) for m_idx in group_mol_indices
+            ]
+
+            # 5. Establish Parents
+            group_obj.add_parent(mol, indices=group_mol_indices)
+            group_obj.set_inherit_adjmatrix("molecule")
+            group_obj.add_parent(ligands[lig_idx], indices=group_ligand_indices)
+
+            # 6. Link Metal (ensure list exists)
+            if getattr(group_obj, "metals", None) is None:
+                object.__setattr__(group_obj, "metals", [])
+            group_obj.metals.append(metal)
+
+            coordination_groups.append(group_obj)
+
+            # Detailed log of the final stabilized coordination mode
+            logger.info(
+                "Final Coordinated Group [%s]: Formula=%s, Haptic=%s, Type=%s",
+                metal_info,
+                group_info["formula"],
+                group_info["is_haptic"],
+                group_info["haptic_type"],
             )
-            if tmp_adjmat is None:
-                continue
-            else:
-                tmp_adjnum = tmp_adjmat.sum(axis=1)
-                if any(tmp_adjnum) > 0:
-                    logger.debug(
-                        "Atom %s%s (ligand_idx %s, atom_mol_idx %s) is connected to metal %s%s (met_mol_idx %s)",
-                        atom.label,
-                        f" ({atom.atom_site_label})" if atom.atom_site_label else "",
-                        ligand_idx,
-                        atom_mol_idx,
-                        met.label,
-                        f" ({met.atom_site_label})" if met.atom_site_label else "",
-                        met_mol_idx,
-                    )
-                    if use_bond_info:
-                        isadded = True
-                        logger.debug(
-                            "Connectivity verified for atom %s%s with ligand_idx %s, atom_mol_idx %s based on CIF bonds",
-                            atom.label,
-                            f" ({atom.atom_site_label})"
-                            if atom.atom_site_label
-                            else "",
-                            ligand_idx,
-                            atom_mol_idx,
-                        )
-                        conn_idx.append(idx)
-                        final_ligand_indices.append(atom.get_parent_index("ligand"))
-                        good_atoms.append(atom)
-                        conn_idx_by_metal[jdx].append(idx)
-                    else:
-                        isadded, newlab, newcoord = add_atom(
-                            lig.labels,
-                            lig.coord,
-                            ligand_idx,
-                            lig,
-                            "H",
-                            removed_idx=removed_idx,
-                            metal=met,
-                        )
-                        if isadded:
-                            logger.debug(
-                                "Connectivity verified for atom %s%s with ligand_idx %s, atom_mol_idx %s",
-                                atom.label,
-                                f" ({atom.atom_site_label})"
-                                if atom.atom_site_label
-                                else "",
-                                ligand_idx,
-                                atom_mol_idx,
-                            )
-                            conn_idx.append(idx)
-                            final_ligand_indices.append(atom.get_parent_index("ligand"))
-                            good_atoms.append(atom)
-                            conn_idx_by_metal[jdx].append(idx)
-                        else:
-                            logger.debug(
-                                "Correct mconnec of atom %s%s with ligand_idx %s, atom_mol_idx %s",
-                                atom.label,
-                                f" ({atom.atom_site_label})"
-                                if atom.atom_site_label
-                                else "",
-                                ligand_idx,
-                                atom_mol_idx,
-                            )
-                            isremoved = True
-                            removed_idx.append(ligand_idx)
-                            logger.debug(
-                                "Atom %s%s with ligand_idx %s, atom_mol_idx %s removed from coordination sphere",
-                                atom.label,
-                                f" ({atom.atom_site_label})"
-                                if atom.atom_site_label
-                                else "",
-                                ligand_idx,
-                                atom_mol_idx,
-                            )
-                            logger.debug("removed_idx: %s", removed_idx)
-                            ### Reset Connectivity of the atom and the parents
-                            atom.reset_mconnec(met)
-                            met.get_coord_sphere()
-                            met.get_coord_sphere_formula()
 
-    conn_idx = sorted(list(set(conn_idx)))
-    split_groups = []
-    final_ligand_indices_by_metal = {jdx: [] for jdx, met in enumerate(group.metals)}
+    return coordination_groups
 
-    for jdx, indices in conn_idx_by_metal.items():
-        metal = group.metals[jdx]
-        if indices:
-            logger.debug(
-                "metal %s%s (index %s) connected to %s",
-                metal.label,
-                f" ({metal.atom_site_label})" if metal.atom_site_label else "",
-                jdx,
-                [
-                    atom.atom_site_label if atom.atom_site_label else atom.label
-                    for atom in (group.atoms[i] for i in indices)
-                ],
-            )
-            new_group = [i for i in indices]
-            split_groups.append(new_group)
 
-    for jdx, indices in enumerate(split_groups):
-        for idx in indices:
-            atom = group.atoms[idx]
-            if atom.get_parent_index("ligand") is not None:
-                final_ligand_indices_by_metal[jdx].append(
-                    atom.get_parent_index("ligand")
+def correct_coordination_sphere(
+    metal: object, ligands: list, conn_idx_by_ligands: dict, mol: object
+) -> dict:
+    """
+    Refines the coordination sphere and returns the final stable groups.
+    Returns: {ligand_index: [list of validated haptic/non-haptic groups]}
+    """
+    final_coordination_results = {}
+
+    for jdx, connected_idx in conn_idx_by_ligands.items():
+        current_pool = connected_idx
+        stable_groups = []
+        logger.debug(
+            "Processing ligand %s (index %d) with initial connected indices: %s",
+            ligands[jdx].formula,
+            jdx,
+            current_pool,
+        )
+        while True:
+            results = partition_connected_indices(current_pool, mol)
+            if not results:
+                break
+
+            any_change_in_iteration = False
+            surviving_pool = []
+            temp_stable_groups = []
+
+            for group in results.values():
+                validated_gr_atoms, was_changed = validate_coordinated_atoms(
+                    group["gr_atoms"], metal, ligands[jdx], haptic=group["is_haptic"]
                 )
 
-    final_group_indices = split_groups
+                surviving_pool.extend(
+                    [a.get_parent_index("molecule") for a in validated_gr_atoms]
+                )
 
-    grouped = defaultdict(list)
-    for k, v in final_ligand_indices_by_metal.items():
-        grouped[tuple(v)].append(k)
-    group_metals_indices = [v for v in grouped.values()]
-    # logger.debug("Final group: %s", [a.label for a in group.atoms])
-    # logger.debug("Final group indices: %s", final_group_indices)
-    # logger.debug("Final ligand indices by metal: %s", final_ligand_indices_by_metal)
-    # logger.debug("Group metals indices: %s", group_metals_indices)
+                if was_changed:
+                    any_change_in_iteration = True
 
-    return (
-        group,
-        final_group_indices,
-        final_ligand_indices_by_metal,
-        group_metals_indices,
+                # Store the data of the group as it stands in this iteration
+                temp_stable_groups.append(
+                    {
+                        "formula": group["formula"],
+                        "is_haptic": group["is_haptic"],
+                        "haptic_type": group["haptic_type"],
+                        "atoms": validated_gr_atoms,
+                        "count": len(validated_gr_atoms),
+                    }
+                )
+
+            if any_change_in_iteration:
+                current_pool = surviving_pool
+                continue
+            else:
+                # No changes means temp_stable_groups is now the final state
+                stable_groups = temp_stable_groups
+                break
+
+        final_coordination_results[jdx] = stable_groups
+
+    return final_coordination_results
+
+
+def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, use_bond_info=None):
+    """
+    Checks if atoms in gr_atoms are truly connected to the metal.
+    Returns: (list of surviving atoms, boolean changed_flag)
+    """
+    if not gr_atoms:
+        return [], False
+
+    # 1. Sort atoms by distance: Farthest atoms first to handle
+    sorted_gr_atoms = sorted(
+        gr_atoms, key=lambda a: np.linalg.norm(metal.coord - a.coord), reverse=True
     )
 
+    # 2. Detailed Debug Logging
+    logger.debug(
+        "Sorted coordinated atoms (farthest first): %s",
+        [a.label for a in sorted_gr_atoms],
+    )
+    logger.debug(
+        "Sorted coordinated atom site labels: %s",
+        [a.atom_site_label for a in sorted_gr_atoms]
+        if sorted_gr_atoms and sorted_gr_atoms[0].atom_site_label
+        else None,
+    )
+    logger.debug(
+        "Sorted coordinated atom distances: %s",
+        [
+            float(np.round(np.linalg.norm(metal.coord - a.coord), 3))
+            for a in sorted_gr_atoms
+        ],
+    )
 
-def handle_haptic_coordination(group: object, use_bond_info: bool | None = None):
+    # 3. Haptic Handling: Skip correction if haptic
+    if haptic:
+        logger.info("Haptic ligand detected; skipping connectivity validation.")
+        # Identify if the haptic group forms a single ring (e.g., Cp ring)
+        single_ring = is_single_ring(gr_atoms, use_bond_info=use_bond_info)
+        logger.debug("Is single ring: %s", single_ring)
+
+        # Return original list and False (no changes made)
+        return gr_atoms, False
+
+    # 4. Non-Haptic Correction (Pruning) Logic
+    removed_ligand_indices = []
+    lig_mol_indices = {
+        a.get_parent_index("molecule"): i for i, a in enumerate(ligand.atoms)
+    }
+
+    for atom in sorted_gr_atoms:
+        atom_mol_idx = atom.get_parent_index("molecule")
+
+        if atom_mol_idx in lig_mol_indices:
+            is_added, _, _ = add_atom(
+                labels=ligand.labels,
+                coords=ligand.coord,
+                site=lig_mol_indices[atom_mol_idx],
+                ligand=ligand,
+                element="H",
+                removed_idx=removed_ligand_indices,
+                metal=metal,
+            )
+
+            if not is_added:
+                # --- EARLY RETURN LOGIC ---
+                logger.warning(
+                    f"Atom {atom.label} failed validation. Returning early to re-evaluate."
+                )
+
+                # Reset connectivity for the failed atom
+                atom.reset_mconnec(metal)
+
+                # Filter gr_atoms to exclude only this specific failed atom
+                # All other atoms are still 'potentially' valid in the next iteration
+                updated_gr_atoms = [
+                    a
+                    for a in gr_atoms
+                    if a.get_parent_index("molecule") != atom_mol_idx
+                ]
+
+                return updated_gr_atoms, True
+
+    # If the loop finishes without hitting 'if not is_added', nothing was removed
+    return gr_atoms, False
+
+
+def partition_connected_indices(
+    connected_idx, molecule, use_bond_info: bool | None = None
+) -> list:
+    from cell2mol.operations import extract_from_list
+    from cell2mol.connectivity import split_species
+
+    refcell = molecule.get_parent("reference")
+    bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+    cov_factor = getattr(molecule, "cov_factor", config.COV_FACTOR)
+
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
+    logger.debug("  Partitioning connected indices into blocks %s", connected_idx)
 
-    refcell = group.get_parent("reference")
-    bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+    if not connected_idx:
+        logger.debug("  No connected indices provided.")
+        return {}
 
-    single_ring = is_single_ring(
-        labels=group.labels,
-        positions=group.coord,
-        atom_site_labels=group.atom_site_labels,
+    conn_labels = extract_from_list(connected_idx, molecule.labels, dimension=1)
+    conn_coord = extract_from_list(connected_idx, molecule.coord, dimension=1)
+    if molecule.frac_coord is not None:
+        conn_frac_coord = extract_from_list(
+            connected_idx, molecule.frac_coord, dimension=1
+        )
+    conn_radii = extract_from_list(connected_idx, molecule.radii, dimension=1)
+    conn_atoms = extract_from_list(connected_idx, molecule.atoms, dimension=1)
+    if molecule.atom_site_labels is not None:
+        conn_atom_site_labels = extract_from_list(
+            connected_idx, molecule.atom_site_labels, dimension=1
+        )
+    else:
+        conn_atom_site_labels = None
+
+    blocklist = split_species(
+        labels=conn_labels,
+        positions=conn_coord,
+        radii=conn_radii,
+        indices=None,
+        atom_site_labels=conn_atom_site_labels,
         bond_data=bond_data,
         use_bond_info=use_bond_info,
+        cov_factor=cov_factor,
+        apply_graph=True,
     )
-    logger.debug("Is single ring: %s", single_ring)
-
-    conn_idx = []
-    conn_idx_by_metal = {jdx: [] for jdx, met in enumerate(group.metals)}
-    for idx, atom in enumerate(group.atoms):
-        for jdx, met in enumerate(group.metals):
-            lig = group.get_parent("ligand")
-            ligand_idx = atom.get_parent_index("ligand")
-            tmplabels = [atom.label, met.label]
-            tmpcoord = [atom.coord, met.coord]
-            if atom.atom_site_label is not None and met.atom_site_label is not None:
-                atom_site_labels = [atom.atom_site_label, met.atom_site_label]
-            else:
-                atom_site_labels = None
-
-            refcell = atom.get_parent("reference")
-            bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
-            cov_factor = getattr(lig, "cov_factor", config.COV_FACTOR)
-            metal_factor = getattr(lig, "metal_factor", config.METAL_FACTOR)
-
-            tmp_adjmat = build_adjacency(
-                labels=tmplabels,
-                positions=tmpcoord,
-                atom_site_labels=atom_site_labels,
-                bond_data=bond_data,
-                use_bond_info=use_bond_info,
-                cov_factor=cov_factor,
-                metal_factor=metal_factor,
-                metal_only=True,
-            )
-            if tmp_adjmat is None:
-                continue
-            else:
-                tmp_adjnum = tmp_adjmat.sum(axis=1)
-                if any(tmp_adjnum) > 0:
-                    logger.debug(
-                        "Atom %s (ligand index %s) is connected to metal %s (metal index %s)",
-                        atom.label,
-                        ligand_idx,
-                        met.label,
-                        jdx,
-                    )
-                    conn_idx.append(idx)
-                    conn_idx_by_metal[jdx].append(idx)
-
-    conn_idx = sorted(list(set(conn_idx)))
-    split_groups = []
-    final_ligand_indices_by_metal = {jdx: [] for jdx, met in enumerate(group.metals)}
-
-    for jdx, indices in conn_idx_by_metal.items():
-        metal = group.metals[jdx]
-        if indices:
+    logger.debug("  Identified %s blocks from connected atoms", len(blocklist))
+    logger.debug("    Blocks: %s", [block for block in blocklist])
+    results = {}
+    for idx, block in enumerate(blocklist):
+        gr_atoms = extract_from_list(block, conn_atoms, dimension=1)
+        is_haptic, haptic_type = identify_haptic_mode(
+            gr_atoms, use_bond_info=use_bond_info
+        )
+        if is_haptic:
             logger.debug(
-                "metal %s%s (index %s) connected to %s",
-                metal.label,
-                f" ({metal.atom_site_label})" if metal.atom_site_label else "",
-                jdx,
-                [
-                    atom.atom_site_label if atom.atom_site_label else atom.label
-                    for atom in (group.atoms[i] for i in indices)
-                ],
+                "    Block with atoms %s is haptic with type(s) %s",
+                [atom.label for atom in gr_atoms],
+                haptic_type,
             )
-            new_group = [i for i in indices]
-            split_groups.append(new_group)
-
-    for jdx, indices in enumerate(split_groups):
-        for idx in indices:
-            atom = group.atoms[idx]
-            if atom.get_parent_index("ligand") is not None:
-                final_ligand_indices_by_metal[jdx].append(
-                    atom.get_parent_index("ligand")
-                )
-
-    final_group_indices = split_groups
-    grouped = defaultdict(list)
-    for k, v in final_ligand_indices_by_metal.items():
-        grouped[tuple(v)].append(k)
-    group_metals_indices = [v for v in grouped.values()]
-
-    return (
-        group,
-        final_group_indices,
-        final_ligand_indices_by_metal,
-        group_metals_indices,
-    )
+        else:
+            logger.debug(
+                "    Block with atoms %s is non-haptic",
+                [atom.label for atom in gr_atoms],
+            )
+        results[idx] = {
+            "formula": labels2formula([atom.label for atom in gr_atoms]),
+            "is_haptic": is_haptic,
+            "haptic_type": haptic_type,
+            "gr_atoms": gr_atoms,
+        }
+        # logger.debug("Results for block %s: %s", idx, results[idx])
+    return results
