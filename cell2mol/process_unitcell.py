@@ -15,16 +15,21 @@ from cell2mol.write_results import (
     write_unique_species,
     write_possible_charges,
     get_reference_error_message,
-    get_reference_warning_messages,
     get_unitcell_error_message,
     exit_with_error_exception,
 )
+from cell2mol.utils.limits import ProcessingTimeoutError, set_time_limit
+
+import sys
+import gc
 
 logger = logging.getLogger(__name__)
+
 # Error Codes
-ERR_MEMORY = config.ERR_MEMORY
-ERR_TIMEOUT = config.ERR_TIMEOUT
+ERR_CELL2MOL = config.ERR_CELL2MOL
 ERR_GENERAL = config.ERR_GENERAL
+ERR_TIMEOUT = config.ERR_TIMEOUT
+ERR_MEMORY = config.ERR_MEMORY
 
 
 # -----------------------------------------------------------------------------
@@ -32,31 +37,91 @@ ERR_GENERAL = config.ERR_GENERAL
 # -----------------------------------------------------------------------------
 def interpret_unitcell(input_path: str, name: str, current_dir: str):
     """Orchestrates the cell2mol process for a CIF file."""
+
+    refcell = None
+    unitcell = None
+    sym_ops = None
+    exit_code = 0
+
     try:
-        # 1. Initialize and Load Data
-        refcell, unitcell, sym_ops = _initialize_cells(input_path, name, current_dir)
-        if not refcell or not unitcell:
-            logger.error("Failed to initialize reference or unit cell.")
-            return None
+        # Enforce timeout on the heavy lifting
+        with set_time_limit(config.TIMEOUT):
+            # -------------------------------
+            # Initialize and Load Data
+            # -------------------------------
+            refcell, unitcell, sym_ops = _initialize_cells(
+                input_path, name, current_dir
+            )
+            if not refcell or not unitcell:
+                logger.error("Failed to initialize reference or unit cell.")
+                exit_code = ERR_CELL2MOL
+                return None
+            # -------------------------------
+            # Run the Processing Pipeline
+            # -------------------------------
+            success = _process_cell_logic(refcell, unitcell, sym_ops)
 
-        # 2. Run the Processing Pipeline
-        success = _process_cell_logic(refcell, unitcell, sym_ops)
+            # Update cells object with processed data
+            if success:
+                logger.info("cell2mol process completed successfully.")
+            else:
+                logger.error("cell2mol process encountered errors.")
+                logger.debug(" - Reference error case: %s", refcell.error_cases)
+                logger.debug(" - Unit cell error case: %s", unitcell.error_cases)
+                exit_code = ERR_CELL2MOL
 
-        # Update cells object with processed data
-        if success:
-            logger.info("cell2mol process completed successfully.")
-        else:
-            logger.error("cell2mol process encountered errors.")
-            logger.debug(" - Reference error case: %s", refcell.error_cases)
-            logger.debug(" - Unit cell error case: %s", unitcell.error_cases)
+    # -------------------------------
+    # Memory errors
+    # -------------------------------
+    except MemoryError as exc:
+        logger.error("Memory limit reached. Attempting cleanup.")
+        gc.collect()
 
-    except Exception as exc:
+        if refcell is not None:
+            refcell.error_cases["memory"] = ERR_MEMORY
+        if unitcell is not None:
+            unitcell.error_cases["memory"] = ERR_MEMORY
+
         exit_with_error_exception(exc)
+        exit_code = ERR_MEMORY
+
+    # -------------------------------
+    # Timeout errors
+    # -------------------------------
+    except ProcessingTimeoutError as exc:
+        logger.error(f"Processing timed out after {config.TIMEOUT} seconds.")
+
+        if refcell is not None:
+            refcell.error_cases["timeout"] = ERR_TIMEOUT
+        if unitcell is not None:
+            unitcell.error_cases["timeout"] = ERR_TIMEOUT
+
+        exit_with_error_exception(exc)
+        exit_code = ERR_TIMEOUT
+
+    # -------------------------------
+    # All other runtime errors
+    # -------------------------------
+    except Exception as exc:
+        logger.error(f"Unhandled error: {exc}")
+
+        if refcell is not None:
+            refcell.error_cases["general"] = ERR_GENERAL
+        if unitcell is not None:
+            unitcell.error_cases["general"] = ERR_GENERAL
+
+        exit_with_error_exception(exc)
+        exit_code = ERR_GENERAL
+
     finally:
-        # 3. Handle Saving and Summaries (Always runs even on error)
+        logger.info("Executing final output handling...")
         _save_cell_outputs(name, current_dir, refcell, unitcell)
 
-    return None
+        if exit_code != 0:
+            logger.info(f"Process exiting with code {exit_code}")
+            sys.exit(exit_code)
+
+    return unitcell
 
 
 def _initialize_cells(input_path, name, current_dir):
@@ -195,8 +260,6 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell):
 
 def _write_ref_detailed_summary(name, refcell, summary_path):
     """Writes the molecules info, species, errors, and warnings to file and log."""
-    warnings = get_reference_warning_messages(refcell)
-
     # Write to File
     with open(summary_path, "w") as f:
         print(name, file=f)
@@ -204,16 +267,11 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
         write_unique_species(refcell, file=f)
         write_possible_charges(refcell, file=f)
 
-        if refcell.error_cases is not None:
-            # Print step-specific reference errors
-            for err_mode in refcell.error_cases.keys():
-                code = refcell.error_cases.get(err_mode, 0)
+        # Print step-specific reference errors
+        if refcell.error_cases:
+            for err_mode, code in refcell.error_cases.items():
                 msg = get_reference_error_message(code)
                 print(f"Reference Error (mode={err_mode}): {msg}", file=f)
-
-        # Warnings
-        for msg in warnings:
-            print(f"WARNING: {msg}", file=f)
 
 
 def _write_unit_summary(name: str, unitcell, summary_path: str):
@@ -222,7 +280,7 @@ def _write_unit_summary(name: str, unitcell, summary_path: str):
         print(name, file=f)
         write_cell_molecules_info(unitcell, file=f)
 
-        if unitcell.error_cases is not None:
+        if unitcell.error_cases:
             # Print step-specific unit cell errors
             for err_mode in unitcell.error_cases.keys():
                 code = unitcell.error_cases.get(err_mode, 0)
