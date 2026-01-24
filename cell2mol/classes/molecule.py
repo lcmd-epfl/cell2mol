@@ -111,7 +111,7 @@ class Molecule(Specie):
             ) from e
 
         logger.debug(
-            "Assigned spin multiplicity | molecule=%s | spin=%d",
+            "Assigned spin multiplicity | molecule=%s | spin=%s",
             self.formula,
             self.spin,
         )
@@ -312,6 +312,111 @@ class Molecule(Specie):
         self.metals.extend(self.atoms[i] for i in metal_idx)
 
         return self.ligands, self.metals
+
+    def analyze_coordination(self):
+        """
+        Analyze the coordination environment of the molecule.
+        Determines hapticity and connected metals for ligands.
+        """
+
+        if self.iscomplex:
+            logger.info("Has transition metals %s", self.formula)
+            if not self.ligands:
+                logger.debug("A metal cluster found")
+        elif self.has_ia_iia:
+            logger.info("Has alkali or alkaline earth metals: %s", self.formula)
+            if not self.ligands:
+                logger.debug("Alkali/alkaline earth metal ion found")
+        elif self.has_post_transition_metal:
+            logger.info("Has post transition metals: %s", self.formula)
+            logger.debug("metals=%s", [met.label for met in self.metals])
+            logger.debug("ligands=%s", [lig.formula for lig in self.ligands])
+        else:
+            logger.info("No metals found in molecule: %s", self.formula)
+            return
+
+        for met in self.metals:
+            logger.debug(
+                "Checking coordination for metal %s%s",
+                met.label,
+                (f" ({met.atom_site_label})" if met.atom_site_label else ""),
+            )
+            met.get_connected_metals()
+            logger.debug("  Connected Metals: %s", [m.label for m in met.metals])
+            met.get_connected_nonmetal_atoms()
+            logger.debug(
+                "  Connected Non-Metals: %s",
+                [m.label for m in met.connected_nonmetal_atoms],
+            )
+            met.get_connected_groups()
+            met.get_coordination_geometry()
+            met.get_coord_sphere_formula()
+
+        self.map_metal_groups_to_ligands()
+
+        for lig in self.ligands:
+            logger.debug(
+                f"Ligand: {lig.formula}, Groups: {[group.formula for group in lig.groups]}"
+            )
+            for group in lig.groups:
+                logger.debug(
+                    f"  Group: {group.formula}, Haptic: {group.haptic_type}, Connected Metal: {[met.atom_site_label for met in group.metals]}"
+                )
+                for atom in group.atoms:
+                    logger.debug(
+                        f"    Atom: {atom.atom_site_label}, connec: {atom.connec} mconnec: {atom.mconnec}"
+                    )
+
+    def map_metal_groups_to_ligands(self):
+        """
+        Maps refined metal-coordinated groups to their parent ligands.
+        Handles bridging coordination by comparing ligand atom indices.
+        """
+        # 1. Reset ligand coordination storage
+        for lig in self.ligands:
+            lig.groups = []
+
+        # 2. Iterate through each metal and its identified groups
+        for met in self.metals:
+            groups = getattr(met, "groups", [])
+
+            for group in groups:
+                parent_ligand = group.get_parent("ligand")
+                # Get the local indices of these atoms within the ligand
+                current_indices = set(group.get_parent_indices("ligand"))
+
+                if parent_ligand:
+                    # 3. Check if a group with the same ligand indices already exists
+                    is_duplicate = False
+                    for added_group in parent_ligand.groups:
+                        added_indices = set(added_group.get_parent_indices("ligand"))
+
+                        if current_indices == added_indices:
+                            # It's the same coordination site! Just link the new metal.
+                            if met not in added_group.metals:
+                                added_group.metals.append(met)
+
+                            logger.debug(
+                                "Bridging group detected: Metal %s linked to existing group %s in Ligand %s",
+                                met.label,
+                                added_group.formula,
+                                parent_ligand.formula,
+                            )
+                            is_duplicate = True
+                            break
+
+                    if not is_duplicate:
+                        # 4. New unique coordination group
+                        parent_ligand.groups.append(group)
+                        group.parent_ligand = parent_ligand
+
+                        logger.info(
+                            "Mapped %s (%s) from Metal %s to Ligand %s",
+                            group.formula,
+                            group.haptic_type,
+                            met.label,
+                            parent_ligand.formula,
+                        )
 
     def get_hapticity(self):
         if self.ligands is None:
