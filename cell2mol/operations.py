@@ -645,3 +645,57 @@ def has_mixed_metal_types(labels: list[str]) -> bool:
     logger.debug("Metal type counts: %s", log_map)
     # Mixed metal types detected
     return True
+
+
+def has_different_metal_coordination(refmoleculist, bond_data):
+    """
+    Iterates through all molecules in refmoleculist and compares
+    metal coordination spheres against the provided bond_data.
+    """
+
+    if not bond_data:
+        logger.info("No bond data provided for coordination verification.")
+        return None
+
+    overall_difference = False
+    # Iterate through each molecule in the list
+    for mol_idx, molecule in enumerate(refmoleculist):
+        logger.info(f"Checking Molecule {mol_idx} (Formula: {molecule.formula})")
+
+        # Check each metal within the current molecule
+        for met in molecule.metals:
+            met_label = met.atom_site_label
+
+            # 1. Extract ground truth neighbors from bond_data
+            neighbors_from_data = []
+            for b in bond_data:
+                if b[0] == met_label:
+                    neighbors_from_data.append(b[1])
+                elif b[1] == met_label:
+                    neighbors_from_data.append(b[0])
+
+            # 2. Get current neighbors stored in the object
+            # (Assuming coord_sphere_atoms is the primary storage list)
+            current_sphere_labels = [a.atom_site_label for a in met.coord_sphere_atoms]
+
+            # 3. Perform Set Comparison
+            set_data = set(neighbors_from_data)
+            set_current = set(current_sphere_labels)
+
+            if set_data != set_current:
+                overall_difference = True
+                missing = set_data - set_current
+                extra = set_current - set_data
+
+                logger.warning(
+                    f"Mismatch in Molecule {mol_idx} for Metal {met_label}!\n"
+                    f"  Expected (bond_data): {neighbors_from_data}\n"
+                    f"  Missing in cell2mol: {missing}\n"
+                    f"  Extra in cell2mol: {extra}"
+                )
+            else:
+                logger.debug(
+                    f"Molecule {mol_idx}: Metal {met_label} coordination is correct."
+                )
+
+    return overall_difference
