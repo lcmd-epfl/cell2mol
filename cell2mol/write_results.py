@@ -216,23 +216,46 @@ def get_reference_error_message(error_case):
 
 
 def get_reference_warning_messages(refcell):
-    """Return a list of warning messages based on refcell flags."""
+    """
+    Returns a list of messages based on potential_warnings.
+    Triggers 'Warning' for True and 'Skipped' for None.
+    """
+
+    # Mapping for triggered warnings (status is True)
+    warning_map = {
+        "cif_mismatch": "CIF formula mismatch detected",
+        "over_polynuclear_limit": f"Polynuclear complex exceeds metal center limit (> max_metals {config.MAX_METALS})",
+        "mixed_metals": "Mixed metal types detected",
+        "is_mismatch_adj": "Adjacency matrix does not match CIF bond connectivity.",
+        "metal_coord_diff": "Final metal coordination differs from CIF bond connectivity.",
+    }
+
+    # Mapping for skipped checks (status is None)
+    skip_map = {
+        "cif_mismatch": "CIF formula check skipped (No _chemical_formula_moiety in CIF)",
+        "is_mismatch_adj": "Adjacency check skipped (No _geom_bond in CIF)",
+        "metal_coord_diff": "Metal coordination check skipped (No _geom_bond in CIF)",
+    }
 
     messages = []
 
-    if refcell.disagree_with_cif_formula is True:
-        messages.append("CIF formula mismatch detected")
+    if not refcell.potential_warnings:
+        return messages
 
-    if refcell.is_polynuclear_over_limit:
-        messages.append("Polynuclear complex exceeds metal center limit")
+    for key, status in refcell.potential_warnings.items():
+        # Case 1: The check failed (Warning)
+        if status is True:
+            messages.append(warning_map.get(key, f"Warning: {key}"))
 
-    if refcell.has_mixed_metal_types:
-        messages.append("Mixed metal types detected")
-
-    if refcell.is_mismatch_adjacency is True:
-        messages.append(
-            "Distance-based adjacency matrix does not match the bond connectivity defined in the CIF."
-        )
+        # Case 2: The check was skipped (None)
+        elif status is None:
+            # Only add a message if the key is in our skip_map
+            if key in skip_map:
+                messages.append(f"Skipped: {skip_map[key]}")
+            else:
+                messages.append(
+                    f"Skipped: Check for {key} was skipped due to missing reference data."
+                )
 
     return messages
 
