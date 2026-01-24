@@ -576,8 +576,8 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
 
             logger.debug(
                 f"Element {elemdatabase.elementsym[num]} : {len(indices)} atoms | "
-                f"Group Combinations: {current_group_count:,} | "
-                f"Valences: {group_valences}"
+                f"Group Combinations: {current_group_count:,}"
+                # f" | Valences: {group_valences}"
             )
 
             # Create a product iterator for this group
@@ -595,8 +595,8 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
         other_syms = [elemdatabase.elementsym[n] for n in other_nums]
         logger.debug(
             f"Element Others ({other_syms}): {len(others)} atoms | "
-            f"Group Combinations: {current_group_count:,} | "
-            f"Valences: {other_valences}"
+            f"Group Combinations: {current_group_count:,}"
+            # f" | Valences: {other_valences}"
         )
 
         nested_inputs.append(itertools.product(*other_valences))
