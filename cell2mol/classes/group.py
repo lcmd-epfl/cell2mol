@@ -38,59 +38,6 @@ class Group(Specie):
     ) -> None:
         return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
 
-    # @classmethod
-    # def from_atom_list(
-    #     cls, gr_atoms: list, use_bond_info: bool | None = None
-    # ) -> "Group":
-    #     """
-    #     Factory method to instantiate a Group directly from a list of Atom objects.
-    #     Uses direct attribute injection to bypass Pydantic re-validation.
-    #     """
-    #     if not gr_atoms:
-    #         logger.warning("Group creation aborted: Atom list is empty.")
-    #         return None
-
-    #     first_atom = gr_atoms[0]
-
-    #     try:
-    #         # 1. Instantiate the class with basic structural data
-    #         # This triggers Pydantic's field validation for the base Specie/Atom attributes
-    #         instance = cls(
-    #             labels=[a.label for a in gr_atoms],
-    #             coord=[a.coord for a in gr_atoms],
-    #             frac_coord=[a.frac_coord for a in gr_atoms]
-    #             if first_atom.frac_coord is not None
-    #             else None,
-    #             radii=[a.radii for a in gr_atoms]
-    #             if hasattr(first_atom, "radii")
-    #             else None,
-    #         )
-
-    #         # 2. Directly inject the original Atom objects to preserve memory references
-    #         # This is critical for connectivity consistency across the Molecule
-    #         object.__setattr__(instance, "atoms", gr_atoms)
-
-    #         # 3. Set internal metadata and site labels
-    #         instance.origin = "Group.from_atom_list"
-    #         if hasattr(first_atom, "atom_site_label"):
-    #             site_labels = [a.atom_site_label for a in gr_atoms]
-    #             object.__setattr__(instance, "atom_site_labels", site_labels)
-
-    #         # 4. Store bond info preference
-    #         instance.use_bond_info = (
-    #             use_bond_info if use_bond_info is not None else config.USE_BOND_INFO
-    #         )
-
-    #         logger.debug(
-    #             f"Successfully created Group (Formula: {instance.formula}) with {len(gr_atoms)} atoms."
-    #         )
-    #         return instance
-
-    #     except Exception as e:
-    #         logger.error(f"Failed to create Group from atom list: {e}")
-    #         # Optionally re-raise if this is a critical failure
-    #         return None
-
     @classmethod
     def from_atom_list(
         cls, gr_atoms: list, use_bond_info: bool | None = None
