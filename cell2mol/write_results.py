@@ -557,7 +557,7 @@ def write_possible_charges(object, file=None):
                     # Non-metals use a new line for charge states as per original logic
                     info += f"\n\tpossible_cs={specie.possible_cs}"
             else:
-                info += " No possible cs"
+                info += " NO POSSIBLE CHARGE STATES FOUND"
 
             print(info, file=file)
     else:

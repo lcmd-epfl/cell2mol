@@ -147,25 +147,25 @@ class Cell(BaseModel):
 
             if mol.is_non_complex_molecule:
                 logger.info(
-                    "Non-Complex %d: %s %d %s",
+                    "Non-Complex %d: %s %s %s",
                     idx,
                     mol.formula,
                     mol.totcharge,
                     mol.smiles,
                 )
             else:
-                logger.info("Complex %d: %s %d", idx, mol.formula, mol.totcharge)
+                logger.info("Complex %d: %s %s", idx, mol.formula, mol.totcharge)
 
                 for jdx, lig in enumerate(mol.ligands):
                     logger.info(
-                        "  Ligand %d: %s %d %s",
+                        "  Ligand %d: %s %s %s",
                         jdx,
                         lig.formula,
                         lig.totcharge,
                         lig.smiles,
                     )
                 for kdx, met in enumerate(mol.metals):
-                    logger.info("  Metal %d: %s %d", kdx, met.formula, met.charge)
+                    logger.info("  Metal %d: %s %s", kdx, met.formula, met.charge)
 
     def assign_spin(self):
         """

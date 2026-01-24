@@ -223,12 +223,7 @@ def _construct_state_from_topology(reference, target, final_charge):
         cs = generate_manual_charge_state(target)
 
     # Case B: Standard Molecule (Create Empty/Neutral State)
-    elif (
-        target.subtype == "molecule"
-        and not target.iscomplex
-        and not target.has_ia_iia
-        and not target.has_post_transition_metal
-    ):
+    elif target.is_non_complex_molecule:
         logger.debug("Mode 3: Creating Empty PROTONATION for %s", target.formula)
         empty_list = [0] * len(target.labels)
 

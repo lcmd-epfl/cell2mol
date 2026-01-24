@@ -58,7 +58,10 @@ def enumerate_possible_charge_states(spec: object):
 
     # Fullerenes
     if spec.formula in FULLERENES:
-        return [generate_charge_state(0, spec.protonation_states[0])]
+        logger.debug(
+            "Skipping charge state enumeration for fullerene: %s", spec.formula
+        )
+        return None
 
     # Haptic Ligands
     is_haptic_c8 = (
@@ -70,9 +73,15 @@ def enumerate_possible_charge_states(spec: object):
         ch_state = generate_charge_state(-1, spec.protonation_states[0])
         return [ch_state]
 
-    # Silylyne
-    # if spec.subtype == "ligand" and spec.is_silylyne:
-    #     return [generate_charge_state(0, spec.protonation_states[0])]
+    for prot in spec.protonation_states:
+        logger.debug("detailed: %s\n%s", prot.formula, prot)
+        # if not prot.status:
+        #     logger.warning(
+        #         "Invalid protonation state found %s (status=%s)",
+        #         prot.formula,
+        #         prot.status,
+        #     )
+        #     logger.debug("detailed: %s\n%s", prot.formula, prot)
 
     # 3. Enumeration Loop
     valid_charge_states = []
@@ -122,16 +131,18 @@ def generate_charge_state(
     """
     # If protonation state is invalid, do not allow charged fragments
     if not prot.status:
-        allow_charged_fragments = False
+        logger.warning(
+            "Protonation state invalid for %s, skipping charge state generation.",
+            prot.formula,
+        )
+        return None
 
     logger.debug(
-        "Protonation State: %s | Target Charge: %d | Allow charged fragments: %s | added atoms: %d | block: %s | metal electrons: %s",
+        "Protonation State: %s | Target Charge: %d | Allow charged fragments: %s | added atoms: %d",
         prot.formula,
         charge,
         allow_charged_fragments,
         prot.added_atoms,
-        prot.block,
-        prot.metal_electrons,
     )
 
     # AC2mol returns a list of RDKit molecule objects and bond order (BO) matrix
