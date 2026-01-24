@@ -74,7 +74,13 @@ def enumerate_possible_charge_states(spec: object):
         return [ch_state]
 
     for prot in spec.protonation_states:
-        logger.debug("detailed: %s\n%s", prot.formula, prot)
+        logger.debug(
+            "Detailed info Formula: %s Added atoms: %d Type : %s",
+            prot.formula,
+            prot.added_atoms,
+            prot.typ,
+        )
+        # logger.debug("detailed: %s\n%s", prot.formula, prot)
         # if not prot.status:
         #     logger.warning(
         #         "Invalid protonation state found %s (status=%s)",

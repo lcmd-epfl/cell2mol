@@ -199,7 +199,6 @@ def check_missing_hydrogens(reference_molecules):
                 if (
                     lig.natoms == 1
                     and "O" in lig.labels
-                    and lig.denticity <= 1
                     and not any(m.label in coord_water_exceptions for m in lig.metals)
                 ):
                     missing_h_in_coordinated_water = True
