@@ -660,11 +660,13 @@ def has_different_metal_coordination(refmoleculist, bond_data):
     overall_difference = False
     # Iterate through each molecule in the list
     for mol_idx, molecule in enumerate(refmoleculist):
-        logger.info(f"Checking Molecule {mol_idx} (Formula: {molecule.formula})")
-
         # Check each metal within the current molecule
         if molecule.metals is None:
-            logger.info(f"  No metals found in Molecule {mol_idx}. Skipping.")
+            logger.info(
+                "No metals found in Molecule %s (Formula: %s). Skipping.",
+                mol_idx,
+                molecule.formula,
+            )
             continue
         for met in molecule.metals:
             met_label = met.atom_site_label
@@ -691,14 +693,21 @@ def has_different_metal_coordination(refmoleculist, bond_data):
                 extra = set_current - set_data
 
                 logger.warning(
-                    f"Mismatch in Molecule {mol_idx} for Metal {met_label}!\n"
-                    f"  Expected (bond_data): {neighbors_from_data}\n"
-                    f"  Missing in cell2mol: {missing}\n"
-                    f"  Extra in cell2mol: {extra}"
+                    "Molecule %s (Formula: %s): Mismatch in coordination for Metal %s",
+                    mol_idx,
+                    molecule.formula,
+                    met_label,
                 )
+                logger.warning(f"  Expected (bond_data): {neighbors_from_data}")
+                logger.warning(f"  Missing in cell2mol: {missing}")
+                logger.warning(f"  Present in cell2mol: {set_current}")
+                logger.warning(f"  Extra in cell2mol: {extra}")
             else:
                 logger.debug(
-                    f"Molecule {mol_idx}: Metal {met_label} coordination is correct."
+                    "Molecule %s (Formula: %s): Metal %s coordination is correct.",
+                    mol_idx,
+                    molecule.formula,
+                    met_label,
                 )
 
     return overall_difference
