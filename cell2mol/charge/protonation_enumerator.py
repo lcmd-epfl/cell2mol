@@ -2,22 +2,14 @@ import numpy as np
 import itertools
 import networkx as nx
 from cell2mol.connectivity import add_atom
-from cell2mol.element_utils import (
-    get_alkali_alkaline_earth_metal_idxs,
-    get_post_transition_metal_idxs,
-    get_metalloid_idxs,
-)
+from cell2mol.element_utils import get_post_transition_metal_idxs, get_metalloid_idxs
 from dataclasses import dataclass
 from typing import Dict, List
-
-from cell2mol.hydrogen import add_hydrogens
 from cell2mol.classes.protonation import Protonation
+from cell2mol.charge.utils import FULLERENES, MANUAL_CHARGE_ASSIGN_SPECIES
 import logging
 
 logger = logging.getLogger(__name__)
-
-fullerene = ["C60", "C72", "C80"]
-manual_assign = ["O4-Cl", "N3", "N2", "N-O", "I3", "I4", "I5", "I6"]
 
 
 @dataclass
@@ -54,7 +46,7 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
         else:
             return None
 
-    if specie.formula in manual_assign or specie.formula in fullerene:
+    if specie.formula in MANUAL_CHARGE_ASSIGN_SPECIES or specie.formula in FULLERENES:
         return get_empty_protonation_state(specie)
 
     num_post_tm = len(get_post_transition_metal_idxs(specie.labels))
@@ -100,23 +92,82 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
 
     logger.info("Processing %s (%s):", specie.formula, specie.subtype)
 
+    # --------------------------------------------------
+    # Resolve overlapping groups before processing
+    # --------------------------------------------------
+
+    def _group_priority(g):
+        """Higher value = higher priority."""
+        parent_indices = g.get_parent_indices("ligand")
+        return (
+            1 if g.is_haptic else 0,  # haptic first
+            len(parent_indices),  # larger fragment first
+        )
+
+    # Sort groups by priority (highest first)
+    sorted_groups = sorted(
+        ligand.groups,
+        key=_group_priority,
+        reverse=True,
+    )
+
+    filtered_groups = []
+
+    for g in sorted_groups:
+        pset = set(g.get_parent_indices("ligand"))
+
+        # Find a higher-priority group that fully contains this group
+        superset_group = next(
+            (h for h in filtered_groups if pset <= set(h.get_parent_indices("ligand"))),
+            None,
+        )
+
+        if superset_group is not None:
+            logger.debug(
+                "Skipping group %s (parent_indices=%s) because it is a subset of group %s (parent_indices=%s)",
+                g.formula,
+                sorted(pset),
+                superset_group.formula,
+                sorted(superset_group.get_parent_indices("ligand")),
+            )
+            continue
+
+        filtered_groups.append(g)
+
+    logger.debug("Filtered groups for protonation processing:")
+    for g in filtered_groups:
+        parent_indices = g.get_parent_indices("ligand")
+        logger.debug("        HANDLE_HAPTIC_GROUP: %s %s", g.formula, g.haptic_type)
+        logger.debug("        parent_indices: %s", parent_indices)
+
+        for idx in parent_indices:
+            a = ligand.atoms[idx]
+
+            logger.debug(
+                "        HANDLE_HAPTIC: idx=%d, label=%s, connec=%d, mconnec=%d",
+                idx,
+                a.label,
+                a.connec,
+                a.mconnec,
+            )
     # ============================================================
     # GROUP-LEVEL ANALYSIS
     # ============================================================
-    for g in ligand.groups:
+    # for g in ligand.groups:
+    for g in filtered_groups:
         parent_indices = g.get_parent_indices("ligand")
 
-        ia_iia = get_alkali_alkaline_earth_metal_idxs(
-            [metal.label for metal in g.metals]
-        )
+        # ia_iia = get_alkali_alkaline_earth_metal_idxs(
+        #     [metal.label for metal in g.metals]
+        # )
 
-        # --------------------------------------------------------
-        # Alkali / alkaline-earth only coordination
-        # --------------------------------------------------------
-        if len(ia_iia) == len(g.metals):
-            for idx in parent_indices:
-                block[idx] = 1
-            continue
+        # # --------------------------------------------------------
+        # # Alkali / alkaline-earth only coordination
+        # # --------------------------------------------------------
+        # if len(ia_iia) == len(g.metals):
+        #     for idx in parent_indices:
+        #         block[idx] = 1
+        #     continue
 
         # --------------------------------------------------
         # Dispatch to helper
@@ -170,29 +221,42 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
         if (addedlist[idx] - block[idx]) <= 0:
             continue
 
-        if (addedlist[idx] - block[idx]) == 1:
+        if addedlist[idx] == 1:
             logger.debug("    Single addition for atom index %d", idx)
             isadded, newlab, newcoord = add_atom(
                 newlab, newcoord, idx, ligand, elemlist[idx], unconditional=True
             )
-        else:
-            logger.debug(
-                "    Multiple additions (%d) for atom index %d",
-                (addedlist[idx] - block[idx]),
-                idx,
-            )
+        elif addedlist[idx] > 1:
             if pos_carbenes[idx]:
-                reset_H_indices.extend(
-                    list(
-                        range(len(newlab), len(newlab) + (addedlist[idx] - block[idx]))
-                    )
+                logger.debug(
+                    "    Position %s (%s) %d is a carbene site, added_list %d block %d",
+                    a.label,
+                    a.atom_site_label,
+                    idx,
+                    addedlist[idx],
+                    block[idx],
                 )
-            isadded, newlab, newcoord = add_hydrogens(
-                newlab, newcoord, idx, ligand, (addedlist[idx] - block[idx])
+            isadded, newlab, newcoord = add_atom(
+                newlab, newcoord, idx, ligand, elemlist[idx], unconditional=True
             )
+        # else:
+        #     logger.debug(
+        #         "    Multiple additions (%d) for atom index %d",
+        #         (addedlist[idx] - block[idx]),
+        #         idx,
+        #     )
+        #     if pos_carbenes[idx]:
+        #         reset_H_indices.extend(
+        #             list(
+        #                 range(len(newlab), len(newlab) + (addedlist[idx] - block[idx]))
+        #             )
+        #         )
+        #     isadded, newlab, newcoord = add_hydrogens(
+        #         newlab, newcoord, idx, ligand, (addedlist[idx] - block[idx])
+        #     )
 
         if isadded:
-            added_atoms += addedlist[idx] - block[idx]
+            added_atoms += 1
             block[idx] = 1
         else:
             addedlist[idx] = 0
@@ -327,6 +391,17 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     logger.debug("        HANDLE_HAPTIC_GROUP: %s %s", g.formula, g.haptic_type)
     logger.debug("        parent_indices: %s", parent_indices)
 
+    for idx in parent_indices:
+        a = ligand.atoms[idx]
+
+        logger.debug(
+            "        HANDLE_HAPTIC: idx=%d, label=%s, connec=%d, mconnec=%d",
+            idx,
+            a.label,
+            a.connec,
+            a.mconnec,
+        )
+
     # --------------------------------------------------
     # Helper: add up to N hydrogens on parent_indices
     # --------------------------------------------------
@@ -334,7 +409,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
         tmp = 0
         for idx in parent_indices:
             a = ligand.atoms[idx]
-            if a.mconnec == 1:
+            if a.mconnec >= 1:
                 if tmp < max_protons:
                     addedlist[idx] = addedlist.get(idx, 0) + 1
                     elemlist[idx] = "H"
@@ -383,7 +458,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                         issubstituted = True
         _assign_protonation_sites(0 if issubstituted else 1)
 
-    elif "eta3(Cp)" in g.haptic_type and not selected:
+    elif "eta3(C,C,C)" in g.haptic_type and not selected:
         selected = True
         _assign_protonation_sites(1)
 
