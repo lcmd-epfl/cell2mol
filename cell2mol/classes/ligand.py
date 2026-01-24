@@ -7,9 +7,9 @@ from cell2mol.classes.atom import Atom
 from cell2mol.classes.group import Group
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
-from cell2mol.connectivity import build_adjacency, split_species, split_group
+from cell2mol.connectivity import build_adjacency
 from cell2mol.utils import config
-from cell2mol.operations import extract_from_list, get_angle
+from cell2mol.operations import get_angle
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import HapticType, NOType, OptionalRefList, SubType
 import logging
