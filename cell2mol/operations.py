@@ -663,6 +663,9 @@ def has_different_metal_coordination(refmoleculist, bond_data):
         logger.info(f"Checking Molecule {mol_idx} (Formula: {molecule.formula})")
 
         # Check each metal within the current molecule
+        if molecule.metals is None:
+            logger.info(f"  No metals found in Molecule {mol_idx}. Skipping.")
+            continue
         for met in molecule.metals:
             met_label = met.atom_site_label
 
