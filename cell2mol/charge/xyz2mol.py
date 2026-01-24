@@ -12,6 +12,7 @@ import copy
 import itertools
 import logging
 import rdkit
+import math
 
 try:
     from rdkit.Chem import rdEHTTools  # requires RDKit 2019.9.1 or later
@@ -29,7 +30,6 @@ from cell2mol.element_utils import labels2formula
 
 logger = logging.getLogger(__name__)
 
-
 elemdatabase = ElementData()
 
 valence_electrons = []
@@ -44,6 +44,9 @@ global atomic_valence
 global atomic_valence_electrons
 
 atomic_valence_electrons = dict(zip(elemdatabase.elementsym, valence_electrons))
+
+valence_combinations_limit = 1_000_000
+num_try_limit = 50
 
 
 def get_atomic_valences(k):
@@ -538,13 +541,15 @@ def get_UA_pairs(UA, AC, use_graph=True):
 def get_sorted_valences_list(valences_list_of_lists, atoms):
     """
     Memory-efficient generator for valence combinations.
-    Logs the nested structure of element groups before generating combinations.
+    Groups atoms by element priority (O > N > C > P > S) to ensure
+    the resulting product follows the desired sorting order.
     """
-    priority_order = [8, 7, 6, 15, 16]  # O, N, C, P, S
+    # 1. Define atomic priority (O, N, C, P, S)
+    priority_order = [8, 7, 6, 15, 16]
     groups = {num: [] for num in priority_order}
     others = []
 
-    # 1. Group indices by atomic priority
+    # Group atom indices based on their atomic number
     for i, atomicNum in enumerate(atoms):
         if atomicNum in groups:
             groups[atomicNum].append(i)
@@ -553,48 +558,75 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
 
     reordered_indices = []
     nested_inputs = []
+    group_counts = []  # Stores the total combinations for each element group
 
-    # 2. Build and Log Nested Structure
     logger.debug("--- Nested Valence Input Structure ---")
 
+    # 2. Process prioritized groups
     for num in priority_order:
         indices = groups[num]
         if indices:
             reordered_indices.extend(indices)
-            # Gather the valence choices for this specific atom group
             group_valences = [valences_list_of_lists[i] for i in indices]
 
-            # Log the group details
+            # Estimate complexity for this specific element group
+            # math.prod calculates the product of lengths of all sub-lists
+            current_group_count = math.prod(len(v) for v in group_valences)
+            group_counts.append(current_group_count)
+
             logger.debug(
-                f"Element {elemdatabase.elementsym[num]} : {len(indices)} atoms | Valences: {group_valences}"
+                f"Element {elemdatabase.elementsym[num]} : {len(indices)} atoms | "
+                f"Group Combinations: {current_group_count:,} | "
+                f"Valences: {group_valences}"
             )
 
-            # Add to the product list
+            # Create a product iterator for this group
             nested_inputs.append(itertools.product(*group_valences))
 
+    # 3. Process remaining elements (Others)
     if others:
         reordered_indices.extend(others)
         other_valences = [valences_list_of_lists[i] for i in others]
+
+        current_group_count = math.prod(len(v) for v in other_valences)
+        group_counts.append(current_group_count)
+
         other_nums = [atoms[i] for i in others]
         other_syms = [elemdatabase.elementsym[n] for n in other_nums]
         logger.debug(
-            f"Element Others ({other_syms}): {len(others)} atoms | Valences: {other_valences}"
+            f"Element Others ({other_syms}): {len(others)} atoms | "
+            f"Group Combinations: {current_group_count:,} | "
+            f"Valences: {other_valences}"
         )
+
         nested_inputs.append(itertools.product(*other_valences))
 
-    # 3. Restore Map Calculation
+    # 4. Complexity Estimation
+    total_expected_combinations = math.prod(group_counts)
+    logger.info(f"Total Expected Combinations: {total_expected_combinations:,}")
+
+    # TERMINATION LOGIC:
+    if total_expected_combinations > valence_combinations_limit:
+        logger.error(
+            f"Search space too large ({total_expected_combinations:,}). "
+            "Terminating valence generation to prevent hang."
+        )
+        return None  # Explicitly return None instead of the generator
+
+    # 5. Restore Map Calculation
+    # Maps the reordered indices back to the original atom sequence in the CIF
     restore_map = [0] * len(atoms)
     for sorted_pos, original_pos in enumerate(reordered_indices):
         restore_map[original_pos] = sorted_pos
 
-    # 4. Generator with Flattening Logic
+    # 6. Generator Function
     def valence_generator():
-        # itertools.product(*nested_inputs) creates a sorted stream
+        # itertools.product(*nested_inputs) creates a sorted stream lazily
         for combined in itertools.product(*nested_inputs):
-            # 'combined' is the nested tuple: e.g., ((O_v1, O_v2), (N_v1,), (C_v1...))
-            # Flattening to a single list
+            # 'combined' is a nested tuple like ((O1, O2), (N1,), (C1, C2...))
+            # Flatten to a single list
             flat = [v for group in combined for v in group]
-            # Map back to original CIF atom order
+            # Map back to original atom order and yield as tuple
             yield tuple(flat[restore_map[i]] for i in range(len(atoms)))
 
     return valence_generator()
@@ -653,7 +685,7 @@ def AC2BO(
             if elemdatabase.elementgroup[element] in (1, 2):
                 # Alkali and alkaline earth metals
                 logger.warning(
-                    "Atom %s (index %d) has valence %d, which exceeds the allowed maximum (%d) "
+                    "  Atom %s (index %d) has valence %d, which exceeds the allowed maximum (%d) "
                     "for group %d elements. Stopping.",
                     element,
                     i,
@@ -666,7 +698,7 @@ def AC2BO(
             elif elemdatabase.elementperiod[element] < 3:
                 # e.g. F in  HOLMOK
                 logger.warning(
-                    "Atom %s (index %d) has valence %d, which exceeds the allowed maximum (%d) "
+                    "  Atom %s (index %d) has valence %d, which exceeds the allowed maximum (%d) "
                     "for period %d elements. Stopping.",
                     element,
                     i,
@@ -682,22 +714,20 @@ def AC2BO(
         return None, atomic_valence_electrons
 
     best_BO = AC.copy()
-    BO_is_OK_list = []
-    # sorted_valences_list = get_sorted_valences_list(valences_list_of_lists, atoms)
-    # count = 0
-    # max_count = min(len(sorted_valences_list), 50)
-    # for valences in sorted_valences_list:  # valences_list:
-
     # Get the generator (0 bytes consumed for combinations)
     sorted_gen = get_sorted_valences_list(valences_list_of_lists, atoms)
+
+    if sorted_gen is None:
+        logger.warning("AC2BO terminating: Valence search space exceeded limit.")
+        return None, None  # Return None to generate_charge_state
 
     # Use islice to safely take only the first 50 entries
     # This prevents calculating millions of combinations you don't need
     count = 0
-    max_count = 50
-    top_50_valences = list(itertools.islice(sorted_gen, max_count))
+    max_count = num_try_limit
+    top_valences = list(itertools.islice(sorted_gen, max_count))
 
-    for count, valences in enumerate(top_50_valences, 1):
+    for count, valences in enumerate(top_valences, 1):
         UA, DU_from_AC = get_UA(valences, AC_valence)
 
         check_len = len(UA) == 0
@@ -718,7 +748,7 @@ def AC2BO(
             check_bo = None
 
         if check_len and check_bo:
-            logger.info("return AC %s charge %d count %d", formula, charge, count)
+            logger.info("  return AC %s charge %d count %d", formula, charge, count)
 
             return AC, atomic_valence_electrons
 
@@ -750,7 +780,7 @@ def AC2BO(
 
             if status:
                 logger.debug(
-                    "formula=%s status=%s charge=%s count=%s",
+                    "  formula=%s status=%s charge=%s count=%s",
                     formula,
                     status,
                     charge,
@@ -767,7 +797,10 @@ def AC2BO(
             count += 1
             if count > max_count:
                 logger.debug(
-                    "reached max count %s (charge=%d) count: %d", formula, charge, count
+                    "  reached max count %s (charge=%d) count: %d",
+                    formula,
+                    charge,
+                    count,
                 )
                 return best_BO, atomic_valence_electrons
 
