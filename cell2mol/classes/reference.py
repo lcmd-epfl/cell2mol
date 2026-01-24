@@ -55,11 +55,8 @@ class Reference(Cell):
     reported_metal_os: list[tuple[str, int]] | None = None
     moiety_dicts: list[dict] | None = None
 
-    # Potential warning flags
-    disagree_with_cif_formula: bool | None = None
-    is_polynuclear_over_limit: bool | None = None
-    has_mixed_metal_types: bool | None = None
-    is_mismatch_adjacency: bool | None = None
+    # Potential warning flags dictionary allowing True, False, or None
+    potential_warnings: dict[str, bool | None] | None = None
 
     # Frozen fields
     subtype: SubType = Field(default="reference")
@@ -90,17 +87,23 @@ class Reference(Cell):
         self.reported_metal_os = reported_metal_os
         self.moiety_dicts = moiety_dicts
 
-    def set_potential_warning(
-        self, cif_mismatch, over_polynuclear_limit, mixed_metals, is_mismatch_adj
-    ):
+    def set_potential_warning(self, warnings_dict: dict[str, bool | None]):
         """
-        Set potential warning flags based on CIF mismatch, polynuclear limit,
-        mixed metals, and adjacency mismatch.
+        Directly stores the warnings dictionary and logs any active flags.
+        Based on CIF mismatch, polynuclear limit,
+        mixed metals, and adjacency mismatch, metal coordination differences.
         """
-        self.disagree_with_cif_formula = cif_mismatch
-        self.is_polynuclear_over_limit = over_polynuclear_limit
-        self.has_mixed_metal_types = mixed_metals
-        self.is_mismatch_adjacency = is_mismatch_adj
+        self.potential_warnings = warnings_dict
+
+        # Log only actual warnings to the system console
+        active = [k for k, v in warnings_dict.items() if v is True]
+        if active:
+            logger.warning(f"Reference Warnings: {active}")
+
+        # Log skipped checks as debug info
+        skipped = [k for k, v in warnings_dict.items() if v is None]
+        if skipped:
+            logger.debug(f"Comparisons with CIF Skipped: {skipped}")
 
     def get_reference_molecules(
         self,
