@@ -119,13 +119,50 @@ class Protonation(BaseModel):
                 self.adjmat = adjmat
                 self.adjnum = adjnum
             else:
+                # 1. Generate the initial adjacency matrix
                 self.status, self.adjmat, warning = get_adjmatrix(
                     self.labels,
                     self.coords,
                     radii=self.radii,
                     cov_factor=self.cov_factor,
+                    add_atom=True,
                 )
+
+                # 2. Synchronize adjnum with the new matrix
                 self.adjnum = self.adjmat.sum(axis=1)
+
+                # 3. Fix connectivity for unconditionally added atoms
+                if len(self.addedlist) > 0:
+                    # Identify the starting index of the newly added atoms
+                    # If self.labels grew by the number of non-zero entries in addedlist:
+                    original_count = len(self.labels) - sum(
+                        1 for x in self.addedlist if x != 0
+                    )
+
+                    current_added_offset = 0
+                    for original_site_idx, add_flag in enumerate(self.addedlist):
+                        if add_flag != 0:
+                            # Calculate the absolute index of the added atom in the current matrix
+                            added_atom_idx = original_count + current_added_offset
+                            current_added_offset += 1
+
+                            logger.debug(
+                                "Enforcing single bond: Site %d <-> Added Atom %d",
+                                original_site_idx,
+                                added_atom_idx,
+                            )
+
+                            # Clear all 'accidental' bonds for the added atom
+                            self.adjmat[added_atom_idx, :] = 0
+                            self.adjmat[:, added_atom_idx] = 0
+
+                            # Enforce the single intended bond
+                            self.adjmat[original_site_idx, added_atom_idx] = 1
+                            self.adjmat[added_atom_idx, original_site_idx] = 1
+
+                    # 4. Final Recalculation: Always recalculate adjnum after manual adjmat changes
+                    self.adjnum = self.adjmat.sum(axis=1)
+
                 if warning:
                     self.status = False
 
