@@ -10,6 +10,7 @@ from cell2mol.operations import (
     frac2cart_fromparam,
     is_polynuclear_over_limit,
     has_mixed_metal_types,
+    has_different_metal_coordination,
 )
 from cell2mol.read_cif import (
     get_cell_parameters,
@@ -34,9 +35,10 @@ import gc
 logger = logging.getLogger(__name__)
 
 # Error Codes
-ERR_MEMORY = config.ERR_MEMORY
-ERR_TIMEOUT = config.ERR_TIMEOUT
+ERR_CELL2MOL = config.ERR_CELL2MOL
 ERR_GENERAL = config.ERR_GENERAL
+ERR_TIMEOUT = config.ERR_TIMEOUT
+ERR_MEMORY = config.ERR_MEMORY
 
 
 def interpret_reference(input_path, name, current_dir):
@@ -49,6 +51,7 @@ def interpret_reference(input_path, name, current_dir):
 
     refcell = None
     exit_code = 0
+    process_failure = False
 
     try:
         # Enforce timeout on the heavy lifting
@@ -69,6 +72,7 @@ def interpret_reference(input_path, name, current_dir):
                 logger.error(
                     f"Fails generating reference molecules (case={refcell.error_cases['hydrogens']})"
                 )
+                process_failure = True
 
             refcell.get_unique_species()
 
@@ -83,6 +87,7 @@ def interpret_reference(input_path, name, current_dir):
                 logger.error(
                     f"Fails retrieving possible charges (case={refcell.error_cases['possible_charges']})"
                 )
+                process_failure = True
 
     # 1. Handle Memory Errors First
     except MemoryError as exc:
@@ -122,6 +127,9 @@ def interpret_reference(input_path, name, current_dir):
         logger.info("Executing final output handling...")
         # Ensure we try to save whatever valid data we have (refcell might be None)
         _handle_reference_outputs(name, current_dir, refcell, mode="possible_charges")
+
+        if exit_code == 0 and process_failure:
+            exit_code = ERR_CELL2MOL
 
         if exit_code != 0:
             logger.info(f"Process exiting with code {exit_code}")
@@ -173,21 +181,29 @@ def create_reference(input_path, name, cell_vector, cell_param):
         logger.warning("No reference molecules found in the CIF file")
         return refcell
 
-    # Check for potential warnings
-    cif_mismatch = compare_cif_with_reference(moiety_dicts, refcell.refmoleclist)
-    over_polynuclear_limit = any(
-        is_polynuclear_over_limit(ref.labels, max_metal_centers=config.MAX_METALS)
-        for ref in refcell.refmoleclist
-    )
-    mixed_metals = any(
-        has_mixed_metal_types(ref.labels) for ref in refcell.refmoleclist
-    )
-    is_mismatch_adj = is_mismatch_adjacency(
-        ref_labels, ref_pos, atom_site_labels, geom_bond_cif
-    )
-    refcell.set_potential_warning(
-        cif_mismatch, over_polynuclear_limit, mixed_metals, is_mismatch_adj
-    )
+    # --------------------------------------------------
+    # Gather warnings into a dictionary
+    # --------------------------------------------------
+    warnings_payload = {
+        "cif_mismatch": compare_cif_with_reference(moiety_dicts, refcell.refmoleclist),
+        "over_polynuclear_limit": any(
+            is_polynuclear_over_limit(ref.labels, max_metal_centers=config.MAX_METALS)
+            for ref in refcell.refmoleclist
+        ),
+        "mixed_metals": any(
+            has_mixed_metal_types(ref.labels) for ref in refcell.refmoleclist
+        ),
+        "is_mismatch_adj": is_mismatch_adjacency(
+            ref_labels, ref_pos, atom_site_labels, geom_bond_cif
+        ),
+        "metal_coord_diff": has_different_metal_coordination(
+            refcell.refmoleclist, geom_bond_cif
+        ),
+    }
+
+    # Set the warnings in the refcell object
+    refcell.set_potential_warning(warnings_payload)
+
     return refcell
 
 
@@ -217,9 +233,10 @@ def _handle_reference_outputs(name, current_dir, refcell, mode=None):
 
 def _write_ref_detailed_summary(name, refcell, summary_path, mode=None):
     """Writes the molecules info, species, errors, and warnings to file and log."""
-    warnings = get_reference_warning_messages(refcell)
+    # Retrieve pre-formatted messages (Warnings for True, INFO for None)
+    warning_messages = get_reference_warning_messages(refcell)
 
-    # Write to File
+    # --- Write to File ---
     with open(summary_path, "w") as f:
         print(name, file=f)
         write_cell_molecules_info(refcell, file=f)
@@ -229,25 +246,36 @@ def _write_ref_detailed_summary(name, refcell, summary_path, mode=None):
             write_possible_charges(refcell, file=f)
 
         # Print step-specific reference errors
-        for err_mode in refcell.error_cases.keys():
-            code = refcell.error_cases.get(err_mode, 0)
-            msg = get_reference_error_message(code)
-            print(f"Reference Error (mode={err_mode}): {msg}", file=f)
+        if refcell.error_cases:
+            for err_mode, code in refcell.error_cases.items():
+                msg = get_reference_error_message(code)
+                print(f"Reference Error (mode={err_mode}): {msg}", file=f)
 
-        # Warnings
-        for msg in warnings:
-            print(f"WARNING: {msg}", file=f)
+        # Print potential issues and data status
+        if warning_messages:
+            print("\nPotential issues and data status detected:", file=f)
+            for msg in warning_messages:
+                # Apply appropriate prefix based on the message content
+                prefix = "  " if msg.startswith("Skipped:") else "  Warning: "
+                print(f"{prefix}{msg}", file=f)
 
-    # Write to Logger
-    code = refcell.error_cases.get(mode, 0)
-    msg = get_reference_error_message(code)
-    logger.info("Reference Error (mode=%s): %s", mode, msg)
-    if not warnings:
-        logger.info("No potential issues detected.")
+    # --- Write to Logger ---
+    # Log the specific error for the current operation mode
+    current_err_code = refcell.error_cases.get(mode, 0)
+    current_err_msg = get_reference_error_message(current_err_code)
+    logger.info("Reference Error (mode=%s): %s", mode, current_err_msg)
+
+    if not warning_messages:
+        logger.info("No potential issues or skipped checks detected.")
     else:
-        logger.warning("Potential issues detected:")
-        for msg in warnings:
-            logger.warning("  - %s", msg)
+        logger.warning("Potential issues and data status detected:")
+        for msg in warning_messages:
+            if msg.startswith("Skipped:"):
+                # Log skipped checks as INFO level to avoid cluttering warnings
+                logger.info("  - %s", msg)
+            else:
+                # Log actual mismatches as WARNING level
+                logger.warning("  - %s", msg)
 
 
 def _safe_run(func, error_msg):
