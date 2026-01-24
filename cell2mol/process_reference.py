@@ -99,6 +99,8 @@ def interpret_reference(input_path, name, current_dir):
         logger.error("Memory limit reached. RAM cleared.")
 
         if refcell is not None:
+            if refcell.error_cases is None:
+                refcell.error_cases = {}
             refcell.error_cases["memory"] = ERR_MEMORY
 
         # Now it is safe(r) to call the exit helper
@@ -110,6 +112,8 @@ def interpret_reference(input_path, name, current_dir):
         logger.error(f"Processing timed out after {config.TIMEOUT} seconds.")
 
         if refcell is not None:
+            if refcell.error_cases is None:
+                refcell.error_cases = {}
             refcell.error_cases["timeout"] = ERR_TIMEOUT
 
         exit_with_error_exception(exc)
@@ -119,6 +123,8 @@ def interpret_reference(input_path, name, current_dir):
     except Exception as exc:
         logger.error(f"Unhandled error: {exc}")
         if refcell is not None:
+            if refcell.error_cases is None:
+                refcell.error_cases = {}
             refcell.error_cases["general"] = ERR_GENERAL
         exit_with_error_exception(exc)
         exit_code = ERR_GENERAL
