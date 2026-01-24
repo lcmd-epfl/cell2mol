@@ -355,6 +355,8 @@ class Molecule(Specie):
         self.map_metal_groups_to_ligands()
 
         for lig in self.ligands:
+            lig.get_hapticity()
+            lig.get_denticity()
             logger.debug(
                 f"Ligand: {lig.formula}, Groups: {[group.formula for group in lig.groups]}"
             )
