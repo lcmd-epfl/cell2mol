@@ -67,7 +67,7 @@ def interpret_reference(input_path, name, current_dir):
             refcell.assess_errors(mode="hydrogens")
             if refcell.has_error():
                 logger.error(
-                    f"Error generating reference molecules (case={refcell.error_case})"
+                    f"Fails generating reference molecules (case={refcell.error_cases['hydrogens']})"
                 )
 
             refcell.get_unique_species()
@@ -81,7 +81,7 @@ def interpret_reference(input_path, name, current_dir):
 
             if refcell.has_error():
                 logger.error(
-                    f"Error retrieving possible charges (case={refcell.error_case})"
+                    f"Fails retrieving possible charges (case={refcell.error_cases['possible_charges']})"
                 )
 
     # 1. Handle Memory Errors First
@@ -94,7 +94,7 @@ def interpret_reference(input_path, name, current_dir):
         logger.error("Memory limit reached. RAM cleared.")
 
         if refcell is not None:
-            refcell.error_case = ERR_MEMORY
+            refcell.error_cases["memory"] = ERR_MEMORY
 
         # Now it is safe(r) to call the exit helper
         exit_with_error_exception(exc)
@@ -105,7 +105,7 @@ def interpret_reference(input_path, name, current_dir):
         logger.error(f"Processing timed out after {config.TIMEOUT} seconds.")
 
         if refcell is not None:
-            refcell.error_case = ERR_TIMEOUT
+            refcell.error_cases["timeout"] = ERR_TIMEOUT
 
         exit_with_error_exception(exc)
         exit_code = ERR_TIMEOUT
@@ -114,8 +114,7 @@ def interpret_reference(input_path, name, current_dir):
     except Exception as exc:
         logger.error(f"Unhandled error: {exc}")
         if refcell is not None:
-            refcell.error_case = ERR_GENERAL
-
+            refcell.error_cases["general"] = ERR_GENERAL
         exit_with_error_exception(exc)
         exit_code = ERR_GENERAL
 
@@ -170,7 +169,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
     refcell.get_reference_molecules()
 
     if not refcell.refmoleclist:
-        refcell.error_case = -1
+        refcell.error_cases["no_ref_molecules"] = -1
         logger.warning("No reference molecules found in the CIF file")
         return refcell
 
@@ -210,7 +209,7 @@ def _handle_reference_outputs(name, current_dir, refcell, mode=None):
     def save_ref():
         refcell.save(ref_cell_fname)
         # from cell2mol.write_results import extract_refmoleclist_xyz
-        # if logger.isEnabledFor(logging.DEBUG) and not refcell.error_case == -1:
+        # if logger.isEnabledFor(logging.DEBUG) and not refcell.error_cases.get("no_ref_molecules", 0) == -1:
         #     extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
 
     _safe_run(save_ref, "Failed to save reference cell")
@@ -218,7 +217,6 @@ def _handle_reference_outputs(name, current_dir, refcell, mode=None):
 
 def _write_ref_detailed_summary(name, refcell, summary_path, mode=None):
     """Writes the molecules info, species, errors, and warnings to file and log."""
-    error_message = get_reference_error_message(refcell.error_case)
     warnings = get_reference_warning_messages(refcell)
 
     # Write to File
@@ -226,14 +224,24 @@ def _write_ref_detailed_summary(name, refcell, summary_path, mode=None):
         print(name, file=f)
         write_cell_molecules_info(refcell, file=f)
         write_unique_species(refcell, file=f)
+
         if mode == "possible_charges":
             write_possible_charges(refcell, file=f)
-        print(f"ERROR: {error_message}", file=f)
+
+        # Print step-specific reference errors
+        for err_mode in refcell.error_cases.keys():
+            code = refcell.error_cases.get(err_mode, 0)
+            msg = get_reference_error_message(code)
+            print(f"Reference Error (mode={err_mode}): {msg}", file=f)
+
+        # Warnings
         for msg in warnings:
             print(f"WARNING: {msg}", file=f)
 
     # Write to Logger
-    logger.info("Reference Error (mode=%s): %s", mode, error_message)
+    code = refcell.error_cases.get(mode, 0)
+    msg = get_reference_error_message(code)
+    logger.info("Reference Error (mode=%s): %s", mode, msg)
     if not warnings:
         logger.info("No potential issues detected.")
     else:
