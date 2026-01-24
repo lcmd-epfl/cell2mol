@@ -10,6 +10,7 @@ import numpy as np
 from typing import Tuple
 from cell2mol.operations import get_angle, unit_vector, perp_unit, kabsch_rotation
 from cell2mol.elementdata import ElementData
+from cell2mol.element_utils import ALKALI_AND_ALKALINE_EARTH_METALS
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
@@ -399,7 +400,8 @@ def add_hydrogens(
             # Skip d- and f-block elements
             if elemdatabase.elementblock[n_label] in {"d", "f"}:
                 continue
-
+            if n_label in ALKALI_AND_ALKALINE_EARTH_METALS:
+                continue
             bonded_atom_coord.append(n_coord)
             bonded_atom_labels.append(n_label)
 
