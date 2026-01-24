@@ -538,31 +538,7 @@ def generate_unitcell_molecules(
         unitcell.moleclist.append(newmolec)
 
     for mol in unitcell.moleclist:
-        if mol.iscomplex:
-            logger.info("Has transition metals %s", mol.formula)
-            mol.get_hapticity()
-            if not mol.ligands:
-                logger.debug("A metal cluster found")
-
-        elif mol.has_ia_iia:
-            logger.info("Has alkali or alkaline earth metals: %s", mol.formula)
-
-        elif mol.has_post_transition_metal:
-            logger.info("Has post transition metals: %s", mol.formula)
-            logger.debug("metals=%s", [met.label for met in mol.metals])
-            logger.debug("ligands=%s", [lig.formula for lig in mol.ligands])
-
-        else:
-            continue
-
-        # Common ligand analysis
-        for lig in mol.ligands:
-            lig.get_denticity()
-        # Common metal analysis
-        for met in mol.metals:
-            met.get_connected_metals()
-            met.get_coordination_geometry()
-            met.get_coord_sphere_formula()
+        mol.analyze_coordination()
 
     return unitcell
 
