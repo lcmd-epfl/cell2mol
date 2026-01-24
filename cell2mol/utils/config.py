@@ -6,6 +6,7 @@ from .defaults import (
 )
 
 # Error Codes
+ERR_CELL2MOL = 50
 ERR_GENERAL = 97
 ERR_TIMEOUT = 98
 ERR_MEMORY = 99
@@ -18,8 +19,8 @@ METAL_FACTOR = DEFAULT_METAL_FACTOR
 
 USE_BOND_INFO = False
 MAX_METALS = 6
-TIMEOUT = 300  # seconds
-MAX_MEM_GB = 5  # GB
+TIMEOUT = 600  # seconds
+MAX_MEM_GB = 10  # GB
 
 
 def dump():
