@@ -313,7 +313,6 @@ def extract_moiety(file_path: str) -> list:
             for f, s, c, t in moiety_tuples
         ]
     else:
-        logger.error("Error parsing moiety information from CIF file.")
         return None
     return moiety_dicts
 
@@ -694,13 +693,16 @@ def extract_info_from_cif(cif_file_path):
         logger.info("Reported oxidation states in CIF: %s", reported_metal_os)
 
     moiety_dicts = extract_moiety(cif_file_path)
-    logger.info(
-        "Number of moieties extracted from CIF: %d",
-        len(moiety_dicts) if moiety_dicts else 0,
-    )
-    logger.debug("Moiety dictionaries:")
-    for i, moiety in enumerate(moiety_dicts):
-        logger.debug("  %d: %s", i, moiety)
+    if moiety_dicts is None:
+        logger.info("No moiety information found in CIF")
+    else:
+        logger.info(
+            "Number of moieties extracted from CIF: %d",
+            len(moiety_dicts) if moiety_dicts else 0,
+        )
+        logger.debug("Moiety dictionaries:")
+        for i, moiety in enumerate(moiety_dicts):
+            logger.debug("  %d: %s", i, moiety)
 
     return chemical_name, reported_metal_os, moiety_dicts
 
