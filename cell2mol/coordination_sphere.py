@@ -413,6 +413,10 @@ def handle_metal_coordination(metal: object) -> list:
     # Iterate through refined results to create Group objects
     for lig_idx, groups_list in final_refined_data.items():
         current_lig_m_indices = lig_mol_indices[lig_idx]
+        current_lig = ligands[lig_idx]
+        if getattr(current_lig, "metals", None) is None:
+            object.__setattr__(current_lig, "metals", [])
+        current_lig.metals.append(metal)
         for group_info in groups_list:
             atoms = group_info["atoms"]
 
