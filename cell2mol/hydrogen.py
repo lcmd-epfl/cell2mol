@@ -150,7 +150,7 @@ def check_missing_hydrogens(reference_molecules):
     missing_h_in_coordinated_water = False
     missing_h_detected = False
     # coord_water_exceptions = {}
-    # coord_water_exceptions = {"Re", "V", "Mo", "W", "Fe", "Tc", "Os", "Cr", "Nb", "U"}
+    # coord_water_exceptions = {"Re", "V", "Mo", "W", "Fe", "Tc", "U" "Os", "Cr", "Nb", "U"}
     coord_water_exceptions = {"Re", "V", "Mo", "W", "Fe", "Tc"}
     fullerenes = {"C60", "C72", "C80"}
 
@@ -196,11 +196,13 @@ def check_missing_hydrogens(reference_molecules):
 
         else:
             for lig in ref.ligands:
-                if (
-                    lig.natoms == 1
-                    and "O" in lig.labels
-                    and not any(m.label in coord_water_exceptions for m in lig.metals)
-                ):
+                is_single_oxygen = lig.formula == "O"
+                is_monodentate = getattr(lig, "denticity", 0) < 2
+                connected_metals = getattr(lig, "metals", [])
+                is_not_exception = not any(
+                    m.label in coord_water_exceptions for m in connected_metals
+                )
+                if is_single_oxygen and is_monodentate and is_not_exception:
                     missing_h_in_coordinated_water = True
 
     has_missing_h = (

@@ -3,7 +3,11 @@ from __future__ import annotations
 import logging
 import pickle
 from pathlib import Path
-from typing import Self
+
+try:
+    from typing import Self  # py3.11+
+except ImportError:
+    from typing_extensions import Self  # py3.10
 
 from pydantic import Field
 from typing_extensions import deprecated
