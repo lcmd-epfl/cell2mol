@@ -35,7 +35,12 @@ import types
 import typing
 import uuid
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Annotated, Any, Self, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
+
+try:
+    from typing import Self  # py3.11+
+except ImportError:
+    from typing_extensions import Self  # py3.10
 
 import numpy as np
 import pydantic
