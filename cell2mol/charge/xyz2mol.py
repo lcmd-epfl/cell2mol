@@ -686,7 +686,7 @@ def AC2BO(
                 # Alkali and alkaline earth metals
                 logger.warning(
                     "  Atom %s (index %d) has valence %d, which exceeds the allowed maximum (%d) "
-                    "for group %d elements. Stopping.",
+                    "for group %d elements.",
                     element,
                     i,
                     valence,
@@ -699,13 +699,14 @@ def AC2BO(
                 # e.g. F in  HOLMOK
                 logger.warning(
                     "  Atom %s (index %d) has valence %d, which exceeds the allowed maximum (%d) "
-                    "for period %d elements. Stopping.",
+                    "for period %d elements.",
                     element,
                     i,
                     valence,
                     max_valence,
                     elemdatabase.elementperiod[element],
                 )
+                possible_valence.append(max_valence)
             else:
                 possible_valence.append(valence)
             # sys.exit()
