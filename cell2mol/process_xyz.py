@@ -91,37 +91,7 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
         else:
             newmolec.add_parent(newmolec, indices=list(range(newmolec.natoms)))
 
-        # --- classification logging ---
-        if newmolec.iscomplex:
-            logger.info("Has transition metals: %s", newmolec.formula)
-            newmolec.get_hapticity()
-            if not newmolec.ligands:
-                logger.debug("Metal cluster detected")
-
-        elif newmolec.has_ia_iia:
-            logger.info("Has alkali or alkaline earth metals: %s", newmolec.formula)
-
-        elif newmolec.has_post_transition_metal:
-            logger.info("Has post-transition metals: %s", newmolec.formula)
-            logger.debug("metals=%s", [m.label for m in newmolec.metals])
-            logger.debug("ligands=%s", [l.formula for l in newmolec.ligands])
-
-        else:
-            logger.info(
-                "Non-complex molecule: %s (non-complex=%s)",
-                newmolec.formula,
-                newmolec.is_non_complex_molecule,
-            )
-
-        # --- common analysis ---
-        for lig in newmolec.ligands:
-            lig.get_denticity()
-
-        for met in newmolec.metals:
-            met.get_connected_metals()
-            met.get_coordination_geometry()
-            met.get_coord_sphere_formula()
-
+        newmolec.analyze_coordination()
         # --- charge assignment ---
         newmolec.input_charge = input_charge
         if input_charge is None:
