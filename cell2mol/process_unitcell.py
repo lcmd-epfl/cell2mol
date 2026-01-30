@@ -161,7 +161,8 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
             logger.info(f"Process exiting with code {exit_code}")
             sys.exit(exit_code)
 
-    return unitcell
+    # return unitcell
+    return cells
 
 
 # def _initialize_cells(input_path, name, current_dir):
