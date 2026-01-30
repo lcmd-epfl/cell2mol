@@ -29,6 +29,7 @@ from cell2mol.write_results import (
 from cell2mol.connectivity import is_mismatch_adjacency
 from cell2mol.write_results import exit_with_error_exception
 from cell2mol.utils.limits import ProcessingTimeoutError, set_time_limit
+from cell2mol.utils.exceptions import ASEParseError
 import sys
 import gc
 
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 # Error Codes
 ERR_CELL2MOL = config.ERR_CELL2MOL
+ERR_ASE_PARSE = config.ERR_ASE_PARSE
 ERR_GENERAL = config.ERR_GENERAL
 ERR_TIMEOUT = config.ERR_TIMEOUT
 ERR_MEMORY = config.ERR_MEMORY
@@ -58,9 +60,9 @@ def interpret_reference(input_path, name, current_dir):
         with set_time_limit(config.TIMEOUT):
             try:
                 structure = read(input_path, format="cif")
-            except (AssertionError, Exception) as e:
-                logger.error(f"ASE failed to parse {input_path}: {e}")
-                raise  # Re-raise to be caught by the outer Exception block
+            except Exception as exc:
+                logger.error(f"ASE failed to parse {input_path}: {exc}")
+                raise ASEParseError from exc
 
             cell_vector, cell_param, _ = get_cell_parameters(structure)
             refcell = create_reference(input_path, name, cell_vector, cell_param)
@@ -70,7 +72,8 @@ def interpret_reference(input_path, name, current_dir):
             refcell.assess_errors(mode="hydrogens")
             if refcell.has_error():
                 logger.error(
-                    f"Fails generating reference molecules (case={refcell.error_cases['hydrogens']})"
+                    "Fails generating reference molecules (case=%s)",
+                    refcell.error_cases.get("hydrogens"),
                 )
                 process_failure = True
 
@@ -85,11 +88,16 @@ def interpret_reference(input_path, name, current_dir):
 
             if refcell.has_error():
                 logger.error(
-                    f"Fails retrieving possible charges (case={refcell.error_cases['possible_charges']})"
+                    "Fails retrieving possible charges (case=%s)",
+                    refcell.error_cases.get("possible_charges"),
                 )
                 process_failure = True
 
-    # 1. Handle Memory Errors First
+    except ASEParseError as exc:
+        logger.error("ASE parsing failed.")
+        exit_with_error_exception(exc)
+        exit_code = ERR_ASE_PARSE
+
     except MemoryError as exc:
         # CRITICAL: Delete large objects and force GC *before* doing anything else
         if "structure" in locals():

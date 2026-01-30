@@ -165,38 +165,6 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
     return cells
 
 
-# def _initialize_cells(input_path, name, current_dir):
-#     """Handles file reading and initial object instantiation."""
-#     logger.info("Starting the cell2mol process for reference (Wyckoff sites)")
-
-#     refcell: Reference = interpret_reference(input_path, name, current_dir)
-#     print(refcell)
-#     if not refcell:
-#         logger.error("Failed to create reference cell from CIF.")
-#         return None, None, None
-
-#     try:
-#         structure = read(input_path, format="cif")
-#     except (AssertionError, Exception) as e:
-#         logger.error(f"ASE failed to parse {input_path}: {e}")
-#         raise
-#     cell_labels, cell_pos, cell_fracs = get_cell_atoms(structure)
-#     cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
-
-#     unitcell = UnitCell.from_positional(
-#         name=name,
-#         labels=cell_labels,
-#         pos=cell_pos,
-#         frac_coord=cell_fracs,
-#         cell_vector=cell_vector,
-#         cell_param=cell_param,
-#     )
-
-#     unitcell.set_subtype("unitcell")
-
-#     return refcell, unitcell, sym_ops
-
-
 def _process_cell_logic(refcell, unitcell, sym_ops) -> bool:
     """Executes the scientific logic: reconstruction, charge balancing, and assignment."""
     if refcell.has_error():
