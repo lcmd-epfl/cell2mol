@@ -359,7 +359,6 @@ def reconstruct_fragments(
     target_ref,
     refcell,
     full: bool = False,
-    final_merge: bool = False,
 ):
     reconstructed_molecules = []
     remaining_fragments = []
@@ -369,7 +368,6 @@ def reconstruct_fragments(
         target_ref,
         refcell,
         full=full,
-        final_merge=final_merge,
     )
 
     for merged in merged_candidates:
@@ -399,7 +397,7 @@ def final_reconstruct(
 
     This function attempts a last reconstruction step for fragments that could
     not be merged during symmetry-based reconstruction. Reconstruction is
-    performed per reference molecule using `final_merge=True`.
+    performed per reference molecule using `full=True`.
 
     Successfully reconstructed molecules are appended to
     `reconstructed_molecules`. Fragments that still cannot be reconstructed
@@ -439,7 +437,6 @@ def final_reconstruct(
             target_ref_indices,
             refcell,
             full=True,
-            final_merge=True,
         )
 
         if reconstructed:
@@ -792,7 +789,6 @@ def _merge_fragments_iterative(
     target_ref,
     refcell,
     full: bool = False,
-    final_merge: bool = False,
 ):
     """
     Iteratively merge fragment pairs in-place until no further merges are possible.
@@ -822,7 +818,6 @@ def _merge_fragments_iterative(
                 (frag_i, frag_j),
                 refcell,
                 full=full,
-                final_merge=final_merge,
             )
             if merged is None:
                 continue
@@ -843,7 +838,6 @@ def _merge_fragment_pair(
     refcell: object,
     use_bond_info: bool | None = None,
     full: bool = False,
-    final_merge: bool = False,
 ):
     """
     Attempt to merge two fragments by translating one fragment across the unit cell.
@@ -900,34 +894,28 @@ def _merge_fragment_pair(
             merged_atom_site_labels = [atom_site_labels[i] for i in merged_ref_indices]
 
         # --- fast reject: must form exactly one species ---
-        if final_merge:
-            numspecs = split_species(merged_labels, merged_coord)
-        else:
-            numspecs = split_species(
-                labels=merged_labels,
-                positions=merged_coord,
-                atom_site_labels=merged_atom_site_labels,
-                bond_data=bond_data,
-                use_bond_info=use_bond_info,
-                cov_factor=cov_factor,
-                metal_factor=metal_factor,
-                count_species_only=True,
-            )
+        numspecs = split_species(
+            labels=merged_labels,
+            positions=merged_coord,
+            atom_site_labels=merged_atom_site_labels,
+            bond_data=bond_data,
+            use_bond_info=use_bond_info,
+            cov_factor=cov_factor,
+            metal_factor=metal_factor,
+            count_species_only=True,
+        )
         if numspecs != 1:
             continue
 
-        if final_merge:
-            blocklist = split_species(merged_labels, merged_coord)
-        else:
-            blocklist = split_species(
-                labels=merged_labels,
-                positions=merged_coord,
-                atom_site_labels=merged_atom_site_labels,
-                bond_data=bond_data,
-                use_bond_info=use_bond_info,
-                cov_factor=cov_factor,
-                metal_factor=metal_factor,
-            )
+        blocklist = split_species(
+            labels=merged_labels,
+            positions=merged_coord,
+            atom_site_labels=merged_atom_site_labels,
+            bond_data=bond_data,
+            use_bond_info=use_bond_info,
+            cov_factor=cov_factor,
+            metal_factor=metal_factor,
+        )
 
         if not blocklist or len(blocklist) != 1:
             continue
