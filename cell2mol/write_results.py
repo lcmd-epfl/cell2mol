@@ -194,7 +194,7 @@ def get_reference_error_message(error_case):
         return "Missing hydrogens in coordinated water molecules"
 
     elif error_case == 4:
-        return "Missing hydrogens in coordinated carbon atoms"
+        return "Missing hydrogens in carbon atoms"
 
     elif error_case == 5:
         return "Some unique species have no possible charge states"

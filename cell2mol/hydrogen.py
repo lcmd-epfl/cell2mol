@@ -157,11 +157,7 @@ def check_missing_hydrogens(reference_molecules):
     logger.info("Checking any missing hydrogens in reference molecules...")
 
     for mol_idx, ref in enumerate(reference_molecules):
-        if (
-            not ref.iscomplex
-            and not ref.has_ia_iia
-            and not ref.has_post_transition_metal
-        ):
+        if ref.is_non_complex_molecule:
             if ref.natoms == 1 and "O" in ref.labels:
                 missing_h_in_water = True
                 logger.warning(
