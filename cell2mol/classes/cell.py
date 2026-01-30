@@ -21,8 +21,8 @@ _CHARGE_ERRORS = [("error_assign_charge", 8), ("error_create_bonds", 9)]
 _SPIN_ERRORS = [("error_get_spin", 10)]
 
 ERROR_MAPS = {
-    "no_ref_molecules": [("no_ref_molecules", -1)],
     "reference": {
+        "no_ref_molecules": [("no_ref_molecules", -1)],
         "hydrogens": [
             ("has_isolated_H", 1),
             ("missing_H_in_Water", 2),
