@@ -229,7 +229,7 @@ def _handle_reference_outputs(name, current_dir, refcell, mode=None):
         return
 
     # 1. Write the .out summary file
-    summary_path = os.path.join(current_dir, "reference_summary.out")
+    summary_path = os.path.join(current_dir, "reference_summary.txt")
     _safe_run(
         lambda: _write_ref_detailed_summary(name, refcell, summary_path, mode=mode),
         "Failed to write reference summary",

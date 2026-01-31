@@ -231,8 +231,8 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
         "cell": os.path.join(current_dir, f"Cell_{name}.cell"),
         "json": os.path.join(current_dir, f"Cells_{name}.json"),
         "pickle": os.path.join(current_dir, f"Cells_{name}.cell"),
-        "ref_sum": os.path.join(current_dir, "reference_summary.out"),
-        "unit_sum": os.path.join(current_dir, "unitcell_summary.out"),
+        "ref_sum": os.path.join(current_dir, "reference_summary.txt"),
+        "unit_sum": os.path.join(current_dir, "unitcell_summary.txt"),
     }
 
     if refcell:
