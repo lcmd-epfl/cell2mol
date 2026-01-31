@@ -210,9 +210,11 @@ class BaseModel(pydantic.BaseModel, ABC):
             "root": root_id,
         }
 
-    def to_json(self, indent: int = 2) -> str:
+    def to_json(self, indent: int = 2, separators=None) -> str:
         """Serialize to JSON string with central object store."""
-        return json.dumps(self.to_dict_store(), indent=indent, separators=(",", ":"))
+        if separators is not None:
+            return json.dumps(self.to_dict_store(), separators=separators)
+        return json.dumps(self.to_dict_store(), indent=indent)
 
     # =========================================================================
     # Deserialization with Two-Pass Reference Resolution

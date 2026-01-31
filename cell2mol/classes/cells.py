@@ -71,8 +71,12 @@ class Cells(BaseModel):
     ):
         if not str(path).endswith(".json"):
             logger.warning("Use `.json` extension instead for path: %s", path)
+        # Pretty print with indent=4
         with open(path, "w") as fd:
             fd.write(self.to_json(indent=4))
+        # Minified version
+        # with open(path, "w") as fd:
+        #     fd.write(self.to_json(separators=(",", ":")))
 
     @classmethod
     def _load_from_json(
