@@ -68,14 +68,23 @@ def interpret_reference(input_path, name, current_dir):
             refcell = create_reference(input_path, name, cell_vector, cell_param)
 
             # Check missing hydrogens and assess errors
+            if refcell.has_error():
+                logger.error(
+                    "Fails generating reference molecules (case=%s)",
+                    refcell.error_cases.get("no_ref_molecules"),
+                )
+                process_failure = True
+                return refcell
+
             refcell.check_hydrogens()
             refcell.assess_errors(mode="hydrogens")
             if refcell.has_error():
                 logger.error(
-                    "Fails generating reference molecules (case=%s)",
+                    "Detects missing hydrogens (case=%s)",
                     refcell.error_cases.get("hydrogens"),
                 )
                 process_failure = True
+                return refcell
 
             refcell.get_unique_species()
 
@@ -92,6 +101,7 @@ def interpret_reference(input_path, name, current_dir):
                     refcell.error_cases.get("possible_charges"),
                 )
                 process_failure = True
+                return refcell
 
     except ASEParseError as exc:
         logger.error("ASE parsing failed.")
