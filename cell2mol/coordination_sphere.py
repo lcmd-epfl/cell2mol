@@ -276,10 +276,34 @@ def shape_measure(symbols: list, positions: list) -> dict:
     return posgeom_dev
 
 
+# def normalize_structure(coordinates):
+#     # center and normalize the structure for CShM calculations
+#     centered_coords = coordinates - np.mean(coordinates, axis=0)
+#     norm = np.sqrt(np.mean(np.sum(centered_coords**2, axis=1)))
+#     return centered_coords / norm
+
+
 def normalize_structure(coordinates):
-    # center and normalize the structure for CShM calculations
+    """
+    Center and normalize the structure for CShM calculations
+    """
+    if coordinates.size == 0:
+        logger.warning("normalize_structure: empty coordinates")
+        return coordinates  # return as is
+
     centered_coords = coordinates - np.mean(coordinates, axis=0)
-    norm = np.sqrt(np.mean(np.sum(centered_coords**2, axis=1)))
+
+    sq = np.sum(centered_coords**2, axis=1)
+    if sq.size == 0:
+        logger.warning("normalize_structure: no atoms after centering")
+        return centered_coords
+
+    norm = np.sqrt(np.mean(sq))
+
+    if norm == 0:
+        logger.warning("normalize_structure: zero norm (all atoms coincident)")
+        return centered_coords
+
     return centered_coords / norm
 
 
