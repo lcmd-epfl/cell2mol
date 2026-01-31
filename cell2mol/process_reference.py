@@ -191,6 +191,8 @@ def create_reference(input_path, name, cell_vector, cell_param):
     refcell.get_reference_molecules()
 
     if not refcell.refmoleclist:
+        if refcell.error_cases is None:
+            refcell.error_cases = {}
         refcell.error_cases["no_ref_molecules"] = -1
         logger.warning("No reference molecules found in the CIF file")
         return refcell
