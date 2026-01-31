@@ -99,7 +99,11 @@ def infer_coordination_geometry(bond_vectors):
                 if angle not in angles:
                     angles.append(angle)
 
-    avg_angle = np.mean(angles)
+    if len(angles) == 0:
+        logger.warning("No bond angles computed; returning NaN")
+        avg_angle = np.nan
+    else:
+        avg_angle = np.mean(angles)
 
     geometry_report += f"Angles (rad): {angles} Avg: {avg_angle}\n"
     geometry_report += (
