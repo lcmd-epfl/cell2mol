@@ -104,7 +104,7 @@ def parsing_arguments():
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format=FORMAT,
-        filename="cell2mol.out",
+        filename="cell2mol.log",
         filemode="w",
         force=True,
     )

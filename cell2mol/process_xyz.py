@@ -34,7 +34,7 @@ METAL_FACTOR = config.METAL_FACTOR
 # -----------------------------------------------------------------------------
 def interpret_molecule(input_path, name, input_charge, current_dir):
     molec_fname = os.path.join(current_dir, f"Molecule_{name}.mol")
-    summary_molecule_fname = os.path.join(current_dir, "molecule_summary.out")
+    summary_molecule_fname = os.path.join(current_dir, "molecule_summary.txt")
 
     logger.info("cell2mol version %s", config.VERSION)
     logger.info("Input XYZ: %s", input_path)
