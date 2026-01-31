@@ -287,7 +287,7 @@ def normalize_structure(coordinates):
     """
     Center and normalize the structure for CShM calculations
     """
-    if coordinates.size == 0:
+    if len(coordinates) == 0:
         logger.warning("normalize_structure: empty coordinates")
         return coordinates  # return as is
 
