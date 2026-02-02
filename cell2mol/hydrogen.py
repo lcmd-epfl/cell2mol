@@ -47,14 +47,13 @@ def detect_missing_hydrogens(
     )
 
     if observed_coordination == 1:
-        if neighbor_labels[0] not in {"O", "N"}:
-            missing_h = True
+        missing_h = True
     elif observed_coordination < expected_coordination:
         missing_h = True
 
     num_missing_h = max(expected_coordination - observed_coordination, 0)
 
-    report += f"Summary of facts:\n - Atom has {observed_coordination} adjacent atoms\n"
+    report += f" - Atom has {observed_coordination} adjacent atoms\n"
 
     if observed_coordination == 1 and missing_h:
         report += (
@@ -88,49 +87,58 @@ def infer_coordination_geometry(bond_vectors):
     coordination_number = 0
     geometry_report = ""
 
-    if len(bond_vectors) == 1:
+    n = len(bond_vectors)
+    if n == 1:
         return "Point", 1, geometry_report
 
-    angles = []
-    for i, a in enumerate(bond_vectors):
-        for j, b in enumerate(bond_vectors):
-            if i != j:
-                angle = get_angle(a, b)
-                if angle not in angles:
-                    angles.append(angle)
-
-    if len(angles) == 0:
-        logger.warning("No bond angles computed; returning NaN")
-        avg_angle = np.nan
-    else:
-        avg_angle = np.mean(angles)
-
-    geometry_report += f"Angles (rad): {angles} Avg: {avg_angle}\n"
-    geometry_report += (
-        f"Angles (deg): {np.degrees(angles).tolist()} Avg: {np.degrees(avg_angle)}\n"
-    )
-
-    angle_differences = [
-        abs(avg_angle - np.pi),  # linear
-        abs(avg_angle - 2.094395),  # trigonal
-        abs(avg_angle - 1.570796),  # square planar
-        abs(avg_angle - 1.911136),  # tetrahedral
+    # --- Compute unique angles only once ---
+    angles = [
+        get_angle(bond_vectors[i], bond_vectors[j])
+        for i in range(n)
+        for j in range(i + 1, n)
     ]
 
-    min_difference = min(angle_differences)
-    best_geometry_idx = angle_differences.index(min_difference)
+    if not angles:
+        logger.warning(" - No bond angles computed; returning NaN")
+        return geometry, coordination_number, geometry_report
 
-    geometry_report += f"Diffs: {angle_differences} Minval: {min_difference}\n"
+    avg_angle = float(np.mean(angles))
 
+    # --- Report angles in degrees ---
+    angles_deg = [round(float(x), 3) for x in np.degrees(angles)]
+    avg_deg = round(float(np.degrees(avg_angle)), 3)
+    geometry_report += f" - Angles (deg): {angles_deg} Avg: {avg_deg}\n"
+
+    # --- Ideal angles (radians) ---
+    ideal_angles = {
+        "Linear": np.pi,
+        "Triangular": 2.094395,  # 120°
+        "SquarePlanar": 1.570796,  # 90°
+        "Tetrahedral": 1.911136,  # 109.47°
+    }
+
+    # --- Compute deviations cleanly ---
+    angle_differences = {
+        name: round(float(abs(avg_angle - val)), 3)
+        for name, val in ideal_angles.items()
+    }
+
+    best_geometry = min(angle_differences, key=angle_differences.get)
+    min_difference = angle_differences[best_geometry]
+
+    geometry_report += (
+        f" - Angle_differences: {angle_differences} Min_diff: {min_difference}\n"
+    )
+
+    # --- Assign geometry ---
     if min_difference <= atol:
-        if best_geometry_idx == 0:
-            geometry, coordination_number = "Linear", 2
-        elif best_geometry_idx == 1:
-            geometry, coordination_number = "Triangular", 3
-        elif best_geometry_idx == 2:
-            geometry, coordination_number = "SquarePlanar", 4
-        elif best_geometry_idx == 3:
-            geometry, coordination_number = "Tetrahedron", 4
+        geometry = best_geometry
+        coordination_number = {
+            "Linear": 2,
+            "Triangular": 3,
+            "SquarePlanar": 4,
+            "Tetrahedral": 4,
+        }[geometry]
 
     return geometry, coordination_number, geometry_report
 
@@ -153,16 +161,13 @@ def check_missing_hydrogens(reference_molecules):
     missing_h_in_water = False
     missing_h_in_coordinated_water = False
     missing_h_detected = False
-    # coord_water_exceptions = {}
-    # coord_water_exceptions = {"Re", "V", "Mo", "W", "Fe", "Tc", "U" "Os", "Cr", "Nb", "U"}
-    coord_water_exceptions = {"Re", "V", "Mo", "W", "Fe", "Tc"}
     fullerenes = {"C60", "C72", "C80"}
 
-    logger.info("Checking any missing hydrogens in reference molecules...")
+    logger.info("Detecting any missing hydrogens in reference molecules...")
 
-    for mol_idx, ref in enumerate(reference_molecules):
+    for ref in reference_molecules:
         if ref.is_non_complex_molecule:
-            if ref.natoms == 1 and "O" in ref.labels:
+            if ref.natoms == 1 and ref.labels[0] == "O":
                 missing_h_in_water = True
                 logger.warning(
                     "Isolated O atom detected (possible water with missing H)"
@@ -172,12 +177,12 @@ def check_missing_hydrogens(reference_molecules):
             if ref.formula in {"C-O", "C-N"} or ref.formula in fullerenes:
                 continue
 
-            for atom_idx, atom in enumerate(ref.atoms):
+            for atom in ref.atoms:
                 if atom.label != "C" or atom.adjacency is None:
                     continue
 
                 neighbor_coords = [ref.coord[i] for i in atom.adjacency]
-                neighbor_labels = [ref.atoms[i].label for i in atom.adjacency]
+                neighbor_labels = [ref.labels[i] for i in atom.adjacency]
 
                 missing_h_detected, report, _ = detect_missing_hydrogens(
                     atom.atnum,
@@ -188,22 +193,64 @@ def check_missing_hydrogens(reference_molecules):
 
                 if missing_h_detected:
                     logger.warning(
-                        f"Missing H in molecule {mol_idx} "
-                        f"({ref.formula}), C atom index {atom_idx}"
+                        "Missing H in Molecule (%s), C atom (%s) (mol idx %s)",
+                        ref.formula,
+                        atom.atom_site_label,
+                        atom.get_parent_index("molecule"),
                     )
-                    logger.warning(report)
+                    for line in report.splitlines():
+                        logger.warning(line)
                     missing_h_in_carbon = True
 
         else:
             for lig in ref.ligands:
                 is_single_oxygen = lig.formula == "O"
-                is_monodentate = getattr(lig, "denticity", 0) < 2
+                oxygen_atom = lig.atoms[0]
                 connected_metals = getattr(lig, "metals", [])
-                is_not_exception = not any(
-                    m.label in coord_water_exceptions for m in connected_metals
-                )
-                if is_single_oxygen and is_monodentate and is_not_exception:
-                    missing_h_in_coordinated_water = True
+                metal = connected_metals[0] if connected_metals else None
+
+                threshold_distance = 1.8  # Å
+                if (
+                    is_single_oxygen
+                    and oxygen_atom is not None
+                    and oxygen_atom.mconnec == 1
+                    and metal is not None
+                ):
+                    distance_to_metal = np.linalg.norm(oxygen_atom.coord - metal.coord)
+
+                    if distance_to_metal > threshold_distance:
+                        missing_h_in_coordinated_water = True
+
+                if lig.formula in {"C-O", "C-N"} or lig.formula in fullerenes:
+                    continue
+
+                for atom_idx, atom in enumerate(lig.atoms):
+                    if atom.label != "C" or atom.adjacency is None:
+                        continue
+
+                    if atom.mconnec >= 1:  # Don't check carbons bonded to metals
+                        continue
+
+                    neighbor_coords = [ref.coord[i] for i in atom.adjacency]
+                    neighbor_labels = [ref.labels[i] for i in atom.adjacency]
+
+                    missing_h_detected, report, _ = detect_missing_hydrogens(
+                        atom.atnum,
+                        atom.coord,
+                        neighbor_coords,
+                        neighbor_labels,
+                    )
+
+                    if missing_h_detected:
+                        logger.warning(
+                            "Missing H in Ligand (%s), C atom (%s) (mol idx %s)",
+                            lig.formula,
+                            atom.atom_site_label,
+                            atom.get_parent_index("molecule"),
+                        )
+                        for line in report.splitlines():
+                            logger.warning(line)
+                        missing_h_in_carbon = True
 
     has_missing_h = (
         missing_h_in_carbon or missing_h_in_coordinated_water or missing_h_in_water
