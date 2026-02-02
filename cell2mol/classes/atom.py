@@ -191,6 +191,8 @@ class Atom(BaseModel):
         if self.subtype is not None:
             to_print += f" Sub-Type                     = {self.subtype}\n"
         to_print += f" Label                        = {self.label}\n"
+        if self.atom_site_label is not None:
+            to_print += f" Atom Site Label              = {self.atom_site_label}\n"
         to_print += f" Atomic Number                = {self.atnum}\n"
         idx = self.get_parent_index("molecule")
         if idx is not None:
