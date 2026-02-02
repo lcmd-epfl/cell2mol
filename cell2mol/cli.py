@@ -8,7 +8,6 @@ from cell2mol.args import parsing_arguments
 from cell2mol.process_reference import interpret_reference
 from cell2mol.process_unitcell import interpret_unitcell
 from cell2mol.process_xyz import interpret_molecule
-from cell2mol.read_cif import prefilter_cif
 from cell2mol.write_results import exit_with_error_input, exit_with_error_exception
 from rdkit import RDLogger
 
@@ -88,14 +87,7 @@ def handle_cif_file(
     name,
     current_dir,
 ):
-    logger.info("Processing CIF file")
-
-    cif_okay, error_message = prefilter_cif(input_path)
-    if not cif_okay:
-        exit_with_error_input(
-            f"CIF file is not suitable for processing: {error_message}"
-        )
-
+    logger.info("Processing CIF file: %s", input_path)
     try:
         if system_type == "reference":
             logger.info("Processing reference (Wyckoff sites)")
