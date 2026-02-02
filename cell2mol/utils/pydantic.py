@@ -212,8 +212,8 @@ class BaseModel(pydantic.BaseModel, ABC):
 
     def to_json(self, indent: int = 2, separators=None) -> str:
         """Serialize to JSON string with central object store."""
-        if separators is not None:
-            return json.dumps(self.to_dict_store(), separators=separators)
+        # if separators is not None:
+        #     return json.dumps(self.to_dict_store(), separators=separators)
         return json.dumps(self.to_dict_store(), indent=indent)
 
     # =========================================================================
