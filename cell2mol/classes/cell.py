@@ -22,7 +22,7 @@ _SPIN_ERRORS = [("error_get_spin", 10)]
 
 ERROR_MAPS = {
     "reference": {
-        "no_ref_molecules": [("no_ref_molecules", -1)],
+        "ref_molecules": [("ref_molecules", -1)],
         "hydrogens": [
             ("has_isolated_H", 1),
             ("missing_H_in_Water", 2),
@@ -257,11 +257,10 @@ class Cell(BaseModel):
             is_triggered = getattr(self, attr, False)
 
             logger.debug(
-                "Checking %s (Code %d) in %s:%s. Result: %s",
+                "Checking %s (Code %d) in %s: Result: %s",
                 attr,
                 code,
                 self.subtype,
-                mode,
                 is_triggered,
             )
 
@@ -271,42 +270,6 @@ class Cell(BaseModel):
 
         # No error in this mode
         self.error_cases[mode] = 0
-
-    # def assess_errors(self, mode):
-    #     """
-    #     Assess error conditions based on subtype and mode.
-    #     First truthy attribute found sets the error_case and exits.
-    #     """
-    #     # 1. Get the map for the current subtype
-    #     subtype_map = ERROR_MAPS.get(self.subtype)
-    #     if not subtype_map:
-    #         raise ValueError(f"Unknown Cell subtype: {self.subtype}")
-
-    #     # 2. Get the rules for the specific processing mode
-    #     rules = subtype_map.get(mode)
-    #     if rules is None:
-    #         raise ValueError(f"Invalid mode '{mode}' for subtype '{self.subtype}'")
-
-    #     # 3. Check attributes
-    #     for attr, code in rules:
-    #         # We use False as default so missing attributes don't trigger errors
-    #         is_triggered = getattr(self, attr, False)
-
-    #         logger.debug(
-    #             "Checking %s (Code %d) in %s:%s. Result: %s",
-    #             attr,
-    #             code,
-    #             self.subtype,
-    #             mode,
-    #             is_triggered,
-    #         )
-
-    #         if is_triggered:
-    #             self.error_case = code
-    #             return
-
-    #     # 4. Fallback if no errors triggered
-    #     self.error_case = 0
 
     def has_error(self, mode: str | None = None) -> bool:
         """

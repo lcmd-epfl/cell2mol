@@ -449,6 +449,23 @@ def write_molecule_info(mol, file=None, index=None):
                     file=file,
                 )
 
+            if getattr(met, "groups", None):
+                for group in met.groups:
+                    group_info = f"\t|--(group) {group.labels}"
+                    group_atom_site_labels = [
+                        a.atom_site_label
+                        for a in group.atoms
+                        if a.atom_site_label is not None
+                    ]
+                    if group_atom_site_labels:
+                        group_info += f" atom_site_labels={group_atom_site_labels}"
+                    if hasattr(group, "denticity"):
+                        group_info += f" denticity={group.denticity}"
+                    if getattr(group, "is_haptic", False):
+                        group_info += f" haptic_type={[HAPTIC_PRETTY.get(ht, ht) for ht in group.haptic_type]}"
+
+                    print(group_info, file=file)
+
             # Metal-Metal Bonds
             if hasattr(met, "metals") and hasattr(met, "coord_nr_with_metal_bonds"):
                 bonded_metals = [m.label for m in met.metals]
@@ -470,7 +487,6 @@ def write_molecule_info(mol, file=None, index=None):
                 val = getattr(lig, attr, None)
                 if val is not None:
                     lig_info += f" {attr}={val}"
-
             if (
                 getattr(lig, "possible_cs", None) is not None
                 and getattr(lig, "totcharge", None) is None

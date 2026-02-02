@@ -444,22 +444,9 @@ def handle_metal_coordination(metal: object) -> list:
         for group_info in groups_list:
             atoms = group_info["atoms"]
 
-            # 1. Create the Group instance using positional data to satisfy Pydantic
-            # group_obj = Group.from_positional(
-            #     labels=[a.label for a in atoms],
-            #     coord=[a.coord for a in atoms],
-            #     frac_coord=[a.frac_coord for a in atoms]
-            #     if atoms[0].frac_coord is not None
-            #     else None,
-            #     radii=[a.radii for a in atoms],
-            # )
-
             # 1. Create the Group instance from atom list
             group_obj = Group.from_atom_list(atoms)
-
-            # 2. Inject the actual Atom objects to maintain referential integrity
-            # object.__setattr__(group_obj, "atoms", atoms)
-
+            # 2. Set origin for traceability
             group_obj.origin = "handle_metal_coordination"
 
             # 3. Analyze coordination mode
@@ -470,7 +457,6 @@ def handle_metal_coordination(metal: object) -> list:
             group_ligand_indices = [
                 current_lig_m_indices.index(m_idx) for m_idx in group_mol_indices
             ]
-
             # 5. Establish Parents
             group_obj.add_parent(mol, indices=group_mol_indices)
             group_obj.set_inherit_adjmatrix("molecule")
