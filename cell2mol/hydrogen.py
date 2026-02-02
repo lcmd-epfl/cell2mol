@@ -174,7 +174,11 @@ def check_missing_hydrogens(reference_molecules):
                 )
                 continue
 
-            if ref.formula in {"C-O", "C-N"} or ref.formula in fullerenes:
+            if (
+                ref.formula in {"C-N", "C-P", "C-As", "C-Sb"}
+                or ref.formula in {"C-O", "C-S", "C-Se", "C-Te"}
+                or ref.formula in fullerenes
+            ):
                 continue
 
             for atom in ref.atoms:
@@ -193,9 +197,10 @@ def check_missing_hydrogens(reference_molecules):
 
                 if missing_h_detected:
                     logger.warning(
-                        "Missing H in Molecule (%s), C atom (%s) (mol idx %s)",
+                        "Missing H in Molecule (formula: %s), C atom %s%s (mol idx %s)",
                         ref.formula,
-                        atom.atom_site_label,
+                        atom.coord,
+                        f" ({atom.atom_site_label})" if atom.atom_site_label else "",
                         atom.get_parent_index("molecule"),
                     )
                     for line in report.splitlines():
@@ -221,14 +226,20 @@ def check_missing_hydrogens(reference_molecules):
                     if distance_to_metal > threshold_distance:
                         missing_h_in_coordinated_water = True
 
-                if lig.formula in {"C-O", "C-N"} or lig.formula in fullerenes:
+                if (
+                    lig.formula in {"C-N", "C-P", "C-As", "C-Sb"}
+                    or lig.formula in {"C-O", "C-S", "C-Se", "C-Te"}
+                    or lig.formula in fullerenes
+                ):
                     continue
 
+                only_carbon = all(el == "C" for el in lig.labels) and lig.natoms > 2
+                print(lig.formula, only_carbon)
                 for atom_idx, atom in enumerate(lig.atoms):
                     if atom.label != "C" or atom.adjacency is None:
                         continue
 
-                    if atom.mconnec >= 1:  # Don't check carbons bonded to metals
+                    if atom.mconnec >= 1 and not only_carbon:
                         continue
 
                     neighbor_coords = [ref.coord[i] for i in atom.adjacency]
@@ -243,9 +254,12 @@ def check_missing_hydrogens(reference_molecules):
 
                     if missing_h_detected:
                         logger.warning(
-                            "Missing H in Ligand (%s), C atom (%s) (mol idx %s)",
+                            "Missing H in Ligand (formula: %s), C atom %s%s (mol idx %s)",
                             lig.formula,
-                            atom.atom_site_label,
+                            atom.coord,
+                            f" ({atom.atom_site_label})"
+                            if atom.atom_site_label
+                            else "",
                             atom.get_parent_index("molecule"),
                         )
                         for line in report.splitlines():
