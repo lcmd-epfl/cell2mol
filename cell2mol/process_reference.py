@@ -13,6 +13,7 @@ from cell2mol.operations import (
     has_different_metal_coordination,
 )
 from cell2mol.read_cif import (
+    prefilter_cif,
     get_cell_parameters,
     get_wyckoff_positions,
     get_geom_bond,
@@ -25,9 +26,10 @@ from cell2mol.write_results import (
     write_possible_charges,
     get_reference_error_message,
     get_reference_warning_messages,
+    exit_with_error_input,
+    exit_with_error_exception,
 )
 from cell2mol.connectivity import is_mismatch_adjacency
-from cell2mol.write_results import exit_with_error_exception
 from cell2mol.utils.limits import ProcessingTimeoutError, set_time_limit
 from cell2mol.utils.exceptions import ASEParseError
 import sys
@@ -54,8 +56,16 @@ def interpret_reference(input_path, name, current_dir):
     refcell = None
     exit_code = 0
     process_failure = False
-
+    mode = None
     try:
+        logger.info("Processing CIF file")
+
+        cif_okay, error_message = prefilter_cif(input_path)
+        if not cif_okay:
+            exit_with_error_input(
+                f"CIF file is not suitable for processing: {error_message}"
+            )
+
         # Enforce timeout on the heavy lifting
         with set_time_limit(config.TIMEOUT):
             try:
@@ -71,9 +81,10 @@ def interpret_reference(input_path, name, current_dir):
             if refcell.has_error():
                 logger.error(
                     "Fails generating reference molecules (case=%s)",
-                    refcell.error_cases.get("no_ref_molecules"),
+                    refcell.error_cases.get("ref_molecules"),
                 )
                 process_failure = True
+                mode = "ref_molecules"
                 return refcell
 
             refcell.check_hydrogens()
@@ -84,14 +95,14 @@ def interpret_reference(input_path, name, current_dir):
                     refcell.error_cases.get("hydrogens"),
                 )
                 process_failure = True
+                mode = "hydrogens"
                 return refcell
-
-            refcell.get_unique_species()
 
             # Save intermediate success
             _handle_reference_outputs(name, current_dir, refcell, mode="hydrogens")
 
-            # --- Possible charge analysis ---
+            # Possible charge states for unique species
+            refcell.get_unique_species()
             refcell.get_selected_cs()
             refcell.assess_errors(mode="possible_charges")
 
@@ -101,6 +112,7 @@ def interpret_reference(input_path, name, current_dir):
                     refcell.error_cases.get("possible_charges"),
                 )
                 process_failure = True
+                mode = "possible_charges"
                 return refcell
 
     except ASEParseError as exc:
@@ -150,7 +162,9 @@ def interpret_reference(input_path, name, current_dir):
     finally:
         logger.info("Executing final output handling...")
         # Ensure we try to save whatever valid data we have (refcell might be None)
-        _handle_reference_outputs(name, current_dir, refcell, mode="possible_charges")
+        if mode is None:
+            mode = "possible_charges"  # Default to hydrogens if no mode set
+        _handle_reference_outputs(name, current_dir, refcell, mode=mode)
 
         if exit_code == 0 and process_failure:
             exit_code = ERR_CELL2MOL
@@ -200,12 +214,15 @@ def create_reference(input_path, name, cell_vector, cell_param):
     # Generate reference molecules
     refcell.get_reference_molecules()
 
+    if refcell.error_cases is None:
+        refcell.error_cases = {}
     if not refcell.refmoleclist:
-        if refcell.error_cases is None:
-            refcell.error_cases = {}
-        refcell.error_cases["no_ref_molecules"] = -1
-        logger.warning("No reference molecules found in the CIF file")
+        logger.warning("No reference molecules could be generated.")
+        refcell.error_cases["ref_molecules"] = -1
         return refcell
+
+    logger.info("Generated %d reference molecules.", len(refcell.refmoleclist))
+    refcell.error_cases["ref_molecules"] = 0
 
     # --------------------------------------------------
     # Gather warnings into a dictionary
@@ -251,7 +268,7 @@ def _handle_reference_outputs(name, current_dir, refcell, mode=None):
     def save_ref():
         refcell.save(ref_cell_fname)
         # from cell2mol.write_results import extract_refmoleclist_xyz
-        # if logger.isEnabledFor(logging.DEBUG) and not refcell.error_cases.get("no_ref_molecules", 0) == -1:
+        # if logger.isEnabledFor(logging.DEBUG) and not refcell.error_cases.get("ref_molecules", 0) == -1:
         #     extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
 
     _safe_run(save_ref, "Failed to save reference cell")
@@ -266,9 +283,9 @@ def _write_ref_detailed_summary(name, refcell, summary_path, mode=None):
     with open(summary_path, "w") as f:
         print(name, file=f)
         write_cell_molecules_info(refcell, file=f)
-        write_unique_species(refcell, file=f)
 
         if mode == "possible_charges":
+            write_unique_species(refcell, file=f)
             write_possible_charges(refcell, file=f)
 
         # Print step-specific reference errors
