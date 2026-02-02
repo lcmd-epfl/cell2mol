@@ -400,8 +400,8 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
                     if max_protons == 2 and added == 1 and skip_cnt < 2:
                         skip_cnt += 1
-                        print(
-                            f"  Skipping {idx} (count: {skip_cnt})",
+                        logger.debug(
+                            f"  Skipping {idx} (count: {skip_cnt}) %s %s",
                             atom.label,
                             atom.atom_site_label,
                         )
@@ -412,8 +412,8 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
                     protonation_sites.append(idx)
                     added += 1
-                    print(
-                        "  Added proton to",
+                    logger.debug(
+                        "  Added proton to %d %s %s %s %s",
                         idx,
                         atom.label,
                         atom.atom_site_label,
@@ -438,8 +438,8 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                 if nTot == 3 and nC == 3:
                     if max_protons == 2 and added == 1 and skip_cnt < 2:
                         skip_cnt += 1
-                        print(
-                            f"  Skipping {idx} (count: {skip_cnt})",
+                        logger.debug(
+                            f"  Skipping {idx} (count: {skip_cnt}) %s %s",
                             atom.label,
                             atom.atom_site_label,
                         )
@@ -447,8 +447,8 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
                     protonation_sites.append(idx)
                     added += 1
-                    print(
-                        "  Added proton to",
+                    logger.debug(
+                        "  Added proton to %d %s %s %s %s",
                         idx,
                         atom.label,
                         atom.atom_site_label,
@@ -466,7 +466,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
         # ---------- Fallback pass ----------
         if len(protonation_sites) < max_protons:
-            print("  Falling back to relaxed protonation rules")
+            logger.debug("  Falling back to relaxed protonation rules")
             protonation_sites = _select_sites(strict_mode=False)
 
         # ---------- Apply results ----------
@@ -500,7 +500,6 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
         _assign_protonation_sites(2)
 
     elif "pentalene" in g.haptic_type and not selected:
-        print(g.topology)
         selected = True
         _assign_protonation_sites(2)
 
@@ -538,7 +537,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
         if (
             g.topology["is_single_simple_ring"] and g.ring_sizes[0] == 8
         ) or ligand.formula == "H8-C8":
-            print("  Special case: cyclooctatetraene detected")
+            logger.debug("  Special case: cyclooctatetraene detected")
             _assign_protonation_sites(2)
         else:
             logger.debug(

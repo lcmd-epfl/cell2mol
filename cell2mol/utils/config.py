@@ -20,8 +20,8 @@ METAL_FACTOR = DEFAULT_METAL_FACTOR
 
 USE_BOND_INFO = False
 MAX_METALS = 6
-TIMEOUT = 600  # seconds
-MAX_MEM_GB = 10  # GB
+TIMEOUT = 300  # seconds
+MAX_MEM_GB = 5  # GB
 
 
 def dump():

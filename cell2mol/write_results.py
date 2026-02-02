@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 def exit_with_error_input(message):
     """Logs the error message to a file and exits the program."""
-    error_log_path = os.path.join(os.getcwd(), "error_input.out")
+    error_log_path = os.path.join(os.getcwd(), "error_InputFile.out")
     with open(error_log_path, "w") as error_log:
         error_log.write(f"Error: {message}\n")
-    sys.exit(message)
+    sys.exit(301)
 
 
 def exit_with_error_exception(exc, error_log_path=None):
