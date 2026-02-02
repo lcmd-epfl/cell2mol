@@ -462,7 +462,7 @@ def write_molecule_info(mol, file=None, index=None):
                     if hasattr(group, "denticity"):
                         group_info += f" denticity={group.denticity}"
                     if getattr(group, "is_haptic", False):
-                        group_info += f" haptic_type={[HAPTIC_PRETTY.get(ht, ht) for ht in group.haptic_type]}"
+                        group_info += f" haptic_type={group.haptic_type}"
 
                     print(group_info, file=file)
 
@@ -509,7 +509,7 @@ def write_molecule_info(mol, file=None, index=None):
                     if hasattr(group, "denticity"):
                         group_info += f" denticity={group.denticity}"
                     if getattr(group, "is_haptic", False):
-                        group_info += f" haptic_type={[HAPTIC_PRETTY.get(ht, ht) for ht in group.haptic_type]}"
+                        group_info += f" haptic_type={group.haptic_type}"
 
                     if getattr(group, "metals", None):
                         labels = [
@@ -551,9 +551,7 @@ def write_unique_species(object, file):
         elif specie.subtype == "ligand":
             parts.append(f"denticity={specie.denticity}")
             if specie.is_haptic:
-                parts.append(
-                    f"haptic_type={[HAPTIC_PRETTY.get(ht, ht) for ht in specie.haptic_type]}"
-                )
+                parts.append(f"haptic_type={specie.haptic_type}")
             if getattr(specie, "smiles", None) is not None:
                 parts.append(f"smiles={specie.smiles}")
             if getattr(specie, "totcharge", None) is not None:

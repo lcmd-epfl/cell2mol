@@ -5,7 +5,7 @@ from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.ligand import Ligand
 from cell2mol.classes.specie import Specie
-from cell2mol.connectivity import split_species
+from cell2mol.connectivity import split_species, merge_multiple_groups
 from cell2mol.element_utils import (
     labels2formula,
     get_metal_idxs,
@@ -25,8 +25,9 @@ from cell2mol.charge.smiles_handler import (
 from cell2mol.spin import assign_spin_complexes
 from cell2mol.operations import extract_from_list
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import Spin, HapticType, SubType
+from cell2mol.my_types import Spin, SubType
 from cell2mol.utils import config
+import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class Molecule(Specie):
     A molecule is a specie that contains other specie objects.
     """
 
-    haptic_type: HapticType | None = None
+    haptic_type: list[str] | None = None
     is_haptic: bool | None = None
     ligands: list[Ligand] | None = Field(default=None)
     metals: list[Metal] | None = Field(default=None)
@@ -337,7 +338,7 @@ class Molecule(Specie):
 
         for met in self.metals:
             logger.debug(
-                "Checking coordination for metal %s%s",
+                "Analyzing coordination for metal %s%s",
                 met.label,
                 (f" ({met.atom_site_label})" if met.atom_site_label else ""),
             )
@@ -353,6 +354,7 @@ class Molecule(Specie):
             met.get_coord_sphere_formula()
 
         self.map_metal_groups_to_ligands()
+        self.merge_connected_groups()
 
         for lig in self.ligands:
             lig.get_hapticity()
@@ -419,6 +421,120 @@ class Molecule(Specie):
                             met.label,
                             parent_ligand.formula,
                         )
+
+    def merge_connected_groups(self):
+        """
+        Merge ligand groups that are graph-connected.
+
+        Groups are merged if they:
+        1) Are purely comprised of Carbon atoms (no heteroatoms allowed in the group),
+        2) Share atoms (overlap), or
+        3) Are directly bonded through the molecule adjacency graph (C-C bonds).
+
+        This allows reconstruction of extended haptic domains (e.g., fused rings)
+        while keeping heteroatom groups isolated.
+        """
+        for lig in self.ligands:
+            if not lig.groups:
+                continue
+
+            n = len(lig.groups)
+            adj = {i: set() for i in range(n)}
+
+            adjmat = self.adjmat  # Molecule adjacency matrix
+            mol_labels = self.labels  # Molecule atom labels
+            group_atom_sets = [
+                set([atom.get_parent_index("molecule") for atom in g.atoms])
+                for g in lig.groups
+            ]
+            # --- NEW: Identify which groups are purely Carbon ---
+            # We create a boolean mask: True if the group contains ONLY "C", False otherwise.
+            group_is_pure_carbon = [
+                all(mol_labels[idx] == "C" for idx in atoms)
+                for atoms in group_atom_sets
+            ]
+
+            # --- Build connectivity graph between groups ---
+            for i in range(n):
+                # STRICT RULE: If group i has heteroatoms (e.g., N1), it is not mergeable.
+                if not group_is_pure_carbon[i]:
+                    continue
+
+                atoms_i = group_atom_sets[i]
+
+                for j in range(i + 1, n):
+                    # STRICT RULE: If group j has heteroatoms, it is not mergeable.
+                    if not group_is_pure_carbon[j]:
+                        continue
+
+                    atoms_j = group_atom_sets[j]
+
+                    # Condition 1: overlap
+                    if not atoms_i.isdisjoint(atoms_j):
+                        adj[i].add(j)
+                        adj[j].add(i)
+                        continue
+
+                    # Condition 2: bonded continuity
+                    connected = False
+                    # Direct check: Is there ANY bond between ANY atom in i and ANY atom in j?
+                    # This dual loop is safe for both Dense (numpy) and Sparse (scipy) matrices.
+                    for ai in atoms_i:
+                        for aj in atoms_j:
+                            if adjmat[ai, aj]:  # Non-zero means bonded
+                                connected = True
+                                break
+                        if connected:
+                            break
+
+                    if connected:
+                        adj[i].add(j)
+                        adj[j].add(i)
+
+                    if connected:
+                        adj[i].add(j)
+                        adj[j].add(i)
+
+            # --- Find connected components ---
+            visited = [False] * n
+            merged_groups = []
+
+            for i in range(n):
+                if visited[i]:
+                    continue
+
+                stack = [i]
+                visited[i] = True
+                component = []
+
+                while stack:
+                    curr = stack.pop()
+                    component.append(curr)
+                    for nb in adj[curr]:
+                        if not visited[nb]:
+                            visited[nb] = True
+                            stack.append(nb)
+
+                # --- Merge component ---
+                if len(component) == 1:
+                    merged_groups.append(lig.groups[component[0]])
+                else:
+                    groups_to_merge = [lig.groups[idx] for idx in component]
+                    # Expecting a LIST of groups
+                    new_groups = merge_multiple_groups(self, groups_to_merge, lig)
+                    if new_groups:
+                        merged_groups.extend(new_groups)
+                        logger.debug(
+                            "Merged %d connected groups in %s → %s",
+                            len(groups_to_merge),
+                            lig.formula,
+                            [g.haptic_type for g in new_groups],
+                        )
+                    else:
+                        logger.warning("Failed to merge groups in %s", lig.formula)
+                        merged_groups.extend(groups_to_merge)
+
+            lig.groups = merged_groups
 
     def get_hapticity(self):
         if self.ligands is None:

@@ -678,7 +678,7 @@ def partition_connected_indices(
     results = {}
     for idx, block in enumerate(blocklist):
         gr_atoms = extract_from_list(block, conn_atoms, dimension=1)
-        is_haptic, haptic_type = identify_haptic_mode(
+        is_haptic, haptic_type, topology = identify_haptic_mode(
             gr_atoms, use_bond_info=use_bond_info
         )
         if is_haptic:

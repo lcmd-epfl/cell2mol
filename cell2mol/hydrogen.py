@@ -234,7 +234,6 @@ def check_missing_hydrogens(reference_molecules):
                     continue
 
                 only_carbon = all(el == "C" for el in lig.labels) and lig.natoms > 2
-                print(lig.formula, only_carbon)
                 for atom_idx, atom in enumerate(lig.atoms):
                     if atom.label != "C" or atom.adjacency is None:
                         continue
