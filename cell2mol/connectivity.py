@@ -415,13 +415,13 @@ def get_adjmatrix(
             if dist <= clash_threshold:
                 isgood = False
                 logger.error(
-                    "Adjacency clash: dist=%.3f < %.3f for atoms (%d,%d) [%s-%s]",
+                    "Adjacency clash: dist=%.3f < %.3f for atoms (%s:%s)-(%s:%s)",
                     dist,
                     clash_threshold,
-                    i,
-                    j,
                     labels[i],
+                    pos[i],
                     labels[j],
+                    pos[j],
                 )
                 continue
 
@@ -435,15 +435,16 @@ def get_adjmatrix(
             ):
                 madjmat[i, j] = madjmat[j, i] = 1
 
+    if not isgood:
+        return False, (madjmat if metal_only else adjmat), False
+
     # --- valence correction ---
     warning = False
     if not add_atom:
         adjmat, madjmat, warning = correct_valence_violation(
             adjmat, madjmat, labels, pos, radii
         )
-    if metal_only:
-        return isgood, madjmat, warning
-    return isgood, adjmat, warning
+    return True, (madjmat if metal_only else adjmat), warning
 
 
 def correct_valence_violation(adjmat, madjmat, labels, pos, radii):
@@ -483,8 +484,9 @@ def correct_valence_violation(adjmat, madjmat, labels, pos, radii):
             continue
 
         logger.warning(
-            "Valence violation: %s (index:%d), valence=%d > max_valence=%d",
+            "Valence violation: %s %s(index:%d), valence=%d > max_valence=%d",
             labels[i],
+            pos[i],
             i,
             valence,
             max_valence,
@@ -511,11 +513,13 @@ def correct_valence_violation(adjmat, madjmat, labels, pos, radii):
             connections.append((j, margin))
 
             logger.debug(
-                "Bond %d-%d [%s-%s]: dist=%.3f, margin=%.3f",
+                "Bond %d-%d (%s:%s)-(%s:%s): dist=%.3f, margin=%.3f",
                 i,
                 j,
                 labels[i],
+                pos[i],
                 labels[j],
+                pos[j],
                 dist,
                 margin,
             )
@@ -528,11 +532,14 @@ def correct_valence_violation(adjmat, madjmat, labels, pos, radii):
                 adjmat[i, j] = adjmat[j, i] = 0
                 madjmat[i, j] = madjmat[j, i] = 0
                 logger.info(
-                    "Removed bond %d-%d [%s-%s], margin=%.3f",
+                    "Removed bond %d-%d (%s:%s)-(%s:%s), dist=%.3f, margin=%.3f",
                     i,
                     j,
                     labels[i],
+                    pos[i],
                     labels[j],
+                    pos[j],
+                    np.linalg.norm(pos[i] - pos[j]),
                     margin,
                 )
 
@@ -873,11 +880,12 @@ def identify_haptic_mode(atoms: list, use_bond_info: bool | None = None):
         atoms (list): List of Atom objects
         use_bond_info (bool, optional): Whether to use bond information from CIF
     Returns:
-        tuple: (is_haptic (bool), haptic_type (list of str))
+        tuple: (is_haptic (bool), haptic_type (str), topology analysis (dict))
     """
     labels = [atom.label for atom in atoms]
+    group_formula = labels2formula(labels)
     is_haptic = False  # old self.hapticity
-    haptic_type = []  # old self.hapttype
+    haptic_type = None  # old self.hapttype
 
     totnum = len(labels)
 
@@ -888,23 +896,25 @@ def identify_haptic_mode(atoms: list, use_bond_info: bool | None = None):
         "O": labels.count("O"),
     }
 
+    if use_bond_info is None:
+        use_bond_info = config.USE_BOND_INFO
+
     # (numC, numAs, numP, numO, total_atoms) → haptic modes
     HAPTIC_RULES = {
         # eta2
-        (2, 0, 0, 0, 2): ["eta2(C,C)"],
+        (2, 0, 0, 0, 2): "eta2(C2)",
         # eta3
-        (3, 0, 0, 0, 3): ["eta3(C,C,C)"],
+        (3, 0, 0, 0, 3): "eta3(C3)",
         # eta4
-        (3, 0, 0, 1, 4): ["eta4(C,C,C,O)"],
-        (4, 0, 0, 0, 4): ["eta4(C,C,C,C)"],
+        (4, 0, 0, 0, 4): "eta4(C4)",
         # eta5
-        (5, 0, 0, 0, 5): ["eta5(Cp)"],
-        (0, 5, 0, 0, 5): ["eta5(AsCp)"],
-        (0, 0, 5, 0, 5): ["eta5(P5)"],
+        (5, 0, 0, 0, 5): "eta5(C5)",
+        (0, 5, 0, 0, 5): "eta5(As5)",
+        (0, 0, 5, 0, 5): "eta5(P5)",
         # eta6+
-        (6, 0, 0, 0, 6): ["eta6(C6)"],
-        (7, 0, 0, 0, 7): ["eta7(C7)"],
-        (8, 0, 0, 0, 8): ["eta8(C8)"],
+        (6, 0, 0, 0, 6): "eta6(C6)",
+        (7, 0, 0, 0, 7): "eta7(C7)",
+        (8, 0, 0, 0, 8): "eta8(C8)",
     }
 
     key = (
@@ -915,25 +925,38 @@ def identify_haptic_mode(atoms: list, use_bond_info: bool | None = None):
         totnum,
     )
 
+    # Fallback: generic single-ring hapticity
+    results = analyze_topology(atoms, use_bond_info=use_bond_info)
     if key in HAPTIC_RULES:
         haptic_type = HAPTIC_RULES[key]
         is_haptic = True
-
+        if results["is_single_simple_ring"]:
+            if group_formula == "C5":
+                haptic_type = "eta5(Cp)"  # cyclopentadienyl anion
+            elif group_formula == "C6":
+                haptic_type = "eta6(benzene)"  # benzene
+            elif group_formula == "C7":
+                haptic_type = "eta7(CHT)"  # cycloheptatrienyl
+            elif group_formula == "C8":
+                haptic_type = "eta8(COT)"  # cyclooctatetraenyl dianion
+        elif results["n_rings"] == 2 and results["is_fused_5_5"]:
+            if group_formula == "C8":
+                haptic_type = "eta5,eta5(pentalene)"  # pentalene
+        elif results["n_rings"] == 2 and results["is_fused_5_6"]:
+            if group_formula == "C9":
+                haptic_type = "eta5,eta6(indene)"  # indene
+        elif results["n_rings"] == 2 and results["is_fused_5_7"]:
+            if group_formula == "C10":
+                haptic_type = "eta5,eta7(azulene)"  # azulene
     else:
-        if use_bond_info is None:
-            use_bond_info = config.USE_BOND_INFO
-
-        # Fallback: generic single-ring hapticity
-        single_ring = is_single_ring(atoms, use_bond_info=use_bond_info)
-
-        if single_ring:
-            mode = f"eta{totnum}({labels2formula(labels)})"
-            haptic_type = [mode]
+        if results["is_single_simple_ring"]:
+            haptic_type = f"eta{totnum}({group_formula})"
             is_haptic = True
     logger.debug(
         "Identified haptic mode: is_haptic=%s, haptic_type=%s", is_haptic, haptic_type
     )
-    return is_haptic, haptic_type
+
+    return is_haptic, haptic_type, results
 
 
 def is_single_ring(atoms: list, use_bond_info: bool | None = None) -> bool:
@@ -985,6 +1008,272 @@ def is_single_ring(atoms: list, use_bond_info: bool | None = None) -> bool:
     #     return False, cycle_basis[0]  # The graph has a cycle but not all nodes are included
 
     return False  # Otherwise, not a ring compound
+
+
+def analyze_topology(atoms: list, use_bond_info: bool | None = None):
+    """
+    Analyze graph topology for a group of atoms.
+
+    Detects:
+    - graph connectivity
+    - number of rings
+    - ring sizes
+    - whether all atoms belong to rings
+    - simple single ring
+    - fused ring systems (5–5, 5–6, 5–7)
+    """
+
+    def _empty_result(is_connected=False):
+        return {
+            "is_connected": is_connected,
+            "n_rings": 0,
+            "ring_sizes": [],
+            "ring_atoms": set(),
+            "all_atoms_in_rings": False,
+            "is_single_simple_ring": False,
+            "is_fused_5_5": False,
+            "is_fused_5_6": False,
+            "is_fused_5_7": False,
+        }
+
+    if not atoms:
+        return _empty_result(is_connected=False)
+
+    labels = [atom.label for atom in atoms]
+    positions = [atom.coord for atom in atoms]
+    atom_site_labels = (
+        [atom.atom_site_label for atom in atoms] if atoms[0].atom_site_label else None
+    )
+
+    refcell = atoms[0].get_parent("reference")
+    bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
+
+    if use_bond_info is None:
+        use_bond_info = config.USE_BOND_INFO
+
+    adjmat = build_adjacency(
+        labels=labels,
+        positions=positions,
+        atom_site_labels=atom_site_labels,
+        bond_data=bond_data,
+        use_bond_info=use_bond_info,
+    )
+
+    if adjmat is None:
+        return _empty_result(is_connected=False)
+
+    G = nx.from_numpy_array(np.array(adjmat))
+
+    is_connected = nx.is_connected(G)
+    if not is_connected:
+        return _empty_result(is_connected=False)
+
+    # --- Ring detection ---
+    cycle_basis = nx.cycle_basis(G)
+    ring_sets = [set(cycle) for cycle in cycle_basis]
+    n_rings = len(ring_sets)
+
+    ring_atoms = set().union(*ring_sets) if ring_sets else set()
+    all_atoms_in_rings = len(ring_atoms) == G.number_of_nodes()
+    is_single_simple_ring = (n_rings == 1) and all_atoms_in_rings
+
+    # --- Fused ring detection ---
+    fused_flags = {
+        "is_fused_5_5": False,
+        "is_fused_5_6": False,
+        "is_fused_5_7": False,
+    }
+
+    if n_rings == 2:
+        r1, r2 = ring_sets
+        shared = r1 & r2
+        sizes = tuple(sorted([len(r1), len(r2)]))
+        total_unique = len(r1 | r2)
+
+        fused_rules = {
+            (5, 5): ("is_fused_5_5", 8),
+            (5, 6): ("is_fused_5_6", 9),
+            (5, 7): ("is_fused_5_7", 10),
+        }
+
+        if sizes in fused_rules and len(shared) == 2:
+            flag_name, expected_total = fused_rules[sizes]
+            if total_unique == expected_total:
+                fused_flags[flag_name] = True
+
+    return {
+        "is_connected": True,
+        "n_rings": n_rings,
+        "ring_sizes": [len(r) for r in ring_sets],
+        "ring_atoms": ring_atoms,
+        "all_atoms_in_rings": all_atoms_in_rings,
+        "is_single_simple_ring": is_single_simple_ring,
+        **fused_flags,
+    }
+
+
+def merge_multiple_groups(parent_molecule, groups, parent_ligand):
+    from cell2mol.classes.group import Group
+
+    """
+    Merge multiple Group objects.
+    Returns a LIST of Group objects (usually 1, but can be 2 if splitting occurs).
+    """
+    all_atoms = []
+    seen_atom_ids = set()
+    all_metals = []
+    haptic_denticities = []
+
+    # --- 1. Aggregate Atoms & Metals ---
+    for grp in groups:
+        if grp.is_haptic:
+            haptic_denticities.append(grp.haptic_type.split("(", 1)[0])
+
+        for atom in grp.atoms:
+            idx = atom.get_parent_index("molecule")
+            if idx not in seen_atom_ids:
+                seen_atom_ids.add(idx)
+                all_atoms.append(atom)
+
+        for m in grp.metals:
+            if m not in all_metals:
+                all_metals.append(m)
+
+    # --- 2. Topology Analysis ---
+    results = analyze_topology(all_atoms)
+    if not results["is_connected"]:
+        return []
+
+    # --- Helper: Filter metals connected to specific atoms ---
+    def get_bonded_metals(atom_subset, metal_candidates):
+        """
+        Return a list of metals from candidates that are bonded
+        to at least one atom in atom_subset based on adjacency matrix.
+        """
+        bonded = []
+        atom_indices = [a.get_parent_index("molecule") for a in atom_subset]
+        adj = parent_molecule.adjmat
+
+        for m in metal_candidates:
+            m_idx = m.get_parent_index("molecule")
+            is_connected = False
+            # Check bond between metal and ANY atom in the subset
+            for a_idx in atom_indices:
+                if adj[m_idx, a_idx]:  # Check adjacency (works for dense or sparse)
+                    is_connected = True
+                    break
+
+            if is_connected:
+                bonded.append(m)
+        return bonded
+
+    # --- Helper: Create and link a group ---
+    def create_linked_group(atom_subset, metals_subset, forced_haptic_type=None):
+        """Creates a Group object, sets parents, and links specific metals."""
+        new_grp = Group.from_atom_list(atom_subset)
+        new_grp.origin = "_merge_groups"
+
+        # Hapticity
+        if forced_haptic_type:
+            new_grp.haptic_type = forced_haptic_type
+            new_grp.is_haptic = True
+            new_grp.topology = results
+        else:
+            new_grp.get_hapticity()
+
+        # Map Indices
+        grp_mol_indices = [a.get_parent_index("molecule") for a in atom_subset]
+        lig_mol_indices = [
+            atom.get_parent_index("molecule") for atom in parent_ligand.atoms
+        ]
+        grp_lig_indices = [lig_mol_indices.index(m_idx) for m_idx in grp_mol_indices]
+
+        # Establish Parents
+        new_grp.add_parent(parent_molecule, indices=grp_mol_indices)
+        new_grp.set_inherit_adjmatrix("molecule")
+        new_grp.add_parent(parent_ligand, indices=grp_lig_indices)
+
+        # Link Specific Metals
+        if getattr(new_grp, "metals", None) is None:
+            object.__setattr__(new_grp, "metals", [])
+        new_grp.metals.extend(metals_subset)
+
+        return new_grp
+
+    # --- 3. Decision: Split or Keep Merged? ---
+    ring_indices = list(results.get("ring_atoms", []))
+    ring_size = len(ring_indices)
+
+    # CONDITION: Not all atoms in rings AND ring size is 5-8
+    if (not results["all_atoms_in_rings"]) and (ring_size in [5, 6, 7, 8]):
+        logger.debug(
+            "Splitting merged group into Ring (size %d) and Non-Ring parts", ring_size
+        )
+
+        # A. Ring Group
+        ring_atoms = [all_atoms[i] for i in ring_indices]
+        # Only attach metals bonded to the ring atoms
+        ring_metals = get_bonded_metals(ring_atoms, all_metals)
+        group_ring = create_linked_group(
+            ring_atoms, ring_metals, forced_haptic_type=None
+        )
+
+        # B. Non-Ring Group
+        non_ring_atoms = [
+            atom for i, atom in enumerate(all_atoms) if i not in ring_indices
+        ]
+        # Only attach metals bonded to the tail atoms
+        non_ring_metals = get_bonded_metals(non_ring_atoms, all_metals)
+        group_rest = create_linked_group(
+            non_ring_atoms, non_ring_metals, forced_haptic_type=None
+        )
+
+        return [group_ring, group_rest]
+
+    # --- 4. Standard Merged Path (One Group) ---
+    else:
+        labels = [a.label for a in all_atoms]
+        formula = labels2formula(labels)
+
+        # Determine Name
+        ring_map = {
+            ("single", "C5"): "Cp",
+            ("single", "C6"): "benzene",
+            ("single", "C7"): "CHT",
+            ("single", "C8"): "COT",
+            ("fused_5_5", "C8"): "pentalene",
+            ("fused_5_6", "C9"): "indene",
+            ("fused_5_7", "C10"): "azulene",
+        }
+
+        key = None
+        if results.get("all_atoms_in_rings"):
+            if results.get("is_single_simple_ring"):
+                key = ("single", formula)
+            elif results.get("n_rings") == 2:
+                if results.get("is_fused_5_5"):
+                    key = ("fused_5_5", formula)
+                elif results.get("is_fused_5_6"):
+                    key = ("fused_5_6", formula)
+                elif results.get("is_fused_5_7"):
+                    key = ("fused_5_7", formula)
+
+        group_name = ring_map.get(key, formula)
+        denticity_str = ",".join(haptic_denticities)
+        new_haptic_type = f"{denticity_str}({group_name})" if denticity_str else None
+
+        # Create single unified group with ALL metals
+        group_unified = create_linked_group(
+            all_atoms, all_metals, forced_haptic_type=new_haptic_type
+        )
+
+        logger.info(
+            "Merged group created: %s %s with metals %s",
+            group_unified.formula,
+            group_unified.haptic_type,
+            [m.label for m in group_unified.metals],
+        )
+        return [group_unified]
 
 
 def add_atom(
