@@ -88,7 +88,6 @@ OptionalRefList = list[T] | None
 # =============================================================================
 
 Spin = int
-HapticType = list[str]
 Type = Literal["cell", "cells", "specie", "protonation", "charge_state", "atom", "bond"]
 SubType = Literal[
     "reference",

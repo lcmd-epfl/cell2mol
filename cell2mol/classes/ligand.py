@@ -11,7 +11,7 @@ from cell2mol.connectivity import build_adjacency
 from cell2mol.utils import config
 from cell2mol.operations import get_angle
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import HapticType, NOType, OptionalRefList, SubType
+from cell2mol.my_types import NOType, OptionalRefList, SubType
 import logging
 
 elemdatabase = ElementData()
@@ -28,7 +28,7 @@ class Ligand(Specie):
     denticity: int | None = None
     # Ownership: groups are children of this ligand
     groups: list[Group] | None = Field(default=None)
-    haptic_type: HapticType | None = None
+    haptic_type: list[str] | None = None
     is_haptic: bool | None = None
     is_nitrosyl: bool | None = None
     is_silylyne: bool | None = None
@@ -175,8 +175,7 @@ class Ligand(Specie):
         for gr in self.groups:
             if gr.is_haptic is None:
                 gr.get_hapticity()
-            for entry in gr.haptic_type:
-                self.haptic_type.append(entry)
+                self.haptic_type.append(gr.haptic_type)
         if len(self.haptic_type) > 0:
             self.is_haptic = True
 

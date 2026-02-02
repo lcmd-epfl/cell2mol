@@ -10,7 +10,7 @@ from cell2mol.connectivity import identify_haptic_mode
 from cell2mol.element_utils import labels2electrons, labels2formula
 from cell2mol.operations import compute_centroid
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import HapticType, OptionalRef, OptionalRefList, SubType
+from cell2mol.my_types import OptionalRef, OptionalRefList, SubType
 import logging
 
 elemdatabase = ElementData()
@@ -20,8 +20,9 @@ logger = logging.getLogger(__name__)
 class Group(Specie):
     model_config = {"arbitrary_types_allowed": True, "extra": "allow"}
 
-    haptic_type: HapticType | None = None
+    haptic_type: str | None = None
     is_haptic: bool | None = None
+    topology: dict | None = None
     checked_coordination: bool | None = None
     # Cross-reference: points to a metal in parent Molecule
     closest_metal: OptionalRef[Metal] = None
@@ -163,10 +164,13 @@ class Group(Specie):
             return None
         logger.debug(f"Determining hapticity for group {self.formula}")
         logger.debug(f"Group atoms: {[atom.label for atom in self.atoms]}")
-        is_haptic, haptic_type = identify_haptic_mode(self.atoms, use_bond_info)
+        is_haptic, haptic_type, topology = identify_haptic_mode(
+            self.atoms, use_bond_info
+        )
 
         self.is_haptic = is_haptic
         self.haptic_type = haptic_type
+        self.topology = topology
 
     def get_denticity(self):
         self.denticity = 0

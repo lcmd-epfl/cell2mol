@@ -81,6 +81,7 @@ POST_TRANSITION_METALS = {"Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"}
 
 METALLOIDS = {"B", "Si", "Ge", "As", "Sb", "Te"}
 
+# TODO: update/add more haptic notations
 HAPTIC_PRETTY = {
     # eta2
     "eta2(C,C)": "η²-C,C",
@@ -91,12 +92,17 @@ HAPTIC_PRETTY = {
     "eta4(C,C,C,O)": "η⁴-C₃O",
     # eta5
     "eta5(Cp)": "η⁵-Cp",
-    "eta5(AsCp)": "η⁵-AsCp",
+    "eta5(C5)": "η⁵-C₅",
+    "eta5(As5)": "η⁵-As₅",
     "eta5(P5)": "η⁵-P₅",
     # eta6+
     "eta6(C6)": "η⁶-C₆",
+    "eta6(benzene)": "η⁶-benzene",
     "eta7(C7)": "η⁷-C₇",
+    "eta7(CHT)": "η⁷-cycloheptatrienyl",
     "eta8(C8)": "η⁸-C₈",
+    "eta8(COT)": "η⁸-cyclooctatetraenyl",
+    "eta5,5(Cp,Cp)": "η⁵,η⁵-Cp,Cp",
 }
 
 
