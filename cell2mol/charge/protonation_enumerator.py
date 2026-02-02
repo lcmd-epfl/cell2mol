@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Dict, List
 from cell2mol.classes.protonation import Protonation
 from cell2mol.charge.utils import FULLERENES, MANUAL_CHARGE_ASSIGN_SPECIES
+from cell2mol.hydrogen import detect_missing_hydrogens
 import logging
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
         )
         logger.info("Skipping protonation enumeration.")
         return None
-        # return get_empty_protonation_state(specie)
+    # return get_empty_protonation_state(specie)
 
     if specie.subtype == "ligand":
         parent = specie.get_parent("molecule")
@@ -92,82 +93,11 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
 
     logger.info("Processing %s (%s):", specie.formula, specie.subtype)
 
-    # --------------------------------------------------
-    # Resolve overlapping groups before processing
-    # --------------------------------------------------
-
-    def _group_priority(g):
-        """Higher value = higher priority."""
-        parent_indices = g.get_parent_indices("ligand")
-        return (
-            1 if g.is_haptic else 0,  # haptic first
-            len(parent_indices),  # larger fragment first
-        )
-
-    # Sort groups by priority (highest first)
-    sorted_groups = sorted(
-        ligand.groups,
-        key=_group_priority,
-        reverse=True,
-    )
-
-    filtered_groups = []
-
-    for g in sorted_groups:
-        pset = set(g.get_parent_indices("ligand"))
-
-        # Find a higher-priority group that fully contains this group
-        superset_group = next(
-            (h for h in filtered_groups if pset <= set(h.get_parent_indices("ligand"))),
-            None,
-        )
-
-        if superset_group is not None:
-            logger.debug(
-                "Skipping group %s (parent_indices=%s) because it is a subset of group %s (parent_indices=%s)",
-                g.formula,
-                sorted(pset),
-                superset_group.formula,
-                sorted(superset_group.get_parent_indices("ligand")),
-            )
-            continue
-
-        filtered_groups.append(g)
-
-    logger.debug("Filtered groups for protonation processing:")
-    for g in filtered_groups:
-        parent_indices = g.get_parent_indices("ligand")
-        logger.debug("        HANDLE_HAPTIC_GROUP: %s %s", g.formula, g.haptic_type)
-        logger.debug("        parent_indices: %s", parent_indices)
-
-        for idx in parent_indices:
-            a = ligand.atoms[idx]
-
-            logger.debug(
-                "        HANDLE_HAPTIC: idx=%d, label=%s, connec=%d, mconnec=%d",
-                idx,
-                a.label,
-                a.connec,
-                a.mconnec,
-            )
     # ============================================================
     # GROUP-LEVEL ANALYSIS
     # ============================================================
-    # for g in ligand.groups:
-    for g in filtered_groups:
+    for g in ligand.groups:
         parent_indices = g.get_parent_indices("ligand")
-
-        # ia_iia = get_alkali_alkaline_earth_metal_idxs(
-        #     [metal.label for metal in g.metals]
-        # )
-
-        # # --------------------------------------------------------
-        # # Alkali / alkaline-earth only coordination
-        # # --------------------------------------------------------
-        # if len(ia_iia) == len(g.metals):
-        #     for idx in parent_indices:
-        #         block[idx] = 1
-        #     continue
 
         # --------------------------------------------------
         # Dispatch to helper
@@ -222,7 +152,12 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
             continue
 
         if addedlist[idx] == 1:
-            logger.debug("    Single addition for atom index %d", idx)
+            logger.debug(
+                "    Single addition for atom %s%s (group index: %d)",
+                a.label,
+                f" ({a.atom_site_label})" if a.atom_site_label else "",
+                idx,
+            )
             isadded, newlab, newcoord = add_atom(
                 newlab, newcoord, idx, ligand, elemlist[idx], unconditional=True
             )
@@ -231,7 +166,7 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
                 logger.debug(
                     "    Position %s (%s) %d is a carbene site, added_list %d block %d",
                     a.label,
-                    a.atom_site_label,
+                    f" ({a.atom_site_label})" if a.atom_site_label else "",
                     idx,
                     addedlist[idx],
                     block[idx],
@@ -395,9 +330,10 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
         a = ligand.atoms[idx]
 
         logger.debug(
-            "        HANDLE_HAPTIC: idx=%d, label=%s, connec=%d, mconnec=%d",
+            "        HANDLE_HAPTIC: idx=%d, label=%s %s, connec=%d, mconnec=%d",
             idx,
             a.label,
+            f", atom_site_label={a.atom_site_label}" if a.atom_site_label else "",
             a.connec,
             a.mconnec,
         )
@@ -405,15 +341,141 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     # --------------------------------------------------
     # Helper: add up to N hydrogens on parent_indices
     # --------------------------------------------------
+
     def _assign_protonation_sites(max_protons: int):
-        tmp = 0
+        molecule = ligand.get_parent("molecule")
+
+        adjacency_dict = {}
+        metal_adjacency_dict = {}
+
+        # ---------- Build adjacency maps ----------
         for idx in parent_indices:
-            a = ligand.atoms[idx]
-            if a.mconnec >= 1:
-                if tmp < max_protons:
+            atom = ligand.atoms[idx]
+
+            adjacency_dict[idx] = [
+                molecule.labels[adj]
+                for adj in atom.adjacency
+                if adj not in atom.metal_adjacency
+            ]
+
+            metal_adjacency_dict[idx] = [
+                molecule.labels[adj] for adj in atom.metal_adjacency
+            ]
+
+        def _select_sites(strict_mode: bool):
+            """Select protonation sites with chemical priority."""
+            protonation_sites = []
+            added = 0
+            skip_cnt = 0
+
+            # ================= STRICT MODE =================
+            if strict_mode:
+                candidates = []
+
+                # --- gather and score candidates ---
+                for idx in parent_indices:
+                    adj_labels = adjacency_dict[idx]
+                    nC = adj_labels.count("C")
+                    nH = adj_labels.count("H")
+                    nTot = len(adj_labels)
+
+                    # priority (lower number = higher priority)
+                    if nTot == 2 and nC == 1 and nH == 1:  # C1H1
+                        priority = 0
+                    elif nTot == 2 and nC == 2 and nH == 0:  # C2H0
+                        priority = 1
+                    elif nTot == 3 and nC == 2 and nH == 1:  # C2H1
+                        priority = 2
+                    else:
+                        continue
+
+                    candidates.append((priority, idx))
+                logger.debug("  Candidates: %s", candidates)
+                # --- sort by chemical priority ---
+                candidates.sort(key=lambda x: x[0])
+
+                # --- select respecting spacing rule ---
+                for _, idx in candidates:
+                    atom = ligand.atoms[idx]
+
+                    if max_protons == 2 and added == 1 and skip_cnt < 2:
+                        skip_cnt += 1
+                        print(
+                            f"  Skipping {idx} (count: {skip_cnt})",
+                            atom.label,
+                            atom.atom_site_label,
+                        )
+                        continue
+
+                    if added >= max_protons:
+                        break
+
+                    protonation_sites.append(idx)
+                    added += 1
+                    print(
+                        "  Added proton to",
+                        idx,
+                        atom.label,
+                        atom.atom_site_label,
+                        adjacency_dict[idx],
+                        metal_adjacency_dict[idx],
+                    )
+
+                return protonation_sites
+
+            # ================= FALLBACK MODE =================
+            for idx in parent_indices:
+                atom = ligand.atoms[idx]
+                adj_labels = adjacency_dict[idx]
+                metal_adj_labels = metal_adjacency_dict[idx]
+
+                if len(metal_adj_labels) >= 2:
+                    continue
+
+                nC = adj_labels.count("C")
+                nTot = len(adj_labels)
+
+                if nTot == 3 and nC == 3:
+                    if max_protons == 2 and added == 1 and skip_cnt < 2:
+                        skip_cnt += 1
+                        print(
+                            f"  Skipping {idx} (count: {skip_cnt})",
+                            atom.label,
+                            atom.atom_site_label,
+                        )
+                        continue
+
+                    protonation_sites.append(idx)
+                    added += 1
+                    print(
+                        "  Added proton to",
+                        idx,
+                        atom.label,
+                        atom.atom_site_label,
+                        adjacency_dict[idx],
+                        metal_adjacency_dict[idx],
+                    )
+
+                    if added >= max_protons:
+                        break
+
+            return protonation_sites
+
+        # ---------- First pass (strict chemistry) ----------
+        protonation_sites = _select_sites(strict_mode=True)
+
+        # ---------- Fallback pass ----------
+        if len(protonation_sites) < max_protons:
+            print("  Falling back to relaxed protonation rules")
+            protonation_sites = _select_sites(strict_mode=False)
+
+        # ---------- Apply results ----------
+        if len(protonation_sites) == max_protons:
+            site_set = set(protonation_sites)
+            for idx in parent_indices:
+                if idx in site_set:
                     addedlist[idx] = addedlist.get(idx, 0) + 1
                     elemlist[idx] = "H"
-                    tmp += 1
                 else:
                     block.append(idx)
 
@@ -424,18 +486,29 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
         selected = True
         _assign_protonation_sites(1)
 
-    elif "eta7(C7)" in g.haptic_type and not selected:
+    elif "eta6(benzene)" in g.haptic_type and not selected:
         selected = True
-        _assign_protonation_sites(1)
+        for idx in parent_indices:
+            block.append(idx)
 
-    elif "eta8(C8)" in g.haptic_type and not selected:
+    elif "CHT" in g.haptic_type and not selected:
         selected = True
-        _assign_protonation_sites(1)
+        _assign_protonation_sites(0)
+
+    elif "COT" in g.haptic_type and not selected:
+        selected = True
+        _assign_protonation_sites(2)
+
+    elif "pentalene" in g.haptic_type and not selected:
+        print(g.topology)
+        selected = True
+        _assign_protonation_sites(2)
 
     # --------------------------------------------------
-    # AsCp / Pentaphosphole (substitution dependent)
+    # As5 / Pentaphosphole (substitution dependent)
     # --------------------------------------------------
-    elif "eta5(AsCp)" in g.haptic_type and not selected:
+    # e.g. GOCSID
+    elif "eta5(As5)" in g.haptic_type and not selected:
         selected = True
         issubstituted = False
         for idx in parent_indices:
@@ -458,42 +531,116 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                         issubstituted = True
         _assign_protonation_sites(0 if issubstituted else 1)
 
-    elif "eta3(C,C,C)" in g.haptic_type and not selected:
-        selected = True
-        _assign_protonation_sites(1)
+    # --------------------------------------------------
+    # Other hapticities
+    # --------------------------------------------------
+    else:
+        if (
+            g.topology["is_single_simple_ring"] and g.ring_sizes[0] == 8
+        ) or ligand.formula == "H8-C8":
+            print("  Special case: cyclooctatetraene detected")
+            _assign_protonation_sites(2)
+        else:
+            logger.debug(
+                "  Unrecognized haptic type: %s Ligand: %s",
+                g.haptic_type,
+                ligand.formula,
+            )
+            logger.debug("  Topology analysis: %s", g.topology)
 
-    elif "eta4(C,C,C,C)" in g.haptic_type and not selected:
-        selected = True
-        for idx in parent_indices:
-            if ligand.atoms[idx].mconnec == 1:
-                block.append(idx)
+            molecule = ligand.get_parent("molecule")
 
-    elif "eta2(C,C)" in g.haptic_type and not selected:
-        selected = True
-        for idx in parent_indices:
-            if ligand.atoms[idx].mconnec == 1:
-                block.append(idx)
+            adjacency_dict = {}
+            metal_adjacency_dict = {}
 
-    elif "eta4(C,C,C,O)" in g.haptic_type and not selected:
-        selected = True
-        for idx in parent_indices:
-            if ligand.atoms[idx].mconnec == 1:
-                block.append(idx)
+            # ---------- Build adjacency maps ----------
+            for idx in parent_indices:
+                atom = ligand.atoms[idx]
 
-    elif "eta6(C6)" in g.haptic_type and not selected:
-        selected = True
-        for idx in parent_indices:
-            if ligand.atoms[idx].mconnec == 1:
-                block.append(idx)
+                adjacency_dict[idx] = [
+                    molecule.atoms[adj]
+                    for adj in atom.adjacency
+                    if adj not in atom.metal_adjacency
+                ]
 
+                metal_adjacency_dict[idx] = [
+                    molecule.atoms[adj] for adj in atom.metal_adjacency
+                ]
+
+            for idx in parent_indices:
+                atom = ligand.atoms[idx]
+                neighbor_coords = [atom.coord for atom in adjacency_dict[idx]]
+                neighbor_labels = [atom.label for atom in adjacency_dict[idx]]
+
+                missing_h_detected, report, num_missing_h = detect_missing_hydrogens(
+                    atom.atnum,
+                    atom.coord,
+                    neighbor_coords,
+                    neighbor_labels,
+                )
+                if num_missing_h > 0:
+                    needs_nonlocal = True
+                    non_local_indices.append(idx)
+                    logger.debug(
+                        "  Needing non-local protonation for atom %d (%s): %s",
+                        idx,
+                        atom.atom_site_label,
+                        report,
+                    )
+                    # logger.debug(
+                    #     "  Missing H detected on atom %d (%s): %s",
+                    #     idx,
+                    #     atom.atom_site_label,
+                    #     report,
+                    # )
+                    # addedlist[idx] = 1
+                    # elemlist[idx] = "H"
+                else:
+                    block.append(idx)
+
+    # elif "eta2(C2)" in g.haptic_type and not selected:
+    #     selected = True
+    #     for idx in parent_indices:
+    #         if ligand.atoms[idx].mconnec == 1:
+    #             block.append(idx)
+
+    # elif "eta3(C3)" in g.haptic_type and not selected:
+    #     selected = True
+    # _assign_protonation_sites_middle(1)
+    # _assign_protonation_sites_eta3_carbons(1)
+    # _assign_protonation_sites(0)
+    # non_local
+    # elif "eta4(C4)" in g.haptic_type and not selected:
+    #     selected = True
+    #     for idx in parent_indices:
+    #         if ligand.atoms[idx].mconnec == 1:
+    #             block.append(idx)
+
+    # elif "eta5(C5)" in g.haptic_type and not selected:
+    #     selected = True
+    #     _assign_protonation_sites(1)
+
+    # elif "eta6(C6)" in g.haptic_type and not selected:
+    #     selected = True
+    #     for idx in parent_indices:
+    #         if ligand.atoms[idx].mconnec == 1:
+    #             block.append(idx)
+
+    # elif "eta7(C7)" in g.haptic_type and not selected:
+    #     selected = True
+    #     _assign_protonation_sites(1)
+
+    # elif "eta8(C8)" in g.haptic_type and not selected:
+    #     selected = True
+    #     _assign_protonation_sites(1)
     # --------------------------------------------------
     # Fallback: unrecognized hapticity
     # --------------------------------------------------
-    elif not selected:
-        if len(g.haptic_type) == 1 and g.haptic_type[0] == "eta5(C4-N)":
-            _assign_protonation_sites(1)
+    # elif not selected:
+    #     if "eta5(C4-N)" in g.haptic_type:
+    #         _assign_protonation_sites(1)
 
-        logger.info("Haptic group not recognized, using fallback. %s", g.haptic_type)
+    # logger.info("Haptic group not recognized. %s", g.haptic_type)
 
     return ProtonationGroupResult(
         addedlist=addedlist,
@@ -535,9 +682,10 @@ def _handle_non_haptic_group(
         a = ligand.atoms[idx]
 
         logger.debug(
-            "        HANDLE_NON_HAPTIC: idx=%d, label=%s, connec=%d, mconnec=%d",
+            "        HANDLE_NON_HAPTIC: idx=%d, label=%s%s, connec=%d, mconnec=%d",
             idx,
             a.label,
+            f", atom_site_label={a.atom_site_label}" if a.atom_site_label else "",
             a.connec,
             a.mconnec,
         )
