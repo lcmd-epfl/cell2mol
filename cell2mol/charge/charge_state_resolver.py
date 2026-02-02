@@ -80,14 +80,14 @@ def enumerate_possible_charge_states(spec: object):
             prot.added_atoms,
             prot.typ,
         )
-        # logger.debug("detailed: %s\n%s", prot.formula, prot)
-        # if not prot.status:
-        #     logger.warning(
-        #         "Invalid protonation state found %s (status=%s)",
-        #         prot.formula,
-        #         prot.status,
-        #     )
-        #     logger.debug("detailed: %s\n%s", prot.formula, prot)
+        logger.debug("detailed: %s\n%s", prot.formula, prot)
+        if not prot.status:
+            logger.warning(
+                "Invalid protonation state found %s (status=%s)",
+                prot.formula,
+                prot.status,
+            )
+            logger.debug("detailed: %s\n%s", prot.formula, prot)
 
     # 3. Enumeration Loop
     valid_charge_states = []
@@ -144,7 +144,7 @@ def generate_charge_state(
         return None
 
     logger.debug(
-        "Protonation State: %s | Target Charge: %d | Allow charged fragments: %s | added atoms: %d",
+        "Protonation Formula: %s | Target Charge: %d | Allow charged fragments: %s | added atoms: %d",
         prot.formula,
         charge,
         allow_charged_fragments,

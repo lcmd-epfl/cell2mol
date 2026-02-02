@@ -8,7 +8,6 @@ import traceback
 from collections import Counter
 from ase.io import read
 from cell2mol.elementdata import ElementData
-from cell2mol.element_utils import HAPTIC_PRETTY
 import logging
 
 elemdatabase = ElementData()
