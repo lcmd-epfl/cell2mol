@@ -1028,7 +1028,8 @@ def analyze_topology(atoms: list, use_bond_info: bool | None = None):
             "is_connected": is_connected,
             "n_rings": 0,
             "ring_sizes": [],
-            "ring_atoms": set(),
+            "ring_atoms": [],
+            "ring_sets": [],
             "all_atoms_in_rings": False,
             "is_single_simple_ring": False,
             "is_fused_5_5": False,
@@ -1072,8 +1073,8 @@ def analyze_topology(atoms: list, use_bond_info: bool | None = None):
     cycle_basis = nx.cycle_basis(G)
     ring_sets = [set(cycle) for cycle in cycle_basis]
     n_rings = len(ring_sets)
-
     ring_atoms = set().union(*ring_sets) if ring_sets else set()
+    ring_atoms = list(ring_atoms)
     all_atoms_in_rings = len(ring_atoms) == G.number_of_nodes()
     is_single_simple_ring = (n_rings == 1) and all_atoms_in_rings
 
@@ -1101,11 +1102,13 @@ def analyze_topology(atoms: list, use_bond_info: bool | None = None):
             if total_unique == expected_total:
                 fused_flags[flag_name] = True
 
+    ring_sets = [list(r) for r in ring_sets]
     return {
         "is_connected": True,
         "n_rings": n_rings,
         "ring_sizes": [len(r) for r in ring_sets],
         "ring_atoms": ring_atoms,
+        "ring_sets": ring_sets,
         "all_atoms_in_rings": all_atoms_in_rings,
         "is_single_simple_ring": is_single_simple_ring,
         **fused_flags,
