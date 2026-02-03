@@ -1204,28 +1204,34 @@ def merge_multiple_groups(parent_molecule, groups, parent_ligand):
         return new_grp
 
     # --- 3. Decision: Split or Keep Merged? ---
-    ring_indices = list(results.get("ring_atoms", []))
-    ring_size = len(ring_indices)
+    ring_sets = results.get("ring_sets", [])
 
-    # CONDITION: Not all atoms in rings AND ring size is 5-8
-    if (not results["all_atoms_in_rings"]) and (ring_size in [5, 6, 7, 8]):
+    # Find a specific ring that fits the criteria (Size 5 to 8)
+    # We look for the first ring in the set that meets the condition.
+    primary_ring_indices = next((r for r in ring_sets if 5 <= len(r) <= 8), None)
+
+    # CONDITION: Not all atoms in rings AND we found a valid primary ring
+    if (not results.get("all_atoms_in_rings")) and (primary_ring_indices is not None):
+        target_indices = set(primary_ring_indices)  # Convert to set for O(1) lookup
+        ring_size = len(target_indices)
+
         logger.debug(
-            "Splitting merged group into Ring (size %d) and Non-Ring parts", ring_size
+            "Splitting: Isolated Primary Ring (size %d) from merged system", ring_size
         )
 
-        # A. Ring Group
-        ring_atoms = [all_atoms[i] for i in ring_indices]
-        # Only attach metals bonded to the ring atoms
+        # A. Ring Group (Only atoms in the identified 5-8 membered ring)
+        # Note: In your example, this keeps [0, 1, 2, 3, 4]
+        ring_atoms = [atom for i, atom in enumerate(all_atoms) if i in target_indices]
         ring_metals = get_bonded_metals(ring_atoms, all_metals)
         group_ring = create_linked_group(
             ring_atoms, ring_metals, forced_haptic_type=None
         )
 
-        # B. Non-Ring Group
+        # B. Rest Group (Tails AND atoms from other smaller fused rings)
+        # Note: In your example, atom [6] (from the 3-ring) moves here.
         non_ring_atoms = [
-            atom for i, atom in enumerate(all_atoms) if i not in ring_indices
+            atom for i, atom in enumerate(all_atoms) if i not in target_indices
         ]
-        # Only attach metals bonded to the tail atoms
         non_ring_metals = get_bonded_metals(non_ring_atoms, all_metals)
         group_rest = create_linked_group(
             non_ring_atoms, non_ring_metals, forced_haptic_type=None
@@ -1331,10 +1337,8 @@ def add_atom(
             cov_factor=ligand.cov_factor,
             add_atom=True,
         )
-
         tmpconnec = tmpconmat.sum(axis=1)
         # logger.debug("tmpconnec at added position=%d", int(tmpconnec[posadded]))
-
         # newlab_with_metal = newlab + [tgt.label]
         # newcoord_with_metal = newcoord + [tgt.coord]
 
@@ -1437,5 +1441,18 @@ def add_atom(
                 isadded = False
                 newlab = list(labels)
                 newcoord = list(coords)
+
+        else:
+            logger.info(
+                "Reset at site (ligand index: %d) of atom %s %s due to dummy %s connectivity=%d",
+                site,
+                atom.label,
+                atom.atom_site_label,
+                element,
+                tmpconnec[posadded],
+            )
+            isadded = False
+            newlab = list(labels)
+            newcoord = list(coords)
 
     return isadded, newlab, newcoord
