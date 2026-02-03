@@ -457,6 +457,7 @@ def handle_metal_coordination(metal: object) -> list:
 
             # 3. Analyze coordination mode
             group_obj.get_hapticity()
+            group_obj.get_denticity()
 
             # 4. Map indices
             group_mol_indices = [a.get_parent_index("molecule") for a in atoms]
