@@ -96,6 +96,19 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     # ============================================================
     # GROUP-LEVEL ANALYSIS
     # ============================================================
+    logger.info("Ligand formula: %s, natoms: %d", ligand.formula, ligand.natoms)
+    logger.debug(
+        "Ligand groups info: %s",
+        [
+            (
+                g.formula,
+                g.natoms,
+                [a.atom_site_label for a in g.atoms],
+                [m.atom_site_label for m in g.metals],
+            )
+            for g in ligand.groups
+        ],
+    )
     for g in ligand.groups:
         parent_indices = g.get_parent_indices("ligand")
 
@@ -324,7 +337,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     selected = False
 
     logger.debug("        HANDLE_HAPTIC_GROUP: %s %s", g.formula, g.haptic_type)
-    logger.debug("        parent_indices: %s", parent_indices)
+    logger.debug("        parent_indices (ligand): %s", parent_indices)
 
     for idx in parent_indices:
         a = ligand.atoms[idx]
@@ -568,34 +581,45 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
             for idx in parent_indices:
                 atom = ligand.atoms[idx]
-                neighbor_coords = [atom.coord for atom in adjacency_dict[idx]]
-                neighbor_labels = [atom.label for atom in adjacency_dict[idx]]
-
-                missing_h_detected, report, num_missing_h = detect_missing_hydrogens(
-                    atom.atnum,
-                    atom.coord,
-                    neighbor_coords,
-                    neighbor_labels,
-                )
-                if num_missing_h > 0:
-                    needs_nonlocal = True
-                    non_local_indices.append(idx)
-                    logger.debug(
-                        "  Needing non-local protonation for atom %d (%s): %s",
-                        idx,
-                        atom.atom_site_label,
-                        report,
-                    )
-                    # logger.debug(
-                    #     "  Missing H detected on atom %d (%s): %s",
-                    #     idx,
-                    #     atom.atom_site_label,
-                    #     report,
-                    # )
-                    # addedlist[idx] = 1
-                    # elemlist[idx] = "H"
-                else:
+                if atom.label != "C":
                     block.append(idx)
+                    logger.debug(
+                        "  Non-carbon atom %d %s (%s) blocked.",
+                        idx,
+                        atom.label,
+                        atom.atom_site_label,
+                    )
+                else:
+                    neighbor_coords = [atom.coord for atom in adjacency_dict[idx]]
+                    neighbor_labels = [atom.label for atom in adjacency_dict[idx]]
+
+                    missing_h_detected, report, num_missing_h = (
+                        detect_missing_hydrogens(
+                            atom.atnum,
+                            atom.coord,
+                            neighbor_coords,
+                            neighbor_labels,
+                        )
+                    )
+                    if num_missing_h > 0:
+                        needs_nonlocal = True
+                        non_local_indices.append(idx)
+                        logger.debug(
+                            "  Needing non-local protonation for atom %d (%s): %s",
+                            idx,
+                            atom.atom_site_label,
+                            report,
+                        )
+                        # logger.debug(
+                        #     "  Missing H detected on atom %d (%s): %s",
+                        #     idx,
+                        #     atom.atom_site_label,
+                        #     report,
+                        # )
+                        # addedlist[idx] = 1
+                        # elemlist[idx] = "H"
+                    else:
+                        block.append(idx)
 
     # elif "eta2(C2)" in g.haptic_type and not selected:
     #     selected = True
@@ -675,7 +699,7 @@ def _handle_non_haptic_group(
     ions = {"F", "Cl", "Br", "I", "As"}
 
     logger.debug("        HANDLE_NON_HAPTIC_GROUP: %s", g.formula)
-    logger.debug("        parent_indices: %s", parent_indices)
+    logger.debug("        parent_indices (ligand): %s", parent_indices)
 
     for idx in parent_indices:
         a = ligand.atoms[idx]
