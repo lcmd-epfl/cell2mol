@@ -449,23 +449,23 @@ class Molecule(Specie):
             ]
             # --- NEW: Identify which groups are purely Carbon ---
             # We create a boolean mask: True if the group contains ONLY "C", False otherwise.
-            group_is_pure_carbon = [
-                all(mol_labels[idx] == "C" for idx in atoms)
-                for atoms in group_atom_sets
-            ]
+            # group_is_pure_carbon = [
+            #     all(mol_labels[idx] == "C" for idx in atoms)
+            #     for atoms in group_atom_sets
+            # ]
 
             # --- Build connectivity graph between groups ---
             for i in range(n):
                 # STRICT RULE: If group i has heteroatoms (e.g., N1), it is not mergeable.
-                if not group_is_pure_carbon[i]:
-                    continue
+                # if not group_is_pure_carbon[i]:
+                #     continue
 
                 atoms_i = group_atom_sets[i]
 
                 for j in range(i + 1, n):
                     # STRICT RULE: If group j has heteroatoms, it is not mergeable.
-                    if not group_is_pure_carbon[j]:
-                        continue
+                    # if not group_is_pure_carbon[j]:
+                    #     continue
 
                     atoms_j = group_atom_sets[j]
 
