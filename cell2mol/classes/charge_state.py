@@ -81,17 +81,17 @@ class ChargeState(BaseModel):
             self.uncorr_total_charge,
             self.charge_tried,
         )
-        logger.debug("Added List: %s %d", self.addedlist, len(self.addedlist))
-        logger.debug("block: %s %d", self.block, len(self.block))
-        logger.debug(
-            "Metal Electrons: %s %d", self.metal_electrons, len(self.metal_electrons)
-        )
-        logger.debug("Element List: %s %d", self.elemlist, len(self.elemlist))
-        logger.debug(
-            "Uncorrected Atom Charges: %s %s",
-            self.uncorr_atom_charges,
-            len(self.uncorr_atom_charges),
-        )
+        # logger.debug("Added List: %s %d", self.addedlist, len(self.addedlist))
+        # logger.debug("block: %s %d", self.block, len(self.block))
+        # logger.debug(
+        #     "Metal Electrons: %s %d", self.metal_electrons, len(self.metal_electrons)
+        # )
+        # logger.debug("Element List: %s %d", self.elemlist, len(self.elemlist))
+        # logger.debug(
+        #     "Uncorrected Atom Charges: %s %s",
+        #     self.uncorr_atom_charges,
+        #     len(self.uncorr_atom_charges),
+        # )
         # Corrects the Charge of atoms with addedH
         count = 0
         if len(self.addedlist) > 0:
