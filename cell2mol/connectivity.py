@@ -539,7 +539,7 @@ def correct_valence_violation(adjmat, madjmat, labels, pos, radii):
                     pos[i],
                     labels[j],
                     pos[j],
-                    np.linalg.norm(pos[i] - pos[j]),
+                    np.linalg.norm(np.asarray(pos[i]) - np.asarray(pos[j])),
                     margin,
                 )
 

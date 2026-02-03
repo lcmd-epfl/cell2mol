@@ -352,7 +352,14 @@ def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
 
         rotated_ideal = np.dot(permuted_ideal, R)
         scale = np.sum(input_structure * rotated_ideal) / ideal_sq_norms
-        cshm = np.mean(np.sum((input_structure - scale * rotated_ideal) ** 2, axis=1))
+        if input_structure.size == 0:
+            logger.warning("calc_cshm_fast: empty input_structure")
+            print("calc_cshm_fast: empty input_structure", coordinates, ideal_shape)
+            cshm = float("inf")
+        else:
+            cshm = np.mean(
+                np.sum((input_structure - scale * rotated_ideal) ** 2, axis=1)
+            )
 
         min_cshm = min(min_cshm, cshm)
 

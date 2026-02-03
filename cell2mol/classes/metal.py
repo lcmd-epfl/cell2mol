@@ -288,7 +288,10 @@ class Metal(Atom):
                 )
                 diff = round(float(diff), 3)
                 diff_list.append(diff)
-        average = round(float(np.average(diff_list)), 3)
+        if len(diff_list) > 0:
+            average = round(float(np.mean(diff_list)), 3)
+        else:
+            average = 0.0
 
         logger.debug("diff_list(distance-covalent_radius)=%s", diff_list)
         logger.debug("average=%s", average)
