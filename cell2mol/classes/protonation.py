@@ -132,6 +132,7 @@ class Protonation(BaseModel):
                 self.adjnum = self.adjmat.sum(axis=1)
 
                 # 3. Fix connectivity for unconditionally added atoms
+
                 if len(self.addedlist) > 0:
                     # Identify the starting index of the newly added atoms
                     # If self.labels grew by the number of non-zero entries in addedlist:
@@ -145,11 +146,20 @@ class Protonation(BaseModel):
                             # Calculate the absolute index of the added atom in the current matrix
                             added_atom_idx = original_count + current_added_offset
                             current_added_offset += 1
-
                             logger.debug(
-                                "Enforcing single bond: Site %d <-> Added Atom %d",
+                                "Enforcing single bond: Site %d %s%s %s <-> Added Atom %d %s %s",
                                 original_site_idx,
+                                self.labels[original_site_idx],
+                                f" ({self.atom_site_labels[original_site_idx]})"
+                                if self.atom_site_labels
+                                else "",
+                                self.coords[original_site_idx],
                                 added_atom_idx,
+                                self.labels[added_atom_idx],
+                                # f" ({self.atom_site_labels[added_atom_idx]})"
+                                # if self.atom_site_labels
+                                # else "",
+                                self.coords[added_atom_idx],
                             )
 
                             # Clear all 'accidental' bonds for the added atom
@@ -207,7 +217,6 @@ class Protonation(BaseModel):
                         if add != 0:
                             count += 1
                             added_idx = len(self.addedlist) - 1 + count
-                            print("PROTONATION.added_idx", f"{idx=} {added_idx=}")
                             adjmat[idx, added_idx] += 1
                             adjmat[added_idx, idx] += 1
                             adjnum[idx] += 1
