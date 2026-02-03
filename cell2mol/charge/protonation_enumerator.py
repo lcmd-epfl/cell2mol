@@ -534,9 +534,9 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     # Other hapticities
     # --------------------------------------------------
     else:
-        if (
-            g.topology["is_single_simple_ring"] and g.ring_sizes[0] == 8
-        ) or ligand.formula == "H8-C8":
+        if ligand.formula == "H8-C8" or (
+            g.topology["is_single_simple_ring"] and g.topology["ring_sizes"][0] == 8
+        ):
             logger.debug("  Special case: cyclooctatetraene detected")
             _assign_protonation_sites(2)
         else:
