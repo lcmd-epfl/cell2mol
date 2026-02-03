@@ -354,7 +354,6 @@ def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
         scale = np.sum(input_structure * rotated_ideal) / ideal_sq_norms
         if input_structure.size == 0:
             logger.warning("calc_cshm_fast: empty input_structure")
-            print("calc_cshm_fast: empty input_structure", coordinates, ideal_shape)
             cshm = float("inf")
         else:
             cshm = np.mean(
@@ -616,7 +615,7 @@ def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, use_bond_info=No
             if not is_added:
                 # --- EARLY RETURN LOGIC ---
                 logger.warning(
-                    f"Atom {atom.label} failed validation. Returning early to re-evaluate."
+                    f"Atom {atom.label} ({atom.atom_site_label}) failed validation. Returning early to re-evaluate."
                 )
 
                 # Reset connectivity for the failed atom
