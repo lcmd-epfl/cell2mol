@@ -210,21 +210,23 @@ def check_missing_hydrogens(reference_molecules):
         else:
             for lig in ref.ligands:
                 is_single_oxygen = lig.formula == "O"
-                oxygen_atom = lig.atoms[0]
-                connected_metals = getattr(lig, "metals", [])
-                metal = connected_metals[0] if connected_metals else None
-
-                threshold_distance = 1.8  # Å
-                if (
-                    is_single_oxygen
-                    and oxygen_atom is not None
-                    and oxygen_atom.mconnec == 1
-                    and metal is not None
-                ):
-                    distance_to_metal = np.linalg.norm(oxygen_atom.coord - metal.coord)
-
-                    if distance_to_metal > threshold_distance:
-                        missing_h_in_coordinated_water = True
+                if is_single_oxygen:
+                    oxygen_atom = lig.atoms[0]
+                    connected_metals = getattr(lig, "metals", [])
+                    if len(connected_metals) >= 2:
+                        logger.warning(
+                            "Ligand (formula: %s) has multiple connected metals %s; skipping bridged O atom",
+                            lig.formula,
+                            [m.label for m in connected_metals],
+                        )
+                    elif len(connected_metals) == 1:
+                        metal = connected_metals[0]
+                        threshold_distance = 1.9  # Å
+                        distance_to_metal = np.linalg.norm(
+                            oxygen_atom.coord - metal.coord
+                        )
+                        if distance_to_metal > threshold_distance:
+                            missing_h_in_coordinated_water = True
 
                 if (
                     lig.formula in {"C-N", "C-P", "C-As", "C-Sb"}
