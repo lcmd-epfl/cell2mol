@@ -225,19 +225,16 @@ def _construct_state_from_topology(reference, target, final_charge):
     # Case B: Standard Molecule (Create Empty/Neutral State)
     elif target.is_non_complex_molecule:
         logger.debug("Mode 3: Creating Empty PROTONATION for %s", target.formula)
-        empty_list = [0] * len(target.labels)
 
         # Construct a neutral/empty protonation object
         empty_prot = Protonation.from_positional(
             labels=target.labels,
-            coords=target.coord,
+            coord=target.coord,
             cov_factor=target.cov_factor,
-            total_charge=0,
-            added_list=empty_list,
-            added_type=empty_list,
-            added_z=empty_list,
-            added_lab=empty_list,
-            typ="Empty",
+            n_protons_added=0,
+            site_proton_counts=[0] * len(target.labels),
+            ligand_donor_electrons=[0] * len(target.labels),
+            mode="none",
             parent=target,
         )
         cs = generate_charge_state(final_charge, empty_prot)
@@ -300,7 +297,7 @@ def _reorder_ligand_protonation(reference, target):
     else:
         # Handle case where charges length differs (e.g., added protons)
         reordered_charges = [temp_uncorr_atom_charges[idx] for idx in sorted_indices]
-        # Append remaining charges (usually added atoms like H+)
+        # Append remaining charges (usually added protons like H+)
         remaining = temp_uncorr_atom_charges[len(sorted_indices) :]
         reordered_charges.extend(remaining)
 
