@@ -75,10 +75,10 @@ def enumerate_possible_charge_states(spec: object):
 
     for prot in spec.protonation_states:
         logger.debug(
-            "Detailed info Formula: %s Added atoms: %d Type : %s",
+            "Detailed info Protonation State formula: %s Number of protons added: %d Mode : %s",
             prot.formula,
-            prot.added_atoms,
-            prot.typ,
+            prot.n_protons_added,
+            prot.mode,
         )
         logger.debug("detailed: %s\n%s", prot.formula, prot)
         if not prot.status:
@@ -106,7 +106,7 @@ def enumerate_possible_charge_states(spec: object):
                     spec.formula,
                     prot.formula,
                     charge,
-                    prot.added_atoms,
+                    prot.n_protons_added,
                     charge_state.smiles,
                 )
             else:
@@ -115,7 +115,7 @@ def enumerate_possible_charge_states(spec: object):
                     spec.formula,
                     prot.formula,
                     charge,
-                    prot.added_atoms,
+                    prot.n_protons_added,
                 )
 
     # 4. Final Selection / Filtering
@@ -144,11 +144,11 @@ def generate_charge_state(
         return None
 
     logger.debug(
-        "Protonation Formula: %s | Target Charge: %d | Allow charged fragments: %s | added atoms: %d",
+        "Protonation Formula: %s | Target Charge: %d | Allow charged fragments: %s | N Protons Added: %d",
         prot.formula,
         charge,
         allow_charged_fragments,
-        prot.added_atoms,
+        prot.n_protons_added,
     )
 
     # AC2mol returns a list of RDKit molecule objects and bond order (BO) matrix
@@ -377,7 +377,9 @@ def get_candidate_charges(prot: object) -> list:
         if not spec.is_haptic:
             if spec.denticity is None:
                 spec.get_denticity()
-            maxcharge = spec.denticity + num_noncoordinated_oxygen - prot.added_atoms
+            maxcharge = (
+                spec.denticity + num_noncoordinated_oxygen - prot.n_protons_added
+            )
         else:
             maxcharge = 2
 
@@ -388,7 +390,7 @@ def get_candidate_charges(prot: object) -> list:
         maxcharge = max(2, min(maxcharge, 4))
 
         # If protons were added and it's not nitrosyl, favor neutrality
-        if not spec.is_nitrosyl and prot.added_atoms > 0:
+        if not spec.is_nitrosyl and prot.n_protons_added > 0:
             maxcharge = 0
     else:
         maxcharge = 0
@@ -635,7 +637,9 @@ def _get_best_candidate_indices(charge_states: list) -> list:
         atom.label for idx, atom in enumerate(parent.atoms) if atom.mconnec > 0
     ]
     blocked_indices = [
-        idx for idx, b in enumerate(charge_states[0].protonation.block) if b == 1
+        idx
+        for idx, n_added in enumerate(charge_states[0].protonation.site_proton_counts)
+        if n_added == 0
     ]
     coord_abs_atcharge = []
     coord_raw_atcharge = []
@@ -648,7 +652,9 @@ def _get_best_candidate_indices(charge_states: list) -> list:
 
         # Aromatic calculations
         added_indices = [
-            idx for idx, added in enumerate(chs.protonation.addedlist) if added != 0
+            idx
+            for idx, n_added in enumerate(chs.protonation.site_proton_counts)
+            if n_added > 0
         ]
         aromatic_dict = aromatic_info(chs.rdkit_obj, added_indices=added_indices)
 
