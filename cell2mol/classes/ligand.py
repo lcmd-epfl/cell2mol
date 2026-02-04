@@ -44,7 +44,6 @@ class Ligand(Specie):
         cls, labels: list, coord: list, frac_coord: list = None, radii: list = None
     ) -> None:
         return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
-        # self.evaluate_as_nitrosyl() ### move to the split_complexes function
 
     def __repr__(self):
         to_print = ""
@@ -175,6 +174,7 @@ class Ligand(Specie):
         for gr in self.groups:
             if gr.is_haptic is None:
                 gr.get_hapticity()
+            if gr.is_haptic:
                 self.haptic_type.append(gr.haptic_type)
         if len(self.haptic_type) > 0:
             self.is_haptic = True

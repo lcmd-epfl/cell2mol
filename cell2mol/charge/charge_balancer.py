@@ -261,7 +261,9 @@ def _filter_by_aromaticity(spec, possible_cs) -> List[int]:
     for cs in possible_cs:
         # Get indices of added protons
         added_indices = [
-            i for i, val in enumerate(cs.protonation.addedlist) if val != 0
+            i
+            for i, n_added in enumerate(cs.protonation.site_proton_counts)
+            if n_added > 0
         ]
 
         info = aromatic_info(cs.rdkit_obj, added_indices)
