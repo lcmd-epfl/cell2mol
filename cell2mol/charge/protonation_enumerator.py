@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Dict, List
 from cell2mol.classes.protonation import Protonation
 from cell2mol.charge.utils import FULLERENES, MANUAL_CHARGE_ASSIGN_SPECIES
-from cell2mol.hydrogen import detect_missing_hydrogens
+from cell2mol.hydrogen import detect_missing_hydrogens, add_hydrogens
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,11 +15,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ProtonationGroupResult:
-    addedlist: Dict[int, int]
-    block: List[int]
-    elemlist: Dict[int, str]
-    metal_electrons: Dict[int, int]
-    pos_carbenes: Dict[int, int]
+    site_proton_counts: Dict[int, int]
+    ligand_donor_electrons: Dict[int, int]
     needs_nonlocal: bool
     non_local_indices: List[int]
 
@@ -60,7 +57,6 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
         )
         logger.info("Skipping protonation enumeration.")
         return None
-    # return get_empty_protonation_state(specie)
 
     if specie.subtype == "ligand":
         parent = specie.get_parent("molecule")
@@ -73,21 +69,17 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     ligand = specie
     protonation_states: list = []
 
-    natoms = ligand.natoms
     newlab = ligand.labels.copy()
     newcoord = ligand.coord.copy()
     # ============================================================
     # Initialization
     # ============================================================
-    added_atoms = 0
-    addedlist = np.zeros(natoms, dtype=int)
-    block = np.zeros(natoms, dtype=int)
-    elemlist = np.empty(natoms, dtype=str)
-    metal_electrons = np.zeros(natoms, dtype=int)
-    pos_carbenes = np.zeros(natoms, dtype=int)
-
+    n_protons_added = 0
+    site_proton_counts = np.zeros(ligand.natoms, dtype=int)
+    ligand_donor_electrons = np.zeros(ligand.natoms, dtype=int)
     non_local_groups_indices: list[int] = []
-    reset_H_indices: list[int] = []
+    process_both_modes: list[int] = []
+    protonated_indices_to_reset: list[int] = []  # old : reset_H_indices
 
     limit_of_nonlocal_sites = 4  # Arbitrary limit to avoid combinatorial explosion
 
@@ -119,23 +111,15 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
             result = _handle_haptic_group(ligand, g, parent_indices)
         else:  # NON-HAPTIC GROUPS
             result = _handle_non_haptic_group(ligand, g, parent_indices)
+
         # --------------------------------------------------
         # Merge results (THIS IS THE IMPORTANT PART)
         # --------------------------------------------------
-        for idx, val in result.addedlist.items():
-            addedlist[idx] += val
+        for idx, val in result.site_proton_counts.items():
+            site_proton_counts[idx] += val
 
-        for idx in result.block:
-            block[idx] = 1
-
-        for idx, elem in result.elemlist.items():
-            elemlist[idx] = elem
-
-        for idx, val in result.metal_electrons.items():
-            metal_electrons[idx] += val
-
-        for idx, val in result.pos_carbenes.items():
-            pos_carbenes[idx] = val
+        for idx, val in result.ligand_donor_electrons.items():
+            ligand_donor_electrons[idx] += val
 
         if result.needs_nonlocal:
             non_local_groups_indices.extend(result.non_local_indices)
@@ -146,7 +130,7 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     logger.debug("    non_local_groups_indices: %s", non_local_groups_indices)
     if len(non_local_groups_indices) > limit_of_nonlocal_sites:
         logger.info(
-            "  %d non-local protonation sites detected (more than the limit of %d). ",
+            "  %d combinatorial protonation sites detected (more than the limit of %d). ",
             len(non_local_groups_indices),
             limit_of_nonlocal_sites,
         )
@@ -154,89 +138,112 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
             itertools.product([0, 1], repeat=len(non_local_groups_indices))
         )
         logger.info("  Total combinations to evaluate: %d. ", len(combinations))
-        # logger.info("  Skipping protonation enumeration for %s.", specie.formula)
         logger.info("  Generating empty protonation state only for %s.", specie.formula)
+
         return get_empty_protonation_state(specie)
+
     # ============================================================
     # LOCAL ATOM ADDITION
     # ============================================================
     for idx, a in enumerate(ligand.atoms):
-        if (addedlist[idx] - block[idx]) <= 0:
-            continue
-
-        if addedlist[idx] == 1:
+        atom_label = (
+            f"{a.label} ({a.atom_site_label})" if a.atom_site_label else a.label
+        )
+        n_protons_added += site_proton_counts[idx]
+        if site_proton_counts[idx] == 1:
             logger.debug(
-                "    Single addition for atom %s%s (group index: %d)",
-                a.label,
-                f" ({a.atom_site_label})" if a.atom_site_label else "",
+                "    Single proton addition for atom %s (ligand idx %d)",
+                atom_label,
                 idx,
             )
-            isadded, newlab, newcoord = add_atom(
-                newlab, newcoord, idx, ligand, elemlist[idx], unconditional=True
+            _, newlab, newcoord = add_atom(
+                newlab, newcoord, idx, ligand, element="H", unconditional=True
             )
-        elif addedlist[idx] > 1:
-            if pos_carbenes[idx]:
+        elif site_proton_counts[idx] >= 2:
+            logger.debug(
+                "    Multiple proton addition for atom %s (ligand idx %d): %d protons, ligand_donor_electrons %d",
+                atom_label,
+                idx,
+                site_proton_counts[idx],
+                ligand_donor_electrons[idx],
+            )
+
+            _, newlab, newcoord = add_hydrogens(
+                newlab, newcoord, idx, ligand, num_hydrogens=site_proton_counts[idx]
+            )
+
+            if ligand_donor_electrons[idx] >= 2 and idx in non_local_groups_indices:
+                process_both_modes.append(idx)
                 logger.debug(
-                    "    Position %s (%s) %d is a carbene site, added_list %d block %d",
-                    a.label,
-                    f" ({a.atom_site_label})" if a.atom_site_label else "",
+                    "    Atom %s (ligand idx %d) is also proccessed for combinatorial protonation.",
+                    atom_label,
                     idx,
-                    addedlist[idx],
-                    block[idx],
                 )
-            isadded, newlab, newcoord = add_atom(
-                newlab, newcoord, idx, ligand, elemlist[idx], unconditional=True
-            )
-        # else:
-        #     logger.debug(
-        #         "    Multiple additions (%d) for atom index %d",
-        #         (addedlist[idx] - block[idx]),
-        #         idx,
-        #     )
-        #     if pos_carbenes[idx]:
-        #         reset_H_indices.extend(
-        #             list(
-        #                 range(len(newlab), len(newlab) + (addedlist[idx] - block[idx]))
-        #             )
-        #         )
-        #     isadded, newlab, newcoord = add_hydrogens(
-        #         newlab, newcoord, idx, ligand, (addedlist[idx] - block[idx])
-        #     )
-
-        if isadded:
-            added_atoms += 1
-            block[idx] = 1
-        else:
-            addedlist[idx] = 0
-            block[idx] = 1
+                start_idx = len(newlab)
+                end_idx = start_idx + site_proton_counts[idx]
+                protonated_indices_to_reset.extend(list(range(start_idx, end_idx)))
 
     # ============================================================
-    # LOCAL PROTONATION
+    # Heuristic protonation
     # ============================================================
-    if not non_local_groups_indices:
+    no_nonlocal_sites = len(non_local_groups_indices) == 0
+    force_local_mode = process_both_modes
+
+    if no_nonlocal_sites or force_local_mode:
         protonation_states.append(
             Protonation.from_positional(
-                newlab,
-                newcoord,
-                ligand.cov_factor,
-                added_atoms,
-                addedlist,
-                block,
-                metal_electrons,
-                elemlist,
-                parent=specie,
+                labels=newlab,
+                coord=newcoord,
+                cov_factor=ligand.cov_factor,
+                n_protons_added=n_protons_added,
+                site_proton_counts=site_proton_counts,
+                ligand_donor_electrons=ligand_donor_electrons,
+                mode="heuristic",
+                parent=ligand,
             )
         )
-        return protonation_states
+        if not force_local_mode:
+            return protonation_states
 
     # ============================================================
-    # NON-LOCAL PROTONATION
+    # Combinatorial protonation
     # ============================================================
+    if protonated_indices_to_reset:
+        logger.debug(
+            "Ligand natoms: %d, Protonation state: natoms %d, number of added protons: %d",
+            ligand.natoms,
+            len(newlab),
+            n_protons_added,
+        )
+        logger.debug(
+            "Sites process_both_modes: %s %s",
+            process_both_modes,
+            [ligand.atoms[idx].atom_site_label for idx in process_both_modes],
+        )
+        logger.debug(
+            "Remove previously added protons at indices: %s for combinatorial protonation.",
+            protonated_indices_to_reset,
+        )
+        newlab = [
+            label
+            for idx, label in enumerate(newlab)
+            if idx not in protonated_indices_to_reset
+        ]
+        newcoord = [
+            coord
+            for idx, coord in enumerate(newcoord)
+            if idx not in protonated_indices_to_reset
+        ]
+        for idx in process_both_modes:
+            n_protons_added -= site_proton_counts[idx]
+            site_proton_counts[idx] = 0
+            ligand_donor_electrons[idx] = 0
+
     local_labels = newlab.copy()
     local_coords = newcoord.copy()
-    local_addedlist = addedlist.copy()
-    local_block = block.copy()
-    local_added_atoms = added_atoms
+    local_site_proton_counts = site_proton_counts.copy()
+    local_ligand_donor_electrons = ligand_donor_electrons.copy()
+    local_n_protons_added = n_protons_added
 
     combinations = list(itertools.product([0, 1], repeat=len(non_local_groups_indices)))
     combinations.sort(key=sum)
@@ -244,34 +251,26 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     for com in combinations:
         newlab = local_labels.copy()
         newcoord = local_coords.copy()
-        addedlist = local_addedlist.copy()
-        block = local_block.copy()
-        added_atoms = local_added_atoms
-        elemlist = np.empty(len(newlab), dtype=str)
-        metal_electrons = np.zeros(len(newlab), dtype=int)
+        n_protons_added = local_n_protons_added
+        site_proton_counts = local_site_proton_counts.copy()
+        ligand_donor_electrons = local_ligand_donor_electrons.copy()
 
         for flag, idx in zip(com, non_local_groups_indices):
             if flag == 1:
-                elemlist[idx] = "H"
-                addedlist[idx] = 1
-                isadded, newlab, newcoord = add_atom(
-                    newlab, newcoord, idx, ligand, "H", unconditional=True
+                site_proton_counts[idx] = 1
+                n_protons_added += site_proton_counts[idx]
+                _, newlab, newcoord = add_atom(
+                    newlab, newcoord, idx, ligand, element="H", unconditional=True
                 )
-                if isadded:
-                    added_atoms += 1
-
         prot = Protonation.from_positional(
-            newlab,
-            newcoord,
-            ligand.cov_factor,
-            added_atoms,
-            addedlist,
-            block,
-            metal_electrons,
-            elemlist,
-            o_s=sum(com),
-            typ="Non-local",
-            parent=specie,
+            labels=newlab,
+            coord=newcoord,
+            cov_factor=ligand.cov_factor,
+            n_protons_added=n_protons_added,
+            site_proton_counts=site_proton_counts,
+            ligand_donor_electrons=ligand_donor_electrons,
+            mode="combinatorial",
+            parent=ligand,
         )
 
         if prot.status:
@@ -287,7 +286,7 @@ def get_empty_protonation_state(specie: object) -> list[Protonation]:
     This "empty" protonation state does NOT represent a chemical
     protonation. It is created solely as a preprocessing step for
     charge-state enumeration, where a Protonation object is required
-    even when no atoms are added.
+    even when no protons are added.
     """
     logger.debug(
         "Creating empty protonation placeholder for %s (%s)",
@@ -295,23 +294,14 @@ def get_empty_protonation_state(specie: object) -> list[Protonation]:
         specie.subtype,
     )
 
-    natoms = len(specie.labels)
-
-    addedlist = [0] * natoms
-    block = [0] * natoms
-    metal_electrons = [0] * natoms
-    elemlist = np.empty(natoms, dtype=str)
-
     empty_protonation = Protonation.from_positional(
-        specie.labels,
-        specie.coord,
-        specie.cov_factor,
-        0,
-        addedlist,
-        block,
-        metal_electrons,
-        elemlist,
-        typ="Empty",
+        labels=specie.labels,
+        coord=specie.coord,
+        cov_factor=specie.cov_factor,
+        n_protons_added=0,
+        site_proton_counts=[0] * len(specie.labels),
+        ligand_donor_electrons=[0] * len(specie.labels),
+        mode="none",
         parent=specie,
     )
 
@@ -326,11 +316,8 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     It returns a ProtonationGroupResult describing intended changes.
     """
 
-    addedlist: Dict[int, int] = {}
-    block: List[int] = []
-    elemlist: Dict[int, str] = {}
-    metal_electrons: Dict[int, int] = {}
-    pos_carbenes: Dict[int, int] = {}
+    site_proton_counts: Dict[int, int] = {}
+    ligand_donor_electrons: Dict[int, int] = {}
     needs_nonlocal = False
     non_local_indices: List[int] = []
 
@@ -358,19 +345,16 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     def _assign_protonation_sites(max_protons: int):
         molecule = ligand.get_parent("molecule")
 
+        # ---------- Build adjacency maps ----------
         adjacency_dict = {}
         metal_adjacency_dict = {}
-
-        # ---------- Build adjacency maps ----------
         for idx in parent_indices:
             atom = ligand.atoms[idx]
-
             adjacency_dict[idx] = [
                 molecule.labels[adj]
                 for adj in atom.adjacency
                 if adj not in atom.metal_adjacency
             ]
-
             metal_adjacency_dict[idx] = [
                 molecule.labels[adj] for adj in atom.metal_adjacency
             ]
@@ -395,10 +379,12 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                     # priority (lower number = higher priority)
                     if nTot == 2 and nC == 1 and nH == 1:  # C1H1
                         priority = 0
-                    elif nTot == 2 and nC == 2 and nH == 0:  # C2H0
+                    if nTot == 3 and nC == 1 and nH == 2:  # C1H2
                         priority = 1
-                    elif nTot == 3 and nC == 2 and nH == 1:  # C2H1
+                    elif nTot == 2 and nC == 2 and nH == 0:  # C2H0
                         priority = 2
+                    elif nTot == 3 and nC == 2 and nH == 1:  # C2H1
+                        priority = 3
                     else:
                         continue
 
@@ -487,10 +473,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
             site_set = set(protonation_sites)
             for idx in parent_indices:
                 if idx in site_set:
-                    addedlist[idx] = addedlist.get(idx, 0) + 1
-                    elemlist[idx] = "H"
-                else:
-                    block.append(idx)
+                    site_proton_counts[idx] = 1
 
     # --------------------------------------------------
     # Cp-like rings
@@ -501,12 +484,9 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
     elif "eta6(benzene)" in g.haptic_type and not selected:
         selected = True
-        for idx in parent_indices:
-            block.append(idx)
 
-    elif "CHT" in g.haptic_type and not selected:
+    elif "CHT" in g.haptic_type and not selected:  # can be anion or cation
         selected = True
-        _assign_protonation_sites(0)
 
     elif "COT" in g.haptic_type and not selected:
         selected = True
@@ -543,6 +523,9 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                         issubstituted = True
         _assign_protonation_sites(0 if issubstituted else 1)
 
+    elif "eta3(C3)" in g.haptic_type and not selected:
+        selected = True
+        _assign_protonation_sites(1)
     # --------------------------------------------------
     # Other hapticities
     # --------------------------------------------------
@@ -581,13 +564,16 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
             for idx in parent_indices:
                 atom = ligand.atoms[idx]
+                atom_label = (
+                    f"{atom.label} ({atom.atom_site_label})"
+                    if atom.atom_site_label
+                    else atom.label
+                )
                 if atom.label != "C":
-                    block.append(idx)
                     logger.debug(
-                        "  Non-carbon atom %d %s (%s) blocked.",
+                        "  Non-carbon atom (%d) %s is not protonated in haptic group.",
                         idx,
-                        atom.label,
-                        atom.atom_site_label,
+                        atom_label,
                     )
                 else:
                     neighbor_coords = [atom.coord for atom in adjacency_dict[idx]]
@@ -605,72 +591,15 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                         needs_nonlocal = True
                         non_local_indices.append(idx)
                         logger.debug(
-                            "  Needing non-local protonation for atom %d (%s): %s",
+                            "  Needing combinatorial protonation for atom %d (%s): %s",
                             idx,
-                            atom.atom_site_label,
+                            atom_label,
                             report,
                         )
-                        # logger.debug(
-                        #     "  Missing H detected on atom %d (%s): %s",
-                        #     idx,
-                        #     atom.atom_site_label,
-                        #     report,
-                        # )
-                        # addedlist[idx] = 1
-                        # elemlist[idx] = "H"
-                    else:
-                        block.append(idx)
-
-    # elif "eta2(C2)" in g.haptic_type and not selected:
-    #     selected = True
-    #     for idx in parent_indices:
-    #         if ligand.atoms[idx].mconnec == 1:
-    #             block.append(idx)
-
-    # elif "eta3(C3)" in g.haptic_type and not selected:
-    #     selected = True
-    # _assign_protonation_sites_middle(1)
-    # _assign_protonation_sites_eta3_carbons(1)
-    # _assign_protonation_sites(0)
-    # non_local
-    # elif "eta4(C4)" in g.haptic_type and not selected:
-    #     selected = True
-    #     for idx in parent_indices:
-    #         if ligand.atoms[idx].mconnec == 1:
-    #             block.append(idx)
-
-    # elif "eta5(C5)" in g.haptic_type and not selected:
-    #     selected = True
-    #     _assign_protonation_sites(1)
-
-    # elif "eta6(C6)" in g.haptic_type and not selected:
-    #     selected = True
-    #     for idx in parent_indices:
-    #         if ligand.atoms[idx].mconnec == 1:
-    #             block.append(idx)
-
-    # elif "eta7(C7)" in g.haptic_type and not selected:
-    #     selected = True
-    #     _assign_protonation_sites(1)
-
-    # elif "eta8(C8)" in g.haptic_type and not selected:
-    #     selected = True
-    #     _assign_protonation_sites(1)
-    # --------------------------------------------------
-    # Fallback: unrecognized hapticity
-    # --------------------------------------------------
-    # elif not selected:
-    #     if "eta5(C4-N)" in g.haptic_type:
-    #         _assign_protonation_sites(1)
-
-    # logger.info("Haptic group not recognized. %s", g.haptic_type)
 
     return ProtonationGroupResult(
-        addedlist=addedlist,
-        block=block,
-        elemlist=elemlist,
-        metal_electrons=metal_electrons,
-        pos_carbenes=pos_carbenes,
+        site_proton_counts=site_proton_counts,
+        ligand_donor_electrons=ligand_donor_electrons,
         needs_nonlocal=needs_nonlocal,
         non_local_indices=non_local_indices,
     )
@@ -688,11 +617,8 @@ def _handle_non_haptic_group(
     All intended changes are returned via ProtonationGroupResult.
     """
 
-    addedlist: Dict[int, int] = {}
-    block: List[int] = []
-    elemlist: Dict[int, str] = {}
-    metal_electrons: Dict[int, int] = {}
-    pos_carbenes: Dict[int, int] = {}
+    site_proton_counts: Dict[int, int] = {}
+    ligand_donor_electrons: Dict[int, int] = {}
     needs_nonlocal = False
     non_local_indices: List[int] = []
 
@@ -703,12 +629,11 @@ def _handle_non_haptic_group(
 
     for idx in parent_indices:
         a = ligand.atoms[idx]
-
+        atom_label = a.label + (f" ({a.atom_site_label})" if a.atom_site_label else "")
         logger.debug(
-            "        HANDLE_NON_HAPTIC: idx=%d, label=%s%s, connec=%d, mconnec=%d",
+            "        HANDLE_NON_HAPTIC: idx=%d, label=%s, connec=%d, mconnec=%d",
             idx,
-            a.label,
-            f", atom_site_label={a.atom_site_label}" if a.atom_site_label else "",
+            atom_label,
             a.connec,
             a.mconnec,
         )
@@ -716,94 +641,79 @@ def _handle_non_haptic_group(
         # Collect non-metal adjacent atom labels
         # -----------------------------------------
         adj_labels = []
+        metal_adj_labels = []
         for adj in a.adjacency:
             if adj not in a.metal_adjacency:
                 adj_labels.append(ligand.get_parent("molecule").labels[adj])
+            else:
+                metal_adj_labels.append(ligand.get_parent("molecule").labels[adj])
 
         # -----------------------------------------
         # Simple ionic cases
         # -----------------------------------------
         if a.label in ions:
             if a.connec == 0:
-                addedlist[idx] = 1
-                elemlist[idx] = "H"
-            else:
-                block.append(idx)
+                site_proton_counts[idx] = 1
 
         # -----------------------------------------
         # Oxygen
         # -----------------------------------------
         elif a.label == "O":
-            if a.connec == 2 and len(adj_labels) == 1:
+            if len(adj_labels) == 1:
                 needs_nonlocal = True
                 non_local_indices.append(idx)
-            else:
-                block.append(idx)
 
         # -----------------------------------------
         # Sulfur / Selenium
         # -----------------------------------------
         elif a.label in {"S", "Se"}:
-            if a.connec == 1:
-                addedlist[idx] = 1
-                elemlist[idx] = "H"
-            elif a.connec == 2 and len(adj_labels) == 1:
+            if len(adj_labels) == 1:
                 needs_nonlocal = True
                 non_local_indices.append(idx)
-            else:
-                block.append(idx)
 
         # -----------------------------------------
         # Hydrides (handle manually)
         # -----------------------------------------
-        # elif a.label == "H":
-        #     if len(adj_labels) <= 1:
-        #         addedlist[idx] = 1
-        #         elemlist[idx] = "Cl"
-        #     else:
-        #         block.append(idx)
 
         # -----------------------------------------
         # Nitrogen
         # -----------------------------------------
         elif a.label == "N":
-            if ligand.natoms == 2 and ligand.is_nitrosyl:
-                if ligand.NO_type == "Linear":
-                    addedlist[idx] = 1
-                    elemlist[idx] = "O"
-                    metal_electrons[idx] = 1
-                else:  # Bent
-                    addedlist[idx] = 1
-                    elemlist[idx] = "H"
-            else:
-                if len(adj_labels) >= 3:
-                    block.append(idx)
-                elif adj_labels.count("N") == 2:
-                    addedlist[idx] = 1
-                    elemlist[idx] = "H"
+            if len(adj_labels) >= 3:
+                pass
+            elif len(adj_labels) == 2:
+                if adj_labels.count("N") == 2:
+                    site_proton_counts[idx] = 1
+
                 else:
                     G = nx.from_numpy_array(ligand.adjmat.astype(float))
                     cycles = nx.cycle_basis(G)
                     in_cycles = [c for c in cycles if idx in c]
 
                     if len(in_cycles) == 1 and len(in_cycles[0]) == 6:
-                        block.append(idx)
+                        pass  # pyridine-like
                     else:
                         needs_nonlocal = True
                         non_local_indices.append(idx)
+            elif len(adj_labels) == 1:
+                # Nitrosyl ligand (handle manually)
+                needs_nonlocal = True
+                non_local_indices.append(idx)
 
+            else:  # only N atom in the ligand
+                pass
         # -----------------------------------------
         # Phosphorus
         # -----------------------------------------
         elif a.label == "P":
             if len(adj_labels) >= 3:
-                block.append(idx)
+                pass
             elif len(adj_labels) == 1:
                 if adj_labels[0] in {"N", "C"}:
-                    block.append(idx)
+                    pass
                 elif adj_labels[0] == "P":
-                    addedlist[idx] = 1
-                    elemlist[idx] = "H"
+                    site_proton_counts[idx] = 1
+
                 else:
                     needs_nonlocal = True
                     non_local_indices.append(idx)
@@ -816,12 +726,10 @@ def _handle_non_haptic_group(
         # -----------------------------------------
         elif a.label == "C":
             if ligand.formula in {"C-N", "C-P", "C-As", "C-Sb"}:
-                addedlist[idx] = 1
-                elemlist[idx] = "H"
+                site_proton_counts[idx] = 1
 
             elif ligand.formula in {"C-O", "C-S", "C-Se", "C-Te"}:
-                block.append(idx)
-
+                pass
             else:
                 numN = adj_labels.count("N")
                 numO = adj_labels.count("O")
@@ -829,16 +737,13 @@ def _handle_non_haptic_group(
                 numC = adj_labels.count("C")
 
                 if len(adj_labels) == 1:
-                    addedlist[idx] = 1
-                    elemlist[idx] = "H"
+                    site_proton_counts[idx] = 1
 
                 elif len(adj_labels) == 2:
                     if numN == 1 and numO == 1:  # amide
-                        addedlist[idx] = 1
-                        elemlist[idx] = "H"
+                        site_proton_counts[idx] = 1
                     elif numH == 2 and ligand.formula == "H2-C":
-                        addedlist[idx] = 2
-                        elemlist[idx] = "H"
+                        site_proton_counts[idx] = 2
                     else:
                         G = nx.from_numpy_array(ligand.adjmat.astype(float))
                         cycles = nx.cycle_basis(G)
@@ -846,30 +751,30 @@ def _handle_non_haptic_group(
 
                         if len(in_cycles) == 1:
                             if numN == 2:
-                                addedlist[idx] = 2
-                                elemlist[idx] = "H"
-                                metal_electrons[idx] = 2
+                                print(
+                                    ligand.formula,
+                                    a.atom_site_label,
+                                    adj_labels,
+                                    "possible NHC",
+                                )
+                                site_proton_counts[idx] = 2
+                                ligand_donor_electrons[idx] = 2
                             elif numC == 2:
                                 needs_nonlocal = True
                                 non_local_indices.append(idx)
                             elif (numO == 1 and numC == 1) or (numN == 1 and numC == 1):
-                                pos_carbenes[idx] = 1
-                                addedlist[idx] = 2
-                                elemlist[idx] = "H"
-                                metal_electrons[idx] = 2
+                                site_proton_counts[idx] = 2
+                                ligand_donor_electrons[idx] = 2
                                 needs_nonlocal = True
                                 non_local_indices.append(idx)
                             else:
                                 needs_nonlocal = True
                                 non_local_indices.append(idx)
                         else:
-                            pos_carbenes[idx] = 1
-                            addedlist[idx] = 2
-                            elemlist[idx] = "H"
-                            metal_electrons[idx] = 2
+                            site_proton_counts[idx] = 2
+                            ligand_donor_electrons[idx] = 2
                             needs_nonlocal = True
                             non_local_indices.append(idx)
-
                 else:
                     needs_nonlocal = True
                     non_local_indices.append(idx)
@@ -879,18 +784,16 @@ def _handle_non_haptic_group(
         # -----------------------------------------
         elif a.label == "Si":
             if len(adj_labels) == 1:
-                addedlist[idx] = 3
-                elemlist[idx] = "H"
-                metal_electrons[idx] = 2
+                site_proton_counts[idx] = 3
+                ligand_donor_electrons[idx] = 2
             elif len(adj_labels) == 2:
                 G = nx.from_numpy_array(ligand.adjmat.astype(float))
                 cycles = nx.cycle_basis(G)
                 in_cycles = [c for c in cycles if idx in c]
 
                 if len(in_cycles) == 1:
-                    addedlist[idx] = 2
-                    elemlist[idx] = "H"
-                    metal_electrons[idx] = 2
+                    site_proton_counts[idx] = 2
+                    ligand_donor_electrons[idx] = 2
                 else:
                     needs_nonlocal = True
                     non_local_indices.append(idx)
@@ -903,10 +806,9 @@ def _handle_non_haptic_group(
         # -----------------------------------------
         elif a.label == "B":
             if len(adj_labels) < 4:
-                addedlist[idx] = 1
-                elemlist[idx] = "H"
+                site_proton_counts[idx] = 1
             else:
-                block.append(idx)
+                pass
 
         # -----------------------------------------
         # Fallback
@@ -916,11 +818,8 @@ def _handle_non_haptic_group(
             non_local_indices.append(idx)
 
     return ProtonationGroupResult(
-        addedlist=addedlist,
-        block=block,
-        elemlist=elemlist,
-        metal_electrons=metal_electrons,
-        pos_carbenes=pos_carbenes,
+        site_proton_counts=site_proton_counts,
+        ligand_donor_electrons=ligand_donor_electrons,
         needs_nonlocal=needs_nonlocal,
         non_local_indices=non_local_indices,
     )
