@@ -7,6 +7,7 @@ from .defaults import (
 
 # Error Codes
 ERR_CELL2MOL = 50
+ERR_INPUT = 95
 ERR_ASE_PARSE = 96
 ERR_GENERAL = 97
 ERR_TIMEOUT = 98

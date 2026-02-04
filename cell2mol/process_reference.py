@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 # Error Codes
 ERR_CELL2MOL = config.ERR_CELL2MOL
 ERR_ASE_PARSE = config.ERR_ASE_PARSE
+ERR_INPUT = config.ERR_INPUT
 ERR_GENERAL = config.ERR_GENERAL
 ERR_TIMEOUT = config.ERR_TIMEOUT
 ERR_MEMORY = config.ERR_MEMORY
@@ -62,10 +63,13 @@ def interpret_reference(input_path, name, current_dir):
 
         cif_okay, error_message = prefilter_cif(input_path)
         if not cif_okay:
+            for err_msg in error_message.splitlines():
+                logger.info(err_msg)
             exit_with_error_input(
-                f"CIF file is not suitable for processing: {error_message}"
+                f"CIF file is not suitable for processing\n{error_message}"
             )
-
+            exit_code = ERR_INPUT
+            return None
         # Enforce timeout on the heavy lifting
         with set_time_limit(config.TIMEOUT):
             try:

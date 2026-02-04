@@ -62,20 +62,20 @@ def prefilter_cif(cif_file_path):
     # Check for radical, disorder, 3D fractional coordinates, and polymeric structure
     radical, disorder, notfound_atom, polymeric = detect_cif_issues(cif_file_path)
 
-    message = ""
+    messages = []
 
     if any([radical, disorder, notfound_atom, polymeric]):
         if radical:
-            message += "\nRadical found in .cif file."
+            messages.append("Radical found in .cif file.")
         if disorder:
-            message += "\nDisorder found in .cif file."
+            messages.append("Disorder found in .cif file.")
         if notfound_atom:
-            message += "\nNo fractional coordinates found in .cif file."
+            messages.append("No fractional coordinates found in .cif file.")
         if polymeric:
-            message += "\nPolymeric structure found in .cif file."
-        return False, message
+            messages.append("Polymeric structure found in .cif file.")
+        return False, "\n".join(messages)
     else:
-        return True, message
+        return True, ""
 
 
 def get_geom_bond(cif_file_path):
