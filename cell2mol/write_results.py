@@ -19,7 +19,6 @@ def exit_with_error_input(message):
     error_log_path = os.path.join(os.getcwd(), "error_InputFile.out")
     with open(error_log_path, "w") as error_log:
         error_log.write(f"Error: {message}\n")
-    sys.exit(301)
 
 
 def exit_with_error_exception(exc, error_log_path=None):
