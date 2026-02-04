@@ -43,10 +43,9 @@ class ChargeState(BaseModel):
     coincide: bool | None = None
 
     # Copied from protonation with proper defaults
-    addedlist: list[int] | None = None
-    metal_electrons: list[int] | None = None
-    elemlist: list[str] | None = None
-    block: list[int] | None = None
+    site_proton_counts: list[int] | None = None
+    ligand_donor_electrons: list[int] | None = None
+    n_protons_added: int | None = None
 
     # Initialized attributes with defaults
     corr_total_charge: int = Field(default=0)
@@ -70,49 +69,27 @@ class ChargeState(BaseModel):
         self.coincide = self.uncorr_total_charge == self.charge_tried
 
         # Copy attributes from protonation
-        self.addedlist = self.protonation.addedlist
-        self.metal_electrons = self.protonation.metal_electrons
-        self.elemlist = self.protonation.elemlist
-        self.block = self.protonation.block
+        self.site_proton_counts = self.protonation.site_proton_counts
+        self.ligand_donor_electrons = self.protonation.ligand_donor_electrons
+        self.n_protons_added = self.protonation.n_protons_added
 
         logger.debug(
-            "Initializing ChargeState | SMILES: %s | Uncorr Charge: %d | Charge Tried: %d",
+            "Initializing ChargeState | SMILES: %s | Uncorr Charge: %d | Charge Tried: %d | N Protons Added: %d",
             self.smiles,
             self.uncorr_total_charge,
             self.charge_tried,
+            self.n_protons_added,
         )
-        # logger.debug("Added List: %s %d", self.addedlist, len(self.addedlist))
-        # logger.debug("block: %s %d", self.block, len(self.block))
-        # logger.debug(
-        #     "Metal Electrons: %s %d", self.metal_electrons, len(self.metal_electrons)
-        # )
-        # logger.debug("Element List: %s %d", self.elemlist, len(self.elemlist))
-        # logger.debug(
-        #     "Uncorrected Atom Charges: %s %s",
-        #     self.uncorr_atom_charges,
-        #     len(self.uncorr_atom_charges),
-        # )
+
         # Corrects the Charge of atoms with addedH
-        count = 0
-        if len(self.addedlist) > 0:
+        if len(self.site_proton_counts) > 0:
             # Iterates over the original number of ligand atoms, thus without the added H
-            for idx, add in enumerate(self.addedlist):
-                if add != 0:
-                    count += 1
-                    # logger.debug(
-                    #     "Correcting atom index %d | Original Charge: %d | Added: %d | block: %d | Metal Electrons: %d",
-                    #     idx,
-                    #     self.uncorr_atom_charges[idx],
-                    #     self.addedlist[idx],
-                    #     self.block[idx],
-                    #     self.metal_electrons[idx],
-                    # )
+            for idx, n_add in enumerate(self.site_proton_counts):
+                if n_add > 0:
                     corrected = (
                         self.uncorr_atom_charges[idx]
-                        - self.addedlist[idx]
-                        # + self.block[idx]
-                        + self.metal_electrons[idx]
-                        - self.uncorr_atom_charges[len(self.addedlist) - 1 + count]
+                        - self.site_proton_counts[idx]
+                        + self.ligand_donor_electrons[idx]
                     )
                     self.corr_atom_charges.append(corrected)
                     # last term corrects for cases in which a charge has been assigned to the added atom
@@ -136,6 +113,9 @@ class ChargeState(BaseModel):
         to_print += "------------- Cell2mol Charge State ---------------\n"
         to_print += f" Status                          = {self.status}\n"
         to_print += f" Smiles                          = {self.smiles}\n"
+        to_print += f" Number of Protons Added         = {self.n_protons_added}\n"
+        if sum(self.ligand_donor_electrons) > 0:
+            to_print += f" Ligand Donor Electrons          = {sum(self.ligand_donor_electrons)}\n"
         to_print += f" Charge Tried                    = {self.charge_tried}\n"
         to_print += f" Uncorrected Total Charge        = {self.uncorr_total_charge}\n"
         to_print += f" Corrected Total Charge          = {self.corr_total_charge}\n"
