@@ -561,8 +561,14 @@ def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, use_bond_info=No
 
     # 1. Sort atoms by distance: Farthest atoms first to handle
     sorted_gr_atoms = sorted(
-        gr_atoms, key=lambda a: np.linalg.norm(metal.coord - a.coord), reverse=True
+        gr_atoms,
+        key=lambda a: (
+            a.label == "H",  # Primary: H (True) comes before Non-H (False)
+            np.linalg.norm(metal.coord - a.coord),  # Secondary: Furthest distance first
+        ),
+        reverse=True,
     )
+    # e.g. ABAZEK
 
     # 2. Detailed Debug Logging
     logger.debug(
