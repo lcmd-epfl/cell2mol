@@ -386,7 +386,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                     elif nTot == 3 and nC == 2 and nH == 1:  # C2H1
                         priority = 3
                     else:
-                        continue
+                        priority = 4
 
                     candidates.append((priority, idx))
                 logger.debug("  Candidates: %s", candidates)

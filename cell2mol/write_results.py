@@ -9,6 +9,8 @@ from collections import Counter
 from ase.io import read
 from cell2mol.elementdata import ElementData
 import logging
+import pandas as pd
+from pathlib import Path
 
 elemdatabase = ElementData()
 logger = logging.getLogger(__name__)
@@ -108,7 +110,8 @@ def writexyz(fdir, fname, labels, pos, charge: int = 0, spin: int = 1, info: str
 
     with open(fullname, "w") as fil:
         print(natoms, file=fil)
-        print(f"{charge=} {spin=} {info}", file=fil)
+        print(f"{charge} {spin}", file=fil)
+        # print(f"{charge=} {spin=} {info}", file=fil)
         for label, (x, y, z) in zip(labels, pos):
             fil.write(f"{label:<2}  {x:15.8f}  {y:15.8f}  {z:15.8f}\n")
 
@@ -707,3 +710,35 @@ def _validate_species_indices(cell, label: str) -> None:
             logger.debug(
                 "\t[OK] %s (UniqueID: %s)", specie.formula, specie.unique_index
             )
+
+
+def save_coordination_report(report, output_csv):
+    """Save metal coordination discrepancy report as a CSV file."""
+    if not report:
+        logger.info("No coordination discrepancy report to save.")
+        return None
+
+    output_csv = Path(output_csv)
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+
+    fieldnames = [
+        "refcode",
+        "molecule_index",
+        "formula",
+        "metal",
+        "coord_atom",
+        "metal_site_label",
+        "coord_atom_site_label",
+        "distance",
+        "status",
+    ]
+
+    df = pd.DataFrame(report)
+
+    # Keep column order and avoid errors if some columns are missing
+    df = df.reindex(columns=fieldnames)
+
+    df.to_csv(output_csv, index=False)
+
+    logger.info("Saved coordination discrepancy report to %s", output_csv)
+    return output_csv
