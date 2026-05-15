@@ -1298,7 +1298,7 @@ def add_atom(
     """
     Add one atom of type `element` to a given ligand atom site.
 
-    The atom is placed along the vector pointing toward the closest metal atom.
+    The atom is placed along the vector pointing toward a given metal atom.
     """
     isadded = False
     posadded = len(labels)
@@ -1338,7 +1338,7 @@ def add_atom(
             add_atom=True,
         )
         tmpconnec = tmpconmat.sum(axis=1)
-        # logger.debug("tmpconnec at added position=%d", int(tmpconnec[posadded]))
+        logger.debug("tmpconnec at added position=%d", int(tmpconnec[posadded]))
         # newlab_with_metal = newlab + [tgt.label]
         # newcoord_with_metal = newcoord + [tgt.coord]
 
@@ -1376,6 +1376,18 @@ def add_atom(
                 element,
                 site,
             )
+        elif not isgood:
+            logger.info(
+                "Reset at site (ligand index: %d) of atom %s %s. Clash detected when adding dummy %s",
+                site,
+                atom.label,
+                atom.atom_site_label,
+                element,
+            )
+            isadded = False
+            newlab = list(labels)
+            newcoord = list(coords)
+
         # Case 2: acceptable connectivity
         elif tmpconnec[posadded] <= 1:
             isadded = True
@@ -1407,19 +1419,19 @@ def add_atom(
                 [labels[i] for i in removed],
                 [ligand.atom_site_labels[i] for i in removed],
             )
-
+            logger.debug(f"connected: {connected} | removed: {removed}")
             remaining = list(connected - removed)
 
-            # logger.debug("remaining connections after removal=%s", remaining)
+            logger.debug("remaining connections after removal=%s", remaining)
 
             if len(remaining) <= 1:
                 isadded = True
-                # logger.debug(
-                #     "%s added at site %d after removal of %s",
-                #     element,
-                #     site,
-                #     removed_idx,
-                # )
+                logger.debug(
+                    "%s added at site %d after removal of %s",
+                    element,
+                    site,
+                    removed_idx,
+                )
             else:
                 logger.info(
                     "Reset at site (ligand index: %d) of atom %s %s due to dummy %s connectivity=%d",

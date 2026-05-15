@@ -168,6 +168,8 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
                 ligand_donor_electrons[idx],
             )
 
+            start_idx = len(newlab)
+            end_idx = start_idx + site_proton_counts[idx]
             _, newlab, newcoord = add_hydrogens(
                 newlab, newcoord, idx, ligand, num_hydrogens=site_proton_counts[idx]
             )
@@ -179,8 +181,6 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
                     atom_label,
                     idx,
                 )
-                start_idx = len(newlab)
-                end_idx = start_idx + site_proton_counts[idx]
                 protonated_indices_to_reset.extend(list(range(start_idx, end_idx)))
 
     # ============================================================
@@ -674,6 +674,9 @@ def _handle_non_haptic_group(
         # -----------------------------------------
         # Hydrides (handle manually)
         # -----------------------------------------
+        elif a.label == "H":
+            if len(adj_labels) >= 1:
+                pass
 
         # -----------------------------------------
         # Nitrogen

@@ -415,6 +415,8 @@ def generate_manual_charge_state(spec):
         "I5": (None, "II[I-]II", -1),
         "I6": (None, "I[I-]II[I-]I", -2),
         "H": (None, "[H-]", -1),
+        "H2": (None, "[H][H]", 0),
+        "N-O3": ("N", "[N+](=O)([O-])[O-]", -1),
     }
 
     formula = spec.formula
