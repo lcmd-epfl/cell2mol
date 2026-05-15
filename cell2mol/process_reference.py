@@ -209,7 +209,6 @@ def create_reference(input_path, name, cell_vector, cell_param):
     # Get CIF bond moiety information
     geom_bond_cif, moiety_list_cif = get_geom_bond(input_path)
     refcell.set_cif_bond_moiety(geom_bond_cif, moiety_list_cif)
-    logger.info("CIF has bond moiety information: %s", refcell.exist_cif_bond_moiety)
 
     # Extract additional CIF information
     chemical_name, reported_metal_os, moiety_dicts = extract_info_from_cif(input_path)

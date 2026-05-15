@@ -31,7 +31,6 @@ import yaml
 from cell2mol.element_utils import labels2formula
 from cell2mol.operations import compute_centroid
 from cell2mol.connectivity import (
-    is_single_ring,
     add_atom,
     identify_haptic_mode,
 )
@@ -492,14 +491,23 @@ def correct_coordination_sphere(
     metal: object, ligands: list, conn_idx_by_ligands: dict, mol: object
 ) -> dict:
     """
-    Refines the coordination sphere and returns the final stable groups.
-    Returns: {ligand_index: [list of validated haptic/non-haptic groups]}
+    Refine the coordination sphere and return the final coordinated groups.
+    Args:
+        metal: Metal Atom object.
+        ligands: List of ligand Molecule objects.
+        conn_idx_by_ligands: Dictionary mapping each ligand index to the atom indices
+            connected to the metal within that ligand.
+        mol: TMC complex Molecule object.
+    Returns:
+        dict[int, list]: Dictionary mapping each ligand index to a list of validated
+            haptic or non-haptic coordination groups.
     """
     final_coordination_results = {}
 
     for jdx, connected_idx in conn_idx_by_ligands.items():
         current_pool = connected_idx
         stable_groups = []
+        removed_ligand_indices = []
         logger.debug(
             "Processing ligand %s (index %d) with initial connected indices: %s",
             ligands[jdx].formula,
@@ -517,7 +525,11 @@ def correct_coordination_sphere(
 
             for group in results.values():
                 validated_gr_atoms, was_changed = validate_coordinated_atoms(
-                    group["gr_atoms"], metal, ligands[jdx], haptic=group["is_haptic"]
+                    group["gr_atoms"],
+                    metal,
+                    ligands[jdx],
+                    haptic=group["is_haptic"],
+                    removed_ligand_indices=removed_ligand_indices,
                 )
 
                 surviving_pool.extend(
@@ -551,61 +563,82 @@ def correct_coordination_sphere(
     return final_coordination_results
 
 
-def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, use_bond_info=None):
+def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, removed_ligand_indices):
     """
     Checks if atoms in gr_atoms are truly connected to the metal.
+    Args:
+        gr_atoms: List of coordinating atoms.
+        metal: The metal Atom object.
+        ligand: The ligand Molecule object to which these atoms belong.
+        haptic: Boolean indicating if the coordination is haptic.
+        removed_ligand_indices: List of removed atom indices in ligands.
     Returns: (list of surviving atoms, boolean changed_flag)
     """
     if not gr_atoms:
         return [], False
 
-    # 1. Sort atoms by distance: Farthest atoms first to handle
-    sorted_gr_atoms = sorted(
-        gr_atoms,
-        key=lambda a: (
-            a.label == "H",  # Primary: H (True) comes before Non-H (False)
-            np.linalg.norm(metal.coord - a.coord),  # Secondary: Furthest distance first
-        ),
-        reverse=True,
-    )
-    # e.g. ABAZEK
-
-    # 2. Detailed Debug Logging
-    logger.debug(
-        "Sorted coordinated atoms (farthest first): %s",
-        [a.label for a in sorted_gr_atoms],
-    )
-    logger.debug(
-        "Sorted coordinated atom site labels: %s",
-        [a.atom_site_label for a in sorted_gr_atoms]
-        if sorted_gr_atoms and sorted_gr_atoms[0].atom_site_label
-        else None,
-    )
-    logger.debug(
-        "Sorted coordinated atom distances: %s",
-        [
-            float(np.round(np.linalg.norm(metal.coord - a.coord), 3))
-            for a in sorted_gr_atoms
-        ],
-    )
-
-    # 3. Haptic Handling: Skip correction if haptic
-    if haptic:
-        logger.info("Haptic ligand detected; skipping connectivity validation.")
-        # Identify if the haptic group forms a single ring (e.g., Cp ring)
-        single_ring = is_single_ring(gr_atoms, use_bond_info=use_bond_info)
-        logger.debug("Is single ring: %s", single_ring)
-
-        # Return original list and False (no changes made)
+    if len(gr_atoms) == 1:
+        atom = gr_atoms[0]
+        logger.debug(
+            "Only one coordinating atom found: %s (%s) (distance: %s). Skipping connectivity validation.",
+            atom.label,
+            atom.atom_site_label,
+            np.round(np.linalg.norm(metal.coord - atom.coord), 3),
+        )
         return gr_atoms, False
 
-    # 4. Non-Haptic Correction (Pruning) Logic
-    removed_ligand_indices = []
+    if ligand.formula == "H2" and len(gr_atoms) == 2:
+        return gr_atoms, False
+
     lig_mol_indices = {
         a.get_parent_index("molecule"): i for i, a in enumerate(ligand.atoms)
     }
 
-    for atom in sorted_gr_atoms:
+    # 1. Sort atoms by distance: Farthest atoms first to handle
+    sorted_gr_atoms = sorted(
+        gr_atoms,
+        key=lambda a: (
+            a.label == "H",  # Primary: Hydrogen comes before Non-hydrogen atoms
+            np.linalg.norm(metal.coord - a.coord)
+            - metal.radii
+            - a.radii,  # Secondary: Furthest distance first
+        ),
+        reverse=True,
+    )
+
+    gr_atoms_labels = [a.label for a in sorted_gr_atoms]
+    gr_atoms_atom_site_labels = (
+        [a.atom_site_label for a in sorted_gr_atoms]
+        if sorted_gr_atoms and sorted_gr_atoms[0].atom_site_label
+        else None
+    )
+    gr_atoms_distances = [
+        float(np.round(np.linalg.norm(metal.coord - a.coord), 3))
+        for a in sorted_gr_atoms
+    ]
+    gr_atoms_margins = [
+        float(
+            np.round(np.linalg.norm(metal.coord - a.coord) - metal.radii - a.radii, 3)
+        )
+        for a in sorted_gr_atoms
+    ]
+
+    # 2. Detailed Debug Logging
+    logger.debug("Sorted coordinated atoms (farthest first): %s", gr_atoms_labels)
+    logger.debug("Sorted coordinated atom site labels: %s", gr_atoms_atom_site_labels)
+    logger.debug("Sorted coordinated atom distances: %s", gr_atoms_distances)
+    logger.debug("Sorted coordinated atom margins: %s", gr_atoms_margins)
+
+    if "H" not in gr_atoms_labels:
+        outlier_atoms = find_atom_outlier(sorted_gr_atoms, metal, haptic)
+        atoms_to_validate = outlier_atoms
+    else:
+        atoms_to_validate = sorted_gr_atoms
+        logger.debug(
+            "Hydrogen atoms detected in coordination sphere. Prioritizing their validation."
+        )
+
+    for atom in atoms_to_validate:
         atom_mol_idx = atom.get_parent_index("molecule")
 
         if atom_mol_idx in lig_mol_indices:
@@ -627,7 +660,10 @@ def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, use_bond_info=No
 
                 # Reset connectivity for the failed atom
                 atom.reset_mconnec(metal)
-
+                removed_ligand_indices.append(lig_mol_indices[atom_mol_idx])
+                logger.debug(
+                    f"Updated removed ligand indices: {removed_ligand_indices} {lig_mol_indices[atom_mol_idx]}"
+                )
                 # Filter gr_atoms to exclude only this specific failed atom
                 # All other atoms are still 'potentially' valid in the next iteration
                 updated_gr_atoms = [
@@ -637,6 +673,8 @@ def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, use_bond_info=No
                 ]
 
                 return updated_gr_atoms, True
+            else:
+                logger.debug(f"Atom {atom.label} ({atom.atom_site_label}) retained")
 
     # If the loop finishes without hitting 'if not is_added', nothing was removed
     return gr_atoms, False
@@ -662,10 +700,6 @@ def partition_connected_indices(
 
     conn_labels = extract_from_list(connected_idx, molecule.labels, dimension=1)
     conn_coord = extract_from_list(connected_idx, molecule.coord, dimension=1)
-    if molecule.frac_coord is not None:
-        conn_frac_coord = extract_from_list(
-            connected_idx, molecule.frac_coord, dimension=1
-        )
     conn_radii = extract_from_list(connected_idx, molecule.radii, dimension=1)
     conn_atoms = extract_from_list(connected_idx, molecule.atoms, dimension=1)
     if molecule.atom_site_labels is not None:
@@ -713,3 +747,209 @@ def partition_connected_indices(
         }
         # logger.debug("Results for block %s: %s", idx, results[idx])
     return results
+
+
+def find_atom_outlier(atoms, metal, haptic, threshold_percent=50.0):
+    """
+    Takes the list of atoms, calculates distances to metal,
+    and returns atoms identified as outliers.
+    """
+    n = len(atoms)
+    if n < 2:
+        return []
+
+    # 1. Calculate margins (maintaining the order from your sorted list)
+    sorted_margins = np.array(
+        [np.linalg.norm(metal.coord - a.coord) - metal.radii - a.radii for a in atoms]
+    )
+    sorted_indices = np.arange(n)  # indices corresponding to the sorted_margins order
+    outlier_indices = []
+
+    if 3 <= n <= 8:
+        # 90% confidence
+        q_crit_table = {3: 0.941, 4: 0.765, 5: 0.642, 6: 0.560, 7: 0.507, 8: 0.468}
+        # 95% confidence level (alpha = 0.05)
+        # q_crit_table = {3: 0.970, 4: 0.829, 5: 0.710, 6: 0.625, 7: 0.568, 8: 0.526}
+        n3_harsh_factor = 0.98
+
+        largest = sorted_margins[0]
+        second_largest = sorted_margins[1]
+        second_smallest = sorted_margins[-2]
+        smallest = sorted_margins[-1]
+
+        margin_range = largest - smallest
+
+        if margin_range <= 0:
+            logger.debug("Result: Margins are identical. Data retained.")
+            return []
+
+        high_gap = largest - second_largest
+        low_gap = second_smallest - smallest
+
+        q_high = high_gap / margin_range
+        q_low = low_gap / margin_range
+        q_crit = q_crit_table[n]
+        if n == 3:
+            q_crit *= n3_harsh_factor
+
+        logger.debug(
+            f"n={n} | "
+            f"largest={largest:.3f}, second_largest={second_largest:.3f}, "
+            f"second_smallest={second_smallest:.3f}, smallest={smallest:.3f}"
+        )
+        logger.debug(
+            f"high_gap={high_gap:.3f}, low_gap={low_gap:.3f}, range={margin_range:.3f}"
+        )
+        logger.debug(f"Q_high={q_high:.4f}, Q_low={q_low:.4f}, Q_crit={q_crit:.4f}")
+
+        high_is_outlier = q_high > q_crit
+        low_is_outlier = q_low > q_crit
+
+        # ------------------------------------------------------------
+        # Case 1: largest margin is isolated
+        # Example: [0.642, -0.276, -0.310]
+        # The largest-margin atom is likely non-bonded.
+        # ------------------------------------------------------------
+        if high_is_outlier and not low_is_outlier:
+            outlier_indices = [int(sorted_indices[0])]
+            logger.debug(
+                "Result: Largest margin is an outlier. "
+                "Rejecting the furthest atom as non-bonded."
+            )
+        # ------------------------------------------------------------
+        # Case 2: smallest margin is isolated
+        # Example: [0.65, 0.58, 0.52, -0.20]
+        # The smallest-margin atom may be the only true bonded atom.
+        # The larger-margin atoms may be distance-based non-bonded.
+        # ------------------------------------------------------------
+        elif low_is_outlier and not high_is_outlier:
+            outlier_indices = [int(idx) for idx in sorted_indices[:-1]]
+            logger.debug(
+                "Result: Smallest margin is an outlier. "
+                "Keeping the smallest-margin atom and rejecting the rest."
+            )
+            logger.debug(
+                f"Kept atom index: {int(sorted_indices[-1])}; "
+                f"Rejected atom indices: {outlier_indices}"
+            )
+        # ------------------------------------------------------------
+        # Case 3: both sides appear outlying
+        # This is ambiguous. Usually safer to reject only the largest margin.
+        # ------------------------------------------------------------
+        elif high_is_outlier and low_is_outlier:
+            if q_high >= q_low:
+                outlier_indices = [int(sorted_indices[0])]
+                logger.debug(
+                    "Result: Both high and low margins look outlying. "
+                    "High-side outlier is stronger, rejecting largest-margin atom."
+                )
+            else:
+                outlier_indices = [int(idx) for idx in sorted_indices[:-1]]
+                logger.debug(
+                    "Result: Both high and low margins look outlying. "
+                    "Low-side outlier is stronger, keeping smallest-margin atom only."
+                )
+
+        # ------------------------------------------------------------
+        # Case 4: no statistical outlier
+        # Margins are regarded as uniform enough.
+        # ------------------------------------------------------------
+        else:
+            logger.debug("Result: Margins are uniform enough. Data retained.")
+
+    # --- Case: n=2 (Percent Difference) ---
+    elif n == 2:
+        high = sorted_margins[0]
+        low = sorted_margins[1]
+
+        # Robust to negative values and near-zero mean.
+        denom = max(abs(high), abs(low), 1e-8)
+        relative_gap = abs(high - low) / denom * 100.0
+
+        logger.debug(
+            f"n: {n} | margins: [{high:.3f}, {low:.3f}] | "
+            f"relative_gap: {relative_gap:.4f} | "
+            f"threshold_percent: {threshold_percent}"
+        )
+
+        if relative_gap > threshold_percent:
+            outlier_indices = [0]
+            logger.debug(
+                "Result: n=2 signed-margin relative gap is large. "
+                "Rejecting larger-margin atom."
+            )
+        else:
+            logger.debug("Result: n=2 margins are similar enough. Data retained.")
+
+    else:
+        pass
+
+    logger.debug(
+        f"Analysis results: {{'n': {n}, 'outlier_indices': {outlier_indices}}}"
+    )
+
+    adj_matrix, atom_labels, atom_types, is_single_simple_ring = (
+        build_adjacency_matrix_within_atoms(atoms, {metal.get_parent_index("molecule")})
+    )
+    logger.debug(f"atom_labels: {atom_labels}")
+    logger.debug(f"atom_types: {atom_types}")
+    logger.debug(f"is_single_simple_ring: {is_single_simple_ring}")
+    if haptic:
+        logger.debug("Coordination is haptic. No outlier removal applied.")
+        return []
+
+    if n == 3 and atom_types[0] == "internal" and not is_single_simple_ring:
+        if 0 in outlier_indices:
+            pass
+            logger.debug(
+                f"{atom_labels[0]} is already marked as an outlier and is internal"
+            )
+        else:
+            logger.debug(f"Check for outlier {atom_labels[0]}")
+            outlier_indices.insert(0, 0)
+
+    # Return the actual atom object that is an outlier
+    return [atoms[i] for i in outlier_indices] if outlier_indices else []
+    # return [atoms[outlier_index]] if outlier_index is not None else []
+
+
+def build_adjacency_matrix_within_atoms(atoms, metal_indices={}):
+    import networkx as nx
+
+    raw = [(a.label, a.get_parent_index("molecule"), a.adjacency) for a in atoms]
+    non_metal_atoms = [
+        (label, idx, neighbors)
+        for label, idx, neighbors in raw
+        if idx not in metal_indices
+    ]
+
+    non_metal_idx_set = {idx for _, idx, _ in non_metal_atoms}
+    matrix_position = {idx: pos for pos, (_, idx, _) in enumerate(non_metal_atoms)}
+
+    n = len(non_metal_atoms)
+    adj_matrix = [[0] * n for _ in range(n)]
+    for _, atom_idx, neighbors in non_metal_atoms:
+        for neighbor_idx in neighbors:
+            if neighbor_idx in non_metal_idx_set:
+                i, j = matrix_position[atom_idx], matrix_position[neighbor_idx]
+                adj_matrix[i][j] = adj_matrix[j][i] = 1
+
+    atom_labels = [f"{label}(mol idx:{idx})" for label, idx, _ in non_metal_atoms]
+    bond_counts = [sum(adj_matrix[i]) for i in range(n)]
+    atom_types = [
+        "terminal" if count == 1 else "internal" if count > 1 else "isolated"
+        for count in bond_counts
+    ]
+
+    G = nx.from_numpy_array(np.array(adj_matrix))
+
+    # --- Ring detection ---
+    cycle_basis = nx.cycle_basis(G)
+    ring_sets = [set(cycle) for cycle in cycle_basis]
+    n_rings = len(ring_sets)
+    ring_atoms = set().union(*ring_sets) if ring_sets else set()
+    ring_atoms = list(ring_atoms)
+    all_atoms_in_rings = len(ring_atoms) == G.number_of_nodes()
+    is_single_simple_ring = (n_rings == 1) and all_atoms_in_rings
+
+    return adj_matrix, atom_labels, atom_types, is_single_simple_ring
