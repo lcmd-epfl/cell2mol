@@ -13,6 +13,7 @@ from cell2mol.element_utils import (
     METALLOIDS,
     labels2formula,
 )
+from cell2mol.write_results import save_coordination_report
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
@@ -647,7 +648,9 @@ def has_mixed_metal_types(labels: list[str]) -> bool:
     return True
 
 
-def has_different_metal_coordination(refmoleculist, bond_data):
+def has_different_metal_coordination(
+    refmoleculist, bond_data, refcode, report_csv=None
+):
     """
     Iterates through all molecules in refmoleculist and compares
     metal coordination spheres against the provided bond_data.
@@ -657,6 +660,7 @@ def has_different_metal_coordination(refmoleculist, bond_data):
         logger.info("No bond data provided for coordination verification.")
         return None
 
+    report = []
     overall_difference = False
     # Iterate through each molecule in the list
     for mol_idx, molecule in enumerate(refmoleculist):
@@ -702,6 +706,29 @@ def has_different_metal_coordination(refmoleculist, bond_data):
                 logger.warning(f"  Missing in cell2mol: {missing}")
                 logger.warning(f"  Present in cell2mol: {set_current}")
                 logger.warning(f"  Extra in cell2mol: {extra}")
+
+                for atom in molecule.atoms:
+                    if atom.atom_site_label in missing:
+                        # present in bond_data, absent in cell2mol
+                        status = "missing_in_cell2mol"
+                    elif atom.atom_site_label in extra:
+                        # present in cell2mol, absent in bond_data
+                        status = "extra_in_cell2mol"
+                    else:
+                        continue  # This atom is not relevant to the discrepancy
+                    report.append(
+                        {
+                            "refcode": refcode,
+                            "molecule_index": mol_idx,
+                            "formula": molecule.formula,
+                            "metal": met.label,
+                            "coord_atom": atom.label,
+                            "metal_site_label": met_label,
+                            "coord_atom_site_label": atom.atom_site_label,
+                            "distance": get_dist(met.coord, atom.coord),
+                            "status": status,
+                        }
+                    )
             else:
                 logger.debug(
                     "Molecule %s (Formula: %s): Metal %s coordination is correct.",
@@ -709,5 +736,12 @@ def has_different_metal_coordination(refmoleculist, bond_data):
                     molecule.formula,
                     met_label,
                 )
-
+    if report:
+        logger.info(
+            "Coordination discrepancies found for refcode %s. Total issues: %d",
+            refcode,
+            len(report),
+        )
+    if report_csv is not None:
+        save_coordination_report(report, report_csv)
     return overall_difference
