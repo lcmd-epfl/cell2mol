@@ -38,6 +38,7 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
 
     logger.info("cell2mol version %s", config.VERSION)
     logger.info("Input XYZ: %s", input_path)
+    logger.info("Input total charge: %d", input_charge)
     newmolec = None
 
     try:
