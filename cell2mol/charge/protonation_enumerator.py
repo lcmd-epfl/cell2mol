@@ -740,8 +740,9 @@ def _handle_non_haptic_group(
                 numC = adj_labels.count("C")
 
                 if len(adj_labels) == 1:
-                    site_proton_counts[idx] = 1
-
+                    # site_proton_counts[idx] = 1
+                    needs_nonlocal = True
+                    non_local_indices.append(idx)
                 elif len(adj_labels) == 2:
                     if numN == 1 and numO == 1:  # amide
                         site_proton_counts[idx] = 1
