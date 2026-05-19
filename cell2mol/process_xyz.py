@@ -141,6 +141,7 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
                     get_molecule_error_message(newmolec.error_case),
                     file=f,
                 )
+        return newmolec
 
 
 # -----------------------------------------------------------------------------
