@@ -106,11 +106,7 @@ def balance_molecule_charge(molecule, input_charge: int = 0, second_try: bool = 
         return molecule
 
     unique_indices = [spec.unique_index for spec in molecule.species_list]
-    logger.info(
-        "Balancing molecule charge: %s with target charge %d",
-        molecule.name,
-        input_charge,
-    )
+
     # Primary search
     expanded_species_charges, unique_species_charges = resolve_charge_distributions(
         unique_indices, molecule.unique_species, input_charge=input_charge
