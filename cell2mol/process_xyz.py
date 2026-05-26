@@ -17,12 +17,6 @@ from cell2mol.charge.charge_balancer import balance_molecule_charge
 from cell2mol.utils import config
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(levelname)-7s %(name)-30s %(funcName)-30s | %(message)s",
-    filename="cell2mol.log",
-    filemode="w",
-)
 
 # Constants
 COV_FACTOR = config.COV_FACTOR

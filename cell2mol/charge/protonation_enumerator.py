@@ -711,15 +711,15 @@ def _handle_non_haptic_group(
         elif a.label == "P":
             if len(adj_labels) >= 3:
                 pass
-            elif len(adj_labels) == 1:
-                if adj_labels[0] in {"N", "C"}:
-                    pass
-                elif adj_labels[0] == "P":
-                    site_proton_counts[idx] = 1
+            # elif len(adj_labels) == 1:
+            #     if adj_labels[0] in {"N", "C"}:
+            #         pass
+            #     elif adj_labels[0] == "P":
+            #         site_proton_counts[idx] = 1
 
-                else:
-                    needs_nonlocal = True
-                    non_local_indices.append(idx)
+            #     else:
+            #         needs_nonlocal = True
+            #         non_local_indices.append(idx)
             else:
                 needs_nonlocal = True
                 non_local_indices.append(idx)
