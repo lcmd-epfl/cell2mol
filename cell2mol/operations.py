@@ -715,6 +715,7 @@ def has_different_metal_coordination(
                         # present in cell2mol, absent in bond_data
                         status = "extra_in_cell2mol"
                     else:
+                        status = "agree"
                         continue  # This atom is not relevant to the discrepancy
                     report.append(
                         {

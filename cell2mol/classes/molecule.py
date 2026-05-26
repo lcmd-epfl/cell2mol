@@ -25,10 +25,16 @@ from cell2mol.charge.smiles_handler import (
 from cell2mol.spin import assign_spin_complexes
 from cell2mol.operations import extract_from_list
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import Spin, SubType
+from cell2mol.my_types import Format, Spin, SubType
 from cell2mol.utils import config
 import numpy as np
 import logging
+from pathlib import Path
+
+try:
+    from typing import Self  # py3.11+
+except ImportError:
+    from typing_extensions import Self  # py3.10
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
@@ -552,10 +558,66 @@ class Molecule(Specie):
 
         return self.haptic_type
 
-    def save(self, path):
-        logger.info(f"SAVING cell2mol MOLECULE object to {path}")
+    # def save(self, path):
+    #     logger.info(f"SAVING cell2mol MOLECULE object to {path}")
+    #     with open(path, "wb") as fil:
+    #         pickle.dump(self, fil)
+
+    def save(self, path: str | Path, *, format: Format = "json"):
+        if format == "json":
+            self._save_as_json(path)
+        elif format == "pickle":
+            self._save_as_pickle(path)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+
+    @classmethod
+    def load(cls, path: str | Path, *, format: Format = "json") -> Self:
+        if format == "json":
+            return cls._load_from_json(path)
+        elif format == "pickle":
+            return cls._load_from_pickle(path)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+
+    @deprecated("Use json format instead")
+    def _save_as_pickle(
+        self,
+        path: str | Path,
+    ):
+        logger.warning("Use json format instead")
         with open(path, "wb") as fil:
             pickle.dump(self, fil)
+
+    def _save_as_json(
+        self,
+        path: str | Path,
+    ):
+        if not str(path).endswith(".json"):
+            logger.warning("Use `.json` extension instead for path: %s", path)
+        # Pretty print with indent=4
+        with open(path, "w") as fd:
+            fd.write(self.to_json(indent=4))
+        # Minified version
+        # with open(path, "w") as fd:
+        #     fd.write(self.to_json(separators=(",", ":")))
+
+    @classmethod
+    def _load_from_json(
+        cls,
+        path: str | Path,
+    ) -> Self:
+        with open(path, "r") as fd:
+            return cls.from_json(fd.read())
+
+    @classmethod
+    @deprecated("Use json format instead")
+    def _load_from_pickle(
+        cls,
+        path: str | Path,
+    ):
+        with open(path, "rb") as fil:
+            return pickle.load(fil)
 
     def get_unique_species(self):
         logger.info("Getting unique species in molecule: %s", self.formula)
