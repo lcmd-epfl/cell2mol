@@ -737,6 +737,21 @@ def has_different_metal_coordination(
                     molecule.formula,
                     met_label,
                 )
+                for atom in molecule.atoms:
+                    if atom.atom_site_label in set_current:
+                        report.append(
+                            {
+                                "refcode": refcode,
+                                "molecule_index": mol_idx,
+                                "formula": molecule.formula,
+                                "metal": met.label,
+                                "coord_atom": atom.label,
+                                "metal_site_label": met_label,
+                                "coord_atom_site_label": atom.atom_site_label,
+                                "distance": get_dist(met.coord, atom.coord),
+                                "status": "reported",
+                            }
+                        )
     if report:
         logger.info(
             "Coordination discrepancies found for refcode %s. Total issues: %d",
