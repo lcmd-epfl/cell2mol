@@ -515,7 +515,9 @@ def correct_coordination_sphere(
             current_pool,
         )
         while True:
-            results = partition_connected_indices(current_pool, mol)
+            results = partition_connected_indices(
+                current_pool, mol, use_bond_info=config.USE_BOND_INFO
+            )
             if not results:
                 break
 
@@ -524,13 +526,17 @@ def correct_coordination_sphere(
             temp_stable_groups = []
 
             for group in results.values():
-                validated_gr_atoms, was_changed = validate_coordinated_atoms(
-                    group["gr_atoms"],
-                    metal,
-                    ligands[jdx],
-                    haptic=group["is_haptic"],
-                    removed_ligand_indices=removed_ligand_indices,
-                )
+                if config.USE_BOND_INFO:
+                    validated_gr_atoms = group["gr_atoms"]
+                    was_changed = False
+                else:
+                    validated_gr_atoms, was_changed = validate_coordinated_atoms(
+                        group["gr_atoms"],
+                        metal,
+                        ligands[jdx],
+                        haptic=group["is_haptic"],
+                        removed_ligand_indices=removed_ligand_indices,
+                    )
 
                 surviving_pool.extend(
                     [a.get_parent_index("molecule") for a in validated_gr_atoms]
