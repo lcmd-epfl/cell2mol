@@ -776,278 +776,139 @@ def has_different_metal_coordination_v1(
 
 
 def has_different_metal_coordination(
-    refmoleculist,
-    bond_data,
-    refcode,
-    report_csv=None,
+    refmoleculist, bond_data, refcode, report_csv=None
 ):
     """
     Compare final metal coordination spheres against bond_data.
 
-    Also records atoms removed during validate_coordinated_atoms()
-    through:
+    Tracks atoms removed during validate_coordinated_atoms() via metal.removed_from_coordination.
 
-        metal.removed_from_coordination
-
-    Important
-    ---------
-    removed:
-        Validation trace. The atom was removed during coordination refinement.
-
-    final_match:
-        Final comparison result between bond_data and met.coord_sphere_atoms.
-
-    Therefore:
-        removed=True does not always mean final_match=False.
-        If the removed atom was not expected in bond_data, removal may fix the result.
-
-    Special case
-    ------------
-    If an atom was removed but is present in bond_data:
-
-        status = "missing_in_cell2mol"
-        removed = True
-        bond_change = "removed_but_expected"
-
-    This means validation removed an atom that bond_data expected.
+    Notes
+    -----
+    - removed=True does not always mean final_match=False (removal may fix the result).
+    - If a removed atom was expected in bond_data:
+        status="missing_in_cell2mol", bond_change="removed_but_expected"
     """
-
     if not bond_data:
         logger.info("No bond data provided for coordination verification.")
         return None
 
-    report = []
-    overall_difference = False
+    report, overall_difference = [], False
 
     for mol_idx, molecule in enumerate(refmoleculist):
         if molecule.metals is None:
             logger.info(
-                "No metals found in Molecule %s (Formula: %s). Skipping.",
-                mol_idx,
-                molecule.formula,
+                "No metals in Molecule %s (%s). Skipping.", mol_idx, molecule.formula
             )
             continue
 
         for met in molecule.metals:
             met_label = met.atom_site_label
-
-            # ------------------------------------------------------------
-            # 1. Removed atoms from validation trace
-            # ------------------------------------------------------------
-            removed_coord_atoms = getattr(met, "removed_from_coordination", None) or []
-
+            removed_atoms = getattr(met, "removed_from_coordination", None) or []
             set_removed = {
-                atom.atom_site_label
-                for atom in removed_coord_atoms
-                if atom.atom_site_label is not None
+                a.atom_site_label for a in removed_atoms if a.atom_site_label
             }
 
-            # ------------------------------------------------------------
-            # 2. Expected coordination from bond_data
-            # ------------------------------------------------------------
-            neighbors_from_data = []
-
-            for b in bond_data:
-                if b[0] == met_label:
-                    neighbors_from_data.append(b[1])
-                elif b[1] == met_label:
-                    neighbors_from_data.append(b[0])
-
-            # ------------------------------------------------------------
-            # 3. Final current coordination sphere from cell2mol
-            # ------------------------------------------------------------
-            current_sphere_labels = [
-                atom.atom_site_label
-                for atom in met.coord_sphere_atoms
-                if atom.atom_site_label is not None
+            neighbors = [
+                b[1] if b[0] == met_label else b[0]
+                for b in bond_data
+                if met_label in (b[0], b[1])
             ]
-
-            set_data = set(neighbors_from_data)
-            set_current = set(current_sphere_labels)
+            set_data = set(neighbors)
+            set_current = {
+                a.atom_site_label for a in met.coord_sphere_atoms if a.atom_site_label
+            }
 
             final_match = set_data == set_current
-
-            missing = set_data - set_current
-            extra = set_current - set_data
+            missing, extra = set_data - set_current, set_current - set_data
 
             if not final_match:
                 overall_difference = True
-
                 logger.warning(
-                    "Molecule %s (Formula: %s): Mismatch in coordination for Metal %s",
+                    "Molecule %s (%s): Mismatch for Metal %s",
                     mol_idx,
                     molecule.formula,
                     met_label,
                 )
-                logger.warning("  Expected from bond_data: %s", sorted(set_data))
-                logger.warning("  Final in cell2mol: %s", sorted(set_current))
-                logger.warning("  Missing in cell2mol: %s", sorted(missing))
-                logger.warning("  Extra in cell2mol: %s", sorted(extra))
-                logger.warning("  Removed during validation: %s", sorted(set_removed))
-            else:
+                logger.warning(
+                    "  Expected: %s | Final: %s | Missing: %s | Extra: %s | Removed: %s",
+                    sorted(set_data),
+                    sorted(set_current),
+                    sorted(missing),
+                    sorted(extra),
+                    sorted(set_removed),
+                )
+            elif set_removed:
                 logger.debug(
-                    "Molecule %s (Formula: %s): Metal %s final coordination matches bond_data.",
-                    mol_idx,
-                    molecule.formula,
+                    "Metal %s: removed atoms %s but final coord still matches.",
                     met_label,
+                    sorted(set_removed),
                 )
 
-                if set_removed:
-                    logger.debug(
-                        "Metal %s has removed atoms during validation, "
-                        "but final coordination still matches bond_data: %s",
-                        met_label,
-                        sorted(set_removed),
-                    )
-
-            # ------------------------------------------------------------
-            # 4. Normal comparison rows
-            # ------------------------------------------------------------
-            # These rows cover:
-            #   - match
-            #   - missing_in_cell2mol
-            #   - extra_in_cell2mol
-            #
-            # If missing atom was removed, mark:
-            #   removed=True
-            #   bond_change="removed_but_expected"
-            # ------------------------------------------------------------
             recorded_keys = set()
 
-            for atom in molecule.atoms:
-                atom_site = atom.atom_site_label
-
-                if atom_site is None:
-                    continue
-
-                if atom_site in missing:
-                    status = "missing_in_cell2mol"
-                    bond_change = (
-                        "removed_but_expected"
-                        if atom_site in set_removed
-                        else "missing"
-                    )
-
-                elif atom_site in extra:
-                    status = "extra_in_cell2mol"
-                    bond_change = "extra"
-
-                elif atom_site in set_current and atom_site in set_data:
-                    status = "match"
-                    bond_change = "kept"
-
-                else:
-                    continue
-
-                key = (met_label, atom_site, status, bond_change)
-                recorded_keys.add(key)
-
-                report.append(
-                    {
-                        "refcode": refcode,
-                        "molecule_index": mol_idx,
-                        "formula": molecule.formula,
-                        "metal": met.label,
-                        "coord_atom": atom.label,
-                        "metal_site_label": met_label,
-                        "coord_atom_site_label": atom_site,
-                        "bond": f"{met_label}-{atom_site}",
-                        "distance": get_dist(met.coord, atom.coord),
-                        "status": status,
-                        "bond_change": bond_change,
-                        "removed": atom_site in set_removed,
-                        "final_match": final_match,
-                    }
-                )
-
-            # ------------------------------------------------------------
-            # 5. Removed atom rows
-            # ------------------------------------------------------------
-            # Removed atoms may not be in final coord_sphere_atoms.
-            # We add explicit trace rows, but avoid duplicating a
-            # removed_but_expected row already recorded as missing.
-            # ------------------------------------------------------------
-            for removed_atom in removed_coord_atoms:
-                removed_site = removed_atom.atom_site_label
-
-                if removed_site is None:
-                    continue
-
-                # Case A:
-                # Removed atom was expected in bond_data.
-                # This is already recorded above as:
-                #   status="missing_in_cell2mol"
-                #   bond_change="removed_but_expected"
-                if removed_site in set_data and removed_site not in set_current:
-                    key = (
-                        met_label,
-                        removed_site,
-                        "missing_in_cell2mol",
-                        "removed_but_expected",
-                    )
-
-                    if key in recorded_keys:
-                        continue
-
-                    status = "missing_in_cell2mol"
-                    bond_change = "removed_but_expected"
-
-                # Case B:
-                # Removed atom was not expected in bond_data.
-                # This is a successful removal of an extra contact.
-                elif removed_site not in set_data and removed_site not in set_current:
-                    status = "removed_from_coordination"
-                    bond_change = "removed_extra_contact"
-
-                # Case C:
-                # Inconsistent trace:
-                # Atom is recorded as removed, but still exists in final sphere.
-                elif removed_site in set_current:
-                    status = "removed_but_still_current"
-                    bond_change = "inconsistent_removed_record"
-
-                else:
-                    status = "removed_from_coordination"
-                    bond_change = "removed_unknown"
-
-                key = (met_label, removed_site, status, bond_change)
-
+            def add_row(atom_obj, site, status, bond_change):
+                key = (met_label, site, status, bond_change)
                 if key in recorded_keys:
-                    continue
-
+                    return
                 recorded_keys.add(key)
-
                 report.append(
                     {
                         "refcode": refcode,
                         "molecule_index": mol_idx,
                         "formula": molecule.formula,
                         "metal": met.label,
-                        "coord_atom": removed_atom.label,
+                        "coord_atom": atom_obj.label,
                         "metal_site_label": met_label,
-                        "coord_atom_site_label": removed_site,
-                        "bond": f"{met_label}-{removed_site}",
-                        "distance": get_dist(met.coord, removed_atom.coord),
+                        "coord_atom_site_label": site,
+                        "bond": f"{met_label}-{site}",
+                        "distance": get_dist(met.coord, atom_obj.coord),
                         "status": status,
                         "bond_change": bond_change,
-                        "removed": True,
+                        "removed": site in set_removed,
                         "final_match": final_match,
                     }
                 )
 
-    if report:
-        logger.info(
-            "Coordination report generated for refcode %s. Total records: %d",
-            refcode,
-            len(report),
-        )
-    else:
-        logger.info(
-            "No coordination report records generated for refcode %s.",
-            refcode,
-        )
+            # Normal comparison rows
+            for atom in molecule.atoms:
+                site = atom.atom_site_label
+                if not site:
+                    continue
+                if site in missing:
+                    add_row(
+                        atom,
+                        site,
+                        "missing_in_cell2mol",
+                        "removed_but_expected" if site in set_removed else "missing",
+                    )
+                elif site in extra:
+                    add_row(atom, site, "extra_in_cell2mol", "extra")
+                elif site in set_current and site in set_data:
+                    add_row(atom, site, "match", "kept")
 
+            # Removed atom trace rows
+            for atom in removed_atoms:
+                site = atom.atom_site_label
+                if not site:
+                    continue
+                if site in set_data and site not in set_current:
+                    status, bond_change = "missing_in_cell2mol", "removed_but_expected"
+                elif site not in set_data and site not in set_current:
+                    status, bond_change = (
+                        "removed_from_coordination",
+                        "removed_extra_contact",
+                    )
+                elif site in set_current:
+                    status, bond_change = (
+                        "removed_but_still_current",
+                        "inconsistent_removed_record",
+                    )
+                else:
+                    status, bond_change = "removed_from_coordination", "removed_unknown"
+                add_row(atom, site, status, bond_change)
+
+    logger.info("Coordination report for %s: %d records.", refcode, len(report))
     if report_csv is not None:
         save_coordination_report(report, report_csv)
-
     return overall_difference
