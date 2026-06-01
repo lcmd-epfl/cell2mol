@@ -731,6 +731,9 @@ def save_coordination_report(report, output_csv):
         "coord_atom_site_label",
         "distance",
         "status",
+        "bond_change",
+        "removed",
+        "final_match",
     ]
 
     df = pd.DataFrame(report)

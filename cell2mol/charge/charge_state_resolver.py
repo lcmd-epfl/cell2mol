@@ -17,6 +17,8 @@ from cell2mol.charge.xyz2mol import (
 )
 from rdkit import Chem
 from rdkit.Chem import rdchem
+from rdkit.Geometry import Point3D
+from rdkit.Chem import rdDetermineBonds
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
@@ -124,6 +126,91 @@ def enumerate_possible_charge_states(spec: object):
     return best_candidates if best_candidates else None
 
 
+def get_proto_mol_from_ac(
+    atoms,
+    coords,
+    AC,
+    charge=0,
+    sanitize=True,
+    allow_charged_fragments=True,
+    embed_chiral=True,
+):
+    """
+    Build an RDKit molecule from atomic numbers, coordinates, and
+    connectivity matrix from a protonation state, and
+    then assign bond orders using rdDetermineBonds.DetermineBondOrders.
+
+    Parameters
+    ----------
+    atoms : list[int]
+        Atomic numbers, e.g. [6, 1, 1, 1, 1]
+    coords : array-like, shape (n_atoms, 3)
+        Cartesian coordinates.
+    AC : array-like, shape (n_atoms, n_atoms)
+        Connectivity matrix. Nonzero means bonded.
+    charge : int
+        Total molecular charge.
+    sanitize : bool
+        Whether to sanitize after bond-order assignment.
+    allow_charged_fragments : bool
+        Whether to allow charged fragments.
+    embed_chiral : bool
+        Whether to embed chiral information.
+
+    Returns
+    -------
+    mol : rdkit.Chem.Mol
+    """
+
+    atoms = list(map(int, atoms))
+    coords = np.asarray(coords, dtype=float)
+    AC = np.asarray(AC)
+
+    n_atoms = len(atoms)
+
+    if coords.shape != (n_atoms, 3):
+        raise ValueError(f"coords must have shape ({n_atoms}, 3), got {coords.shape}")
+
+    if AC.shape != (n_atoms, n_atoms):
+        raise ValueError(f"AC must have shape ({n_atoms}, {n_atoms}), got {AC.shape}")
+
+    rwMol = Chem.RWMol()
+
+    # Add atoms
+    for atomic_num in atoms:
+        rwMol.AddAtom(Chem.Atom(atomic_num))
+
+    # Add connectivity as single bonds first
+    for i in range(n_atoms):
+        for j in range(i + 1, n_atoms):
+            if AC[i, j] != 0:
+                rwMol.AddBond(i, j, Chem.BondType.SINGLE)
+
+    mol = rwMol.GetMol()
+
+    # Add coordinates
+    conf = Chem.Conformer(n_atoms)
+    conf.Set3D(True)
+
+    for i, xyz in enumerate(coords):
+        conf.SetAtomPosition(i, Point3D(float(xyz[0]), float(xyz[1]), float(xyz[2])))
+
+    mol.AddConformer(conf, assignId=True)
+
+    # Assign bond orders using existing connectivity
+    rdDetermineBonds.DetermineBondOrders(
+        mol,
+        charge=charge,
+        allowChargedFragments=allow_charged_fragments,
+        embedChiral=embed_chiral,
+    )
+
+    if sanitize:
+        Chem.SanitizeMol(mol)
+
+    return mol
+
+
 def generate_charge_state(
     charge: int,
     prot: object,
@@ -153,26 +240,43 @@ def generate_charge_state(
 
     # AC2mol returns a list of RDKit molecule objects and bond order (BO) matrix
     # from the adjacency (AC) matrix
-    new_mols, BO = AC2mol(
-        mol=get_proto_mol(prot.atnums),
-        AC=prot.adjmat,
-        atoms=prot.atnums,
-        charge=charge,
-        allow_charged_fragments=allow_charged_fragments,
-    )
+    # new_mols, BO = AC2mol(
+    #     mol=get_proto_mol(prot.atnums),
+    #     AC=prot.adjmat,
+    #     atoms=prot.atnums,
+    #     charge=charge,
+    #     allow_charged_fragments=allow_charged_fragments,
+    # )
 
-    # Early Exit if no candidates found
-    if not new_mols:
-        logger.warning(f"No mol found for charge {charge}")
+    # # Early Exit if no candidates found
+    # if not new_mols:
+    #     logger.warning(f"No mol found for charge {charge}")
+    #     return None
+
+    # # Stereo and Chirality Validation
+    # if embed_chiral:
+    #     if not all(chiral_stereo_check(mol) for mol in new_mols):
+    #         logger.error("Chirality check failed for one or more candidates")
+    #         return None
+
+    # rdkit_obj = new_mols[0]  # use the first candidate as default
+
+    try:
+        rdkit_obj = get_proto_mol_from_ac(
+            prot.atnums,
+            prot.coord,
+            prot.adjmat,
+            charge,
+            sanitize=False,
+            allow_charged_fragments=allow_charged_fragments,
+            embed_chiral=embed_chiral,
+        )
+    except Exception as e:
+        logger.error(
+            f"Error occurred while generating proto molecule: {e} with {charge} charge for {prot.formula}"
+        )
         return None
 
-    # Stereo and Chirality Validation
-    if embed_chiral:
-        if not all(chiral_stereo_check(mol) for mol in new_mols):
-            logger.error("Chirality check failed for one or more candidates")
-            return None
-
-    rdkit_obj = new_mols[0]  # use the first candidate as default
     atom_charges = []
     total_charge = 0
     for i, atom in enumerate(rdkit_obj.GetAtoms()):

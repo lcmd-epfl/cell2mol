@@ -569,6 +569,25 @@ def correct_coordination_sphere(
     return final_coordination_results
 
 
+def move_to_front(atoms, target_atom):
+    """Move target_atom to the front while keeping the rest order unchanged."""
+    return [target_atom] + [a for a in atoms if a is not target_atom]
+
+
+def unique_atoms(atoms):
+    seen = set()
+    unique = []
+
+    for atom in atoms:
+        atom_id = atom.get_parent_index("molecule")
+
+        if atom_id not in seen:
+            unique.append(atom)
+            seen.add(atom_id)
+
+    return unique
+
+
 def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, removed_ligand_indices):
     """
     Checks if atoms in gr_atoms are truly connected to the metal.
@@ -630,19 +649,76 @@ def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, removed_ligand_i
     ]
 
     # 2. Detailed Debug Logging
+    group_formula = labels2formula(gr_atoms_labels)
     logger.debug("Sorted coordinated atoms (farthest first): %s", gr_atoms_labels)
     logger.debug("Sorted coordinated atom site labels: %s", gr_atoms_atom_site_labels)
     logger.debug("Sorted coordinated atom distances: %s", gr_atoms_distances)
     logger.debug("Sorted coordinated atom margins: %s", gr_atoms_margins)
 
-    if "H" not in gr_atoms_labels:
-        outlier_atoms = find_atom_outlier(sorted_gr_atoms, metal, haptic)
-        atoms_to_validate = outlier_atoms
-    else:
-        atoms_to_validate = sorted_gr_atoms
+    # if "H" not in gr_atoms_labels:
+    #     outlier_atoms = find_atom_outlier(sorted_gr_atoms, metal, haptic)
+    #     atoms_to_validate = outlier_atoms
+    # else:
+    #     atoms_to_validate = sorted_gr_atoms
+    #     logger.debug(
+    #         "Hydrogen atoms detected in coordination sphere. Prioritizing their validation."
+    #     )
+
+    priority_atoms = []
+
+    # Si priority: If Si is present and has a large margin, prioritize it for validation
+    if "Si" in gr_atoms_labels:
+        si_idx = gr_atoms_labels.index("Si")
+        si_margin = gr_atoms_margins[si_idx]
+
+        if si_margin > 0.25:
+            priority_atoms.append(sorted_gr_atoms[si_idx])
+
+    # BH4-like priority
+    is_bh4_like = (
+        ligand.formula == "H4-B"
+        or group_formula in {"H4-B", "H3-B", "H2-B", "H-B"}
+        or ("B" in gr_atoms_labels and "H" in gr_atoms_labels)
+    )
+    logger.debug(
+        "Evaluating BH4-like priority: ligand formula %s, group formula %s, ",
+        ligand.formula,
+        group_formula,
+    )
+    if is_bh4_like and "B" in gr_atoms_labels:
+        priority_atoms.append(sorted_gr_atoms[gr_atoms_labels.index("B")])
+
+    if priority_atoms:
         logger.debug(
-            "Hydrogen atoms detected in coordination sphere. Prioritizing their validation."
+            "Priority atoms identified for validation: %s %s",
+            [a.label for a in priority_atoms],
+            [a.atom_site_label for a in priority_atoms],
         )
+        for atom in priority_atoms:
+            atom_mol_idx = atom.get_parent_index("molecule")
+            atom.reset_mconnec(metal)
+            removed_ligand_indices.append(lig_mol_indices[atom_mol_idx])
+            if getattr(metal, "removed_from_coordination", None) is None:
+                object.__setattr__(metal, "removed_from_coordination", [])
+            metal.removed_from_coordination.append(atom)
+            logger.debug(
+                f"Updated removed ligand indices: {removed_ligand_indices} {lig_mol_indices[atom_mol_idx]}"
+            )
+            # Filter gr_atoms to exclude only this specific failed atom
+            # All other atoms are still 'potentially' valid in the next iteration
+            updated_gr_atoms = [
+                a for a in gr_atoms if a.get_parent_index("molecule") != atom_mol_idx
+            ]
+
+            return updated_gr_atoms, True
+
+    atoms_to_validate = [a for a in sorted_gr_atoms if a not in priority_atoms]
+
+    logger.debug(
+        "Final atoms selected for validation: %s %s",
+        [a.label for a in atoms_to_validate],
+        [a.atom_site_label for a in atoms_to_validate],
+    )
 
     for atom in atoms_to_validate:
         atom_mol_idx = atom.get_parent_index("molecule")
@@ -667,6 +743,9 @@ def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, removed_ligand_i
                 # Reset connectivity for the failed atom
                 atom.reset_mconnec(metal)
                 removed_ligand_indices.append(lig_mol_indices[atom_mol_idx])
+                if getattr(metal, "removed_from_coordination", None) is None:
+                    object.__setattr__(metal, "removed_from_coordination", [])
+                metal.removed_from_coordination.append(atom)
                 logger.debug(
                     f"Updated removed ligand indices: {removed_ligand_indices} {lig_mol_indices[atom_mol_idx]}"
                 )
@@ -959,3 +1038,33 @@ def build_adjacency_matrix_within_atoms(atoms, metal_indices={}):
     is_single_simple_ring = (n_rings == 1) and all_atoms_in_rings
 
     return adj_matrix, atom_labels, atom_types, is_single_simple_ring
+
+
+def discriminate_coord_atoms(atoms, metal, gap_cutoff=0.25):
+
+    sorted_margins = np.array(
+        [np.linalg.norm(metal.coord - a.coord) - metal.radii - a.radii for a in atoms]
+    )
+
+    min_margin = min(margin for margin in sorted_margins)
+
+    coordinating = []
+    rejected = []
+    delta_from_best_margin = []
+    for a, margin in zip(atoms, sorted_margins):
+        delta = margin - min_margin
+
+        delta_from_best_margin.append(delta)
+
+        if delta <= gap_cutoff:
+            coordinating.append(a)
+        else:
+            rejected.append(a)
+    logger.debug(
+        f"Discriminating coordinating atoms based on margin gap cutoff {gap_cutoff}: "
+        f"min_margin={min_margin:.3f}, "
+        f"delta_from_best_margin={delta_from_best_margin}, "
+        f"coordinating={[a.label for a in coordinating]} {[a.atom_site_label for a in coordinating]}, "
+        f"rejected={[a.label for a in rejected]} {[a.atom_site_label for a in rejected]}"
+    )
+    return coordinating, rejected
