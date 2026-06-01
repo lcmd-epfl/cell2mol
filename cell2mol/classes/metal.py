@@ -49,6 +49,7 @@ class Metal(Atom):
     possible_cs: list[int] | None = None
     spin: Spin | None = None
     valence_elec: int | None = None
+    removed_from_coordination: list[Atom] | None = None
 
     subtype: SubType = Field(default="metal")
 
