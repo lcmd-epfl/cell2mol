@@ -714,6 +714,12 @@ def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, removed_ligand_i
 
     atoms_to_validate = [a for a in sorted_gr_atoms if a not in priority_atoms]
 
+    if haptic:
+        logger.debug(
+            "Haptic coordination detected. Skipping validation. %s", group_formula
+        )
+        return gr_atoms, False
+
     logger.debug(
         "Final atoms selected for validation: %s %s",
         [a.label for a in atoms_to_validate],
