@@ -754,8 +754,9 @@ def _handle_non_haptic_group(
                         in_cycles = [c for c in cycles if idx in c]
 
                         if len(in_cycles) == 1:
-                            if numN == 2:
-                                print(
+                            if numN == 2 and len(in_cycles[0]) == 5:
+                                logger.debug(
+                                    "Ligand formula: %s, Atom site label: %s, Adjacency labels: %s, Type: %s",
                                     ligand.formula,
                                     a.atom_site_label,
                                     adj_labels,

@@ -588,6 +588,95 @@ def unique_atoms(atoms):
     return unique
 
 
+def prioritize_coordinating_atoms_to_validate(
+    gr_atoms_dict, sorted_gr_atoms, metal, ligand
+):
+    priority_atoms = []
+
+    group_formula = labels2formula(gr_atoms_dict["labels"])
+
+    def add_priority_atom(atom):
+        if atom not in priority_atoms:
+            priority_atoms.append(atom)
+
+    if "Si" in gr_atoms_dict["labels"]:
+        si_idx = gr_atoms_dict["labels"].index("Si")
+        si_margin = gr_atoms_dict["margins"][si_idx]
+
+        # Si priority: If Si is present and has a large margin, prioritize it for validation
+        if si_margin > 0.25:
+            add_priority_atom(sorted_gr_atoms[si_idx])
+
+    if "B" in gr_atoms_dict["labels"]:
+        is_bh4_like = ligand.formula == "H4-B" or (
+            gr_atoms_dict["labels"].count("B") >= 1
+            and gr_atoms_dict["labels"].count("H") >= 2
+        )
+
+        logger.debug(
+            "Evaluating BH4-like priority: ligand formula %s, group formula %s, is_bh4_like=%s",
+            ligand.formula,
+            group_formula,
+            is_bh4_like,
+        )
+
+        gr_atom_site_set = set(gr_atoms_dict["atom_site_labels"])
+        excluded_neighbor_labels = {}
+
+        for atom in sorted_gr_atoms:
+            if atom.label != "B":
+                continue
+
+            if is_bh4_like:
+                add_priority_atom(atom)
+                continue
+
+            adj_atoms = [
+                ligand.get_parent("molecule").atoms[adj] for adj in atom.adjacency
+            ]
+
+            local_neighbors = [
+                adj
+                for adj in adj_atoms
+                if adj.atom_site_label in gr_atom_site_set
+                and adj.label not in excluded_neighbor_labels
+            ]
+
+            local_atoms = [atom] + local_neighbors
+            n_adj_in_gr_atoms = len(local_neighbors)
+
+            atom_margin = (
+                np.linalg.norm(metal.coord - atom.coord) - metal.radii - atom.radii
+            )
+
+            max_local_margin = max(
+                np.linalg.norm(metal.coord - local_atom.coord)
+                - metal.radii
+                - local_atom.radii
+                for local_atom in local_atoms
+            )
+
+            is_farthest_atom = np.isclose(atom_margin, max_local_margin)
+
+            logger.debug(
+                "B atom %s: n_valid_neighbors=%d, local_neighbor_labels=%s, "
+                "atom_margin=%.3f, max_local_margin=%.3f, is_farthest_atom=%s",
+                atom.atom_site_label,
+                n_adj_in_gr_atoms,
+                [adj.label for adj in local_neighbors],
+                atom_margin,
+                max_local_margin,
+                is_farthest_atom,
+            )
+
+            # Prioritize B if at least two neighboring atoms are also coordinated
+            if n_adj_in_gr_atoms >= 2:
+                add_priority_atom(atom)
+            elif n_adj_in_gr_atoms == 1 and group_formula == "H-B":
+                add_priority_atom(atom)
+    return priority_atoms
+
+
 def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, removed_ligand_indices):
     """
     Checks if atoms in gr_atoms are truly connected to the metal.
@@ -651,7 +740,6 @@ def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, removed_ligand_i
         gr_atoms_dict["atom_site_labels"] = None
 
     # 2. Detailed Debug Logging
-    group_formula = labels2formula(gr_atoms_dict["labels"])
     logger.debug(
         "Sorted coordinated atoms (farthest first): %s", gr_atoms_dict["labels"]
     )
@@ -661,11 +749,11 @@ def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, removed_ligand_i
     logger.debug("Sorted coordinated atom distances: %s", gr_atoms_dict["distances"])
     logger.debug("Sorted coordinated atom margins: %s", gr_atoms_dict["margins"])
 
-    if haptic:
-        logger.debug(
-            "Haptic coordination detected. Skipping validation. %s", group_formula
-        )
-        return gr_atoms, False
+    # if haptic:
+    #     logger.debug(
+    #         "Haptic coordination detected. Skipping validation. %s", group_formula
+    #     )
+    #     return gr_atoms, False
 
     # if "H" not in gr_atoms_labels:
     #     outlier_atoms = find_atom_outlier(sorted_gr_atoms, metal, haptic)
@@ -675,37 +763,9 @@ def validate_coordinated_atoms(gr_atoms, metal, ligand, haptic, removed_ligand_i
     #     logger.debug(
     #         "Hydrogen atoms detected in coordination sphere. Prioritizing their validation."
     #     )
-
-    priority_atoms = []
-
-    def add_priority_atom(atom):
-        if atom not in priority_atoms:
-            priority_atoms.append(atom)
-
-    # Si priority: If Si is present and has a large margin, prioritize it for validation
-    if "Si" in gr_atoms_dict["labels"]:
-        si_idx = gr_atoms_dict["labels"].index("Si")
-        si_margin = gr_atoms_dict["margins"][si_idx]
-
-        if si_margin > 0.25:
-            add_priority_atom(sorted_gr_atoms[si_idx])
-
-    # BH4-like priority
-    is_bh4_like = ligand.formula == "H4-B" or (
-        gr_atoms_dict["labels"].count("B") >= 1
-        and gr_atoms_dict["labels"].count("H") >= 2
+    priority_atoms = prioritize_coordinating_atoms_to_validate(
+        gr_atoms_dict, sorted_gr_atoms, metal, ligand
     )
-    logger.debug(
-        "Evaluating BH4-like priority: ligand formula %s, group formula %s, %s",
-        ligand.formula,
-        group_formula,
-        is_bh4_like,
-    )
-    if is_bh4_like:
-        for atom in sorted_gr_atoms:
-            if atom.label == "B":
-                add_priority_atom(atom)
-
     if priority_atoms:
         logger.debug(
             "Priority atoms identified for validation: %s %s",
