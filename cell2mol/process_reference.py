@@ -242,6 +242,9 @@ def create_reference(input_path, name, cell_vector, cell_param):
         "is_mismatch_adj": is_mismatch_adjacency(
             ref_labels, ref_pos, atom_site_labels, geom_bond_cif
         ),
+        "is_mismatch_metal_adj": is_mismatch_adjacency(
+            ref_labels, ref_pos, atom_site_labels, geom_bond_cif, metal_only=True
+        ),
         "metal_coord_diff": has_different_metal_coordination(
             refcell.refmoleclist,
             geom_bond_cif,
