@@ -14,6 +14,7 @@ from cell2mol.element_utils import (
     labels2formula,
 )
 from cell2mol.write_results import save_coordination_report
+import re
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
@@ -648,133 +649,6 @@ def has_mixed_metal_types(labels: list[str]) -> bool:
     return True
 
 
-def has_different_metal_coordination_v1(
-    refmoleculist, bond_data, refcode, report_csv=None
-):
-    """
-    Iterates through all molecules in refmoleculist and compares
-    metal coordination spheres against the provided bond_data.
-    """
-
-    if not bond_data:
-        logger.info("No bond data provided for coordination verification.")
-        return None
-
-    report = []
-    overall_difference = False
-    # Iterate through each molecule in the list
-    for mol_idx, molecule in enumerate(refmoleculist):
-        # Check each metal within the current molecule
-        if molecule.metals is None:
-            logger.info(
-                "No metals found in Molecule %s (Formula: %s). Skipping.",
-                mol_idx,
-                molecule.formula,
-            )
-            continue
-        for met in molecule.metals:
-            met_label = met.atom_site_label
-
-            if met.removed_from_coordination is not None:
-                removed_atoms = [
-                    atom.atom_site_label for atom in met.removed_from_coordination
-                ]
-            else:
-                removed_atoms = []
-
-            # 1. Extract ground truth neighbors from bond_data
-            neighbors_from_data = []
-            for b in bond_data:
-                if b[0] == met_label:
-                    neighbors_from_data.append(b[1])
-                elif b[1] == met_label:
-                    neighbors_from_data.append(b[0])
-
-            # 2. Get current neighbors stored in the object
-            # (Assuming coord_sphere_atoms is the primary storage list)
-            current_sphere_labels = [a.atom_site_label for a in met.coord_sphere_atoms]
-
-            # 3. Perform Set Comparison
-            set_data = set(neighbors_from_data)
-            set_current = set(current_sphere_labels)
-
-            if set_data != set_current:
-                overall_difference = True
-                missing = set_data - set_current
-                extra = set_current - set_data
-
-                logger.warning(
-                    "Molecule %s (Formula: %s): Mismatch in coordination for Metal %s",
-                    mol_idx,
-                    molecule.formula,
-                    met_label,
-                )
-                logger.warning(f"  Expected (bond_data): {neighbors_from_data}")
-                logger.warning(f"  Missing in cell2mol: {missing}")
-                logger.warning(f"  Present in cell2mol: {set_current}")
-                logger.warning(f"  Extra in cell2mol: {extra}")
-
-                for atom in molecule.atoms:
-                    if atom.atom_site_label in missing:
-                        # present in bond_data, absent in cell2mol
-                        status = "missing_in_cell2mol"
-                    elif atom.atom_site_label in extra:
-                        # present in cell2mol, absent in bond_data
-                        status = "extra_in_cell2mol"
-                    elif (
-                        atom.atom_site_label in set_current
-                        and atom.atom_site_label in set_data
-                    ):
-                        status = "match"
-                    else:
-                        continue
-                    report.append(
-                        {
-                            "refcode": refcode,
-                            "molecule_index": mol_idx,
-                            "formula": molecule.formula,
-                            "metal": met.label,
-                            "coord_atom": atom.label,
-                            "metal_site_label": met_label,
-                            "coord_atom_site_label": atom.atom_site_label,
-                            "distance": get_dist(met.coord, atom.coord),
-                            "status": status,
-                        }
-                    )
-            else:
-                logger.debug(
-                    "Molecule %s (Formula: %s): Metal %s coordination is correct.",
-                    mol_idx,
-                    molecule.formula,
-                    met_label,
-                )
-                for atom in molecule.atoms:
-                    if atom.atom_site_label in set_current:
-                        report.append(
-                            {
-                                "refcode": refcode,
-                                "molecule_index": mol_idx,
-                                "formula": molecule.formula,
-                                "metal": met.label,
-                                "coord_atom": atom.label,
-                                "metal_site_label": met_label,
-                                "coord_atom_site_label": atom.atom_site_label,
-                                "distance": get_dist(met.coord, atom.coord),
-                                "status": "match",
-                            }
-                        )
-
-    if report:
-        logger.info(
-            "Coordination discrepancies found for refcode %s. Total issues: %d",
-            refcode,
-            len(report),
-        )
-    if report_csv is not None:
-        save_coordination_report(report, report_csv)
-    return overall_difference
-
-
 def has_different_metal_coordination(
     refmoleculist, bond_data, refcode, report_csv=None
 ):
@@ -880,6 +754,35 @@ def has_different_metal_coordination(
                     }
                 )
 
+            def add_completely_missing_row(site):
+                key = (met_label, site, "missing_in_cell2mol", "found_other_molecule")
+                if key in recorded_keys:
+                    return
+                recorded_keys.add(key)
+                for b in bond_data:
+                    if met_label in (b[0], b[1]) and site in (b[0], b[1]):
+                        distance = b[2] if len(b) > 2 else None
+                        break
+                report.append(
+                    {
+                        "refcode": refcode,
+                        "molecule_index": mol_idx,
+                        "formula": molecule.formula,
+                        "metal": met.label,
+                        "coord_atom": re.sub(r"\d+$", "", site),
+                        "metal_site_label": met_label,
+                        "coord_atom_site_label": site,
+                        "bond": f"{met_label}-{site}",
+                        "distance": distance,
+                        "status": "missing_in_cell2mol",
+                        "bond_change": "found_other_molecule",
+                        "removed": False,
+                        "final_match": final_match,
+                        "haptic_type": None,
+                        "is_haptic": False,
+                    }
+                )
+
             # Normal comparison rows
             for atom in molecule.atoms:
                 site = atom.atom_site_label
@@ -917,6 +820,17 @@ def has_different_metal_coordination(
                 else:
                     status, bond_change = "removed_from_coordination", "removed_unknown"
                 add_row(atom, site, status, bond_change)
+
+            for site in missing:
+                if site not in set_removed and site not in {
+                    a.atom_site_label for a in molecule.atoms
+                }:
+                    logger.warning(
+                        "Atom %s expected in bond_data but missing in current molecule %s.",
+                        site,
+                        molecule.formula,
+                    )
+                    add_completely_missing_row(site)
 
     logger.info("Coordination report for %s: %d records.", refcode, len(report))
     if report_csv is not None:

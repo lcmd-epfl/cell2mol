@@ -228,6 +228,7 @@ def get_reference_warning_messages(refcell):
         "over_polynuclear_limit": f"Polynuclear complex exceeds metal center limit (> max_metals {config.MAX_METALS})",
         "mixed_metals": "Mixed metal types detected",
         "is_mismatch_adj": "Adjacency matrix does not match CIF bond connectivity.",
+        "is_mismatch_metal_adj": "Metal adjacency does not match CIF bond connectivity.",
         "metal_coord_diff": "Final metal coordination differs from CIF bond connectivity.",
     }
 
@@ -235,6 +236,7 @@ def get_reference_warning_messages(refcell):
     skip_map = {
         "cif_mismatch": "CIF formula check skipped (No _chemical_formula_moiety in CIF)",
         "is_mismatch_adj": "Adjacency check skipped (No _geom_bond in CIF)",
+        "is_mismatch_metal_adj": "Metal adjacency check skipped (No _geom_bond in CIF)",
         "metal_coord_diff": "Metal coordination check skipped (No _geom_bond in CIF)",
     }
 
