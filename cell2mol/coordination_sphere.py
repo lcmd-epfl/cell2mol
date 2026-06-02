@@ -588,49 +588,79 @@ def unique_atoms(atoms):
 
 
 def prioritize_coordinating_atoms_to_validate(
-    gr_atoms_dict, sorted_gr_atoms, ligand, is_haptic, haptic_type
+    gr_atoms_dict, sorted_gr_atoms, metal, ligand, is_haptic, haptic_type
 ):
     priority_atoms = []
 
-    group_formula = labels2formula(gr_atoms_dict["labels"])
+    labels = gr_atoms_dict["labels"]
+    margins = gr_atoms_dict["margins"]
+    group_formula = labels2formula(labels)
 
     def add_priority_atom(atom):
         if atom not in priority_atoms:
             priority_atoms.append(atom)
 
-    if "Si" in gr_atoms_dict["labels"]:
-        si_idx = gr_atoms_dict["labels"].index("Si")
-        si_margin = gr_atoms_dict["margins"][si_idx]
+    # Si priority
+    if labels.count("Si") == 1:
+        si_idx = labels.index("Si")
+        si_atom = sorted_gr_atoms[si_idx]
+        si_margin = float(np.round(margins[si_idx], 3))
 
-        # Si priority: If Si is present and has a large margin, prioritize it for validation
         if si_margin > 0.25:
-            add_priority_atom(sorted_gr_atoms[si_idx])
+            # If Si is present and has a large margin, prioritize it for validation.
+            add_priority_atom(si_atom)
+        else:
+            lig_mol_indices = {
+                atom.get_parent_index("molecule"): idx
+                for idx, atom in enumerate(ligand.atoms)
+            }
+            si_mol_idx = si_atom.get_parent_index("molecule")
 
-    if "B" in gr_atoms_dict["labels"]:
-        is_bh4_like = ligand.formula == "H4-B" or (
-            gr_atoms_dict["labels"].count("B") >= 1
-            and gr_atoms_dict["labels"].count("H") >= 2
-        )
+            if si_mol_idx in lig_mol_indices:
+                is_added, _, _ = add_atom(
+                    labels=ligand.labels,
+                    coords=ligand.coord,
+                    site=lig_mol_indices[si_mol_idx],
+                    ligand=ligand,
+                    element="H",
+                    metal=metal,
+                )
 
+                if not is_added:
+                    logger.warning(
+                        "Atom %s (%s) failed validation. Returning early to re-evaluate.",
+                        si_atom.label,
+                        si_atom.atom_site_label,
+                    )
+                    add_priority_atom(si_atom)
+
+    # B priority
+    if "B" not in labels:
+        return priority_atoms
+
+    if is_haptic:
         logger.debug(
-            "Evaluating BH4-like priority: ligand formula %s, group formula %s, is_bh4_like=%s",
-            ligand.formula,
+            "Haptic coordination detected (%s). Stop validation for B atoms in group %s",
+            haptic_type,
             group_formula,
-            is_bh4_like,
         )
+        return priority_atoms
 
-        if is_haptic:
-            logger.debug(
-                "Haptic coordination detected (%s). Stop validation for  B atoms in group %s",
-                haptic_type,
-                group_formula,
-            )
-            return priority_atoms
+    is_bh4_like = ligand.formula == "H4-B" or (
+        labels.count("B") >= 1 and labels.count("H") >= 2
+    )
 
-        if is_bh4_like:
-            for atom in sorted_gr_atoms:
-                if atom.label == "B":
-                    add_priority_atom(atom)
+    logger.debug(
+        "Evaluating BH4-like priority: ligand formula %s, group formula %s, is_bh4_like=%s",
+        ligand.formula,
+        group_formula,
+        is_bh4_like,
+    )
+
+    if is_bh4_like:
+        for atom in sorted_gr_atoms:
+            if atom.label == "B":
+                add_priority_atom(atom)
 
     return priority_atoms
 
@@ -725,7 +755,7 @@ def validate_coordinated_atoms(group, metal, ligand, removed_ligand_indices):
     #         "Hydrogen atoms detected in coordination sphere. Prioritizing their validation."
     #     )
     priority_atoms = prioritize_coordinating_atoms_to_validate(
-        gr_atoms_dict, sorted_gr_atoms, ligand, is_haptic, haptic_type
+        gr_atoms_dict, sorted_gr_atoms, metal, ligand, is_haptic, haptic_type
     )
     if priority_atoms:
         logger.debug(
