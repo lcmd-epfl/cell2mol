@@ -592,35 +592,53 @@ def prioritize_coordinating_atoms_to_validate(
 ):
     priority_atoms = []
 
-    labels = gr_atoms_dict["labels"]
+    group_labels = gr_atoms_dict["labels"]
+    group_atom_site_labels = gr_atoms_dict["atom_site_labels"]
     margins = gr_atoms_dict["margins"]
-    group_formula = labels2formula(labels)
+    group_formula = labels2formula(group_labels)
+    lig_mol_indices = {
+        atom.get_parent_index("molecule"): idx for idx, atom in enumerate(ligand.atoms)
+    }
 
     def add_priority_atom(atom):
         if atom not in priority_atoms:
             priority_atoms.append(atom)
 
     # Si priority
-    if labels.count("Si") == 1:
-        si_idx = labels.index("Si")
-        si_atom = sorted_gr_atoms[si_idx]
-        si_margin = float(np.round(margins[si_idx], 3))
+    if "Si" in group_labels:
+        for idx, atom in enumerate(sorted_gr_atoms):
+            if atom.label != "Si":
+                continue
+            margin = float(np.round(margins[idx], 3))
 
-        if si_margin > 0.25:
-            # If Si is present and has a large margin, prioritize it for validation.
-            add_priority_atom(si_atom)
-        else:
-            lig_mol_indices = {
-                atom.get_parent_index("molecule"): idx
-                for idx, atom in enumerate(ligand.atoms)
-            }
-            si_mol_idx = si_atom.get_parent_index("molecule")
+            if margin > 0.25:
+                # If Si is present and has a large margin, prioritize it for validation.
+                add_priority_atom(atom)
+            else:
+                neighboring_atoms = []
+                for adj in atom.adjacency:
+                    if adj not in atom.metal_adjacency:
+                        neighboring_atoms.append(atom.get_parent("molecule").atoms[adj])
 
-            if si_mol_idx in lig_mol_indices:
+                for neighbor in neighboring_atoms:
+                    if (
+                        neighbor.label == "H"
+                        and neighbor.atom_site_label in group_atom_site_labels
+                    ):
+                        logger.debug(
+                            "Neighboring H atom %s (%s) of Si atom %s are both in coordianting group %s. Prioritizing Si for validation.",
+                            neighbor.label,
+                            neighbor.atom_site_label,
+                            atom.atom_site_label,
+                            group_formula,
+                        )
+                        add_priority_atom(atom)
+                        break
+
                 is_added, _, _ = add_atom(
                     labels=ligand.labels,
                     coords=ligand.coord,
-                    site=lig_mol_indices[si_mol_idx],
+                    site=lig_mol_indices[atom.get_parent_index("molecule")],
                     ligand=ligand,
                     element="H",
                     metal=metal,
@@ -629,13 +647,13 @@ def prioritize_coordinating_atoms_to_validate(
                 if not is_added:
                     logger.warning(
                         "Atom %s (%s) failed validation. Returning early to re-evaluate.",
-                        si_atom.label,
-                        si_atom.atom_site_label,
+                        atom.label,
+                        atom.atom_site_label,
                     )
-                    add_priority_atom(si_atom)
+                    add_priority_atom(atom)
 
     # B priority
-    if "B" not in labels:
+    if "B" not in group_labels:
         return priority_atoms
 
     if is_haptic:
@@ -647,7 +665,7 @@ def prioritize_coordinating_atoms_to_validate(
         return priority_atoms
 
     is_bh4_like = ligand.formula == "H4-B" or (
-        labels.count("B") >= 1 and labels.count("H") >= 2
+        group_labels.count("B") >= 1 and group_labels.count("H") >= 2
     )
 
     logger.debug(
@@ -1122,7 +1140,6 @@ def build_adjacency_matrix_within_atoms(atoms, metal_indices={}):
 
 
 def discriminate_coord_atoms(atoms, metal, gap_cutoff=0.25):
-
     sorted_margins = np.array(
         [np.linalg.norm(metal.coord - a.coord) - metal.radii - a.radii for a in atoms]
     )
