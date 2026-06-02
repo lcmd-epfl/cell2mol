@@ -809,7 +809,7 @@ def _handle_non_haptic_group(
         # Boron
         # -----------------------------------------
         elif a.label == "B":
-            if len(adj_labels) < 4:
+            if len(adj_labels) < 3:
                 site_proton_counts[idx] = 1
             else:
                 pass

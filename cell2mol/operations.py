@@ -819,6 +819,12 @@ def has_different_metal_coordination(
                 a.atom_site_label for a in met.coord_sphere_atoms if a.atom_site_label
             }
 
+            group_dict = {}
+            for group in met.groups:
+                if group.is_haptic:
+                    for atom in group.atoms:
+                        group_dict[atom.atom_site_label] = group.haptic_type
+
             final_match = set_data == set_current
             missing, extra = set_data - set_current, set_current - set_data
 
@@ -867,6 +873,10 @@ def has_different_metal_coordination(
                         "bond_change": bond_change,
                         "removed": site in set_removed,
                         "final_match": final_match,
+                        "haptic_type": group_dict.get(site, None)
+                        if site in group_dict.keys()
+                        else "not_haptic",
+                        "is_haptic": site in group_dict.keys(),
                     }
                 )
 
