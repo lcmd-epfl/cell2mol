@@ -758,9 +758,9 @@ def apply_graph_to_blocklist(
     """Split a list of atoms into blocks of connected atoms."""
 
     new_blocklist = []
-    # logger.debug("Applying graph analysis to blocklist: %s", blocklist)
+    logger.debug("Applying graph analysis to blocklist: %s", blocklist)
     for b in blocklist:
-        # logger.debug("block=%s", b)
+        logger.debug("block=%s", b)
 
         gr_labels = extract_from_list(b, conn_labels, dimension=1)
         gr_coord = extract_from_list(b, conn_coord, dimension=1)
@@ -796,7 +796,7 @@ def apply_graph_to_blocklist(
             continue
 
         cycle = cycle_basis[0]
-        # logger.debug("Found single cycle in block %s: %s", b, cycle)
+        logger.debug("Found single cycle in block %s: %s", b, cycle)
 
         # Full cycle covers all atoms
         if len(cycle) == len(G.nodes):
@@ -807,10 +807,10 @@ def apply_graph_to_blocklist(
         cycle_block = sorted([b[idx] for idx in cycle])
         new_blocklist.append(cycle_block)
 
-        # logger.debug("Cycle block indices=%s", cycle_block)
+        logger.debug("Cycle block indices=%s", cycle_block)
 
-        remaining = [n for n in G.nodes if n not in cycle]
-        # logger.debug("Remaining nodes in block=%s", remaining)
+        remaining = [b[n] for n in G.nodes if n not in cycle]
+        logger.debug("Remaining nodes in block=%s", remaining)
 
         rem_labels = extract_from_list(remaining, conn_labels, dimension=1)
         rem_coord = extract_from_list(remaining, conn_coord, dimension=1)
@@ -839,12 +839,12 @@ def apply_graph_to_blocklist(
         for comp in nx.connected_components(G_rem):
             remaining_block = [remaining[idx] for idx in comp]
             new_blocklist.append(remaining_block)
-            # logger.debug(
-            #     "Remaining connected block=%s",
-            #     remaining_block,
-            # )
+            logger.debug(
+                "Remaining connected block=%s",
+                remaining_block,
+            )
 
-    # logger.debug("Final new_blocklist=%s", new_blocklist)
+    logger.debug("Final new_blocklist=%s", new_blocklist)
 
     return new_blocklist
 
