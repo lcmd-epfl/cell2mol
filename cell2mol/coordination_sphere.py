@@ -615,42 +615,45 @@ def prioritize_coordinating_atoms_to_validate(
                 # If Si is present and has a large margin, prioritize it for validation.
                 add_priority_atom(atom)
             else:
+                if len(atom.metal_adjacency) >= 2:
+                    logger.debug(
+                        "Si atom %s (%s) has margin %s but is connected to multiple metals. Skipping for validation.",
+                        atom.label,
+                        atom.atom_site_label,
+                        margin,
+                    )
+
                 neighboring_atoms = []
                 for adj in atom.adjacency:
                     if adj not in atom.metal_adjacency:
                         neighboring_atoms.append(atom.get_parent("molecule").atoms[adj])
 
+                n_neighbors_in_group = 0
+                n_h_neighbors_in_group = 0
+
                 for neighbor in neighboring_atoms:
-                    if (
-                        neighbor.label == "H"
-                        and neighbor.atom_site_label in group_atom_site_labels
-                    ):
-                        logger.debug(
-                            "Neighboring H atom %s (%s) of Si atom %s are both in coordianting group %s. Prioritizing Si for validation.",
-                            neighbor.label,
-                            neighbor.atom_site_label,
+                    if neighbor.atom_site_label in group_atom_site_labels:
+                        n_neighbors_in_group += 1
+                        if neighbor.label == "H":
+                            n_h_neighbors_in_group += 1
+
+                if n_neighbors_in_group >= 2 or n_h_neighbors_in_group >= 1:
+                    is_added, _, _ = add_atom(
+                        labels=ligand.labels,
+                        coords=ligand.coord,
+                        site=lig_mol_indices[atom.get_parent_index("molecule")],
+                        ligand=ligand,
+                        element="H",
+                        metal=metal,
+                    )
+
+                    if not is_added:
+                        logger.warning(
+                            "Atom %s (%s) failed validation. Returning early to re-evaluate.",
+                            atom.label,
                             atom.atom_site_label,
-                            group_formula,
                         )
                         add_priority_atom(atom)
-                        break
-
-                is_added, _, _ = add_atom(
-                    labels=ligand.labels,
-                    coords=ligand.coord,
-                    site=lig_mol_indices[atom.get_parent_index("molecule")],
-                    ligand=ligand,
-                    element="H",
-                    metal=metal,
-                )
-
-                if not is_added:
-                    logger.warning(
-                        "Atom %s (%s) failed validation. Returning early to re-evaluate.",
-                        atom.label,
-                        atom.atom_site_label,
-                    )
-                    add_priority_atom(atom)
 
     # B priority
     if "B" not in group_labels:
