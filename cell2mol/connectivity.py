@@ -348,6 +348,42 @@ def includes_metal(
     return False
 
 
+SPECIAL_METALS = ["Cu", "Zn", "Ag", "Cd", "Hg"]
+SPECIAL_DONORS = ["N", "O", "S", "Cl", "Br", "I", "F", "P"]
+
+
+def get_pair_cutoff(
+    label_i: str,
+    label_j: str,
+    default_cutoff: float,
+) -> float:
+    """Return pair-specific distance cutoff added to the sum of atomic radii.
+
+    Special rules:
+    - Cu/Zn/Ag/Cd/Hg bonded to N/O/S/P/halogens: use 0.75 Å
+    - d/f-block metal with Si: use 0.25 Å
+    - otherwise: use default_cutoff 0.45 Å
+    """
+
+    # pair = {label_i, label_j}
+    # block_i = elemdatabase.elementblock[label_i]
+    # block_j = elemdatabase.elementblock[label_j]
+
+    # d/f-block metal-Si contacts should be stricter
+    # if "Si" in pair and (block_i in {"d", "f"} or block_j in {"d", "f"}):
+    #     return 0.25
+
+    # selected metal-donor coordination bonds should be more permissive
+    is_special_metal_donor = (
+        label_i in SPECIAL_METALS and label_j in SPECIAL_DONORS
+    ) or (label_j in SPECIAL_METALS and label_i in SPECIAL_DONORS)
+
+    if is_special_metal_donor:
+        return 0.75
+
+    return default_cutoff
+
+
 def get_adjmatrix(
     labels: list[str],
     pos: np.ndarray,
@@ -410,7 +446,9 @@ def get_adjmatrix(
         for j in range(i + 1, natoms):
             b = np.asarray(pos[j])
             dist = np.linalg.norm(a - b)
-            thres = radii[i] + radii[j] + cutoff
+
+            pair_cutoff = get_pair_cutoff(labels[i], labels[j], default_cutoff=cutoff)
+            thres = radii[i] + radii[j] + pair_cutoff
 
             if dist <= clash_threshold:
                 isgood = False
