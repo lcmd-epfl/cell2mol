@@ -515,17 +515,17 @@ def correct_coordination_sphere(
             current_pool,
         )
         while True:
-            results = partition_connected_indices(
+            partitioned_groups_dict = partition_connected_indices(
                 current_pool, mol, use_bond_info=config.USE_BOND_INFO
             )
-            if not results:
+            if not partitioned_groups_dict:
                 break
 
             any_change_in_iteration = False
             surviving_pool = []
             temp_stable_groups = []
 
-            for group in results.values():
+            for group in partitioned_groups_dict.values():
                 if config.USE_BOND_INFO:
                     validated_gr_atoms = group["gr_atoms"]
                     was_changed = False
@@ -573,6 +573,27 @@ def move_to_front(atoms, target_atom):
     return [target_atom] + [a for a in atoms if a is not target_atom]
 
 
+def get_neighbors_in_group(atom, group_atom_site_labels):
+
+    neighboring_nonmetal_atoms = []
+    for adj in atom.adjacency:
+        if adj not in atom.metal_adjacency:
+            neighboring_nonmetal_atoms.append(atom.get_parent("molecule").atoms[adj])
+
+    n_neighbors_in_group = 0
+    n_h_neighbors_in_group = 0
+    neighbors_in_group = []
+    for neighbor in neighboring_nonmetal_atoms:
+        if neighbor.atom_site_label in group_atom_site_labels:
+            neighbors_in_group.append(neighbor)
+            n_neighbors_in_group += 1
+            if neighbor.label == "H":
+                n_h_neighbors_in_group += 1
+
+    # return neighboring_nonmetal_atoms, n_neighbors_in_group, n_h_neighbors_in_group
+    return neighbors_in_group
+
+
 def unique_atoms(atoms):
     seen = set()
     unique = []
@@ -587,106 +608,128 @@ def unique_atoms(atoms):
     return unique
 
 
-def prioritize_coordinating_atoms_to_validate(
-    gr_atoms_dict, sorted_gr_atoms, metal, ligand, is_haptic, haptic_type
-):
-    priority_atoms = []
+def get_atom_distance_margin(atom, metal) -> float:
+    """Return rounded margin for an atom-site label."""
+    distance = np.linalg.norm(np.array(atom.coord) - np.array(metal.coord))
+    margin = float(np.round(distance - metal.radii - atom.radii, 3))
+    distance = float(np.round(distance, 3))
+    return distance, margin
 
-    group_labels = gr_atoms_dict["labels"]
-    group_atom_site_labels = gr_atoms_dict["atom_site_labels"]
-    margins = gr_atoms_dict["margins"]
-    group_formula = labels2formula(group_labels)
-    lig_mol_indices = {
-        atom.get_parent_index("molecule"): idx for idx, atom in enumerate(ligand.atoms)
+
+def sort_gr_atoms_by_margin(group, metal):
+    """Sort group atoms by margin to prioritize validation."""
+
+    sorted_gr_atoms = sorted(
+        group["gr_atoms"],
+        key=lambda a: (
+            a.label == "H",
+            np.linalg.norm(metal.coord - a.coord) - metal.radii - a.radii,
+        ),
+        reverse=True,
+    )
+
+    sorted_group = {
+        "gr_atoms": [],
+        "labels": [],
+        "atom_site_labels": [],
+        "distances": [],
+        "margins": [],
+        "formula": labels2formula([a.label for a in sorted_gr_atoms]),
+        "is_haptic": group["is_haptic"],
+        "haptic_type": group["haptic_type"],
     }
 
-    def add_priority_atom(atom):
-        if atom not in priority_atoms:
-            priority_atoms.append(atom)
+    for atom in sorted_gr_atoms:
+        distance = float(np.round(np.linalg.norm(metal.coord - atom.coord), 3))
+        margin = float(np.round(distance - metal.radii - atom.radii, 3))
+        sorted_group["gr_atoms"].append(atom)
+        sorted_group["labels"].append(atom.label)
+        sorted_group["atom_site_labels"].append(atom.atom_site_label)
+        sorted_group["distances"].append(distance)
+        sorted_group["margins"].append(margin)
 
-    # Si priority
-    if "Si" in group_labels:
-        for idx, atom in enumerate(sorted_gr_atoms):
-            if atom.label != "Si":
-                continue
-            margin = float(np.round(margins[idx], 3))
-
-            if margin > 0.25:
-                # If Si is present and has a large margin, prioritize it for validation.
-                add_priority_atom(atom)
-            else:
-                if len(atom.metal_adjacency) >= 2:
-                    logger.debug(
-                        "Si atom %s (%s) has margin %s but is connected to multiple metals. Skipping for validation.",
-                        atom.label,
-                        atom.atom_site_label,
-                        margin,
-                    )
-
-                neighboring_atoms = []
-                for adj in atom.adjacency:
-                    if adj not in atom.metal_adjacency:
-                        neighboring_atoms.append(atom.get_parent("molecule").atoms[adj])
-
-                n_neighbors_in_group = 0
-                n_h_neighbors_in_group = 0
-
-                for neighbor in neighboring_atoms:
-                    if neighbor.atom_site_label in group_atom_site_labels:
-                        n_neighbors_in_group += 1
-                        if neighbor.label == "H":
-                            n_h_neighbors_in_group += 1
-
-                if n_neighbors_in_group >= 2 or n_h_neighbors_in_group >= 1:
-                    is_added, _, _ = add_atom(
-                        labels=ligand.labels,
-                        coords=ligand.coord,
-                        site=lig_mol_indices[atom.get_parent_index("molecule")],
-                        ligand=ligand,
-                        element="H",
-                        metal=metal,
-                    )
-
-                    if not is_added:
-                        logger.warning(
-                            "Atom %s (%s) failed validation. Returning early to re-evaluate.",
-                            atom.label,
-                            atom.atom_site_label,
-                        )
-                        add_priority_atom(atom)
-
-    # B priority
-    if "B" not in group_labels:
-        return priority_atoms
-
-    if is_haptic:
-        logger.debug(
-            "Haptic coordination detected (%s). Stop validation for B atoms in group %s",
-            haptic_type,
-            group_formula,
-        )
-        return priority_atoms
-
-    is_bh4_like = ligand.formula == "H4-B" or (
-        group_labels.count("B") >= 1 and group_labels.count("H") >= 2
-    )
+    if not sorted_gr_atoms or not sorted_gr_atoms[0].atom_site_label:
+        sorted_group["atom_site_labels"] = None
 
     logger.debug(
-        "Evaluating BH4-like priority: ligand formula %s, group formula %s, is_bh4_like=%s",
-        ligand.formula,
-        group_formula,
-        is_bh4_like,
+        "Sorted coordinated atoms (farthest first): %s", sorted_group["labels"]
     )
+    logger.debug(
+        "Sorted coordinated atom site labels: %s",
+        sorted_group["atom_site_labels"],
+    )
+    logger.debug("Sorted coordinated atom distances: %s", sorted_group["distances"])
+    logger.debug("Sorted coordinated atom margins: %s", sorted_group["margins"])
 
-    if is_bh4_like:
-        for atom in sorted_gr_atoms:
-            if atom.label == "B":
-                add_priority_atom(atom)
-
-    return priority_atoms
+    return sorted_group
 
 
-def validate_coordinated_atoms(group, metal, ligand, removed_ligand_indices):
+def remove_atom_from_coordination(
+    atom, metal, ligand, removed_ligand_indices, remove_anyway=False
+):
+
+    is_removed = False
+    atom_mol_idx = atom.get_parent_index("molecule")
+    lig_mol_indices = {
+        a.get_parent_index("molecule"): i for i, a in enumerate(ligand.atoms)
+    }
+
+    ligand_idx = lig_mol_indices.get(atom_mol_idx)
+    if ligand_idx is None:
+        return removed_ligand_indices, is_removed
+
+    def marked_as_removed():
+        atom.reset_mconnec(metal)
+        if ligand_idx not in removed_ligand_indices:
+            removed_ligand_indices.append(ligand_idx)
+
+        if getattr(metal, "removed_from_coordination", None) is None:
+            object.__setattr__(metal, "removed_from_coordination", [])
+
+        metal.removed_from_coordination.append(atom)
+
+        logger.debug(
+            "Removed atom %s (%s) from coordination. Removed indices: %s",
+            atom.label,
+            atom.atom_site_label,
+            removed_ligand_indices,
+        )
+
+    if remove_anyway:
+        marked_as_removed()
+        is_removed = True
+    else:
+        is_added, _, _ = add_atom(
+            labels=ligand.labels,
+            coords=ligand.coord,
+            site=ligand_idx,
+            ligand=ligand,
+            element="H",
+            removed_idx=removed_ligand_indices,
+            metal=metal,
+        )
+        if not is_added:
+            marked_as_removed()
+            is_removed = True
+    logger.debug(f"{remove_anyway=}, {is_removed=}")
+    logger.debug(
+        "After attempting to remove atom %s (%s), removed indices: %s",
+        atom.label,
+        atom.atom_site_label,
+        removed_ligand_indices,
+    )
+    return removed_ligand_indices, is_removed
+
+
+def validate_coordinated_atoms(
+    group,
+    metal,
+    ligand,
+    removed_ligand_indices,
+    PRIORITY_MARGIN_DIFF=0.4,
+    PRIORITY_DISTANCE_DIFF=0.4,
+    EXCLUDED_C_NEIGHBOR_PAIRS={("C", "C"), ("B", "C")},
+):
     """
     Checks if atoms in gr_atoms are truly connected to the metal.
     Args:
@@ -696,175 +739,293 @@ def validate_coordinated_atoms(group, metal, ligand, removed_ligand_indices):
         removed_ligand_indices: List of removed atom indices in ligands.
     Returns: (list of surviving atoms, boolean changed_flag)
     """
-    gr_atoms = group["gr_atoms"]
-    is_haptic = group["is_haptic"]
-    haptic_type = group["haptic_type"]
+
+    removed_molecule_indices = set()
+    sorted_group = sort_gr_atoms_by_margin(group, metal)
+    gr_atoms = sorted_group["gr_atoms"]
+
+    def filter_and_return():
+        updated = [
+            a
+            for a in gr_atoms
+            if a.get_parent_index("molecule") not in removed_molecule_indices
+        ]
+        changed = len(updated) < len(gr_atoms)
+        if changed:
+            logger.debug(
+                "Updated coordinated atoms after validation: %s (group formula: %s -> updated formula: %s)",
+                [a.label for a in updated],
+                sorted_group["formula"],
+                labels2formula([a.label for a in updated]),
+            )
+        else:
+            logger.debug(
+                "No atoms removed during validation. Coordinated atoms remain unchanged. (group formula: %s)",
+                sorted_group["formula"],
+            )
+        return updated, changed
 
     if not gr_atoms:
+        logger.debug("No coordinating atoms found in group.")
         return [], False
 
     if len(gr_atoms) == 1:
-        atom = gr_atoms[0]
         logger.debug(
-            "Only one coordinating atom found: %s (%s) (distance: %s). Skipping connectivity validation.",
-            atom.label,
-            atom.atom_site_label,
-            np.round(np.linalg.norm(metal.coord - atom.coord), 3),
+            "Only one coordinating atom found: %s (%s) (distance: %s / margin: %s). Skipping connectivity validation.",
+            sorted_group["labels"][0],
+            sorted_group["atom_site_labels"][0],
+            sorted_group["distances"][0],
+            sorted_group["margins"][0],
         )
         return gr_atoms, False
 
     if ligand.formula == "H2" and len(gr_atoms) == 2:
         return gr_atoms, False
 
-    lig_mol_indices = {
-        a.get_parent_index("molecule"): i for i, a in enumerate(ligand.atoms)
-    }
-
-    # 1. Sort atoms by margin: Farthest atoms first to handle
-    # Primary: Hydrogen comes before Non-hydrogen atoms
-    # Secondary: largest margin first
-    sorted_gr_atoms = sorted(
-        gr_atoms,
-        key=lambda a: (
-            a.label == "H",
-            np.linalg.norm(metal.coord - a.coord) - metal.radii - a.radii,
-        ),
-        reverse=True,
-    )
-
-    gr_atoms_dict = {
-        "labels": [],
-        "atom_site_labels": [],
-        "distances": [],
-        "margins": [],
-    }
-
-    for atom in sorted_gr_atoms:
-        distance = float(np.round(np.linalg.norm(metal.coord - atom.coord), 3))
-        margin = float(np.round(distance - metal.radii - atom.radii, 3))
-
-        gr_atoms_dict["labels"].append(atom.label)
-        gr_atoms_dict["atom_site_labels"].append(atom.atom_site_label)
-        gr_atoms_dict["distances"].append(distance)
-        gr_atoms_dict["margins"].append(margin)
-
-    if not sorted_gr_atoms or not sorted_gr_atoms[0].atom_site_label:
-        gr_atoms_dict["atom_site_labels"] = None
-
-    # 2. Detailed Debug Logging
-    logger.debug(
-        "Sorted coordinated atoms (farthest first): %s", gr_atoms_dict["labels"]
-    )
-    logger.debug(
-        "Sorted coordinated atom site labels: %s", gr_atoms_dict["atom_site_labels"]
-    )
-    logger.debug("Sorted coordinated atom distances: %s", gr_atoms_dict["distances"])
-    logger.debug("Sorted coordinated atom margins: %s", gr_atoms_dict["margins"])
-
-    # if haptic:
-    #     logger.debug(
-    #         "Haptic coordination detected. Skipping validation. %s", group_formula
-    #     )
-    #     return gr_atoms, False
-
-    # if "H" not in gr_atoms_labels:
-    #     outlier_atoms = find_atom_outlier(sorted_gr_atoms, metal, haptic)
-    #     atoms_to_validate = outlier_atoms
-    # else:
-    #     atoms_to_validate = sorted_gr_atoms
-    #     logger.debug(
-    #         "Hydrogen atoms detected in coordination sphere. Prioritizing their validation."
-    #     )
-    priority_atoms = prioritize_coordinating_atoms_to_validate(
-        gr_atoms_dict, sorted_gr_atoms, metal, ligand, is_haptic, haptic_type
-    )
-    if priority_atoms:
+    if sorted_group["is_haptic"]:
         logger.debug(
-            "Priority atoms identified for validation: %s %s",
-            [a.label for a in priority_atoms],
-            [a.atom_site_label for a in priority_atoms],
+            "Group is identified as haptic (type: %s). Skipping connectivity validation for atoms: %s",
+            sorted_group["haptic_type"],
+            sorted_group["labels"],
         )
+        return gr_atoms, False
 
-        removed_atom_mol_indices = set()
+    if "B" in sorted_group["labels"]:
+        is_bh4_like = ligand.formula == "H4-B" or (
+            sorted_group["labels"].count("B") >= 1
+            and sorted_group["labels"].count("H") >= 2
+        )
+    else:
+        is_bh4_like = False
 
-        for atom in priority_atoms:
-            atom_mol_idx = atom.get_parent_index("molecule")
+    if is_bh4_like:
+        logger.debug(
+            "BH4-like coordination detected (ligand formula: %s, group formula: %s). Validating B atoms first.",
+            ligand.formula,
+            sorted_group["formula"],
+        )
+        for atom in gr_atoms:
+            if atom.label == "B":
+                removed_ligand_indices, is_removed = remove_atom_from_coordination(
+                    atom, metal, ligand, removed_ligand_indices, remove_anyway=True
+                )
+                if is_removed:
+                    removed_molecule_indices.add(atom.get_parent_index("molecule"))
+        return filter_and_return()
 
-            atom.reset_mconnec(metal)
-            removed_ligand_indices.append(lig_mol_indices[atom_mol_idx])
-            removed_atom_mol_indices.add(atom_mol_idx)
+    for atom, atom_distance, atom_margin in zip(
+        gr_atoms, sorted_group["distances"], sorted_group["margins"]
+    ):
+        neighbors_in_group = get_neighbors_in_group(
+            atom, sorted_group["atom_site_labels"]
+        )
+        n_neighbors_in_group = len(neighbors_in_group)
+        n_h_neighbors_in_group = sum(1 for n in neighbors_in_group if n.label == "H")
 
-            if getattr(metal, "removed_from_coordination", None) is None:
-                object.__setattr__(metal, "removed_from_coordination", [])
+        if atom.label == "H":
+            if len(gr_atoms) >= 2:
+                if n_neighbors_in_group != 1:
+                    continue
+                neighbor = neighbors_in_group[0]
+                nb_distance, nb_margin = get_atom_distance_margin(neighbor, metal)
+                logger.debug(
+                    "  Atom %s (%s) has distance %s and margin %s, neighbor %s (%s) has distance %s and margin %s",
+                    atom.label,
+                    atom.atom_site_label,
+                    atom_distance,
+                    atom_margin,
+                    neighbor.label,
+                    neighbor.atom_site_label,
+                    nb_distance,
+                    nb_margin,
+                )
+                if atom_distance - nb_distance < PRIORITY_DISTANCE_DIFF:
+                    logger.debug(
+                        "  Atom %s (%s) is kept.",
+                        atom.label,
+                        atom.atom_site_label,
+                    )
+                else:
+                    logger.debug(
+                        "  Atom %s (%s) is removed.",
+                        atom.label,
+                        atom.atom_site_label,
+                    )
+                    removed_ligand_indices, is_removed = remove_atom_from_coordination(
+                        atom, metal, ligand, removed_ligand_indices, remove_anyway=True
+                    )
+                    if is_removed:
+                        removed_molecule_indices.add(atom.get_parent_index("molecule"))
+                        filter_and_return()
+            else:  # single H atom case
+                logger.debug(
+                    "  Single atom %s (%s) with distance %s and margin %s. Validating based on connectivity.",
+                    atom.label,
+                    atom.atom_site_label,
+                    atom_distance,
+                    atom_margin,
+                )
+                removed_ligand_indices, is_removed = remove_atom_from_coordination(
+                    atom, metal, ligand, removed_ligand_indices, remove_anyway=False
+                )
+                if is_removed:
+                    removed_molecule_indices.add(atom.get_parent_index("molecule"))
+                    filter_and_return()
 
-            metal.removed_from_coordination.append(atom)
-
-            logger.debug(
-                "Updated removed ligand indices: %s %s",
-                removed_ligand_indices,
-                lig_mol_indices[atom_mol_idx],
+        elif (
+            atom.label == "Si" and atom_margin > 0.25 and len(atom.metal_adjacency) == 1
+        ):
+            removed_ligand_indices, is_removed = remove_atom_from_coordination(
+                atom, metal, ligand, removed_ligand_indices, remove_anyway=True
             )
+            if is_removed:
+                removed_molecule_indices.add(atom.get_parent_index("molecule"))
+            # elif len(atom.metal_adjacency) >= 2:
+            #     logger.debug(
+            #         "Si atom (%s) has distance %s and margin %s but is connected to multiple metals. Skipping for validation.",
+            #         atom.label,
+            #         atom.atom_site_label,
+            #         atom_distance,
+            #         atom_margin,
+            #     )
+            # else:
+            # if n_neighbors_in_group >= 2 or n_h_neighbors_in_group >= 1:
+            #     logger.debug(
+            #         "  Atom %s (%s) is removed due to having multiple neighbors in group (n_neighbors_in_group: %d, n_h_neighbors_in_group: %d).",
+            #         atom.label,
+            #         atom.atom_site_label,
+            #         n_neighbors_in_group,
+            #         n_h_neighbors_in_group,
+            #     )
+            #     removed_ligand_indices, is_removed = remove_atom_from_coordination(
+            #         atom,
+            #         metal,
+            #         ligand,
+            #         removed_ligand_indices,
+            #         remove_anyway=True,
+            #     )
+            #     if is_removed:
+            #         removed_molecule_indices.add(atom.get_parent_index("molecule"))
+            #         filter_and_return()
+            # else:
+            # logger.debug(
+            #     "  Single atom %s (%s) with distance %s and margin %s. Validating based on connectivity.",
+            #     atom.label,
+            #     atom.atom_site_label,
+            #     atom_distance,
+            #     atom_margin,
+            # )
+            # removed_ligand_indices, is_removed = remove_atom_from_coordination(
+            #     atom,
+            #     metal,
+            #     ligand,
+            #     removed_ligand_indices,
+            #     remove_anyway=False,
+            # )
+            # if is_removed:
+            #     removed_molecule_indices.add(atom.get_parent_index("molecule"))
+            #     filter_and_return()
 
-        # Filter gr_atoms to exclude all priority atoms removed in this pass
-        updated_gr_atoms = [
-            a
-            for a in gr_atoms
-            if a.get_parent_index("molecule") not in removed_atom_mol_indices
-        ]
+        else:
+            if len(gr_atoms) == 2:
+                if n_neighbors_in_group != 1:
+                    continue
 
-        return updated_gr_atoms, True
+                neighbor = neighbors_in_group[0]
+                nb_distance, nb_margin = get_atom_distance_margin(neighbor, metal)
+                logger.debug(
+                    "  Atom %s (%s) has distance %s and margin %s, neighbor %s (%s) has distance %s and margin %s",
+                    atom.label,
+                    atom.atom_site_label,
+                    atom_distance,
+                    atom_margin,
+                    neighbor.label,
+                    neighbor.atom_site_label,
+                    nb_distance,
+                    nb_margin,
+                )
+                if neighbor.label != "H":
+                    if atom_distance - nb_distance < PRIORITY_DISTANCE_DIFF:
+                        logger.debug(
+                            "  Atom %s (%s) is kept",
+                            atom.label,
+                            atom.atom_site_label,
+                        )
+                    else:
+                        logger.debug(
+                            "  Atom %s (%s) is removed.",
+                            atom.label,
+                            atom.atom_site_label,
+                        )
+                        removed_ligand_indices, is_removed = (
+                            remove_atom_from_coordination(
+                                atom,
+                                metal,
+                                ligand,
+                                removed_ligand_indices,
+                                remove_anyway=True,
+                            )
+                        )
+                        if is_removed:
+                            removed_molecule_indices.add(
+                                atom.get_parent_index("molecule")
+                            )
+                            filter_and_return()
+                else:
+                    logger.debug(
+                        "  Atom %s (%s) is kept since its only neighbor is a hydrogen atom, and hydrogen atoms are already validated",
+                        atom.label,
+                        atom.atom_site_label,
+                    )
 
-    # atoms_to_validate = [a for a in sorted_gr_atoms if a not in priority_atoms]
+            elif len(gr_atoms) >= 3:
+                if n_neighbors_in_group != 2:
+                    continue
+                if atom.label == "B" and is_bh4_like:
+                    continue
+                if atom.label == "C":
+                    neighbor_labels = tuple(
+                        sorted(neighbor.label for neighbor in neighbors_in_group)
+                    )
 
-    # logger.debug(
-    #     "Final atoms selected for validation: %s %s",
-    #     [a.label for a in atoms_to_validate],
-    #     [a.atom_site_label for a in atoms_to_validate],
-    # )
+                    if neighbor_labels in EXCLUDED_C_NEIGHBOR_PAIRS:
+                        continue
 
-    # for atom in atoms_to_validate:
-    #     atom_mol_idx = atom.get_parent_index("molecule")
+                nb_distances = []
+                nb_margins = []
+                for neighbor in neighbors_in_group:
+                    nb_distance, nb_margin = get_atom_distance_margin(neighbor, metal)
+                    nb_distances.append(nb_distance)
+                    nb_margins.append(nb_margin)
 
-    #     if atom_mol_idx in lig_mol_indices:
-    #         is_added, _, _ = add_atom(
-    #             labels=ligand.labels,
-    #             coords=ligand.coord,
-    #             site=lig_mol_indices[atom_mol_idx],
-    #             ligand=ligand,
-    #             element="H",
-    #             removed_idx=removed_ligand_indices,
-    #             metal=metal,
-    #         )
+                logger.debug(
+                    "  Atom %s (%s) has distance %s and margin %s, neighbors %s (%s) have distance %s and margins %s",
+                    atom.label,
+                    atom.atom_site_label,
+                    atom_distance,
+                    atom_margin,
+                    [n.label for n in neighbors_in_group],
+                    [n.atom_site_label for n in neighbors_in_group],
+                    nb_distances,
+                    nb_margins,
+                )
+                if all(
+                    atom_distance > neighbor_distance
+                    for neighbor_distance in nb_distances
+                ):
+                    logger.debug(
+                        "  Atom %s (%s) is removed since it is farther from metal than all its neighbors.",
+                        atom.label,
+                        atom.atom_site_label,
+                    )
+                    removed_ligand_indices, is_removed = remove_atom_from_coordination(
+                        atom, metal, ligand, removed_ligand_indices, remove_anyway=True
+                    )
+                    if is_removed:
+                        removed_molecule_indices.add(atom.get_parent_index("molecule"))
+                        filter_and_return()
 
-    #         if not is_added:
-    #             # --- EARLY RETURN LOGIC ---
-    #             logger.warning(
-    #                 f"Atom {atom.label} ({atom.atom_site_label}) failed validation. Returning early to re-evaluate."
-    #             )
-
-    #             # Reset connectivity for the failed atom
-    #             atom.reset_mconnec(metal)
-    #             removed_ligand_indices.append(lig_mol_indices[atom_mol_idx])
-    #             if getattr(metal, "removed_from_coordination", None) is None:
-    #                 object.__setattr__(metal, "removed_from_coordination", [])
-    #             metal.removed_from_coordination.append(atom)
-    #             logger.debug(
-    #                 f"Updated removed ligand indices: {removed_ligand_indices} {lig_mol_indices[atom_mol_idx]}"
-    #             )
-    #             # Filter gr_atoms to exclude only this specific failed atom
-    #             # All other atoms are still 'potentially' valid in the next iteration
-    #             updated_gr_atoms = [
-    #                 a
-    #                 for a in gr_atoms
-    #                 if a.get_parent_index("molecule") != atom_mol_idx
-    #             ]
-
-    #             return updated_gr_atoms, True
-    #         else:
-    #             logger.debug(f"Atom {atom.label} ({atom.atom_site_label}) retained")
-
-    # If the loop finishes without hitting 'if not is_added', nothing was removed
-    return gr_atoms, False
+    return filter_and_return()
 
 
 def partition_connected_indices(
@@ -909,7 +1070,7 @@ def partition_connected_indices(
     )
     logger.debug("  Identified %s blocks from connected atoms", len(blocklist))
     logger.debug("    Blocks: %s", [block for block in blocklist])
-    results = {}
+    partitioned_group_dict = {}
     for idx, block in enumerate(blocklist):
         gr_atoms = extract_from_list(block, conn_atoms, dimension=1)
         is_haptic, haptic_type, topology = identify_haptic_mode(
@@ -926,14 +1087,14 @@ def partition_connected_indices(
                 "    Block with atoms %s is non-haptic",
                 [atom.label for atom in gr_atoms],
             )
-        results[idx] = {
+        partitioned_group_dict[idx] = {
             "formula": labels2formula([atom.label for atom in gr_atoms]),
             "is_haptic": is_haptic,
             "haptic_type": haptic_type,
             "gr_atoms": gr_atoms,
         }
-        # logger.debug("Results for block %s: %s", idx, results[idx])
-    return results
+        # logger.debug("Results for block %s: %s", idx, partitioned_group_dict[idx])
+    return partitioned_group_dict
 
 
 def find_atom_outlier(atoms, metal, haptic, threshold_percent=50.0):
