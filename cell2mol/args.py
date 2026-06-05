@@ -85,6 +85,16 @@ def parsing_arguments():
         parser.error(
             "Invalid input file format. Only .cif and .xyz files are supported."
         )
+    if ext == ".cif":
+        if args.system_type != "reference" and args.system_type != "unitcell":
+            parser.error(
+                "For .cif files, system type must be 'reference' or 'unitcell'."
+            )
+    if ext == ".xyz":
+        if args.system_type != "molecule":
+            parser.error("For .xyz files, system type must be 'molecule'.")
+        if args.charge is None:
+            parser.error("Charge must be provided for .xyz file")
 
     cell_para = None
     if args.filepath.endswith(".xyz") and args.system_type == "unitcell":
