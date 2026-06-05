@@ -702,6 +702,17 @@ def has_different_metal_coordination(
             final_match = set_data == set_current
             missing, extra = set_data - set_current, set_current - set_data
 
+            other_metal_labels = [
+                other_met.atom_site_label
+                for other_met in molecule.metals
+                if other_met != met
+            ]
+            other_metal_labels = set(other_metal_labels)
+            set_data_without_metal = set_data - other_metal_labels
+            set_current_without_metal = set_current - other_metal_labels
+
+            final_match_wo_mm = set_data_without_metal == set_current_without_metal
+
             if not final_match:
                 overall_difference = True
                 logger.warning(
@@ -747,10 +758,12 @@ def has_different_metal_coordination(
                         "bond_change": bond_change,
                         "removed": site in set_removed,
                         "final_match": final_match,
+                        "final_match_wo_mm": final_match_wo_mm,
                         "haptic_type": group_dict.get(site, None)
                         if site in group_dict.keys()
                         else "not_haptic",
                         "is_haptic": site in group_dict.keys(),
+                        "n_metals": len(molecule.metals),
                     }
                 )
 
@@ -778,8 +791,10 @@ def has_different_metal_coordination(
                         "bond_change": "found_other_molecule",
                         "removed": False,
                         "final_match": final_match,
+                        "final_match_wo_mm": final_match_wo_mm,
                         "haptic_type": None,
                         "is_haptic": False,
+                        "n_metals": len(molecule.metals),
                     }
                 )
 

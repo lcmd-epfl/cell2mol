@@ -736,8 +736,10 @@ def save_coordination_report(report, output_csv):
         "bond_change",
         "removed",
         "final_match",
+        "final_match_wo_mm",
         "haptic_type",
         "is_haptic",
+        "n_metals",
     ]
 
     df = pd.DataFrame(report)
