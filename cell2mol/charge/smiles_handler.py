@@ -611,7 +611,7 @@ def create_metal_ligand_bonds(mol: object):
                         else:
                             bond_startatom = met
                             bond_endatom = at
-                        newbond = Bond.from_positional(bond_startatom, bond_endatom, 0)
+                        newbond = Bond.from_positional(bond_startatom, bond_endatom, 1)
                         # Chem.BondType.DATIVE
                         at.add_bond(newbond)
                         met.add_bond(newbond)
