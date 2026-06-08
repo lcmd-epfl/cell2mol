@@ -494,8 +494,8 @@ def get_candidate_charges(prot: object) -> list:
         maxcharge = max(2, min(maxcharge, 4))
 
         # If protons were added and it's not nitrosyl, favor neutrality
-        if not spec.is_nitrosyl and prot.n_protons_added > 0:
-            maxcharge = 0
+        # if not spec.is_nitrosyl and prot.n_protons_added > 0:
+        #     maxcharge = 0
     else:
         maxcharge = 0
 
