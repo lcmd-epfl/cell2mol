@@ -348,8 +348,10 @@ def includes_metal(
     return False
 
 
-SPECIAL_METALS = ["Cu", "Zn", "Ag", "Cd", "Hg"]
-SPECIAL_DONORS = ["N", "O", "S", "Cl", "Br", "I", "F", "P"]
+SPECIAL_DONORS = ["N", "O", "S", "Cl", "Br", "I", "F"]
+
+PAIR_CUTOFF_075_METALS = ["Cu", "Hg"]
+PAIR_CUTOFF_065_METALS = ["Zn", "Ag", "Cd"]
 
 
 def get_pair_cutoff(
@@ -360,27 +362,25 @@ def get_pair_cutoff(
     """Return pair-specific distance cutoff added to the sum of atomic radii.
 
     Special rules:
-    - Cu/Zn/Ag/Cd/Hg bonded to N/O/S/P/halogens: use 0.75 Å
-    - d/f-block metal with Si: use 0.25 Å
-    - otherwise: use default_cutoff 0.45 Å
+    - Cu/Hg bonded to N/O/S/halogens: use 0.75 Å
+    - Zn/Ag/Cd bonded to N/O/S/halogens: use 0.65 Å
+    - otherwise: use default_cutoff, usually 0.45 Å
+
+    Note:
+    Cd was included in both requested rules. Here, the 0.75 Å rule has
+    priority for Cd.
     """
 
-    # pair = {label_i, label_j}
-    # block_i = elemdatabase.elementblock[label_i]
-    # block_j = elemdatabase.elementblock[label_j]
+    pair = {label_i, label_j}
 
-    # d/f-block metal-Si contacts should be stricter
-    # if "Si" in pair and (block_i in {"d", "f"} or block_j in {"d", "f"}):
-    #     return 0.25
+    has_special_donor = any(donor in pair for donor in SPECIAL_DONORS)
 
-    # selected metal-donor coordination bonds should be more permissive
-    is_special_metal_donor = (
-        label_i in SPECIAL_METALS and label_j in SPECIAL_DONORS
-    ) or (label_j in SPECIAL_METALS and label_i in SPECIAL_DONORS)
+    if has_special_donor:
+        if any(metal in pair for metal in PAIR_CUTOFF_075_METALS):
+            return 0.75
 
-    if is_special_metal_donor:
-        return 0.75
-
+        if any(metal in pair for metal in PAIR_CUTOFF_065_METALS):
+            return 0.65
     return default_cutoff
 
 
@@ -945,6 +945,7 @@ def identify_haptic_mode(atoms: list, use_bond_info: bool | None = None):
         (3, 0, 0, 0, 3): "eta3(C3)",
         # eta4
         (4, 0, 0, 0, 4): "eta4(C4)",
+        (3, 0, 0, 1, 4): "eta4(C3O)",
         # eta5
         (5, 0, 0, 0, 5): "eta5(C5)",
         (0, 5, 0, 0, 5): "eta5(As5)",
