@@ -10,8 +10,13 @@ from cell2mol.classes.molecule import Molecule
 from cell2mol.charge.specie_assigner import prepare_mol
 from cell2mol.elementdata import ElementData
 from cell2mol.utils import BaseModel, config
-from cell2mol.my_types import NDArray, Type, SubType
+from cell2mol.my_types import NDArray, Type, SubType, Format
+from pathlib import Path
 
+try:
+    from typing import Self  # py3.11+
+except ImportError:
+    from typing_extensions import Self  # py3.10
 logger = logging.getLogger(__name__)
 
 elemdatabase = ElementData()
@@ -287,11 +292,67 @@ class Cell(BaseModel):
         # Check all modes
         return any(code != 0 for code in self.error_cases.values())
 
-    def save(self, path):
-        """Save the Cell object to a file using pickle."""
-        logger.info(f"SAVING cell2mol CELL ({self.subtype}) object to {path}")
+    # def save(self, path):
+    #     """Save the Cell object to a file using pickle."""
+    #     logger.info(f"SAVING cell2mol CELL ({self.subtype}) object to {path}")
+    #     with open(path, "wb") as fil:
+    #         pickle.dump(self, fil)
+
+    def save(self, path: str | Path, *, format: Format = "json"):
+        if format == "json":
+            self._save_as_json(path)
+        elif format == "pickle":
+            self._save_as_pickle(path)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+
+    @classmethod
+    def load(cls, path: str | Path, *, format: Format = "json") -> Self:
+        if format == "json":
+            return cls._load_from_json(path)
+        elif format == "pickle":
+            return cls._load_from_pickle(path)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+
+    @deprecated("Use json format instead")
+    def _save_as_pickle(
+        self,
+        path: str | Path,
+    ):
+        logger.warning("Use json format instead")
         with open(path, "wb") as fil:
             pickle.dump(self, fil)
+
+    def _save_as_json(
+        self,
+        path: str | Path,
+    ):
+        if not str(path).endswith(".json"):
+            logger.warning("Use `.json` extension instead for path: %s", path)
+        # Pretty print with indent=4
+        with open(path, "w") as fd:
+            fd.write(self.to_json(indent=4))
+        # Minified version
+        # with open(path, "w") as fd:
+        #     fd.write(self.to_json(separators=(",", ":")))
+
+    @classmethod
+    def _load_from_json(
+        cls,
+        path: str | Path,
+    ) -> Self:
+        with open(path, "r") as fd:
+            return cls.from_json(fd.read())
+
+    @classmethod
+    @deprecated("Use json format instead")
+    def _load_from_pickle(
+        cls,
+        path: str | Path,
+    ):
+        with open(path, "rb") as fil:
+            return pickle.load(fil)
 
     def __str__(self):
         """Return a string representation of the Cell object."""
