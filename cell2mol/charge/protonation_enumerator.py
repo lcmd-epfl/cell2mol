@@ -480,7 +480,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     # --------------------------------------------------
     if "eta5(Cp)" in g.haptic_type and not selected:
         selected = True
-        _assign_protonation_sites(1)
+        # _assign_protonation_sites(1)
 
     elif "eta6(benzene)" in g.haptic_type and not selected:
         selected = True
@@ -490,11 +490,11 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
     elif "COT" in g.haptic_type and not selected:
         selected = True
-        _assign_protonation_sites(2)
+        # _assign_protonation_sites(2)
 
     elif "pentalene" in g.haptic_type and not selected:
         selected = True
-        _assign_protonation_sites(2)
+        # _assign_protonation_sites(2)
 
     # --------------------------------------------------
     # As5 / Pentaphosphole (substitution dependent)
@@ -509,7 +509,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                 for adj in a.adjacency:
                     if ligand.get_parent("molecule").labels[adj] != "As":
                         issubstituted = True
-        _assign_protonation_sites(0 if issubstituted else 1)
+        # _assign_protonation_sites(0 if issubstituted else 1)
 
     # e.g. IMUCAX
     elif "eta5(P5)" in g.haptic_type and not selected:
@@ -521,7 +521,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                 for adj in a.adjacency:
                     if ligand.get_parent("molecule").labels[adj] != "P":
                         issubstituted = True
-        _assign_protonation_sites(0 if issubstituted else 1)
+        # _assign_protonation_sites(0 if issubstituted else 1)
 
     elif "eta3(C3)" in g.haptic_type and not selected:
         selected = True
@@ -534,7 +534,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
             g.topology["is_single_simple_ring"] and g.topology["ring_sizes"][0] == 8
         ):
             logger.debug("  Special case: cyclooctatetraene detected")
-            _assign_protonation_sites(2)
+            # _assign_protonation_sites(2)
         else:
             logger.debug(
                 "  Unrecognized haptic type: %s Ligand: %s",
