@@ -126,6 +126,97 @@ def enumerate_possible_charge_states(spec: object):
     return best_candidates if best_candidates else None
 
 
+def check_possible_valence_problems_from_ac(
+    atoms,
+    AC,
+    *,
+    extra_allowed_valences=None,
+):
+    """
+    Check possible valence problems directly from an adjacency/connectivity matrix.
+
+    Parameters
+    ----------
+    atoms : list[int]
+        Atomic numbers.
+    AC : array-like, shape (n_atoms, n_atoms)
+        Connectivity matrix. Nonzero means bonded.
+    ignore_metals : bool, default=True
+        If True, skip metal atoms because their coordination numbers often exceed
+        normal covalent valence rules.
+    extra_allowed_valences : dict[int, list[int]] | None
+        Optional extra allowed valences by atomic number.
+        Example: {15: [3, 5, 6], 33: [3, 5, 6], 51: [3, 5, 6]}
+
+    Returns
+    -------
+    problems : list[dict]
+        List of suspicious atoms.
+    """
+
+    atoms = [int(a) for a in atoms]
+    AC = np.asarray(AC)
+
+    n_atoms = len(atoms)
+
+    if AC.shape != (n_atoms, n_atoms):
+        raise ValueError(f"AC must have shape ({n_atoms}, {n_atoms}), got {AC.shape}")
+
+    if not np.allclose(AC, AC.T):
+        raise ValueError("AC must be symmetric")
+
+    if np.any(np.diag(AC) != 0):
+        raise ValueError("AC diagonal must be zero")
+
+    pt = Chem.GetPeriodicTable()
+    problems = []
+
+    if extra_allowed_valences is None:
+        extra_allowed_valences = {}
+
+    for i, atomic_num in enumerate(atoms):
+        symbol = pt.GetElementSymbol(atomic_num)
+
+        if atomic_num == 0:
+            continue
+
+        degree = int(np.count_nonzero(AC[i]))
+
+        allowed_valences = list(pt.GetValenceList(atomic_num))
+
+        if atomic_num in extra_allowed_valences:
+            allowed_valences = sorted(
+                set(allowed_valences) | set(extra_allowed_valences[atomic_num])
+            )
+
+        # RDKit uses -1 for flexible/unspecified valence.
+        if -1 in allowed_valences:
+            continue
+
+        if allowed_valences and degree > max(allowed_valences):
+            neighbors = [
+                {
+                    "atom_idx": int(j),
+                    "atomic_num": int(atoms[j]),
+                    "symbol": pt.GetElementSymbol(int(atoms[j])),
+                }
+                for j in np.where(AC[i] != 0)[0]
+            ]
+
+            problems.append(
+                {
+                    "atom_idx": int(i),
+                    "atomic_num": int(atomic_num),
+                    "symbol": symbol,
+                    "degree": degree,
+                    "allowed_valences": allowed_valences,
+                    "neighbors": neighbors,
+                }
+            )
+
+    return problems
+
+
 def get_proto_mol_from_ac(
     atoms,
     coords,
@@ -196,6 +287,34 @@ def get_proto_mol_from_ac(
         conf.SetAtomPosition(i, Point3D(float(xyz[0]), float(xyz[1]), float(xyz[2])))
 
     mol.AddConformer(conf, assignId=True)
+
+    problems = check_possible_valence_problems_from_ac(atoms=atoms, AC=AC)
+    if problems or len(atoms) == 1:
+        logger.warning("Possible valence problems detected from AC:")
+        for problem in problems:
+            logger.warning(
+                f"  - Atom {problem['atom_idx']} ({problem['symbol']}): degree {problem['degree']}, allowed valences {problem['allowed_valences']}"
+            )
+        new_mols, BO = AC2mol(
+            mol=get_proto_mol(atoms),
+            AC=AC,
+            atoms=atoms,
+            charge=charge,
+            allow_charged_fragments=allow_charged_fragments,
+        )
+
+        # Early Exit if no candidates found
+        if not new_mols:
+            logger.warning(f"No mol found for charge {charge}")
+            return None
+
+        # Stereo and Chirality Validation
+        if embed_chiral:
+            if not all(chiral_stereo_check(mol) for mol in new_mols):
+                logger.error("Chirality check failed for one or more candidates")
+                return None
+
+        return new_mols[0]  # use the first candidate as default
 
     # Assign bond orders using existing connectivity
     rdDetermineBonds.DetermineBondOrders(
