@@ -390,6 +390,9 @@ def generate_charge_state(
             allow_charged_fragments=allow_charged_fragments,
             embed_chiral=embed_chiral,
         )
+        if rdkit_obj is None:
+            logger.warning(f"Failed to generate RDKit object for charge {charge}")
+            return None
     except Exception as e:
         logger.error(
             f"Error occurred while generating proto molecule: {e} with {charge} charge for {prot.formula}"
