@@ -793,7 +793,12 @@ def apply_graph_to_blocklist(
     cov_factor: float | None = None,
     metal_factor: float | None = None,
 ):
-    """Split a list of atoms into blocks of connected atoms."""
+    """Split a list of atoms into blocks of connected atoms.
+
+    If a connected block contains one or more cycles, each cycle is saved as
+    a separate block. Non-cycle atoms are split into connected components after
+    removing all cycle atoms.
+    """
 
     new_blocklist = []
     logger.debug("Applying graph analysis to blocklist: %s", blocklist)
@@ -829,54 +834,40 @@ def apply_graph_to_blocklist(
 
         cycle_basis = nx.cycle_basis(G)
 
-        if len(cycle_basis) != 1:
+        if len(cycle_basis) == 0:
             new_blocklist.append(b)
             continue
 
-        cycle = cycle_basis[0]
-        logger.debug("Found single cycle in block %s: %s", b, cycle)
-
-        # Full cycle covers all atoms
-        if len(cycle) == len(G.nodes):
-            new_blocklist.append(b)
-            continue
-
-        # Partial cycle: split cycle and remaining components
-        cycle_block = sorted([b[idx] for idx in cycle])
-        new_blocklist.append(cycle_block)
-
-        logger.debug("Cycle block indices=%s", cycle_block)
-
-        remaining = [b[n] for n in G.nodes if n not in cycle]
-        logger.debug("Remaining nodes in block=%s", remaining)
-
-        rem_labels = extract_from_list(remaining, conn_labels, dimension=1)
-        rem_coord = extract_from_list(remaining, conn_coord, dimension=1)
-
-        if conn_atom_site_labels is not None:
-            rem_atom_site_labels = extract_from_list(
-                remaining, conn_atom_site_labels, dimension=1
-            )
-        else:
-            rem_atom_site_labels = None
-
-        adjmat_rem = build_adjacency(
-            labels=rem_labels,
-            positions=rem_coord,
-            atom_site_labels=rem_atom_site_labels,
-            bond_data=bond_data,
-            use_bond_info=use_bond_info,
-            cov_factor=cov_factor,
-            metal_factor=metal_factor,
-            warn_on_mismatch=False,
-            detail=False,
+        logger.debug(
+            "Found %d cycle(s) in block %s: %s", len(cycle_basis), b, cycle_basis
         )
 
-        G_rem = nx.from_numpy_array(np.array(adjmat_rem))
+        cycle_nodes = set()
+
+        for i, cycle in enumerate(cycle_basis):
+            cycle_nodes.update(cycle)
+
+            cycle_block = sorted([b[idx] for idx in cycle])
+            new_blocklist.append(cycle_block)
+
+            logger.debug("Cycle %d block indices=%s", i, cycle_block)
+
+        remaining_nodes = [n for n in G.nodes if n not in cycle_nodes]
+
+        logger.debug(
+            "Remaining non-cycle node indices in local graph=%s",
+            remaining_nodes,
+        )
+
+        if not remaining_nodes:
+            continue
+
+        G_rem = G.subgraph(remaining_nodes)
 
         for comp in nx.connected_components(G_rem):
-            remaining_block = [remaining[idx] for idx in comp]
+            remaining_block = sorted([b[idx] for idx in comp])
             new_blocklist.append(remaining_block)
+
             logger.debug(
                 "Remaining connected block=%s",
                 remaining_block,
