@@ -298,7 +298,7 @@ class Cell(BaseModel):
     #     with open(path, "wb") as fil:
     #         pickle.dump(self, fil)
 
-    def save(self, path: str | Path, *, format: Format = "json"):
+    def save(self, path: str | Path, *, format: Format = "pickle"):
         if format == "json":
             self._save_as_json(path)
         elif format == "pickle":
@@ -307,7 +307,7 @@ class Cell(BaseModel):
             raise ValueError(f"Unsupported format: {format}")
 
     @classmethod
-    def load(cls, path: str | Path, *, format: Format = "json") -> Self:
+    def load(cls, path: str | Path, *, format: Format = "pickle") -> Self:
         if format == "json":
             return cls._load_from_json(path)
         elif format == "pickle":
