@@ -61,6 +61,7 @@ def is_mismatch_adjacency(
     _, adj_dist, _ = get_adjmatrix(
         labels,
         positions,
+        atom_site_labels=atom_site_labels,
         cutoff=cutoff,
         cov_factor=cov_factor,
         metal_factor=metal_factor,
@@ -127,6 +128,7 @@ def build_adjacency(
         isgood, adj_dist, warning = get_adjmatrix(
             labels,
             positions,
+            atom_site_labels=atom_site_labels,
             cutoff=cutoff,
             cov_factor=cov_factor,
             metal_factor=metal_factor,
@@ -249,12 +251,12 @@ def compare_adjacency_and_warn(
         if extra:
             logger.debug("Extra bonds (distance-only):")
             for line in format_bond_info(extra, labels, pos, atom_site_labels):
-                logger.debug("  %s", line)
+                logger.debug("extra bonds  %s", line)
 
         if missing:
             logger.debug("Missing bonds (connectivity-only):")
             for line in format_bond_info(missing, labels, pos, atom_site_labels):
-                logger.debug("  %s", line)
+                logger.debug("missing bonds  %s", line)
 
 
 def format_bond_info(
@@ -387,6 +389,7 @@ def get_pair_cutoff(
 def get_adjmatrix(
     labels: list[str],
     pos: np.ndarray,
+    atom_site_labels: list[str] | None = None,
     radii: np.ndarray | list | None = None,
     cutoff: float | None = None,
     cov_factor: float | None = None,
@@ -398,6 +401,7 @@ def get_adjmatrix(
     Args:
         labels (list): List of atomic labels.
         pos (list): List of atomic positions.
+        atom_site_labels (list[str] | None, optional): List of atomic site labels. Defaults to None.
         cov_factor (float, optional): Scaling factor for covalent radii. Defaults to
             1.0.
         radii (str or np.ndarray, optional): Radii to use. If "default", uses default
@@ -453,12 +457,14 @@ def get_adjmatrix(
             if dist <= clash_threshold:
                 isgood = False
                 logger.error(
-                    "Adjacency clash: dist=%.3f < %.3f for atoms (%s:%s)-(%s:%s)",
+                    "Adjacency clash: dist=%.3f < %.3f for atoms (%s%s:%s)-(%s%s:%s)",
                     dist,
                     clash_threshold,
                     labels[i],
+                    f"({atom_site_labels[i]})" if atom_site_labels else "",
                     pos[i],
                     labels[j],
+                    f"({atom_site_labels[j]})" if atom_site_labels else "",
                     pos[j],
                 )
                 continue
@@ -480,18 +486,21 @@ def get_adjmatrix(
     warning = False
     if not add_atom:
         adjmat, madjmat, warning = correct_valence_violation(
-            adjmat, madjmat, labels, pos, radii
+            adjmat, madjmat, labels, pos, radii, atom_site_labels=atom_site_labels
         )
     return True, (madjmat if metal_only else adjmat), warning
 
 
-def correct_valence_violation(adjmat, madjmat, labels, pos, radii):
+def correct_valence_violation(
+    adjmat, madjmat, labels, pos, radii, atom_site_labels=None
+):
     """Detect and correct valence violations in an adjacency matrix.
     Args:
         adjmat (np.ndarray): Adjacency matrix.
         labels (list): List of atomic labels.
         pos (list): List of atomic positions.
         radii (list): List of atomic radii.
+        atom_site_labels (list, optional): List of atomic site labels. Defaults to None.
     Returns:
         adjmat (np.ndarray): Corrected adjacency matrix.
         madjmat (np.ndarray): Corrected metal adjacency matrix.
@@ -522,8 +531,9 @@ def correct_valence_violation(adjmat, madjmat, labels, pos, radii):
             continue
 
         logger.warning(
-            "Valence violation: %s %s(index:%d), valence=%d > max_valence=%d",
+            "Valence violation: %s%s %s(index:%d), valence=%d > max_valence=%d",
             labels[i],
+            f"({atom_site_labels[i]})" if atom_site_labels else "",
             pos[i],
             i,
             valence,
@@ -551,12 +561,14 @@ def correct_valence_violation(adjmat, madjmat, labels, pos, radii):
             connections.append((j, margin))
 
             logger.debug(
-                "Bond %d-%d (%s:%s)-(%s:%s): dist=%.3f, margin=%.3f",
+                "Bond %d-%d %s%s:%s-%s%s:%s: dist=%.3f, margin=%.3f",
                 i,
                 j,
                 labels[i],
+                f"({atom_site_labels[i]})" if atom_site_labels else "",
                 pos[i],
                 labels[j],
+                f"({atom_site_labels[j]})" if atom_site_labels else "",
                 pos[j],
                 dist,
                 margin,
@@ -570,12 +582,14 @@ def correct_valence_violation(adjmat, madjmat, labels, pos, radii):
                 adjmat[i, j] = adjmat[j, i] = 0
                 madjmat[i, j] = madjmat[j, i] = 0
                 logger.info(
-                    "Removed bond %d-%d (%s:%s)-(%s:%s), dist=%.3f, margin=%.3f",
+                    "Removed bond %d-%d %s%s:%s-%s%s:%s, dist=%.3f, margin=%.3f",
                     i,
                     j,
                     labels[i],
+                    f"({atom_site_labels[i]})" if atom_site_labels else "",
                     pos[i],
                     labels[j],
+                    f"({atom_site_labels[j]})" if atom_site_labels else "",
                     pos[j],
                     np.linalg.norm(np.asarray(pos[i]) - np.asarray(pos[j])),
                     margin,
@@ -699,6 +713,7 @@ def split_species(
     cov_factor: float | None = None,
     metal_factor: float | None = None,
     warn_on_mismatch: bool = False,
+    detail: bool = False,
     count_species_only: bool = False,
     apply_graph: bool = False,
 ):
@@ -722,6 +737,7 @@ def split_species(
         cov_factor=cov_factor,
         metal_factor=metal_factor,
         warn_on_mismatch=warn_on_mismatch,
+        detail=detail,
     )
     if adjmat is None:
         logger.warning("Adjacency matrix is None. Returning empty blocklist.")
