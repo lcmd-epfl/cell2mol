@@ -141,9 +141,6 @@ def check_possible_valence_problems_from_ac(
         Atomic numbers.
     AC : array-like, shape (n_atoms, n_atoms)
         Connectivity matrix. Nonzero means bonded.
-    ignore_metals : bool, default=True
-        If True, skip metal atoms because their coordination numbers often exceed
-        normal covalent valence rules.
     extra_allowed_valences : dict[int, list[int]] | None
         Optional extra allowed valences by atomic number.
         Example: {15: [3, 5, 6], 33: [3, 5, 6], 51: [3, 5, 6]}
@@ -173,6 +170,15 @@ def check_possible_valence_problems_from_ac(
 
     if extra_allowed_valences is None:
         extra_allowed_valences = {}
+    extra_allowed_valences = (
+        {
+            5: [3, 4],  # B, e.g. BF4-
+            7: [3, 4],  # N
+            15: [3, 5, 6],  # P, e.g. PF6-
+            33: [3, 5, 6],  # As, e.g. AsF6-
+            51: [3, 5, 6],  # Sb, e.g. SbF6-
+        },
+    )
 
     for i, atomic_num in enumerate(atoms):
         symbol = pt.GetElementSymbol(atomic_num)
@@ -217,7 +223,7 @@ def check_possible_valence_problems_from_ac(
     return problems
 
 
-def get_proto_mol_from_ac(
+def generate_rdkit_mol_from_rdDetermineBonds(
     atoms,
     coords,
     AC,
@@ -227,10 +233,9 @@ def get_proto_mol_from_ac(
     embed_chiral=True,
 ):
     """
-    Build an RDKit molecule from atomic numbers, coordinates, and
-    connectivity matrix from a protonation state, and
+    Build an RDKit Mol object from atomic numbers, coordinates, and
+    adjacency matrix from a protonation state, and
     then assign bond orders using rdDetermineBonds.DetermineBondOrders.
-
     Parameters
     ----------
     atoms : list[int]
@@ -256,7 +261,6 @@ def get_proto_mol_from_ac(
     atoms = list(map(int, atoms))
     coords = np.asarray(coords, dtype=float)
     AC = np.asarray(AC)
-
     n_atoms = len(atoms)
 
     if coords.shape != (n_atoms, 3):
@@ -288,34 +292,6 @@ def get_proto_mol_from_ac(
 
     mol.AddConformer(conf, assignId=True)
 
-    problems = check_possible_valence_problems_from_ac(atoms=atoms, AC=AC)
-    if problems or len(atoms) == 1:
-        logger.warning("Possible valence problems detected from AC:")
-        for problem in problems:
-            logger.warning(
-                f"  - Atom {problem['atom_idx']} ({problem['symbol']}): degree {problem['degree']}, allowed valences {problem['allowed_valences']}"
-            )
-        new_mols, BO = AC2mol(
-            mol=get_proto_mol(atoms),
-            AC=AC,
-            atoms=atoms,
-            charge=charge,
-            allow_charged_fragments=allow_charged_fragments,
-        )
-
-        # Early Exit if no candidates found
-        if not new_mols:
-            logger.warning(f"No mol found for charge {charge}")
-            return None
-
-        # Stereo and Chirality Validation
-        if embed_chiral:
-            if not all(chiral_stereo_check(mol) for mol in new_mols):
-                logger.error("Chirality check failed for one or more candidates")
-                return None
-
-        return new_mols[0]  # use the first candidate as default
-
     # Assign bond orders using existing connectivity
     rdDetermineBonds.DetermineBondOrders(
         mol,
@@ -328,6 +304,62 @@ def get_proto_mol_from_ac(
         Chem.SanitizeMol(mol)
 
     return mol
+
+
+def generate_rdkit_mol_from_AC2mol(
+    atoms,
+    AC,
+    charge=0,
+    allow_charged_fragments=True,
+    embed_chiral=True,
+):
+    """
+    Build an RDKit Mol object from atomic numbers, coordinates, and
+    adjacency matrix from a protonation state, and
+    then assign bond orders
+    - using rdDetermineBonds.DetermineBondOrders.
+    - modified AC2mol from xyz2mol
+    Parameters
+    ----------
+    atoms : list[int]
+        Atomic numbers, e.g. [6, 1, 1, 1, 1]
+    coords : array-like, shape (n_atoms, 3)
+        Cartesian coordinates.
+    AC : array-like, shape (n_atoms, n_atoms)
+        Connectivity matrix. Nonzero means bonded.
+    charge : int
+        Total molecular charge.
+    sanitize : bool
+        Whether to sanitize after bond-order assignment.
+    allow_charged_fragments : bool
+        Whether to allow charged fragments.
+    embed_chiral : bool
+        Whether to embed chiral information.
+
+    Returns
+    -------
+    mol : rdkit.Chem.Mol
+    """
+    new_mols, BO = AC2mol(
+        mol=get_proto_mol(atoms),
+        AC=AC,
+        atoms=atoms,
+        charge=charge,
+        allow_charged_fragments=allow_charged_fragments,
+    )
+
+    # Early Exit if no candidates found
+    if not new_mols:
+        logger.warning(f"No mol found for charge {charge}")
+        return None
+
+    # Stereo and Chirality Validation
+    if embed_chiral:
+        if not all(chiral_stereo_check(mol) for mol in new_mols):
+            logger.error("Chirality check failed for one or more candidates")
+            return None
+
+    return new_mols[0]  # use the first candidate as default
 
 
 def generate_charge_state(
@@ -357,47 +389,69 @@ def generate_charge_state(
         prot.n_protons_added,
     )
 
-    # AC2mol returns a list of RDKit molecule objects and bond order (BO) matrix
-    # from the adjacency (AC) matrix
-    # new_mols, BO = AC2mol(
-    #     mol=get_proto_mol(prot.atnums),
-    #     AC=prot.adjmat,
-    #     atoms=prot.atnums,
-    #     charge=charge,
-    #     allow_charged_fragments=allow_charged_fragments,
-    # )
+    problems = check_possible_valence_problems_from_ac(
+        atoms=prot.atnums, AC=prot.adjmat
+    )
+    if len(prot.atnums) == 1 or prot.formula in {"C-Se", "C-Te"}:
+        logger.debug(
+            "Single-atom or special case detected for %s, generating RDKit Mol object using modified AC2mol",
+            prot.formula,
+        )
+        rdkit_obj = generate_rdkit_mol_from_AC2mol(
+            atoms=prot.atnums,
+            AC=prot.adjmat,
+            charge=charge,
+            allow_charged_fragments=allow_charged_fragments,
+            embed_chiral=embed_chiral,
+        )
 
-    # # Early Exit if no candidates found
-    # if not new_mols:
-    #     logger.warning(f"No mol found for charge {charge}")
-    #     return None
+        if rdkit_obj is None:
+            logger.warning(
+                f"Failed to generate RDKit object of prot.formula {prot.formula} for charge {charge} using modified AC2mol"
+            )
+            return None
 
-    # # Stereo and Chirality Validation
-    # if embed_chiral:
-    #     if not all(chiral_stereo_check(mol) for mol in new_mols):
-    #         logger.error("Chirality check failed for one or more candidates")
-    #         return None
-
-    # rdkit_obj = new_mols[0]  # use the first candidate as default
-
-    try:
-        rdkit_obj = get_proto_mol_from_ac(
-            prot.atnums,
-            prot.coord,
-            prot.adjmat,
-            charge,
-            sanitize=False,
+    elif problems:
+        logger.debug(
+            "Possible valence problems detected for %s, generating RDKit Mol object using modified AC2mol",
+            prot.formula,
+        )
+        logger.warning("Possible valence problems detected from AC:")
+        for problem in problems:
+            logger.warning(
+                f"  - Atom {problem['atom_idx']} ({problem['symbol']}): degree {problem['degree']}, allowed valences {problem['allowed_valences']}"
+            )
+        rdkit_obj = generate_rdkit_mol_from_AC2mol(
+            atoms=prot.atnums,
+            AC=prot.adjmat,
+            charge=charge,
             allow_charged_fragments=allow_charged_fragments,
             embed_chiral=embed_chiral,
         )
         if rdkit_obj is None:
-            logger.warning(f"Failed to generate RDKit object for charge {charge}")
+            logger.warning(
+                f"Failed to generate RDKit object of prot.formula {prot.formula} for charge {charge} using modified AC2mol"
+            )
             return None
-    except Exception as e:
-        logger.error(
-            f"Error occurred while generating proto molecule: {e} with {charge} charge for {prot.formula}"
-        )
-        return None
+    else:
+        try:
+            rdkit_obj = generate_rdkit_mol_from_rdDetermineBonds(
+                prot.atnums,
+                prot.coord,
+                prot.adjmat,
+                charge,
+                sanitize=False,
+                allow_charged_fragments=allow_charged_fragments,
+                embed_chiral=embed_chiral,
+            )
+        except Exception as e:
+            logger.error(
+                f"Error occurred while generating proto molecule: {e} with {charge} charge for {prot.formula}"
+            )
+            logger.warning(
+                f"Failed to generate RDKit object of prot.formula {prot.formula} for charge {charge} using rdDetermineBonds"
+            )
+            return None
 
     atom_charges = []
     total_charge = 0
