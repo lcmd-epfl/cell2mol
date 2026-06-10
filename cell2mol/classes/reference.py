@@ -159,6 +159,7 @@ class Reference(Cell):
                 cov_factor=cov_factor,
                 metal_factor=metal_factor,
                 warn_on_mismatch=True,
+                detail=True,
             )
             logger.info("Using distance-based species splitting for blocklist")
             if self.moiety_indices is not None:
