@@ -34,16 +34,16 @@ def detect_cif_issues(cif_file_path):
             radical = True
         elif "_atom_site_fract_x" not in file_content:
             notfound_atom = True
-        elif "?" in file_content:
-            if (
-                "_diffrn_ambient_temperature ?" not in file_content
-                and "_chemical_melting_point ?" not in file_content
-            ):
-                disorder = True
-            else:
-                num_greps = file_content.count("?")
-                if num_greps > 1:
-                    disorder = True
+
+    UNSPECIFIED_MARKERS = ("?", "*")
+    atom_site_labels, _, _ = get_wyckoff_positions(cif_file_path)
+    if any(
+        marker in (label or "")
+        for label in atom_site_labels
+        for marker in UNSPECIFIED_MARKERS
+    ):
+        logger.warning("Disorder or Unspecified atoms found in Wyckoff positions.")
+        disorder = True
 
     moiety_dicts = extract_moiety(cif_file_path)
     if not moiety_dicts:
@@ -118,7 +118,9 @@ def get_geom_bond(cif_file_path):
                     try:
                         atom_1 = parts[header_map["_geom_bond_atom_site_label_1"]]
                         atom_2 = parts[header_map["_geom_bond_atom_site_label_2"]]
-                        dist = float(parts[header_map["_geom_bond_distance"]])
+                        dist = float(
+                            parts[header_map["_geom_bond_distance"]].split("(")[0]
+                        )
                         geom_bond_data.append((atom_1, atom_2, dist))
                     except (KeyError, ValueError, IndexError):
                         continue
@@ -204,18 +206,6 @@ def get_wyckoff_positions(cif_file_path):
     atom_site_labels = [entry[0] for entry in atom_site_data]
     ref_labels = [entry[1] for entry in atom_site_data]
     ref_fracs = [[entry[2], entry[3], entry[4]] for entry in atom_site_data]
-
-    UNSPECIFIED_MARKERS = ("?", "*")
-
-    if any(
-        marker in (label or "")
-        for label in atom_site_labels
-        for marker in UNSPECIFIED_MARKERS
-    ):
-        logger.warning("Unspecified atoms found in Wyckoff positions.")
-        atom_site_labels, ref_labels, ref_fracs = remove_unspecified_atoms(
-            atom_site_labels, ref_labels, ref_fracs
-        )
 
     return atom_site_labels, ref_labels, ref_fracs
 
