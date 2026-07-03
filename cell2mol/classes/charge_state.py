@@ -114,7 +114,7 @@ class ChargeState(BaseModel):
         to_print += f" Status                          = {self.status}\n"
         to_print += f" Smiles                          = {self.smiles}\n"
         to_print += f" Number of Protons Added         = {self.n_protons_added}\n"
-        if sum(self.ligand_donor_electrons) > 0:
+        if self.ligand_donor_electrons and sum(self.ligand_donor_electrons) > 0:
             to_print += f" Ligand Donor Electrons          = {sum(self.ligand_donor_electrons)}\n"
         to_print += f" Charge Tried                    = {self.charge_tried}\n"
         to_print += f" Uncorrected Total Charge        = {self.uncorr_total_charge}\n"
@@ -135,7 +135,7 @@ class ChargeState(BaseModel):
         smiles: str,
         charge_tried: int,
         allow: bool,
-        protonation: object,
+        protonation: Protonation,
     ) -> "ChargeState":
         return cls(
             status=status,
