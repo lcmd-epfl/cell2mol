@@ -103,7 +103,7 @@ def build_adjacency(
     metal_only: bool = False,
     warn_on_mismatch: bool = False,
     detail: bool = False,
-) -> np.ndarray:
+) -> np.ndarray | None:
     """
     Build an adjacency matrix using distance-based or connectivity-based criteria.
 
@@ -298,7 +298,7 @@ def format_bond_info(
     for i, j in sorted(bonds):
         dist = np.linalg.norm(np.asarray(pos[i]) - np.asarray(pos[j]))
         thres = radii[i] + radii[j] + cutoff
-        margin = dist - thres
+        margin = dist - (radii[i] + radii[j])
 
         elem_pair = f"{labels[i]}-{labels[j]}"
         site_pair = (
