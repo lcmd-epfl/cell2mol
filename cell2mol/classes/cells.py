@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 import pickle
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
+
+import numpy as np
 
 try:
     from typing import Self  # py3.11+
@@ -16,6 +19,10 @@ from cell2mol.classes.cell import Cell
 from cell2mol.my_types import Format, NDArray, Type
 from cell2mol.utils import BaseModel
 from cell2mol.utils import config
+
+if TYPE_CHECKING:
+    from cell2mol.classes.reference import Reference
+    from cell2mol.classes.unitcell import UnitCell
 
 ###############
 #### CELLS ####
@@ -109,17 +116,19 @@ class Cells(BaseModel):
         to_print += f" Cell Parameters al:ga = {self.cell_param[3:6]}\n"
         # to_print += f' Cell Vector           = {self.cell_vector}\n'
         to_print += "---------------------------------------------------\n"
-        if self.reference.refmoleclist is not None:
+        reference = cast("Reference", self.reference)
+        if reference.refmoleclist is not None:
             to_print += "(Reference)                                \n"
-            to_print += f" # of Ref Molecules:   = {len(self.reference.refmoleclist)}\n"
+            to_print += f" # of Ref Molecules:   = {len(reference.refmoleclist)}\n"
             to_print += " with Formula:                                  \n"
-            for idx, ref in enumerate(self.reference.refmoleclist):
+            for idx, ref in enumerate(reference.refmoleclist):
                 to_print += f"    {idx}: {ref.formula} \n"
-        if self.unitcell.moleclist is not None:
+        unitcell = cast("UnitCell | None", self.unitcell)
+        if unitcell is not None and unitcell.moleclist is not None:
             to_print += "(Unitcell)                                \n"
-            to_print += f" # Molecules:          = {len(self.unitcell.moleclist)}\n"
+            to_print += f" # Molecules:          = {len(unitcell.moleclist)}\n"
             to_print += " with Formula:                               \n"
-            for idx, m in enumerate(self.unitcell.moleclist):
+            for idx, m in enumerate(unitcell.moleclist):
                 to_print += f"    {idx}: {m.formula} \n"
         to_print += "---------------------------------------------------\n"
         return to_print
@@ -131,13 +140,13 @@ class Cells(BaseModel):
         name: str,
         reference: Cell,
         unitcell: Cell,
-        cell_vector: object,
-        cell_param: object,
+        cell_vector: np.ndarray | list[list[float]],
+        cell_param: np.ndarray | list[float],
     ) -> "Cells":
         return cls(
             name=name,
             reference=reference,
             unitcell=unitcell,
-            cell_vector=cell_vector,
-            cell_param=cell_param,
+            cell_vector=np.asarray(cell_vector),
+            cell_param=np.asarray(cell_param),
         )
