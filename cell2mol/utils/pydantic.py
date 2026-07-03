@@ -34,8 +34,8 @@ import json
 import types
 import typing
 import uuid
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
+from abc import ABCMeta, abstractmethod
+from typing import TYPE_CHECKING, Annotated, Any, cast, get_args, get_origin
 
 try:
     from typing import Self  # py3.11+
@@ -75,7 +75,7 @@ def _serialize_value(value: Any, context: dict[str, Any]) -> Any:
     # BaseModel → trigger serialization, return UUID
     if isinstance(value, pydantic.BaseModel) and hasattr(value, "id"):
         value.model_dump(mode="json", context=context)
-        return value.id
+        return getattr(value, "id")
 
     # NumPy array → list
     if isinstance(value, np.ndarray):
@@ -111,7 +111,7 @@ def _serialize_value(value: Any, context: dict[str, Any]) -> Any:
 # =============================================================================
 
 
-class BaseModel(pydantic.BaseModel, ABC):
+class BaseModel(pydantic.BaseModel, metaclass=ABCMeta):
     """Base model with central object store serialization support.
 
     All subclasses are automatically registered in the type registry.
@@ -178,9 +178,10 @@ class BaseModel(pydantic.BaseModel, ABC):
 
         # Serialize each field (can't use handler(self) due to Pydantic caching with cycles)
         data: dict[str, Any] = {"_type": type(self).__name__}
+        context = info.context or {}
         for field_name in type(self).model_fields:
             value = getattr(self, field_name)
-            data[field_name] = _serialize_value(value, info.context)
+            data[field_name] = _serialize_value(value, context)
 
         store.set(self.id, data)
         return self.id
@@ -279,7 +280,7 @@ class BaseModel(pydantic.BaseModel, ABC):
         if root is None:
             raise ValueError(f"Root object '{root_id}' not found in store")
 
-        return root  # type: ignore[return-value]
+        return cast(Self, root)
 
     @classmethod
     def from_json(cls, json_str: str) -> Self:

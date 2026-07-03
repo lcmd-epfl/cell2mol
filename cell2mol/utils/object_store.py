@@ -37,6 +37,6 @@ class ObjectStore:
         """Iterate over (id, object) pairs."""
         return self._objects.items()
 
-    def to_dict(self) -> dict[str, dict[str, Any]]:
+    def to_dict(self) -> dict[str, dict[str, Any] | BaseModel]:
         """Export as a plain dict (for JSON serialization)."""
         return dict(self._objects)
