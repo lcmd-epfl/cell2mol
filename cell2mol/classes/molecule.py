@@ -29,7 +29,7 @@ from cell2mol.charge.smiles_handler import (
 from cell2mol.spin import assign_spin_complexes
 from cell2mol.operations import extract_from_list
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import Format, Spin, SubType
+from cell2mol.my_types import Format, Spin, SubType, NDArray
 from cell2mol.utils import config
 import logging
 from pathlib import Path
@@ -81,9 +81,9 @@ class Molecule(Specie):
     def from_positional(
         cls,
         labels: list[str],
-        coord: np.ndarray | list[list[float]],
-        frac_coord: np.ndarray | list[list[float]] | None = None,
-        radii: np.ndarray | list[float] | None = None,
+        coord: NDArray | list[list[float]],
+        frac_coord: NDArray | list[list[float]] | None = None,
+        radii: NDArray | list[float] | None = None,
     ) -> "Molecule":
         return cls(
             labels=labels,
@@ -665,6 +665,7 @@ class Molecule(Specie):
             and not self.has_post_transition_metal
         ):
             found = False
+            kdx = None
             for ldx, typ in enumerate(typelist_mols):
                 issame = compare_species(self, typ[0])
                 if issame:
@@ -698,6 +699,7 @@ class Molecule(Specie):
             # Case 2: ligands
             for jdx, lig in enumerate(self.ligands or []):
                 found = False
+                kdx = None
                 for ldx, typ in enumerate(typelist_ligs):
                     if lig.is_nitrosyl is None:
                         lig.evaluate_as_nitrosyl()

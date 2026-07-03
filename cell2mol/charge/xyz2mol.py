@@ -11,7 +11,6 @@
 import copy
 import itertools
 import logging
-import rdkit
 import math
 
 try:
@@ -148,16 +147,17 @@ def get_BO(AC, UA, DU, valences, UA_pairs, use_graph=True):
     BO = AC.copy()
     DU_save = []
 
-    while DU_save != DU:
+    ua, du = UA, DU
+    while DU_save != du:
         for i, j in UA_pairs:
             BO[i, j] += 1
             BO[j, i] += 1
 
         BO_valence = list(BO.sum(axis=1))
-        DU_save = copy.copy(DU)
-        UA, DU = get_UA(valences, BO_valence)
+        DU_save = copy.copy(du)
+        ua, du = get_UA(valences, BO_valence)
         # UA_pairs = get_UA_pairs(UA, AC, use_graph=use_graph)[0]
-        UA_pairs = get_UA_pairs_new(UA, AC, DU, use_graph=use_graph)[0]
+        UA_pairs = get_UA_pairs_new(ua, AC, du, use_graph=use_graph)[0]
 
     return BO
 
@@ -184,7 +184,7 @@ def charge_is_OK(
     allow_carbenes=True,
 ):
     # total charge
-    Q = 0
+    total_q = 0
 
     # charge fragment list
     q_list = []
@@ -193,7 +193,7 @@ def charge_is_OK(
         BO_valences = list(BO.sum(axis=1))
         for i, atom in enumerate(atoms):
             q = get_atomic_charge(atom, atomic_valence_electrons[atom], BO_valences[i])
-            Q += q
+            total_q += q
             if atom == 6:
                 number_of_single_bonds_to_C = list(BO[i, :]).count(1)
                 if (
@@ -201,16 +201,16 @@ def charge_is_OK(
                     and number_of_single_bonds_to_C == 2
                     and BO_valences[i] == 2
                 ):
-                    Q += 1
+                    total_q += 1
                     q = 2
                     logger.info("Carbenes are not allowed in this molecule")
-                if number_of_single_bonds_to_C == 3 and Q + 1 < charge:
-                    Q += 2
+                if number_of_single_bonds_to_C == 3 and total_q + 1 < charge:
+                    total_q += 2
                     q = 1
 
             if q != 0:
                 q_list.append(q)
-    return charge == Q
+    return charge == total_q
 
 
 def BO_is_OK(
@@ -444,14 +444,14 @@ def get_bonds(UA, AC):
 
 def get_UA_pairs_new(UA, AC, DU, use_graph=True):
     """"""
-    N_UA = 10000
+    n_ua = 10000
     matching_ids = dict()
     matching_ids2 = dict()
     for i, du in zip(UA, DU):
         if du > 1:
-            matching_ids[i] = N_UA
-            matching_ids2[N_UA] = i
-            N_UA += 1
+            matching_ids[i] = n_ua
+            matching_ids2[n_ua] = i
+            n_ua += 1
 
     bonds = get_bonds(UA, AC)
     for i, j in bonds:
@@ -923,7 +923,7 @@ def chiral_stereo_check(mol):
             Chem.AssignAtomChiralTagsFromStructure(mol, -1)
             return True
 
-        except rdkit.Chem.rdchem.AtomValenceException as e:
+        except Chem.rdchem.AtomValenceException as e:
             logger.warning("Failed to process molecule: %s", e)
             return False
 
@@ -960,7 +960,7 @@ def xyz2mol(
         mols - list of rdkit molobjects
 
     """
-    AC = np.array(AC)
+    ac = np.array(AC)
     mol = get_proto_mol(atoms)
     # Get atom connectivity (AC) matrix, list of atomic numbers, molecular charge,
     # and mol object with no connectivity information
@@ -969,7 +969,7 @@ def xyz2mol(
     # mol object
     new_mols, BO = AC2mol(
         mol,
-        AC,
+        ac,
         atoms,
         charge,
         allow_charged_fragments=allow_charged_fragments,

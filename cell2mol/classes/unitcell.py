@@ -13,7 +13,7 @@ from cell2mol.classes.specie import Specie
 from cell2mol.compare import compare_reference_indices
 from cell2mol.charge.specie_assigner import set_charge_state
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import SubType
+from cell2mol.my_types import SubType, NDArray
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +57,7 @@ class UnitCell(Cell):
         ]
         ref_ligands = [ref for ref in reference_species_list if ref.subtype == "ligand"]
         ref_metals = [
-            cast(Metal, ref)
-            for ref in reference_species_list
-            if ref.subtype == "metal"
+            cast(Metal, ref) for ref in reference_species_list if ref.subtype == "metal"
         ]
 
         for mol in self.moleclist or []:
@@ -226,10 +224,10 @@ class UnitCell(Cell):
         cls,
         name: str,
         labels: list[str],
-        pos: np.ndarray | list[list[float]],
-        frac_coord: np.ndarray | list[list[float]],
-        cell_vector: np.ndarray | list[list[float]],
-        cell_param: np.ndarray | list[float],
+        pos: NDArray | list[list[float]],
+        frac_coord: NDArray | list[list[float]],
+        cell_vector: NDArray | list[list[float]],
+        cell_param: NDArray | list[float],
     ) -> "UnitCell":
         return cls(
             name=name,

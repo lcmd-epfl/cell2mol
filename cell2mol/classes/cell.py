@@ -388,10 +388,10 @@ class Cell(BaseModel):
         cls,
         name: str,
         labels: list[str],
-        pos: np.ndarray | list[list[float]],
-        frac_coord: np.ndarray | list[list[float]],
-        cell_vector: np.ndarray | list[list[float]],
-        cell_param: np.ndarray | list[float],
+        pos: NDArray | list[list[float]],
+        frac_coord: NDArray | list[list[float]],
+        cell_vector: NDArray | list[list[float]],
+        cell_param: NDArray | list[float],
     ) -> "Cell":
         return cls(
             name=name,

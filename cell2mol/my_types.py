@@ -1,6 +1,7 @@
 from typing import Annotated, Any, Literal, TypeVar
 
 import numpy as np
+import numpy.typing as npt
 from pydantic import BeforeValidator, GetCoreSchemaHandler, PlainSerializer
 from pydantic_core import CoreSchema, core_schema
 from rdkit import Chem
@@ -119,7 +120,7 @@ class _NDArrayType:
         )
 
     @staticmethod
-    def _validate(value: Any) -> np.ndarray:
+    def _validate(value: Any) -> npt.NDArray[Any]:
         if isinstance(value, np.ndarray):
             return value
         if isinstance(value, list):
@@ -127,14 +128,13 @@ class _NDArrayType:
         raise ValueError(f"Cannot convert {type(value)} to ndarray")
 
     @staticmethod
-    def _serialize(value: np.ndarray) -> list:
+    def _serialize(value: npt.NDArray[Any]) -> list[Any]:
         if isinstance(value, np.ndarray):
             return value.tolist()
         return value
 
 
-NDArray = Annotated[np.ndarray, _NDArrayType()]
-
+NDArray = Annotated[npt.NDArray[Any], _NDArrayType()]
 Format = Literal["json", "pickle"]
 
 

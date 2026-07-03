@@ -149,9 +149,9 @@ class Specie(BaseModel):
     def from_positional(
         cls,
         labels: list[str],
-        coord: np.ndarray | list[list[float]],
-        frac_coord: np.ndarray | list[list[float]] | None = None,
-        radii: np.ndarray | list[float] | None = None,
+        coord: NDArray | list[list[float]],
+        frac_coord: NDArray | list[list[float]] | None = None,
+        radii: NDArray | list[float] | None = None,
     ) -> "Specie":
         return cls(
             labels=labels,
@@ -231,7 +231,7 @@ class Specie(BaseModel):
             self.frac_centroid = np.asarray(compute_centroid(np.array(self.frac_coord)))
         return self.centroid
 
-    def set_fractional_coord(self, frac_coord: np.ndarray | list[list[float]]) -> None:
+    def set_fractional_coord(self, frac_coord: NDArray | list[list[float]]) -> None:
         assert len(frac_coord) == len(self.coord)
         self.frac_coord = np.asarray(frac_coord)
 
@@ -551,7 +551,9 @@ class Specie(BaseModel):
         if self.totcharge is not None:
             to_print += f" Total Charge                 = {self.totcharge}\n"
         if self.subtype == "molecule" and cast("Molecule", self).spin is not None:
-            to_print += f" Spin                         = {cast('Molecule', self).spin}\n"
+            to_print += (
+                f" Spin                         = {cast('Molecule', self).spin}\n"
+            )
         if self.smiles is not None:
             to_print += f" Smiles                       = {self.smiles}\n"
         if self.origin is not None:
