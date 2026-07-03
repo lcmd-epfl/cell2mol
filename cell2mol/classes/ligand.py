@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
 import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
@@ -13,6 +15,9 @@ from cell2mol.operations import get_angle
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import NOType, OptionalRefList, SubType
 import logging
+
+if TYPE_CHECKING:
+    from cell2mol.classes.molecule import Molecule
 
 elemdatabase = ElementData()
 logger = logging.getLogger(__name__)
@@ -36,16 +41,25 @@ class Ligand(Specie):
     metals: OptionalRefList[Metal] = None
     unique_index: int | None = None
 
-    subtype: SubType = Field(default="ligand")
+    subtype: SubType | None = Field(default="ligand")
 
     @classmethod
     @deprecated("Use ligand(**kwargs) with keyword arguments")
     def from_positional(
-        cls, labels: list, coord: list, frac_coord: list = None, radii: list = None
-    ) -> None:
-        return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
+        cls,
+        labels: list[str],
+        coord: np.ndarray | list[list[float]],
+        frac_coord: np.ndarray | list[list[float]] | None = None,
+        radii: np.ndarray | list[float] | None = None,
+    ) -> "Ligand":
+        return cls(
+            labels=labels,
+            coord=np.asarray(coord),
+            frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
+            radii=np.asarray(radii) if radii is not None else None,
+        )
 
-    def __repr__(self):
+    def __repr__(self, indirect: bool = False):
         to_print = ""
         to_print += "------------- Cell2mol LIGAND Object --------------\n"
         to_print += Specie.__repr__(self, indirect=True)
@@ -60,22 +74,24 @@ class Ligand(Specie):
         bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
         cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
         metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
-        mol = self.get_parent("molecule")
+        mol = cast("Molecule", self.get_parent("molecule"))
 
         if use_bond_info is None:
             use_bond_info = config.USE_BOND_INFO
 
-        for met in mol.metals:
+        for met in mol.metals or []:
             tmplabels = list(self.labels.copy())
             tmpcoord = list(self.coord.copy())
-            atom_site_labels = [atom.atom_site_label for atom in self.atoms]
+            atom_site_labels = [atom.atom_site_label for atom in self.atoms or []]
             tmplabels.append(met.label)
             tmpcoord.append(met.coord)
             atom_site_labels.append(met.atom_site_label)
             tmp_adjmat = build_adjacency(
                 labels=tmplabels,
-                positions=tmpcoord,
-                atom_site_labels=atom_site_labels,
+                positions=np.asarray(tmpcoord),
+                atom_site_labels=cast("list[str]", atom_site_labels)
+                if all(lbl is not None for lbl in atom_site_labels)
+                else None,
                 bond_data=bond_data,
                 use_bond_info=use_bond_info,
                 cov_factor=cov_factor,
@@ -99,7 +115,7 @@ class Ligand(Specie):
             self.get_nitrosyl_geom()
         return self.is_nitrosyl
 
-    def get_nitrosyl_geom(self: object, thres: float = 160) -> str:
+    def get_nitrosyl_geom(self, thres: float = 160) -> str:
         """Get the geometry of a Nitrosyl ligand."""
         # Determines whether the M-N-O angle of a Nitrosyl "ligand" is "Bent" or "Linear"
         # Each case is treated differently
@@ -109,18 +125,23 @@ class Ligand(Specie):
         if self.metals is None:
             self.get_connected_metals()
 
-        for idx, a in enumerate(self.atoms):
+        central = None
+        extreme = None
+        for idx, a in enumerate(self.atoms or []):
             if a.label == "N":
                 central = a.coord.copy()
             if a.label == "O":
                 extreme = a.coord.copy()
+        assert central is not None
+        assert extreme is not None
 
+        metals = self.metals or []
         dist = []
-        for idx, met in enumerate(self.metals):
+        for idx, met in enumerate(metals):
             metal = np.array(met.coord)
             dist.append(np.linalg.norm(central - metal))
-        tgt = np.argmin(dist)
-        metal = self.metals[tgt].coord.copy()
+        tgt = int(np.argmin(dist))
+        metal = metals[tgt].coord.copy()
         vector1 = np.subtract(np.array(central), np.array(extreme))
         vector2 = np.subtract(np.array(central), np.array(metal))
 
@@ -140,7 +161,7 @@ class Ligand(Specie):
         self.connected_idx = []
         if self.madjnum is None:
             self.set_inherit_adjmatrix("molecule")
-        for idx, con in enumerate(self.madjnum):
+        for idx, con in enumerate(self.madjnum if self.madjnum is not None else []):
             if con > 0:
                 self.connected_idx.append(idx)
         return self.connected_idx
@@ -150,11 +171,12 @@ class Ligand(Specie):
             self.set_atoms()
         if self.connected_idx is None:
             self.get_connected_idx()
+        connected_idx = self.connected_idx or []
         self.connected_atoms = []
-        for idx, at in enumerate(self.atoms):
-            if idx in self.connected_idx and at.mconnec > 0:
+        for idx, at in enumerate(self.atoms or []):
+            if idx in connected_idx and (at.mconnec or 0) > 0:
                 self.connected_atoms.append(at)
-            elif idx in self.connected_idx and at.mconnec == 0:
+            elif idx in connected_idx and at.mconnec == 0:
                 logger.warning("Atom appears in connected_idx, but has mconnec=0")
         return self.connected_atoms
 
@@ -174,7 +196,7 @@ class Ligand(Specie):
         for gr in self.groups:
             if gr.is_haptic is None:
                 gr.get_hapticity()
-            if gr.is_haptic:
+            if gr.is_haptic and gr.haptic_type is not None:
                 self.haptic_type.append(gr.haptic_type)
         if len(self.haptic_type) > 0:
             self.is_haptic = True
