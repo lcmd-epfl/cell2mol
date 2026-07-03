@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 from pydantic import Field
@@ -21,6 +21,8 @@ from cell2mol.utils import config
 
 if TYPE_CHECKING:
     from cell2mol.classes.group import Group
+    from cell2mol.classes.molecule import Molecule
+    from cell2mol.classes.specie import Specie
 import logging
 
 logger = logging.getLogger(__name__)
@@ -56,9 +58,18 @@ class Metal(Atom):
     @classmethod
     @deprecated("Use metal() with the keyword arguments instead.")
     def from_positional(
-        cls, label: str, coord: list, frac_coord: list = None, radii: float = None
-    ) -> None:
-        return cls(label=label, coord=coord, frac_coord=frac_coord, radii=radii)
+        cls,
+        label: str,
+        coord: np.ndarray | list[float],
+        frac_coord: np.ndarray | list[float] | None = None,
+        radii: float | None = None,
+    ) -> "Metal":
+        return cls(
+            label=label,
+            coord=np.asarray(coord),
+            frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
+            radii=radii,
+        )
 
     #######################################################
     def get_valence_elec(self, m_ox: int):
@@ -76,14 +87,16 @@ class Metal(Atom):
             return self.metals
 
         self.metals = []
-        mol = self.get_parent("molecule")
+        mol = cast("Molecule", self.get_parent("molecule"))
         self_mol_idx = self.get_parent_index("molecule")
+        assert self_mol_idx is not None
         if mol.madjmat is not None:
             mol_madjmat = mol.madjmat
-            for met in mol.metals:
+            for met in mol.metals or []:
                 if met is self:
                     continue
                 met_mol_idx = met.get_parent_index("molecule")
+                assert met_mol_idx is not None
                 if mol_madjmat[self_mol_idx][met_mol_idx] >= 1:
                     self.metals.append(met)
                     logger.debug(
@@ -103,13 +116,17 @@ class Metal(Atom):
         if use_bond_info is None:
             use_bond_info = config.USE_BOND_INFO
 
-        for met in mol.metals:
+        for met in mol.metals or []:
             if met is self:
                 continue
 
             tmplabels = [self.label, met.label]
-            tmpcoord = [self.coord, met.coord]
-            atom_site_labels = [self.atom_site_label, met.atom_site_label]
+            tmpcoord = np.asarray([self.coord, met.coord])
+            atom_site_labels = (
+                [self.atom_site_label, met.atom_site_label]
+                if self.atom_site_label is not None and met.atom_site_label is not None
+                else None
+            )
 
             tmp_adjmat = build_adjacency(
                 labels=tmplabels,
@@ -145,13 +162,16 @@ class Metal(Atom):
             logger.debug("No parent molecule found, skipping atom connectivity check")
             return self.connected_nonmetal_atoms
 
-        mol = self.get_parent("molecule")
+        mol = cast("Specie", self.get_parent("molecule"))
         self_mol_idx = self.get_parent_index("molecule")
+        assert mol is not None
+        assert self_mol_idx is not None
         if mol.madjmat is None:
             logger.debug("No mol.madjmat found, skipping atom connectivity check")
             return self.connected_nonmetal_atoms
 
         mol_madjmat = mol.madjmat
+        assert mol.atoms is not None
         for idx, val in enumerate(mol_madjmat[self_mol_idx]):
             if idx == self_mol_idx or val < 1:
                 continue
@@ -190,7 +210,7 @@ class Metal(Atom):
 
         return self.groups
 
-    def get_coordination_geometry(self: object):
+    def get_coordination_geometry(self):
         logger.debug(
             "Define coordination geometry of Metal %s%s",
             self.label,
@@ -199,8 +219,9 @@ class Metal(Atom):
 
         coord_groups = self.get_connected_groups()
 
-        (self.coord_nr, self.coord_geometry, self.geom_deviation) = (
-            define_coordination_geometry(self, coord_groups)
+        (self.coord_nr, self.coord_geometry, self.geom_deviation) = cast(
+            "tuple[Any, ...]",
+            define_coordination_geometry(self, coord_groups or []),
         )
 
         self.rel_metal_radius = self.get_relative_metal_radius()
@@ -208,9 +229,9 @@ class Metal(Atom):
         if self.metals is None:
             self.get_connected_metals()
 
-        if len(self.metals) > 0:
-            connected_metals = self.metals
-            whole_coord = coord_groups + connected_metals
+        if len(self.metals or []) > 0:
+            connected_metals = self.metals or []
+            whole_coord = (coord_groups or []) + connected_metals
 
             logger.debug("Including metal-metal bonds for: %s", self.label)
 
@@ -218,7 +239,10 @@ class Metal(Atom):
                 self.coord_nr_with_metal_bonds,
                 self.coord_geometry_with_metal_bonds,
                 self.geom_deviation_with_metal_bonds,
-            ) = define_coordination_geometry(self, whole_coord)
+            ) = cast(
+                "tuple[Any, ...]",
+                define_coordination_geometry(self, whole_coord),
+            )
 
         return self.coord_geometry
 
@@ -237,15 +261,21 @@ class Metal(Atom):
 
         # Use cached value if exists, otherwise compute it
         if getattr(self, "coord_sphere_atoms", None) is None:
-            mol = self.get_parent("molecule")
+            mol = cast("Specie", self.get_parent("molecule"))
             midx = self.get_parent_index("molecule")
 
             # Extract atoms from adjacency matrix
-            self.coord_sphere_atoms = (
-                [mol.atoms[i] for i, val in enumerate(mol.adjmat[midx]) if val >= 1]
-                if mol
-                else []
-            )
+            if (
+                mol is not None
+                and mol.atoms is not None
+                and mol.adjmat is not None
+                and midx is not None
+            ):
+                self.coord_sphere_atoms = [
+                    mol.atoms[i] for i, val in enumerate(mol.adjmat[midx]) if val >= 1
+                ]
+            else:
+                self.coord_sphere_atoms = []
 
         return self.coord_sphere_atoms
 
@@ -260,7 +290,7 @@ class Metal(Atom):
             self.get_coord_sphere_atoms()
 
         # Extract labels and generate the formula
-        atom_labels = [at.label for at in self.coord_sphere_atoms]
+        atom_labels = [at.label for at in self.coord_sphere_atoms or []]
         self.coord_sphere_formula = labels2formula(atom_labels)
 
         return self.coord_sphere_formula
@@ -269,11 +299,11 @@ class Metal(Atom):
         if self.groups is None:
             self.get_connected_groups()
         diff_list = []
-        for group in self.groups:
+        for group in self.groups or []:
             if not group.is_haptic:
-                for atom in group.atoms:
+                for atom in group.atoms or []:
                     diff = (
-                        get_dist(self.coord, atom.coord)
+                        get_dist(list(self.coord), list(atom.coord))
                         - elemdatabase.CovalentRadius3[atom.label]
                     )
                     diff = round(float(diff), 3)
@@ -281,10 +311,10 @@ class Metal(Atom):
             else:
                 haptic_center_label = "C"
                 haptic_center_coord = compute_centroid(
-                    np.array([atom.coord for atom in group.atoms])
+                    np.array([atom.coord for atom in group.atoms or []])
                 )
                 diff = (
-                    get_dist(self.coord, haptic_center_coord)
+                    get_dist(list(self.coord), list(haptic_center_coord))
                     - elemdatabase.CovalentRadius3[haptic_center_label]
                 )
                 diff = round(float(diff), 3)
@@ -327,14 +357,13 @@ class Metal(Atom):
         Atom.reset_charge(
             self
         )  ## First uses the generic atom class function for itself
-        if self.poscharges is not None:
-            delattr(self, "poscharge")
+        self.possible_cs = None
 
     def __str__(self):
         # This will make print(object) behave like before
         return self.__repr__()
 
-    def __repr__(self):
+    def __repr__(self, indirect: bool = False):
         to_print = ""
         to_print += "------------- Cell2mol METAL Object --------------\n"
         to_print += Atom.__repr__(self, indirect=True)
