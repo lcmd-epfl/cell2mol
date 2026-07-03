@@ -5,12 +5,18 @@ to detect missing hydrogen atoms in molecules using adjacency and geometric anal
 to place hydrogen atoms based on existing neighbors and add hydrogen for protonation state.
 """
 
+from __future__ import annotations
+
 import logging
 import numpy as np
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING, cast
 from cell2mol.operations import get_angle, unit_vector, perp_unit, kabsch_rotation
 from cell2mol.elementdata import ElementData
 from cell2mol.element_utils import ALKALI_AND_ALKALINE_EARTH_METALS
+
+if TYPE_CHECKING:
+    from cell2mol.classes.ligand import Ligand
+    from cell2mol.classes.specie import Specie
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
@@ -82,7 +88,7 @@ def infer_coordination_geometry(bond_vectors):
             coordination_number (int): expected coordination number
             geometry_report (str): diagnostic angle information
     """
-    atol = 4e-1
+    atol = 5e-1
     geometry = "Unassigned"
     coordination_number = 0
     geometry_report = ""
@@ -123,7 +129,7 @@ def infer_coordination_geometry(bond_vectors):
         for name, val in ideal_angles.items()
     }
 
-    best_geometry = min(angle_differences, key=angle_differences.get)
+    best_geometry = min(angle_differences, key=lambda x: angle_differences[x])
     min_difference = angle_differences[best_geometry]
 
     geometry_report += (
@@ -438,7 +444,7 @@ def add_hydrogens(
     labels: list,
     coords: np.ndarray,
     site: int,
-    ligand: object,
+    ligand: "Ligand",
     num_hydrogens: int,
     element: str = "H",
 ) -> Tuple[bool, list, np.ndarray]:
@@ -448,7 +454,7 @@ def add_hydrogens(
     newlab = labels.copy()
     newcoord = coords.copy()
 
-    for idx, atom in enumerate(ligand.atoms):
+    for idx, atom in enumerate(ligand.atoms or []):
         if idx != site:
             continue
 
@@ -456,9 +462,10 @@ def add_hydrogens(
         bonded_atom_coord = []
         bonded_atom_labels = []
 
+        molecule_parent = cast("Specie", ligand.get_parent("molecule"))
         for adj in atom.adjacency:
-            n_label = ligand.get_parent("molecule").labels[adj]
-            n_coord = ligand.get_parent("molecule").coord[adj]
+            n_label = molecule_parent.labels[adj]
+            n_coord = molecule_parent.coord[adj]
 
             # Skip d- and f-block elements
             if elemdatabase.elementblock[n_label] in {"d", "f"}:
