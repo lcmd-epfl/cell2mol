@@ -57,7 +57,5 @@ class Bond(BaseModel):
 
     @classmethod
     @deprecated("Use Bond() with keyword arguments instead.")
-    def from_positional(
-        cls, atom1: object, atom2: object, bond_order: float = 1
-    ) -> "Bond":
+    def from_positional(cls, atom1: Atom, atom2: Atom, bond_order: float = 1) -> "Bond":
         return cls(atom1=atom1, atom2=atom2, bond_order=bond_order)
