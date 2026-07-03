@@ -1,14 +1,20 @@
+from __future__ import annotations
+
 import numpy as np
 import itertools
 import networkx as nx
 from cell2mol.connectivity import add_atom
 from cell2mol.element_utils import get_post_transition_metal_idxs, get_metalloid_idxs
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, TYPE_CHECKING, cast
 from cell2mol.classes.protonation import Protonation
 from cell2mol.charge.utils import FULLERENES, MANUAL_CHARGE_ASSIGN_SPECIES
 from cell2mol.hydrogen import detect_missing_hydrogens, add_hydrogens
 import logging
+
+if TYPE_CHECKING:
+    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.ligand import Ligand
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +27,7 @@ class ProtonationGroupResult:
     non_local_indices: List[int]
 
 
-def enumerate_protonation_states(specie: object) -> list[Protonation]:
+def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     """Enumerate possible protonation states for the specie.
 
     Protonation states are only generated for:
@@ -60,14 +66,14 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
 
     if specie.subtype == "ligand":
         parent = specie.get_parent("molecule")
-        if parent.has_ia_iia and not parent.iscomplex:
+        if parent is not None and parent.has_ia_iia and not parent.iscomplex:
             return get_empty_protonation_state(specie)
 
     # ============================================================
     # From here on: ligand protonation engine
     # ============================================================
-    ligand = specie
-    protonation_states: list = []
+    ligand = cast("Ligand", specie)
+    protonation_states: list[Protonation] = []
 
     newlab = ligand.labels.copy()
     newcoord = ligand.coord.copy()
@@ -89,19 +95,20 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     # GROUP-LEVEL ANALYSIS
     # ============================================================
     logger.info("Ligand formula: %s, natoms: %d", ligand.formula, ligand.natoms)
+    groups = ligand.groups or []
     logger.debug(
         "Ligand groups info: %s",
         [
             (
                 g.formula,
                 g.natoms,
-                [a.atom_site_label for a in g.atoms],
-                [m.atom_site_label for m in g.metals],
+                [a.atom_site_label for a in (g.atoms or [])],
+                [m.atom_site_label for m in (g.metals or [])],
             )
-            for g in ligand.groups
+            for g in groups
         ],
     )
-    for g in ligand.groups:
+    for g in groups:
         parent_indices = g.get_parent_indices("ligand")
 
         # --------------------------------------------------
@@ -145,7 +152,7 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     # ============================================================
     # LOCAL ATOM ADDITION
     # ============================================================
-    for idx, a in enumerate(ligand.atoms):
+    for idx, a in enumerate(ligand.atoms or []):
         atom_label = (
             f"{a.label} ({a.atom_site_label})" if a.atom_site_label else a.label
         )
@@ -157,7 +164,7 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
                 idx,
             )
             _, newlab, newcoord = add_atom(
-                newlab, newcoord, idx, ligand, element="H", unconditional=True
+                newlab, list(newcoord), idx, ligand, element="H", unconditional=True
             )
         elif site_proton_counts[idx] >= 2:
             logger.debug(
@@ -171,7 +178,11 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
             start_idx = len(newlab)
             end_idx = start_idx + site_proton_counts[idx]
             _, newlab, newcoord = add_hydrogens(
-                newlab, newcoord, idx, ligand, num_hydrogens=site_proton_counts[idx]
+                newlab,
+                np.asarray(newcoord),
+                idx,
+                ligand,
+                num_hydrogens=site_proton_counts[idx],
             )
 
             if ligand_donor_electrons[idx] >= 2 and idx in non_local_groups_indices:
@@ -193,11 +204,11 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
         protonation_states.append(
             Protonation.from_positional(
                 labels=newlab,
-                coord=newcoord,
+                coord=np.asarray(newcoord),
                 cov_factor=ligand.cov_factor,
                 n_protons_added=n_protons_added,
-                site_proton_counts=site_proton_counts,
-                ligand_donor_electrons=ligand_donor_electrons,
+                site_proton_counts=site_proton_counts.tolist(),
+                ligand_donor_electrons=ligand_donor_electrons.tolist(),
                 mode="heuristic",
                 parent=ligand,
             )
@@ -218,7 +229,7 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
         logger.debug(
             "Sites process_both_modes: %s %s",
             process_both_modes,
-            [ligand.atoms[idx].atom_site_label for idx in process_both_modes],
+            [(ligand.atoms or [])[idx].atom_site_label for idx in process_both_modes],
         )
         logger.debug(
             "Remove previously added protons at indices: %s for combinatorial protonation.",
@@ -260,15 +271,15 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
                 site_proton_counts[idx] = 1
                 n_protons_added += site_proton_counts[idx]
                 _, newlab, newcoord = add_atom(
-                    newlab, newcoord, idx, ligand, element="H", unconditional=True
+                    newlab, list(newcoord), idx, ligand, element="H", unconditional=True
                 )
         prot = Protonation.from_positional(
             labels=newlab,
-            coord=newcoord,
+            coord=np.asarray(newcoord),
             cov_factor=ligand.cov_factor,
             n_protons_added=n_protons_added,
-            site_proton_counts=site_proton_counts,
-            ligand_donor_electrons=ligand_donor_electrons,
+            site_proton_counts=site_proton_counts.tolist(),
+            ligand_donor_electrons=ligand_donor_electrons.tolist(),
             mode="combinatorial",
             parent=ligand,
         )
@@ -279,7 +290,7 @@ def enumerate_protonation_states(specie: object) -> list[Protonation]:
     return protonation_states
 
 
-def get_empty_protonation_state(specie: object) -> list[Protonation]:
+def get_empty_protonation_state(specie: Specie) -> list[Protonation]:
     """
     Create a placeholder protonation state with no added hydrogens.
 
@@ -596,7 +607,13 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                             atom_label,
                             report,
                         )
-
+                    else:
+                        logger.debug(
+                            "  No missing hydrogens detected for atom %d (%s). %s",
+                            idx,
+                            atom_label,
+                            report,
+                        )
     return ProtonationGroupResult(
         site_proton_counts=site_proton_counts,
         ligand_donor_electrons=ligand_donor_electrons,
@@ -689,8 +706,8 @@ def _handle_non_haptic_group(
                     site_proton_counts[idx] = 1
 
                 else:
-                    G = nx.from_numpy_array(ligand.adjmat.astype(float))
-                    cycles = nx.cycle_basis(G)
+                    graph = nx.from_numpy_array(ligand.adjmat.astype(float))
+                    cycles = nx.cycle_basis(graph)
                     in_cycles = [c for c in cycles if idx in c]
 
                     if len(in_cycles) == 1 and len(in_cycles[0]) == 6:
@@ -749,8 +766,8 @@ def _handle_non_haptic_group(
                     elif numH == 2 and ligand.formula == "H2-C":
                         site_proton_counts[idx] = 2
                     else:
-                        G = nx.from_numpy_array(ligand.adjmat.astype(float))
-                        cycles = nx.cycle_basis(G)
+                        graph = nx.from_numpy_array(ligand.adjmat.astype(float))
+                        cycles = nx.cycle_basis(graph)
                         in_cycles = [c for c in cycles if idx in c]
 
                         if len(in_cycles) == 1:
@@ -792,8 +809,8 @@ def _handle_non_haptic_group(
                 site_proton_counts[idx] = 3
                 ligand_donor_electrons[idx] = 2
             elif len(adj_labels) == 2:
-                G = nx.from_numpy_array(ligand.adjmat.astype(float))
-                cycles = nx.cycle_basis(G)
+                graph = nx.from_numpy_array(ligand.adjmat.astype(float))
+                cycles = nx.cycle_basis(graph)
                 in_cycles = [c for c in cycles if idx in c]
 
                 if len(in_cycles) == 1:
