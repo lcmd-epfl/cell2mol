@@ -1,18 +1,26 @@
+from __future__ import annotations
+
+from typing import Tuple, TYPE_CHECKING, cast
+
 from rdkit import Chem
-from typing import Tuple
 from cell2mol.element_utils import (
     get_metal_idxs,
     get_alkali_alkaline_earth_metal_idxs,
     get_post_transition_metal_idxs,
 )
 from cell2mol.elementdata import ElementData
+from cell2mol.my_types import RDKitObject
 import logging
+
+if TYPE_CHECKING:
+    from cell2mol.classes.ligand import Ligand
+    from cell2mol.classes.molecule import Molecule
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 
-def correct_smiles_ligand(ligand: object) -> Tuple[bool, bool]:
+def correct_smiles_ligand(ligand: "Ligand") -> Tuple[bool, bool]:
     """
     Constructs an RDKit molecule from cell2mol ligand object.
     This function synchronizes the cell2mol ligand object with RDKit,
@@ -22,14 +30,15 @@ def correct_smiles_ligand(ligand: object) -> Tuple[bool, bool]:
     rwlig = Chem.RWMol()
 
     # --- atoms ---
-    for atom in ligand.atoms:
+    for atom in ligand.atoms or []:
         rd_atom = Chem.Atom(atom.atnum)
-        rd_atom.SetFormalCharge(int(atom.charge))
+        rd_atom.SetFormalCharge(int(atom.charge or 0))
         rd_atom.SetNoImplicit(True)
         rwlig.AddAtom(rd_atom)
 
     # --- metal context ---
-    labels = ligand.get_parent("molecule").labels
+    molecule_parent = cast("Molecule", ligand.get_parent("molecule"))
+    labels = molecule_parent.labels
     metal_idxs = get_metal_idxs(labels)
     alkali_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
 
@@ -63,7 +72,7 @@ def correct_smiles_ligand(ligand: object) -> Tuple[bool, bool]:
     }
 
     # --- bonds & hybridization ---
-    for jdx, atom in enumerate(ligand.atoms):
+    for jdx, atom in enumerate(ligand.atoms or []):
         if atom.bonds is None:
             logger.error("Ligand atom %s has no bond information.", atom.label)
             raise ValueError("Ligand atom bonds are not set")
@@ -76,6 +85,8 @@ def correct_smiles_ligand(ligand: object) -> Tuple[bool, bool]:
 
             begin_idx = b.atom1.get_parent_index("ligand")
             end_idx = b.atom2.get_parent_index("ligand")
+            assert begin_idx is not None
+            assert end_idx is not None
             nbonds += 1
 
             btype = btype_map.get(b.order, Chem.BondType.SINGLE)
@@ -137,7 +148,7 @@ def correct_smiles_ligand(ligand: object) -> Tuple[bool, bool]:
 
     except Exception as e:
         logger.error("RDKit processing failed for ligand %s: %s", ligand.formula, e)
-        return False, fix_zwitterions
+        return False, False
 
 
 def fix_zwitterions(mol):
@@ -274,22 +285,25 @@ def fix_zwitterions(mol):
     return rw_mol.GetMol(), fixed
 
 
-def generate_tmc_rdkit_obj_smiles(mol: object):
-    all_metals_indices = [met.get_parent_index("molecule") for met in mol.metals]
+def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
+    metals = mol.metals or []
+    all_metals_indices = [met.get_parent_index("molecule") for met in metals]
     logger.debug(
         "Found metals %s with indices %s",
-        [met.atom_site_label for met in mol.metals]
-        if getattr(mol.metals[0], "atom_site_label", None) is not None
-        else [met.label for met in mol.metals],
+        [met.atom_site_label for met in metals]
+        if getattr(metals[0], "atom_site_label", None) is not None
+        else [met.label for met in metals],
         all_metals_indices,
     )
     temp_mol = Chem.RWMol()
 
-    for met in mol.metals:
+    for met in metals:
         a = Chem.Atom(met.label)
-        a.SetFormalCharge(int(met.charge))  # Assign the metal oxidation state
-        a.SetIntProp("__mol_idx", met.get_parent_index("molecule"))
-        if getattr(met, "atom_site_label", None) is not None:
+        a.SetFormalCharge(int(met.charge or 0))  # Assign the metal oxidation state
+        met_mol_idx = met.get_parent_index("molecule")
+        assert met_mol_idx is not None
+        a.SetIntProp("__mol_idx", met_mol_idx)
+        if met.atom_site_label is not None:
             a.SetProp("__atom_site_label", met.atom_site_label)
 
         idx = temp_mol.AddAtom(a)
@@ -297,14 +311,17 @@ def generate_tmc_rdkit_obj_smiles(mol: object):
             "Add metal atom %s to rdkit molecule object", Chem.MolToSmiles(temp_mol)
         )
 
-    for lig in mol.ligands:
+    for lig in mol.ligands or []:
         # lig_atom : atom object from cell2mol
         # a : atom object from rdkit object
-        for lig_atom, a in zip(lig.atoms, lig.rdkit_obj.GetAtoms()):
-            a.SetFormalCharge(int(lig_atom.charge))
-            a.SetIntProp("__mol_idx", lig_atom.get_parent_index("molecule"))
+        assert lig.rdkit_obj is not None
+        for lig_atom, a in zip(lig.atoms or [], lig.rdkit_obj.GetAtoms()):
+            a.SetFormalCharge(int(lig_atom.charge or 0))
+            lig_atom_mol_idx = lig_atom.get_parent_index("molecule")
+            assert lig_atom_mol_idx is not None
+            a.SetIntProp("__mol_idx", lig_atom_mol_idx)
 
-            if getattr(lig_atom, "atom_site_label", None) is not None:
+            if lig_atom.atom_site_label is not None:
                 a.SetProp("__atom_site_label", lig_atom.atom_site_label)
 
         logger.debug(
@@ -332,13 +349,15 @@ def generate_tmc_rdkit_obj_smiles(mol: object):
     new_mol = Chem.RenumberAtoms(new_mol, new_order)
     new_mol = Chem.RWMol(new_mol)
 
-    for met in mol.metals:
+    for met in metals:
         met_idx = met.get_parent_index("molecule")
+        assert met_idx is not None
 
-        coordinating_atoms_labels = [atom.label for atom in met.coord_sphere_atoms]
+        coord_sphere_atoms = met.coord_sphere_atoms or []
+        coordinating_atoms_labels = [atom.label for atom in coord_sphere_atoms]
 
         coordinating_atoms_indices = [
-            atom.get_parent_index("molecule") for atom in met.coord_sphere_atoms
+            atom.get_parent_index("molecule") for atom in coord_sphere_atoms
         ]
         logger.debug(
             "%s%s coordinates to %s %s",
@@ -349,6 +368,7 @@ def generate_tmc_rdkit_obj_smiles(mol: object):
         )
 
         for idx in coordinating_atoms_indices:
+            assert idx is not None
             # print(idx, new_mol.GetBondBetweenAtoms(idx, met_idx))
             if new_mol.GetBondBetweenAtoms(idx, met_idx):
                 logger.debug(
@@ -393,17 +413,16 @@ def generate_tmc_rdkit_obj_smiles(mol: object):
     return new_mol, tmc_rdkit_obj
 
 
-def create_bonds_specie(specie, rdkit_obj: object = None):
+def create_bonds_specie(specie, rdkit_obj: RDKitObject | None = None):
     from cell2mol.classes import Bond
 
     # logger.debug(
     #     "CREATE_bonds_specie: %s %s %s", specie.formula, specie.subtype, specie.smiles
     # )
     n_atoms = specie.natoms  # e.g. 9
-    if rdkit_obj is not None:
-        rdkit_obj = rdkit_obj
-    else:
+    if rdkit_obj is None:
         rdkit_obj = specie.rdkit_obj
+    assert rdkit_obj is not None
 
     n_atoms_rdkit = rdkit_obj.GetNumAtoms()  # e.g.10
 
@@ -441,7 +460,7 @@ def create_bonds_specie(specie, rdkit_obj: object = None):
                         if bond_endatom == idx:
                             start = bond_endatom
                             end = bond_startatom
-                        elif bond_startatom == idx:
+                        else:
                             start = bond_startatom
                             end = bond_endatom
                         # create new bond object
@@ -472,7 +491,7 @@ def create_bonds_specie(specie, rdkit_obj: object = None):
                         if bond_endatom == idx:
                             start = bond_endatom
                             end = bond_startatom
-                        elif bond_startatom == idx:
+                        else:
                             start = bond_startatom
                             end = bond_endatom
 
@@ -548,7 +567,7 @@ def create_bonds_specie(specie, rdkit_obj: object = None):
                         if bond_endatom == idx:
                             start = bond_endatom
                             end = bond_startatom
-                        elif bond_startatom == idx:
+                        else:
                             start = bond_startatom
                             end = bond_endatom
 
@@ -592,17 +611,20 @@ def create_bonds_specie(specie, rdkit_obj: object = None):
     return True
 
 
-def create_metal_ligand_bonds(mol: object):
+def create_metal_ligand_bonds(mol: "Molecule"):
     # Adds Metal-Ligand Bonds, with a zero order:
     from cell2mol.classes import Bond
 
+    assert mol.madjmat is not None
     if mol.iscomplex or mol.has_ia_iia or mol.has_post_transition_metal:
-        for lig in mol.ligands:
-            for at in lig.atoms:
+        for lig in mol.ligands or []:
+            for at in lig.atoms or []:
                 count = 0
                 index_1 = at.get_parent_index("molecule")
-                for met in mol.metals:
+                assert index_1 is not None
+                for met in mol.metals or []:
                     index_2 = met.get_parent_index("molecule")
+                    assert index_2 is not None
                     isconnected = mol.madjmat[index_1, index_2] == 1
                     if isconnected:
                         if index_1 < index_2:
@@ -624,19 +646,23 @@ def create_metal_ligand_bonds(mol: object):
                     )
 
 
-def create_metal_metal_bonds(mol: object):
+def create_metal_metal_bonds(mol: "Molecule"):
     from cell2mol.classes import Bond
 
     # Adds Metal-Metal Bonds, with a zero order:
+    assert mol.madjmat is not None
     if mol.iscomplex or mol.has_ia_iia or mol.has_post_transition_metal:
-        if len(mol.metals) > 1:
+        metals = mol.metals or []
+        if len(metals) > 1:
             logger.debug("Creating Metal-Metal Bonds for molecule %s", mol.formula)
-            for idx, met1 in enumerate(mol.metals):
+            for idx, met1 in enumerate(metals):
                 index_1 = met1.get_parent_index("molecule")
-                for jdx, met2 in enumerate(mol.metals):
+                assert index_1 is not None
+                for jdx, met2 in enumerate(metals):
                     if idx <= jdx:
                         continue
                     index_2 = met2.get_parent_index("molecule")
+                    assert index_2 is not None
                     isconnected = mol.madjmat[index_1, index_2] == 1
                     if isconnected:
                         if index_1 < index_2:
