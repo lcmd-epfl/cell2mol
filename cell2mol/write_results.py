@@ -6,6 +6,7 @@ import re
 import os
 import traceback
 from collections import Counter
+from ase import Atoms
 from ase.io import read
 from cell2mol.elementdata import ElementData
 import logging
@@ -16,11 +17,13 @@ elemdatabase = ElementData()
 logger = logging.getLogger(__name__)
 
 
-def exit_with_error_input(message):
+def exit_with_error_input(message, details=None):
     """Logs the error message to a file and exits the program."""
     error_log_path = os.path.join(os.getcwd(), "error_InputFile.out")
     with open(error_log_path, "w") as error_log:
         error_log.write(f"Error: {message}\n")
+        if details is not None:
+            error_log.write(f"Details: {details}\n")
 
 
 def exit_with_error_exception(exc, error_log_path=None):
@@ -47,7 +50,9 @@ def exit_with_error_exception(exc, error_log_path=None):
         )
 
 
-def compare_formula_xyz_vs_cif(xyzfile: str, formula_str_from_cif: str) -> dict:
+def compare_formula_xyz_vs_cif(
+    xyzfile: str, formula_str_from_cif: str
+) -> dict[str, dict[str, int]]:
     """
     Compare the elements from CIF with the elements in the XYZ file.
     """
@@ -56,6 +61,7 @@ def compare_formula_xyz_vs_cif(xyzfile: str, formula_str_from_cif: str) -> dict:
     for element, count in re.findall(element_pattern, formula_str_from_cif):
         parsed_formula_cif[element] = int(count) if count else 1
     mol = read(xyzfile, format="xyz")
+    assert isinstance(mol, Atoms)
     element_list = mol.get_chemical_symbols()
     element_list_count = dict(Counter(element_list))
     comparison_result = {
@@ -101,7 +107,15 @@ def printxyz(labels, pos):
         print("%s  %.6f  %.6f  %.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]))
 
 
-def writexyz(fdir, fname, labels, pos, charge: int = 0, spin: int = 1, info: str = ""):
+def writexyz(
+    fdir,
+    fname,
+    labels,
+    pos,
+    charge: int | str = 0,
+    spin: int | str = 1,
+    info: str = "",
+):
     """Writes an XYZ file with given labels and positions."""
     os.makedirs(fdir, exist_ok=True)
 
@@ -127,11 +141,11 @@ def extract_refmoleclist_xyz(fdir, refmoleclist, name: str):
     for i, ref in enumerate(refmoleclist):
         if ref.iscomplex:
             if ref.totcharge_cif is not None:
-                N = 0
+                n_electrons = 0
                 for atom in ref.labels:
-                    N += elemdatabase.elementnr[atom]
-                N -= ref.totcharge_cif
-                if N % 2 == 0:
+                    n_electrons += elemdatabase.elementnr[atom]
+                n_electrons -= ref.totcharge_cif
+                if n_electrons % 2 == 0:
                     spin = 1
                 else:
                     spin = 2
