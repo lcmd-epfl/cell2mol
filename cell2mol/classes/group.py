@@ -1,17 +1,22 @@
 from __future__ import annotations
 
+from typing import Any, TYPE_CHECKING, cast
+
 import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
 from cell2mol.utils import config
+from cell2mol.classes.atom import Atom
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
 from cell2mol.connectivity import identify_haptic_mode
-from cell2mol.element_utils import labels2electrons, labels2formula
 from cell2mol.operations import compute_centroid
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import OptionalRef, OptionalRefList, SubType
 import logging
+
+if TYPE_CHECKING:
+    from cell2mol.classes.molecule import Molecule
 
 elemdatabase = ElementData()
 logger = logging.getLogger(__name__)
@@ -22,7 +27,7 @@ class Group(Specie):
 
     haptic_type: str | None = None
     is_haptic: bool | None = None
-    topology: dict | None = None
+    topology: dict[str, Any] | None = None
     checked_coordination: bool | None = None
     # Cross-reference: points to a metal in parent Molecule
     closest_metal: OptionalRef[Metal] = None
@@ -30,25 +35,33 @@ class Group(Specie):
     metals: OptionalRefList[Metal] = None
     denticity: int | None = None
 
-    subtype: SubType = Field(default="group")
+    subtype: SubType | None = Field(default="group")
 
     @classmethod
     @deprecated("Use group(**kwargs) with keyword arguments")
     def from_positional(
-        cls, labels: list, coord: list, frac_coord: list = None, radii: list = None
-    ) -> None:
-        return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
+        cls,
+        labels: list[str],
+        coord: np.ndarray | list[list[float]],
+        frac_coord: np.ndarray | list[list[float]] | None = None,
+        radii: np.ndarray | list[float] | None = None,
+    ) -> "Group":
+        return cls(
+            labels=labels,
+            coord=np.asarray(coord),
+            frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
+            radii=np.asarray(radii) if radii is not None else None,
+        )
 
     @classmethod
     def from_atom_list(
-        cls, gr_atoms: list, use_bond_info: bool | None = None
+        cls, gr_atoms: list["Atom"], use_bond_info: bool | None = None
     ) -> "Group":
         """
         Factory method to instantiate a Group directly from a list of Atom objects.
         """
         if not gr_atoms:
-            logger.warning("Attempted to create a Group from an empty atom list.")
-            return None
+            raise ValueError("Attempted to create a Group from an empty atom list.")
 
         # 1. Extract data from the atom list
         # We assume all atoms in the list have the same attribute availability
@@ -58,11 +71,11 @@ class Group(Specie):
         # Since Group inherits from Specie, we pass the basic structural data
         instance = cls(
             labels=[a.label for a in gr_atoms],
-            coord=[a.coord for a in gr_atoms],
-            frac_coord=[a.frac_coord for a in gr_atoms]
+            coord=np.asarray([a.coord for a in gr_atoms]),
+            frac_coord=np.asarray([a.frac_coord for a in gr_atoms])
             if first_atom.frac_coord is not None
             else None,
-            radii=[a.radii for a in gr_atoms],
+            radii=np.asarray([a.radii for a in gr_atoms]),
         )
 
         # 3. Set internal metadata
@@ -73,7 +86,7 @@ class Group(Specie):
         instance.set_atoms(
             atomlist=gr_atoms,
             create_adjacencies=False,
-            atom_site_labels=[a.atom_site_label for a in gr_atoms]
+            atom_site_labels=cast("list[str]", [a.atom_site_label for a in gr_atoms])
             if first_atom.atom_site_label is not None
             else None,
             use_bond_info=use_bond_info
@@ -87,7 +100,7 @@ class Group(Specie):
         # This will make print(object) behave like before
         return self.__repr__()
 
-    def __repr__(self):
+    def __repr__(self, indirect: bool = False):
         to_print = ""
         to_print += "------------- Cell2mol GROUP Object --------------\n"
         to_print += Specie.__repr__(self, indirect=True)
@@ -104,14 +117,13 @@ class Group(Specie):
             return None
         if self.atoms is None:
             self.set_atoms()
+        assert self.atoms is not None
         self.atoms.pop(index)
         self.labels.pop(index)
-        self.coord.pop(index)
-        self.radii.pop(index)
-        self.formula = labels2formula(self.labels)
-        ### Assuming neutral specie (so basically this is the sum of atomic numbers)
-        self.eleccount = labels2electrons(self.labels)
-        self.natoms = len(self.labels)
+        self.coord = np.delete(self.coord, index, axis=0)
+        self.radii = np.delete(np.asarray(self.radii), index)
+        # formula, eleccount, and natoms are computed properties on Specie;
+        # they update automatically from self.labels and don't need to be set.
         logger.info("Group after removing atom: %s", self)
 
         if self.natoms > 0:
@@ -122,7 +134,7 @@ class Group(Specie):
             if self.centroid is not None:
                 self.get_centroid()
             if self.frac_coord is not None:
-                self.frac_coord.pop(index)
+                self.frac_coord = np.delete(self.frac_coord, index, axis=0)
             if self.adjmat is not None:
                 self.build_adjmatrix(metal_only=False)
             if self.madjmat is not None:
@@ -133,12 +145,12 @@ class Group(Specie):
         Calculates the centroid of the group and identifies the
         nearest metal atom within the parent molecule.
         """
-        mol = self.get_parent("molecule")
+        mol = cast("Molecule", self.get_parent("molecule"))
 
         # Safety check for parent molecule and metal availability
-        if mol is None or not getattr(mol, "metals", None):
+        if mol is None or not mol.metals:
             logger.warning(
-                f"Group {self.label} has no parent molecule or metals to reference."
+                f"Group {self.formula} has no parent molecule or metals to reference."
             )
             return
 
@@ -153,7 +165,7 @@ class Group(Specie):
         )
 
         logger.debug(
-            f"Closest metal for group {self.label} identified as {self.closest_metal.label}"
+            f"Closest metal for group {self.formula} identified as {self.closest_metal.label}"
         )
 
     def get_hapticity(self, use_bond_info: bool | None = None):
@@ -174,6 +186,6 @@ class Group(Specie):
 
     def get_denticity(self):
         self.denticity = 0
-        for a in self.atoms:
-            self.denticity += a.mconnec
+        for a in self.atoms or []:
+            self.denticity += a.mconnec or 0
         return self.denticity
