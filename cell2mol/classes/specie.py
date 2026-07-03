@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TYPE_CHECKING, cast
 
 import numpy as np
 from pydantic import Field
@@ -23,10 +23,15 @@ from cell2mol.element_utils import (
 )
 from cell2mol.connectivity import build_adjacency, get_adjacency_types
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import NDArray, RDKitObject, RefList, SubType
+from cell2mol.my_types import NDArray, RDKitObject, SubType
 from cell2mol.operations import compute_centroid, extract_from_list
 from cell2mol.utils import BaseModel, config
 import logging
+
+if TYPE_CHECKING:
+    from cell2mol.classes.ligand import Ligand
+    from cell2mol.classes.molecule import Molecule
+    from cell2mol.classes.cell import Cell
 
 elemdatabase = ElementData()
 logger = logging.getLogger(__name__)
@@ -42,7 +47,7 @@ class Specie(BaseModel):
     radii: NDArray | None = None
 
     # Optional arguments - parents is a cross-reference to parent Species
-    parents: RefList[Specie] = Field(default_factory=list)
+    parents: list["Specie | Cell"] = Field(default_factory=list)
     parents_indices: list[list[int]] = Field(default_factory=list)
     cov_factor: float = Field(default=config.COV_FACTOR)
     metal_factor: float = Field(default=config.METAL_FACTOR)
@@ -135,16 +140,25 @@ class Specie(BaseModel):
                 assert len(self.labels) == len(self.radii)
             # If radii is a scalar and we have multiple atoms, expand it or recompute
             elif len(self.labels) > 1:
-                self.radii = get_radii(self.labels)
+                self.radii = np.asarray(get_radii(self.labels))
         else:
-            self.radii = get_radii(self.labels)
+            self.radii = np.asarray(get_radii(self.labels))
 
     @classmethod
     @deprecated("Use specie() with the keyword arguments instead.")
     def from_positional(
-        cls, labels: list, coord: list, frac_coord: list = None, radii: list = None
-    ) -> None:
-        return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
+        cls,
+        labels: list[str],
+        coord: np.ndarray | list[list[float]],
+        frac_coord: np.ndarray | list[list[float]] | None = None,
+        radii: np.ndarray | list[float] | None = None,
+    ) -> "Specie":
+        return cls(
+            labels=labels,
+            coord=np.asarray(coord),
+            frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
+            radii=np.asarray(radii) if radii is not None else None,
+        )
 
     def set_subtype(self, subtype: SubType):
         self.subtype = subtype
@@ -152,7 +166,9 @@ class Specie(BaseModel):
     def set_origin(self, origin: str):
         self.origin = origin
 
-    def add_parent(self, parent: object, indices: list, overwrite: bool = True):
+    def add_parent(
+        self, parent: "Specie | Cell", indices: list[int], overwrite: bool = True
+    ):
         ## associates a parent specie to self. The atom indices of self in parent are given in "indices"
         ## if parent of the same subtype already in self.parent then it is overwritten
         ## this is to avoid having a substructure (e.g. a ligand) in more than one superstructure (e.g. a molecule)
@@ -170,20 +186,22 @@ class Specie(BaseModel):
             self.parents_indices.append(indices)
 
         # 2nd-evaluates parents of parent
-        if hasattr(parent, "parents"):
+        if isinstance(parent, Specie):
             for jdx, p2 in enumerate(parent.parents):
                 append = True
                 for idx, p in enumerate(self.parents):
                     if p.subtype == p2.subtype:
                         if overwrite:
                             self.parents[idx] = p2
-                            self.parents_indices[idx] = parent.get_parent_indices(
-                                p2.subtype
+                            self.parents_indices[idx] = (
+                                parent.get_parent_indices(p2.subtype or "") or []
                             )
                         append = False
                 if append:
                     self.parents.append(p2)
-                    self.parents_indices.append(parent.get_parent_indices(p2.subtype))
+                    self.parents_indices.append(
+                        parent.get_parent_indices(p2.subtype or "") or []
+                    )
 
     def check_parent(self, subtype: str):
         ## checks if parent of a given subtype exists
@@ -207,21 +225,21 @@ class Specie(BaseModel):
         return None
 
     def get_centroid(self):
-        self.centroid = compute_centroid(np.array(self.coord))
+        self.centroid = np.asarray(compute_centroid(np.array(self.coord)))
         # If fractional coordinates exists, then also computes their centroid
         if self.frac_coord is not None:
-            self.frac_centroid = compute_centroid(np.array(self.frac_coord))
+            self.frac_centroid = np.asarray(compute_centroid(np.array(self.frac_coord)))
         return self.centroid
 
-    def set_fractional_coord(self, frac_coord: list) -> None:
+    def set_fractional_coord(self, frac_coord: np.ndarray | list[list[float]]) -> None:
         assert len(frac_coord) == len(self.coord)
-        self.frac_coord = frac_coord
+        self.frac_coord = np.asarray(frac_coord)
 
     def get_atomic_numbers(self):
         if self.atoms is None:
             self.set_atoms()
         self.atnums = []
-        for at in self.atoms:
+        for at in self.atoms or []:
             self.atnums.append(at.atnum)
         return self.atnums
 
@@ -281,7 +299,8 @@ class Specie(BaseModel):
             use_bond_info = config.USE_BOND_INFO
         if self.adjmat is None:
             self.build_adjmatrix(use_bond_info=use_bond_info, metal_only=False)
-        self.adj_types = get_adjacency_types(self.labels, self.adjmat)
+        if self.adjmat is not None:
+            self.adj_types = get_adjacency_types(self.labels, self.adjmat)
         return self.adj_types
 
     def set_adjacency_parameters(self, cov_factor: float, metal_factor: float) -> None:
@@ -294,9 +313,9 @@ class Specie(BaseModel):
 
     def set_atoms(
         self,
-        atomlist: list | None = None,
+        atomlist: list[Atom] | None = None,
         create_adjacencies: bool = False,
-        atom_site_labels: list | None = None,
+        atom_site_labels: list[str] | None = None,
         use_bond_info: bool | None = None,
     ):
         if use_bond_info is None:
@@ -313,6 +332,7 @@ class Specie(BaseModel):
                 self.labels
             )
 
+            assert self.radii is not None
             for idx, label in enumerate(self.labels):
                 ## For each label in labels, create an atom class object.
                 ismetal = (
@@ -365,6 +385,8 @@ class Specie(BaseModel):
                 self.build_adjmatrix(use_bond_info=use_bond_info, metal_only=True)
 
             if self.adjmat is not None and self.madjmat is not None:
+                assert self.adjnum is not None
+                assert self.madjnum is not None
                 for idx, at in enumerate(self.atoms):
                     at.set_adjacencies(
                         self.adjmat[idx],
@@ -378,23 +400,28 @@ class Specie(BaseModel):
         if not exists:
             logger.debug(f"{parent_subtype=} does not exist")
             return None
-        parent = self.get_parent(parent_subtype)
+        parent = cast("Specie", self.get_parent(parent_subtype))
         indices = self.get_parent_indices(parent_subtype)
+        assert parent is not None
+        assert indices is not None
         if parent.madjnum is None:
             logger.debug(f"{parent_subtype=} does not have madjnum")
             return None
+        assert parent.madjmat is not None
+        assert parent.adjmat is not None
+        assert parent.adjnum is not None
 
         self.madjmat = np.stack(
-            extract_from_list(indices, parent.madjmat, dimension=2), axis=0
+            extract_from_list(indices, parent.madjmat.tolist(), dimension=2), axis=0
         )
         self.madjnum = np.stack(
-            extract_from_list(indices, parent.madjnum, dimension=1), axis=0
+            extract_from_list(indices, parent.madjnum.tolist(), dimension=1), axis=0
         )
         self.adjmat = np.stack(
-            extract_from_list(indices, parent.adjmat, dimension=2), axis=0
+            extract_from_list(indices, parent.adjmat.tolist(), dimension=2), axis=0
         )
         self.adjnum = np.stack(
-            extract_from_list(indices, parent.adjnum, dimension=1), axis=0
+            extract_from_list(indices, parent.adjnum.tolist(), dimension=1), axis=0
         )
 
     def get_protonation_states(self):
@@ -411,12 +438,13 @@ class Specie(BaseModel):
             return self.protonation_states
 
         if self.subtype == "ligand":
-            if self.is_haptic is None:
-                self.get_hapticity()
-            if self.denticity is None:
-                self.get_denticity()
-            if self.is_nitrosyl is None:
-                self.evaluate_as_nitrosyl()
+            ligand_self = cast("Ligand", self)
+            if ligand_self.is_haptic is None:
+                ligand_self.get_hapticity()
+            if ligand_self.denticity is None:
+                ligand_self.get_denticity()
+            if ligand_self.is_nitrosyl is None:
+                ligand_self.evaluate_as_nitrosyl()
 
         self.protonation_states = enumerate_protonation_states(self)
         return self.protonation_states
@@ -452,7 +480,7 @@ class Specie(BaseModel):
 
     def set_charges(
         self,
-        totcharge: int = None,
+        totcharge: int | None = None,
         atomic_charges: list[int] | NDArray | None = None,
         smiles: str | None = None,
         rdkit_obj: object = None,
@@ -461,15 +489,15 @@ class Specie(BaseModel):
         if totcharge is not None:
             self.totcharge = totcharge
         elif totcharge is None and atomic_charges is not None:
-            self.totcharge = np.sum(atomic_charges)
+            self.totcharge = int(np.sum(atomic_charges))
         elif totcharge is None and atomic_charges is None:
-            self.totcharge = "Unknown"
+            self.totcharge = None
         ## Sets atomic charges
         if atomic_charges is not None:
             self.atomic_charges = atomic_charges
             if self.atoms is None:
                 self.set_atoms()
-            for idx, a in enumerate(self.atoms):
+            for idx, a in enumerate(self.atoms or []):
                 a.set_charge(self.atomic_charges[idx])
         if smiles is not None:
             self.smiles = smiles
@@ -483,7 +511,7 @@ class Specie(BaseModel):
         self.rdkit_obj = None
         self.possible_cs = None
 
-        for a in self.atoms:
+        for a in self.atoms or []:
             a.reset_charge()
 
     def print_xyz(self):
@@ -522,8 +550,8 @@ class Specie(BaseModel):
             to_print += " Has Adjacency Matrix         = NO \n"
         if self.totcharge is not None:
             to_print += f" Total Charge                 = {self.totcharge}\n"
-        if self.subtype == "molecule" and self.spin is not None:
-            to_print += f" Spin                         = {self.spin}\n"
+        if self.subtype == "molecule" and cast("Molecule", self).spin is not None:
+            to_print += f" Spin                         = {cast('Molecule', self).spin}\n"
         if self.smiles is not None:
             to_print += f" Smiles                       = {self.smiles}\n"
         if self.origin is not None:
