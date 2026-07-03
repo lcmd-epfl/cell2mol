@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import numpy as np
-from typing import Any
+from typing import Any, TYPE_CHECKING, cast
 from cell2mol.my_types import Type
 from cell2mol.connectivity import get_adjmatrix, get_adjmatrix_from_cif_bonds
 from cell2mol.element_utils import labels2formula, get_radii
@@ -10,6 +12,10 @@ from typing_extensions import Literal, deprecated
 from cell2mol.elementdata import ElementData
 import logging
 from cell2mol.utils import config
+
+if TYPE_CHECKING:
+    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.reference import Reference
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
@@ -36,7 +42,7 @@ class Protonation(BaseModel):
     # "combinatorial": explore combinations
     mode: str | Literal["none", "heuristic", "combinatorial"] | None = None
 
-    parent: object | None = Field(default=None)
+    parent: Specie | None = Field(default=None)
 
     # Computed attributes with proper defaults
     natoms: int | None = None
@@ -82,25 +88,31 @@ class Protonation(BaseModel):
         self.natoms = self.computed_natoms
         self.formula = self.computed_formula
         self.atnums = self.computed_atnums
-        self.radii = self.computed_radii
+        self.radii = np.asarray(self.computed_radii)
 
         # Handle conditional attribute setting based on parent
         # Note: parent may be a string UUID during deserialization, skip in that case
         if self.parent is not None and not isinstance(self.parent, str):
-            refcell = self.parent.get_parent("reference")
+            refcell = cast("Reference", self.parent.get_parent("reference"))
             bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
 
             if refcell is not None:
-                self.atom_site_labels_indices = [
-                    atom.get_parent_index("reference") for atom in self.parent.atoms
+                raw_indices = [
+                    atom.get_parent_index("reference")
+                    for atom in self.parent.atoms or []
                 ]
+                self.atom_site_labels_indices = [
+                    idx for idx in raw_indices if idx is not None
+                ]
+                refcell_labels = refcell.atom_site_labels or []
                 self.atom_site_labels = [
-                    refcell.atom_site_labels[idx]
-                    for idx in self.atom_site_labels_indices
+                    refcell_labels[idx] for idx in self.atom_site_labels_indices
                 ]
             use_bond_info = config.USE_BOND_INFO
             if use_bond_info:
                 self.status = True
+                assert self.atom_site_labels is not None
+                assert bond_data is not None
                 adjmat = get_adjmatrix_from_cif_bonds(
                     self.labels,
                     self.coord,
@@ -207,9 +219,9 @@ class Protonation(BaseModel):
         assert len(map) == len(self.site_proton_counts)
         if len(map) > 0:
             self.labels = list(np.array(self.labels)[mapext])
-            self.coord = list(np.array(self.coord)[mapext])
+            self.coord = np.array(self.coord)[mapext]
             self.atnums = list(np.array(self.atnums)[mapext])
-            self.radii = list(np.array(self.radii)[mapext])
+            self.radii = np.array(self.radii)[mapext]
             # No more hasattr check needed - atom_site_labels is always defined (can be None)
             if self.atom_site_labels is not None:
                 self.atom_site_labels = list(np.array(self.atom_site_labels)[map])
@@ -219,11 +231,14 @@ class Protonation(BaseModel):
             )
 
             self.typ = "Reordered"
-            refcell = self.parent.get_parent("reference")
+            assert self.parent is not None
+            refcell = cast("Reference", self.parent.get_parent("reference"))
             bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
             use_bond_info = config.USE_BOND_INFO
             if use_bond_info:
                 self.status = True
+                assert self.atom_site_labels is not None
+                assert bond_data is not None
                 adjmat = get_adjmatrix_from_cif_bonds(
                     self.labels,
                     self.coord,
@@ -287,8 +302,8 @@ class Protonation(BaseModel):
         n_protons_added: int,
         site_proton_counts: list[int],
         ligand_donor_electrons: list[int],
-        mode: str = None,
-        parent: object = None,
+        mode: str | None = None,
+        parent: Specie | None = None,
     ) -> "Protonation":
         return cls(
             labels=labels,
