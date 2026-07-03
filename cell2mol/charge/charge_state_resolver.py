@@ -398,9 +398,9 @@ def generate_charge_state(
     extra_allowed_valences = {
         5: [3, 4],  # B, e.g. BF4-
         7: [3, 4],  # N
-        15: [3, 5, 6],  # P, e.g. PF6-
-        33: [3, 5, 6],  # As, e.g. AsF6-
-        51: [3, 5, 6],  # Sb, e.g. SbF6-
+        # 15: [3, 5, 6],  # P, e.g. PF6-
+        # 33: [3, 5, 6],  # As, e.g. AsF6-
+        # 51: [3, 5, 6],  # Sb, e.g. SbF6-
     }
 
     problems = check_possible_valence_problems_from_ac(
