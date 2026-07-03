@@ -1,7 +1,9 @@
 from __future__ import annotations
 import pickle
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING, cast
+
+import numpy as np
 from typing_extensions import deprecated
 from pydantic import Field
 from cell2mol.classes.metal import Metal
@@ -12,6 +14,10 @@ from cell2mol.elementdata import ElementData
 from cell2mol.utils import BaseModel, config
 from cell2mol.my_types import NDArray, Type, SubType, Format
 from pathlib import Path
+
+if TYPE_CHECKING:
+    from cell2mol.classes.reference import Reference
+    from cell2mol.classes.unitcell import UnitCell
 
 try:
     from typing import Self  # py3.11+
@@ -104,12 +110,14 @@ class Cell(BaseModel):
         """
         # Determine molecule list and map charges
         if self.subtype == "reference":
-            molecule_list = self.refmoleclist
-            self.map_charges_to_reference()
+            reference_self = cast("Reference", self)
+            molecule_list = reference_self.refmoleclist
+            reference_self.map_charges_to_reference()
             log_prefix = "Reference"
         elif self.subtype == "unitcell":
-            molecule_list = self.moleclist
-            self.map_charges_to_unitcell(refmoleclist=refmoleclist)
+            unitcell_self = cast("UnitCell", self)
+            molecule_list = unitcell_self.moleclist
+            unitcell_self.map_charges_to_unitcell(refmoleclist=refmoleclist or [])
             log_prefix = "UnitCell"
         else:
             raise ValueError(f"Unknown subtype {self.subtype} of Cell")
@@ -193,9 +201,9 @@ class Cell(BaseModel):
         overall_error = False
 
         if self.subtype == "reference":
-            moleclist = self.refmoleclist
+            moleclist = cast("Reference", self).refmoleclist
         elif self.subtype == "unitcell":
-            moleclist = self.moleclist
+            moleclist = cast("UnitCell", self).moleclist
         else:
             raise ValueError(f"Unknown subtype {self.subtype} of Cell")
 
@@ -209,7 +217,7 @@ class Cell(BaseModel):
 
             try:
                 if mol.iscomplex:
-                    for metal in mol.metals:
+                    for metal in mol.metals or []:
                         if metal.coord_nr is None:
                             metal.get_coordination_geometry()
                             metal.get_coord_sphere_formula()
@@ -228,9 +236,9 @@ class Cell(BaseModel):
     def predict_metal_ox(self):
         """Predict oxidation states for metals in all molecules in the cell."""
         if self.subtype == "reference":
-            moleclist = self.refmoleclist
+            moleclist = cast("Reference", self).refmoleclist
         elif self.subtype == "unitcell":
-            moleclist = self.moleclist
+            moleclist = cast("UnitCell", self).moleclist
         else:
             raise ValueError(f"Unknown subtype {self.subtype} of Cell")
 
@@ -239,7 +247,7 @@ class Cell(BaseModel):
 
         for mol in moleclist:
             if mol.iscomplex:
-                for metal in mol.metals:
+                for metal in mol.metals or []:
                     if metal.coord_nr is None:
                         metal.get_coordination_geometry()
                         metal.get_coord_sphere_formula()
@@ -247,10 +255,10 @@ class Cell(BaseModel):
 
     def assess_errors(self, mode):
         """Assess error conditions for a specific processing mode."""
-        if getattr(self, "error_cases", None) is None:
+        if self.error_cases is None:
             self.error_cases = {}
 
-        subtype_map = ERROR_MAPS.get(self.subtype)
+        subtype_map = ERROR_MAPS.get(self.subtype or "")
         if not subtype_map:
             raise ValueError(f"Unknown Cell subtype: {self.subtype}")
 
@@ -283,7 +291,7 @@ class Cell(BaseModel):
         If mode is provided, check only that processing mode.
         If mode is None, check across all recorded modes.
         """
-        if getattr(self, "error_cases", None) is None:
+        if self.error_cases is None:
             return False
 
         if mode is not None:
@@ -380,16 +388,16 @@ class Cell(BaseModel):
         cls,
         name: str,
         labels: list[str],
-        pos: list[list[float]],
-        frac_coord: list[list[float]],
-        cell_vector: object,
-        cell_param: object,
+        pos: np.ndarray | list[list[float]],
+        frac_coord: np.ndarray | list[list[float]],
+        cell_vector: np.ndarray | list[list[float]],
+        cell_param: np.ndarray | list[float],
     ) -> "Cell":
         return cls(
             name=name,
             labels=labels,
-            pos=pos,  # Using pos which gets aliased to coord
-            frac_coord=frac_coord,
-            cell_vector=cell_vector,
-            cell_param=cell_param,
+            pos=np.asarray(pos),  # Using pos which gets aliased to coord
+            frac_coord=np.asarray(frac_coord),
+            cell_vector=np.asarray(cell_vector),
+            cell_param=np.asarray(cell_param),
         )
