@@ -65,7 +65,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
         return None
 
     if specie.subtype == "ligand":
-        parent = specie.get_parent("molecule")
+        parent = cast("Specie", specie.get_parent("molecule"))
         if parent is not None and parent.has_ia_iia and not parent.iscomplex:
             return get_empty_protonation_state(specie)
 

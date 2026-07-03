@@ -100,7 +100,10 @@ def balance_molecule_charge(molecule, input_charge: int = 0, second_try: bool = 
     if molecule.selected_cs is None:
         molecule.get_selected_cs()
 
-    molecule.error_get_poscharges = None in molecule.selected_cs
+    # Flag error if selected_cs is missing or contains None entries
+    molecule.error_get_poscharges = (molecule.selected_cs is None) or (
+        None in molecule.selected_cs
+    )
     if molecule.error_get_poscharges:
         logger.error("No charge states available for some species.")
         return molecule
@@ -151,11 +154,12 @@ def balance_molecule_charge(molecule, input_charge: int = 0, second_try: bool = 
         return molecule
 
     final_charges = unique_species_charges[0]
-    for specie, charge in zip(molecule.unique_species, final_charges):
-        assign_charge_to_specie(specie, charge)
-        for ref_specie in molecule.species_list:
-            if specie.unique_index == ref_specie.unique_index:
-                assign_charge_to_specie(ref_specie, charge)
+    if molecule.unique_species is not None:
+        for specie, charge in zip(molecule.unique_species, final_charges):
+            assign_charge_to_specie(specie, charge)
+            for ref_specie in molecule.species_list:
+                if specie.unique_index == ref_specie.unique_index:
+                    assign_charge_to_specie(ref_specie, charge)
     return molecule
 
 

@@ -1,14 +1,23 @@
+from __future__ import annotations
+
 import copy
 import logging
+from typing import TYPE_CHECKING, cast
+
 import numpy as np
 from rdkit import Chem
 from cell2mol.classes.protonation import Protonation
+from cell2mol.classes.charge_state import ChargeState
 from cell2mol.charge.utils import MANUAL_CHARGE_ASSIGN_SPECIES
 from cell2mol.charge.charge_state_resolver import (
     generate_charge_state,
     generate_manual_charge_state,
 )
 from cell2mol.charge.smiles_handler import generate_tmc_rdkit_obj_smiles
+
+if TYPE_CHECKING:
+    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.metal import Metal
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +44,7 @@ def prepare_mol(mol):
     )
 
 
-def assign_charge_to_specie(specie: object, final_charge: int):
+def assign_charge_to_specie(specie: "Specie | Metal", final_charge: int):
     """
     Assigns the final charge to a specie object.
 
@@ -43,42 +52,46 @@ def assign_charge_to_specie(specie: object, final_charge: int):
         specie: The specie object to update.
         final_charge: The integer charge to assign.
     """
+    specie_unique_index = getattr(specie, "unique_index", None)
     logger.debug(
         "Target: %s (unique index: %s) | Final Charge: %d",
         specie.formula,
-        specie.unique_index,
+        specie_unique_index,
         final_charge,
     )
 
     if specie.subtype == "metal":
-        specie.set_charge(final_charge)
+        metal = cast("Metal", specie)
+        metal.set_charge(final_charge)
 
         logger.debug(
             "Updated Metal: %s | Formula: %s | Charge: %d",
-            specie.unique_index,
-            specie.formula,
-            specie.charge,
+            specie_unique_index,
+            metal.formula,
+            metal.charge,
         )
-    elif specie.is_non_complex_molecule or specie.subtype == "ligand":
+    elif getattr(specie, "is_non_complex_molecule", False) or specie.subtype == "ligand":
+        target = cast("Specie", specie)
         # Extract list of available charges
-        available_charges = [cs.corr_total_charge for cs in specie.possible_cs]
+        target_possible_cs = cast("list[ChargeState]", target.possible_cs or [])
+        available_charges = [cs.corr_total_charge for cs in target_possible_cs]
 
         try:
             idx = available_charges.index(final_charge)
-            cs = specie.possible_cs[idx]
+            cs = target_possible_cs[idx]
 
             # Update the species state
-            specie.charge_state = cs
-            specie.set_charges(
+            target.charge_state = cs
+            target.set_charges(
                 cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj
             )
 
             logger.debug(
                 "Updated State: %s | Formula: %s | Total Charge: %d | SMILES: %s",
-                specie.unique_index,
-                specie.formula,
-                specie.totcharge,
-                specie.smiles,
+                specie_unique_index,
+                target.formula,
+                target.totcharge,
+                target.smiles,
             )
 
         except ValueError:
@@ -124,7 +137,7 @@ def set_charge_state(reference, target, mode: int):
 
 
 # --- Mode 1: Reference Cell (Selection) ---
-def _apply_precalculated_state(target, final_charge):
+def _apply_precalculated_state(target: "Specie", final_charge):
     """Mode 1: Selects an existing charge state from target.possible_cs."""
 
     # 1. Determine the Charge State (cs) object
@@ -137,11 +150,12 @@ def _apply_precalculated_state(target, final_charge):
             target.get_possible_cs()
 
         # Extract charges to find the index matching final_charge
-        charge_list = [c.corr_total_charge for c in target.possible_cs]
+        target_possible_cs = cast("list[ChargeState]", target.possible_cs or [])
+        charge_list = [c.corr_total_charge for c in target_possible_cs]
 
         try:
             idx = charge_list.index(final_charge)
-            cs = target.possible_cs[idx]
+            cs = target_possible_cs[idx]
         except ValueError:
             logger.error(
                 "Charge Mismatch: Target %s needs charge %d, but options are %s",
@@ -189,6 +203,14 @@ def _transfer_state_to_unit_cell(reference, target, final_charge):
         smiles = reference.smiles
     else:
         smiles = Chem.MolToSmiles(rdkit_obj)
+
+    if smiles != reference.smiles:
+        logger.warning(
+            "Mode 2 SMILES Mismatch: %s Reordered SMILES (%s) != Reference SMILES (%s)",
+            target.formula,
+            smiles,
+            reference.smiles,
+        )
 
     # Recalculate properties from the reordered object
     atom_charges = []

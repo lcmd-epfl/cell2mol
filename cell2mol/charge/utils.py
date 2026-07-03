@@ -1,3 +1,5 @@
+from cell2mol.my_types import RDKitObject
+
 # Fullerene species that require special handling
 FULLERENES = {"C60", "C72", "C80"}
 # Ligand or molecules requiring manual charge assignment
@@ -109,7 +111,7 @@ METAL_OXIDATION_STATES = {
 }
 
 
-def aromatic_info(mol: object, added_indices=None):
+def aromatic_info(mol: RDKitObject, added_indices=None):
     if added_indices is None:
         added_indices = []
 
