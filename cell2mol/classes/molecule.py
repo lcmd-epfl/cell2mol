@@ -1,10 +1,14 @@
 from __future__ import annotations
 import pickle
+from typing import cast
+
+import numpy as np
 from typing_extensions import deprecated
 from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.ligand import Ligand
 from cell2mol.classes.specie import Specie
+from cell2mol.classes.charge_state import ChargeState
 from cell2mol.connectivity import split_species, merge_multiple_groups
 from cell2mol.element_utils import (
     labels2formula,
@@ -27,7 +31,6 @@ from cell2mol.operations import extract_from_list
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import Format, Spin, SubType
 from cell2mol.utils import config
-import numpy as np
 import logging
 from pathlib import Path
 
@@ -57,14 +60,13 @@ class Molecule(Specie):
     totcharge_cif: int | None = None
 
     ligand_smiles: str | list[str] | None = None
-    ligand_smiles_with_H: list[str] | None = None
-    subtype: SubType = Field(default="molecule")
+    subtype: SubType | None = Field(default="molecule")
 
     # Needed in interpret_molecule in process_xyz.py
     input_charge: int | None = None
-    unique_species: list[Specie] | None = None
+    unique_species: list[Specie | Metal] | None = None
     unique_indices: list[int] | None = None
-    species_list: list[Specie] | None = None
+    species_list: list[Specie | Metal] | None = None
     selected_cs: list[object] | None = None
     error_get_poscharges: bool | None = None
     error_multiple_distrib: bool | None = None
@@ -77,11 +79,20 @@ class Molecule(Specie):
     @classmethod
     @deprecated("Use molecule() with the keyword arguments instead.")
     def from_positional(
-        cls, labels: list, coord: list, frac_coord: list = None, radii: list = None
+        cls,
+        labels: list[str],
+        coord: np.ndarray | list[list[float]],
+        frac_coord: np.ndarray | list[list[float]] | None = None,
+        radii: np.ndarray | list[float] | None = None,
     ) -> "Molecule":
-        return cls(labels=labels, coord=coord, frac_coord=frac_coord, radii=radii)
+        return cls(
+            labels=labels,
+            coord=np.asarray(coord),
+            frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
+            radii=np.asarray(radii) if radii is not None else None,
+        )
 
-    def __repr__(self):
+    def __repr__(self, indirect: bool = False):
         to_print = ""
         to_print += "------------- Cell2mol MOLECULE Object --------------\n"
         to_print += Specie.__repr__(self, indirect=True)
@@ -106,7 +117,7 @@ class Molecule(Specie):
             if self.iscomplex:
                 self.spin = assign_spin_complexes(self)
             else:
-                if (self.eleccount - self.totcharge) % 2 == 0:
+                if (self.eleccount - (self.totcharge or 0)) % 2 == 0:
                     self.spin = 1
                 else:
                     self.spin = 2
@@ -180,15 +191,16 @@ class Molecule(Specie):
         # ============================================================
         # Identify metal indices (GLOBAL index space: self.indices)
         # ============================================================
+        metal_idx: set[int]
         if post_tms:
             logger.info(
                 "post_tms enabled: ONLY post-transition metals exist as metals."
             )
-            metal_idx: set[int] = {
+            metal_idx = {
                 self.indices[i] for i in get_post_transition_metal_idxs(self.labels)
             }
         else:
-            metal_idx: set[int] = {self.indices[i] for i in get_metal_idxs(self.labels)}
+            metal_idx = {self.indices[i] for i in get_metal_idxs(self.labels)}
             metal_idx.update(
                 self.indices[i]
                 for i in get_alkali_alkaline_earth_metal_idxs(self.labels)
@@ -211,15 +223,17 @@ class Molecule(Specie):
 
         rest_idx = [i for i in self.indices if i not in metal_idx]
 
+        assert self.radii is not None
+        assert self.atoms is not None
         rest_labels = extract_from_list(rest_idx, self.labels, dimension=1)
-        rest_coord = extract_from_list(rest_idx, self.coord, dimension=1)
+        rest_coord = extract_from_list(rest_idx, self.coord.tolist(), dimension=1)
         rest_indices = extract_from_list(rest_idx, self.indices, dimension=1)
-        rest_radii = extract_from_list(rest_idx, self.radii, dimension=1)
+        rest_radii = extract_from_list(rest_idx, self.radii.tolist(), dimension=1)
         rest_atoms = extract_from_list(rest_idx, self.atoms, dimension=1)
         # logger.debug("Remaining atom indices: %s", rest_idx)
 
         rest_frac = (
-            extract_from_list(rest_idx, self.frac_coord, dimension=1)
+            extract_from_list(rest_idx, self.frac_coord.tolist(), dimension=1)
             if self.frac_coord is not None
             else None
         )
@@ -236,22 +250,25 @@ class Molecule(Specie):
                 "No ligands found in complex %s. Assigning metals only.",
                 self.formula,
             )
-            self.metals.extend(self.atoms[i] for i in metal_idx)
+            self.metals.extend(cast(Metal, self.atoms[i]) for i in metal_idx)
             return self.ligands, self.metals
 
         # ============================================================
         # Split ligands
         # ============================================================
 
-        blocklist = split_species(
-            labels=rest_labels,
-            positions=rest_coord,
-            radii=rest_radii,
-            indices=None,  # rest_indices
-            atom_site_labels=rest_atom_site_labels,
-            bond_data=bond_data,
-            use_bond_info=use_bond_info,
-            cov_factor=cov_factor,
+        blocklist = cast(
+            "list[list[int]]",
+            split_species(
+                labels=rest_labels,
+                positions=np.asarray(rest_coord),
+                radii=rest_radii,
+                indices=None,  # rest_indices
+                atom_site_labels=rest_atom_site_labels,
+                bond_data=bond_data,
+                use_bond_info=use_bond_info,
+                cov_factor=cov_factor,
+            ),
         )
 
         logger.info("Received %d ligand blocks", len(blocklist))
@@ -289,16 +306,18 @@ class Molecule(Specie):
             ligand.set_origin("split_complex")
             ligand.add_parent(self, indices=lig_indices)
 
-            if self.check_parent("unitcell"):
+            unitcell_parent = self.get_parent("unitcell")
+            if unitcell_parent is not None:
                 ligand.add_parent(
-                    self.get_parent("unitcell"),
-                    indices=[a.get_parent_index("unitcell") for a in lig_atoms],
+                    unitcell_parent,
+                    indices=[a.get_parent_index("unitcell") or 0 for a in lig_atoms],
                 )
 
-            if self.check_parent("reference"):
+            reference_parent = self.get_parent("reference")
+            if reference_parent is not None:
                 ligand.add_parent(
-                    self.get_parent("reference"),
-                    indices=[a.get_parent_index("reference") for a in lig_atoms],
+                    reference_parent,
+                    indices=[a.get_parent_index("reference") or 0 for a in lig_atoms],
                 )
 
             ligand.set_adjacency_parameters(cov_factor, metal_factor)
@@ -316,7 +335,7 @@ class Molecule(Specie):
         # Metals
         # ============================================================
 
-        self.metals.extend(self.atoms[i] for i in metal_idx)
+        self.metals.extend(cast(Metal, self.atoms[i]) for i in metal_idx)
 
         return self.ligands, self.metals
 
@@ -336,24 +355,24 @@ class Molecule(Specie):
                 logger.debug("Alkali/alkaline earth metal ion found")
         elif self.has_post_transition_metal:
             logger.info("Has post transition metals: %s", self.formula)
-            logger.debug("metals=%s", [met.label for met in self.metals])
-            logger.debug("ligands=%s", [lig.formula for lig in self.ligands])
+            logger.debug("metals=%s", [met.label for met in self.metals or []])
+            logger.debug("ligands=%s", [lig.formula for lig in self.ligands or []])
         else:
             logger.info("No metals found in molecule: %s", self.formula)
             return
 
-        for met in self.metals:
+        for met in self.metals or []:
             logger.debug(
                 "Analyzing coordination for metal %s%s",
                 met.label,
                 (f" ({met.atom_site_label})" if met.atom_site_label else ""),
             )
             met.get_connected_metals()
-            logger.debug("  Connected Metals: %s", [m.label for m in met.metals])
+            logger.debug("  Connected Metals: %s", [m.label for m in met.metals or []])
             met.get_connected_nonmetal_atoms()
             logger.debug(
                 "  Connected Non-Metals: %s",
-                [m.label for m in met.connected_nonmetal_atoms],
+                [m.label for m in met.connected_nonmetal_atoms or []],
             )
             met.get_connected_groups()
             met.get_coordination_geometry()
@@ -362,17 +381,17 @@ class Molecule(Specie):
         self.map_metal_groups_to_ligands()
         self.merge_connected_groups()
 
-        for lig in self.ligands:
+        for lig in self.ligands or []:
             lig.get_hapticity()
             lig.get_denticity()
             logger.debug(
-                f"Ligand: {lig.formula}, Groups: {[group.formula for group in lig.groups]}"
+                f"Ligand: {lig.formula}, Groups: {[group.formula for group in lig.groups or []]}"
             )
-            for group in lig.groups:
+            for group in lig.groups or []:
                 logger.debug(
-                    f"  Group: {group.formula}, Haptic: {group.haptic_type}, Connected Metal: {[met.atom_site_label for met in group.metals]}"
+                    f"  Group: {group.formula}, Haptic: {group.haptic_type}, Connected Metal: {[met.atom_site_label for met in group.metals or []]}"
                 )
-                for atom in group.atoms:
+                for atom in group.atoms or []:
                     logger.debug(
                         f"    Atom: {atom.atom_site_label}, connec: {atom.connec} mconnec: {atom.mconnec}"
                     )
@@ -383,26 +402,30 @@ class Molecule(Specie):
         Handles bridging coordination by comparing ligand atom indices.
         """
         # 1. Reset ligand coordination storage
-        for lig in self.ligands:
+        for lig in self.ligands or []:
             lig.groups = []
 
         # 2. Iterate through each metal and its identified groups
-        for met in self.metals:
+        for met in self.metals or []:
             groups = getattr(met, "groups", [])
 
             for group in groups:
-                parent_ligand = group.get_parent("ligand")
+                parent_ligand = cast("Ligand | None", group.get_parent("ligand"))
                 # Get the local indices of these atoms within the ligand
-                current_indices = set(group.get_parent_indices("ligand"))
+                current_indices = set(group.get_parent_indices("ligand") or [])
 
                 if parent_ligand:
                     # 3. Check if a group with the same ligand indices already exists
                     is_duplicate = False
-                    for added_group in parent_ligand.groups:
-                        added_indices = set(added_group.get_parent_indices("ligand"))
+                    for added_group in parent_ligand.groups or []:
+                        added_indices = set(
+                            added_group.get_parent_indices("ligand") or []
+                        )
 
                         if current_indices == added_indices:
                             # It's the same coordination site! Just link the new metal.
+                            if added_group.metals is None:
+                                added_group.metals = []
                             if met not in added_group.metals:
                                 added_group.metals.append(met)
 
@@ -417,6 +440,8 @@ class Molecule(Specie):
 
                     if not is_duplicate:
                         # 4. New unique coordination group
+                        if parent_ligand.groups is None:
+                            parent_ligand.groups = []
                         parent_ligand.groups.append(group)
                         group.parent_ligand = parent_ligand
 
@@ -440,17 +465,18 @@ class Molecule(Specie):
         This allows reconstruction of extended haptic domains (e.g., fused rings)
         while keeping heteroatom groups isolated.
         """
-        for lig in self.ligands:
+        for lig in self.ligands or []:
             if not lig.groups:
                 continue
 
             n = len(lig.groups)
             adj = {i: set() for i in range(n)}
 
+            assert self.adjmat is not None
             adjmat = self.adjmat  # Molecule adjacency matrix
-            mol_labels = self.labels  # Molecule atom labels
+            # mol_labels = self.labels  # Molecule atom labels
             group_atom_sets = [
-                set([atom.get_parent_index("molecule") for atom in g.atoms])
+                set([atom.get_parent_index("molecule") for atom in g.atoms or []])
                 for g in lig.groups
             ]
             # --- NEW: Identify which groups are purely Carbon ---
@@ -548,12 +574,12 @@ class Molecule(Specie):
         self.is_haptic = False
         self.haptic_type = []
         if self.iscomplex:
-            for lig in self.ligands:
+            for lig in self.ligands or []:
                 if lig.is_haptic is None:
                     lig.get_hapticity()
                 if lig.is_haptic:
                     self.is_haptic = True
-                for entry in lig.haptic_type:
+                for entry in lig.haptic_type or []:
                     self.haptic_type.append(entry)
 
         return self.haptic_type
@@ -657,6 +683,7 @@ class Molecule(Specie):
                     kdx,
                 )
 
+            assert kdx is not None
             self.unique_indices.append(kdx)
             self.unique_index = kdx
             self.species_list.append(self)
@@ -669,7 +696,7 @@ class Molecule(Specie):
                 elif self.has_post_transition_metal:
                     self.split_complex(post_tms=True)
             # Case 2: ligands
-            for jdx, lig in enumerate(self.ligands):
+            for jdx, lig in enumerate(self.ligands or []):
                 found = False
                 for ldx, typ in enumerate(typelist_ligs):
                     if lig.is_nitrosyl is None:
@@ -680,8 +707,8 @@ class Molecule(Specie):
                         lig.get_hapticity()
                     if typ[0].haptic_type is None:
                         typ[0].get_hapticity()
-                    lig_groups_labels = [g.labels for g in lig.groups]
-                    typ_groups_labels = [g.labels for g in typ[0].groups]
+                    lig_groups_labels = [g.labels for g in lig.groups or []]
+                    typ_groups_labels = [g.labels for g in typ[0].groups or []]
 
                     if lig.is_nitrosyl and typ[0].is_nitrosyl:
                         issame = lig.NO_type == typ[0].NO_type
@@ -716,13 +743,15 @@ class Molecule(Specie):
                         kdx,
                     )
 
+                assert kdx is not None
                 self.unique_indices.append(kdx)
                 lig.unique_index = kdx
                 self.species_list.append(lig)
 
             # Case 3: metals
-            for jdx, met in enumerate(self.metals):
+            for jdx, met in enumerate(self.metals or []):
                 found = False
+                kdx: int | None = None
                 for ldx, typ in enumerate(typelist_mets):
                     issame = compare_metals(met, typ[0])
                     if issame:
@@ -745,6 +774,7 @@ class Molecule(Specie):
                         kdx,
                     )
 
+                assert kdx is not None
                 self.unique_indices.append(kdx)
                 met.unique_index = kdx
                 self.species_list.append(met)
@@ -756,7 +786,7 @@ class Molecule(Specie):
             self.get_unique_species()
 
         self.selected_cs = []
-        for unique_specie in self.unique_species:
+        for unique_specie in self.unique_species or []:
             logger.info(
                 "Get possible charge states for unique specie %s", unique_specie.formula
             )
@@ -767,12 +797,15 @@ class Molecule(Specie):
                 self.selected_cs.append(None)
             elif unique_specie.subtype != "metal":
                 self.selected_cs.append(
-                    list([cs.corr_total_charge for cs in unique_specie.possible_cs])
+                    [
+                        cs.corr_total_charge
+                        for cs in cast("list[ChargeState]", unique_specie.possible_cs)
+                    ]
                 )
             else:
                 self.selected_cs.append(unique_specie.possible_cs)
 
-        for specie in self.species_list:
+        for specie in self.species_list or []:
             logger.info(
                 "Get possible charge states for species list %s", specie.formula
             )
@@ -783,7 +816,10 @@ class Molecule(Specie):
                 self.selected_cs.append(None)
             elif specie.subtype != "metal":
                 self.selected_cs.append(
-                    list([cs.corr_total_charge for cs in specie.possible_cs])
+                    [
+                        cs.corr_total_charge
+                        for cs in cast("list[ChargeState]", specie.possible_cs)
+                    ]
                 )
             else:
                 self.selected_cs.append(specie.possible_cs)
@@ -795,16 +831,19 @@ class Molecule(Specie):
 
     def assign_charges(self):
         logger.info("Assigning charges for molecule: %s", self.formula)
-        for specie in self.unique_species:
+        for specie in self.unique_species or []:
+            specie_unique_index = getattr(specie, "unique_index", None)
             if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
-                for jdx, lig in enumerate(self.ligands):
-                    if lig.unique_index == specie.unique_index:
+                for jdx, lig in enumerate(self.ligands or []):
+                    if lig.unique_index == specie_unique_index:
                         set_charge_state(specie, lig, mode=1)
-                for kdx, met in enumerate(self.metals):
-                    if met.unique_index == specie.unique_index:
-                        met.set_charge(specie.charge)
+                for kdx, met in enumerate(self.metals or []):
+                    if met.unique_index == specie_unique_index:
+                        specie_charge = getattr(specie, "charge", None)
+                        if specie_charge is not None:
+                            met.set_charge(specie_charge)
             else:
-                if self.unique_index == specie.unique_index:
+                if self.unique_index == specie_unique_index:
                     set_charge_state(specie, self, mode=1)
         temp = []
         self.create_bonds()
@@ -820,7 +859,7 @@ class Molecule(Specie):
         if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
             prepare_mol(self)
             logger.info("Complex %s %s", self.formula, self.totcharge)
-            for jdx, lig in enumerate(self.ligands):
+            for jdx, lig in enumerate(self.ligands or []):
                 logger.info(
                     "    Ligand %d %s %s %s",
                     jdx,
@@ -828,7 +867,7 @@ class Molecule(Specie):
                     lig.totcharge,
                     lig.smiles,
                 )
-            for kdx, met in enumerate(self.metals):
+            for kdx, met in enumerate(self.metals or []):
                 logger.info("    Metal %d %s %s", kdx, met.formula, met.charge)
         else:
             logger.info(
@@ -849,11 +888,16 @@ class Molecule(Specie):
 
         # Second part: Complex molecule, add bonds for ligands
         if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
-            self.ligand_smiles_with_H = [lig.smiles for lig in self.ligands]
+            for lig in self.ligands or []:
+                if lig.smiles is None:
+                    logger.error(
+                        "Ligand %s has no SMILES after charge assignment. Cannot create bonds.",
+                        lig.formula,
+                    )
             self.ligand_smiles = []
             fix_zwitterions_ligands = []
 
-            for lig in self.ligands:
+            for lig in self.ligands or []:
                 # Creates bonds between ligand.atoms, using the ligand.rdkit_object
                 result = create_bonds_specie(lig)
                 if not result:
@@ -876,10 +920,10 @@ class Molecule(Specie):
                 if fix_zwitterions:
                     fix_zwitterions_ligands.append(lig)
                 else:
-                    self.ligand_smiles.append(lig.smiles)
+                    self.ligand_smiles.append(lig.smiles or "")
 
             for lig in fix_zwitterions_ligands:
-                for atom in lig.atoms:
+                for atom in lig.atoms or []:
                     atom.bonds = []
 
                     logger.debug(
@@ -898,7 +942,7 @@ class Molecule(Specie):
                     "Bonds re-created for ligand %s after zwitterion correction.",
                     lig.formula,
                 )
-                self.ligand_smiles.append(lig.smiles)
+                self.ligand_smiles.append(lig.smiles or "")
 
         # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
         if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
