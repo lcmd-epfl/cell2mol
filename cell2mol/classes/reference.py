@@ -1,11 +1,15 @@
 from __future__ import annotations
 import logging
+from typing import Any, cast
+
+import numpy as np
 from cell2mol.classes.cell import Cell
 from typing_extensions import deprecated
 from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.molecule import Molecule
 from cell2mol.classes.specie import Specie
+from cell2mol.classes.charge_state import ChargeState
 from cell2mol.connectivity import split_species
 from cell2mol.compare import compare_species, compare_metals
 from cell2mol.operations import extract_from_list, get_moiety_indices_from_labels
@@ -31,7 +35,7 @@ class Reference(Cell):
     atom_site_labels: list[str] | None = None
 
     # CIF bond/moiety related attributes
-    geom_bond_cif: list[tuple] | None = None
+    geom_bond_cif: list[tuple[str, str, float]] | None = None
     moiety_list_cif: list[list[str]] | None = None
     exist_cif_bond_moiety: bool | None = None
     moiety_indices: list[list[int]] | None = None
@@ -47,19 +51,19 @@ class Reference(Cell):
     has_missing_H: bool | None = None
 
     # Retrieving possible charges related attributes
-    selected_cs: list[list[int]] | None = None
+    selected_cs: list[object] | None = None
     error_get_poscharges: bool | None = None
 
     # Additional CIF related attributes
     chemical_name: str | None = None
     reported_metal_os: list[tuple[str, int]] | None = None
-    moiety_dicts: list[dict] | None = None
+    moiety_dicts: list[dict[str, Any]] | None = None
 
     # Potential warning flags dictionary allowing True, False, or None
     potential_warnings: dict[str, bool | None] | None = None
 
     # Frozen fields
-    subtype: SubType = Field(default="reference")
+    subtype: SubType | None = Field(default="reference")
 
     def set_atom_site_labels(self, atom_site_labels):
         """Set the atom site labels (e.g. Fe1, O2, C3, etc. from CIF file)."""
@@ -141,25 +145,29 @@ class Reference(Cell):
         ref_fracs = self.frac_coord
         ref_pos = self.coord
         atom_site_labels = self.atom_site_labels
-        bond_data = getattr(self, "geom_bond_cif", None)
+        bond_data = self.geom_bond_cif
 
         # Determine blocklist
+        blocklist: list[list[int]]
         if use_bond_info:
-            blocklist = self.moiety_indices
             logger.info("Using CIF bond/moiety information for blocklist")
             if self.moiety_indices is None:
                 logger.error("CIF moiety indices are not available")
                 return []
+            blocklist = self.moiety_indices
         else:
-            blocklist = split_species(
-                ref_labels,
-                ref_pos,
-                atom_site_labels=atom_site_labels,
-                bond_data=bond_data,
-                cov_factor=cov_factor,
-                metal_factor=metal_factor,
-                warn_on_mismatch=True,
-                detail=True,
+            blocklist = cast(
+                "list[list[int]]",
+                split_species(
+                    ref_labels,
+                    ref_pos,
+                    atom_site_labels=atom_site_labels,
+                    bond_data=bond_data,
+                    cov_factor=cov_factor,
+                    metal_factor=metal_factor,
+                    warn_on_mismatch=True,
+                    detail=True,
+                ),
             )
             logger.info("Using distance-based species splitting for blocklist")
             if self.moiety_indices is not None:
@@ -173,9 +181,13 @@ class Reference(Cell):
         # Build reference molecules
         for b in blocklist:
             mol_labels = extract_from_list(b, ref_labels, dimension=1)
-            mol_coord = extract_from_list(b, ref_pos, dimension=1)
-            mol_frac_coord = extract_from_list(b, ref_fracs, dimension=1)
-            mol_atom_site_labels = extract_from_list(b, atom_site_labels, dimension=1)
+            mol_coord = extract_from_list(b, ref_pos.tolist(), dimension=1)
+            mol_frac_coord = extract_from_list(b, ref_fracs.tolist(), dimension=1)
+            mol_atom_site_labels = (
+                extract_from_list(b, atom_site_labels, dimension=1)
+                if atom_site_labels is not None
+                else None
+            )
 
             newmolec = Molecule.from_positional(mol_labels, mol_coord, mol_frac_coord)
             newmolec.add_parent(self, indices=b)
@@ -186,7 +198,7 @@ class Reference(Cell):
                 use_bond_info=use_bond_info,
             )
 
-            for atom, idx in zip(newmolec.atoms, b):
+            for atom, idx in zip(newmolec.atoms or [], b):
                 atom.add_parent(self, index=idx)
 
             if newmolec.iscomplex or newmolec.has_ia_iia:
@@ -208,7 +220,7 @@ class Reference(Cell):
         has_isolated_h = False
         for ref in self.refmoleclist:
             if ref.natoms == 1:
-                label = ref.atoms[0].label
+                label = (ref.atoms or [])[0].label
                 if label in {"H", "D"}:
                     has_isolated_h = True
                     logger.warning(
@@ -297,19 +309,18 @@ class Reference(Cell):
                         mol.formula,
                         kdx,
                     )
+                assert kdx is not None
                 self.unique_indices.append(kdx)
                 mol.unique_index = kdx
                 self.species_list.append(mol)
             else:  # Complex molecules
                 if mol.ligands is None:
-                    if mol.iscomplex:
+                    if mol.iscomplex or mol.has_ia_iia:
                         mol.split_complex()
-                    elif mol.has_ia_iia:
-                        mol.split_ia_iia()
                     elif mol.has_post_transition_metal:
-                        mol.split_post_transition_metal()
+                        mol.split_complex(post_tms=True)
                 # ligands
-                for jdx, lig in enumerate(mol.ligands):
+                for jdx, lig in enumerate(mol.ligands or []):
                     found = False
                     for ldx, typ in enumerate(typelist_ligs):
                         if lig.is_nitrosyl is None:
@@ -321,8 +332,8 @@ class Reference(Cell):
                         if typ[0].haptic_type is None:
                             typ[0].get_hapticity()
 
-                        lig_groups_labels = [g.labels for g in lig.groups]
-                        typ_groups_labels = [g.labels for g in typ[0].groups]
+                        lig_groups_labels = [g.labels for g in lig.groups or []]
+                        typ_groups_labels = [g.labels for g in typ[0].groups or []]
 
                         if lig.is_nitrosyl and typ[0].is_nitrosyl:
                             if lig.NO_type == typ[0].NO_type:
@@ -358,12 +369,14 @@ class Reference(Cell):
                             lig.formula,
                             kdx,
                         )
+                    assert kdx is not None
                     self.unique_indices.append(kdx)
                     lig.unique_index = kdx
                     self.species_list.append(lig)
                 # metals
-                for jdx, met in enumerate(mol.metals):
+                for jdx, met in enumerate(mol.metals or []):
                     found = False
+                    kdx: int | None = None
                     for ldx, typ in enumerate(typelist_mets):
                         issame = compare_metals(met, typ[0])
                         if issame:
@@ -385,6 +398,7 @@ class Reference(Cell):
                             met.formula,
                             kdx,
                         )
+                    assert kdx is not None
                     self.unique_indices.append(kdx)
                     met.unique_index = kdx
                     self.species_list.append(met)
@@ -408,8 +422,12 @@ class Reference(Cell):
         self.selected_cs = []
 
         # Process unique_species first, then the full species_list
-        all_targets = [(specie, "unique specie") for specie in self.unique_species]
-        all_targets.extend([(specie, "species list") for specie in self.species_list])
+        all_targets = [
+            (specie, "unique specie") for specie in self.unique_species or []
+        ]
+        all_targets.extend(
+            [(specie, "species list") for specie in self.species_list or []]
+        )
 
         for specie, context_label in all_targets:
             logger.info(
@@ -425,7 +443,10 @@ class Reference(Cell):
                 continue
 
             if specie.subtype != "metal":
-                charges = [cs.corr_total_charge for cs in specie.possible_cs]
+                charges = [
+                    cs.corr_total_charge
+                    for cs in cast("list[ChargeState]", specie.possible_cs)
+                ]
                 self.selected_cs.append(charges)
             else:
                 self.selected_cs.append(specie.possible_cs)
@@ -437,27 +458,37 @@ class Reference(Cell):
         """Logic: Propagate charges from Unique Species to Reference Molecules."""
         self.error_assign_charge = False
 
-        for specie in self.unique_species:
-            for ref in self.refmoleclist:
+        for specie in self.unique_species or []:
+            specie_unique_index = getattr(specie, "unique_index", None)
+            for ref in self.refmoleclist or []:
                 try:
                     if ref.is_non_complex_molecule:
                         # Direct match for simple molecules
-                        if ref.unique_index == specie.unique_index:
+                        if ref.unique_index == specie_unique_index:
                             set_charge_state(specie, ref, mode=1)
                     else:
                         # Attempt to match all Ligands
-                        for lig in ref.ligands:
-                            if lig.unique_index == specie.unique_index:
+                        for lig in ref.ligands or []:
+                            if lig.unique_index == specie_unique_index:
                                 try:
                                     set_charge_state(specie, lig, mode=1)
                                 except Exception:
                                     self.error_assign_charge = True
+                                if lig.totcharge is None:
+                                    logger.warning(
+                                        "Ligand %s charge not set from Specie %s",
+                                        lig.formula,
+                                        specie_unique_index,
+                                    )
+                                    self.error_assign_charge = True
 
                         # Attempt to match all Metals
-                        for met in ref.metals:
-                            if met.unique_index == specie.unique_index:
+                        for met in ref.metals or []:
+                            if met.unique_index == specie_unique_index:
                                 try:
-                                    met.set_charge(specie.charge)
+                                    specie_charge = getattr(specie, "charge", None)
+                                    if specie_charge is not None:
+                                        met.set_charge(specie_charge)
                                 except Exception:
                                     self.error_assign_charge = True
 
@@ -465,10 +496,12 @@ class Reference(Cell):
                     # Catch-all for unexpected logic errors in the outer ref loop
                     self.error_assign_charge = True
                     logger.error(
-                        "Error mapping charge for Specie %s: %s", specie.unique_index, e
+                        "Error mapping charge for Specie %s: %s",
+                        specie_unique_index,
+                        e,
                     )
 
-    def __repr__(self):
+    def __repr__(self, indirect: bool = False):
         to_print = ""
         to_print += "------------- Cell2mol Reference Object --------------\n"
         to_print += Cell.__repr__(self, indirect=True)
@@ -486,16 +519,16 @@ class Reference(Cell):
         cls,
         name: str,
         labels: list[str],
-        pos: list[list[float]],
-        frac_coord: list[list[float]],
-        cell_vector: object,
-        cell_param: object,
+        pos: np.ndarray | list[list[float]],
+        frac_coord: np.ndarray | list[list[float]],
+        cell_vector: np.ndarray | list[list[float]],
+        cell_param: np.ndarray | list[float],
     ) -> "Reference":
         return cls(
             name=name,
             labels=labels,
-            pos=pos,  # Using pos which gets aliased to coord
-            frac_coord=frac_coord,
-            cell_vector=cell_vector,
-            cell_param=cell_param,
+            pos=np.asarray(pos),  # Using pos which gets aliased to coord
+            frac_coord=np.asarray(frac_coord),
+            cell_vector=np.asarray(cell_vector),
+            cell_param=np.asarray(cell_param),
         )
