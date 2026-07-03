@@ -77,11 +77,10 @@ ACTINIDES = {
     "Lr",
 }
 
-POST_TRANSITION_METALS = {"Al", "Ga", "Ge", "In", "Sn", "Tl", "Pb", "Bi"}
+POST_TRANSITION_METALS = {"Al", "Ga", "In", "Sn", "Tl", "Pb", "Bi", "Po", "At"}
 
 METALLOIDS = {"B", "Si", "Ge", "As", "Sb", "Te"}
 
-# TODO: update/add more haptic notations
 HAPTIC_PRETTY = {
     # eta2
     "eta2(C,C)": "η²-C,C",
@@ -106,7 +105,7 @@ HAPTIC_PRETTY = {
 }
 
 
-def labels2formula(labels: list):
+def labels2formula(labels: list[str]):
     elems = elemdatabase.elementnr.keys()
     formula = []
     for z in elems:
@@ -119,7 +118,7 @@ def labels2formula(labels: list):
     return formula
 
 
-def labels2ratio(labels):
+def labels2ratio(labels: list[str]):
     elems = elemdatabase.elementnr.keys()
     ratio = []
     for z in elems:
@@ -129,7 +128,7 @@ def labels2ratio(labels):
     return ratio
 
 
-def labels2electrons(labels):
+def labels2electrons(labels: list[str]):
     if isinstance(labels, list):
         eleccount = 0
         for label in labels:
@@ -175,7 +174,7 @@ def get_metalloid_idxs(labels: list[str]) -> list[int]:
     return [i for i, label in enumerate(labels) if label in METALLOIDS]
 
 
-def get_radii(labels: list):
+def get_radii(labels: list[str]):
     radii = []
     for lab in labels:
         if lab[-1].isdigit():
@@ -186,13 +185,18 @@ def get_radii(labels: list):
     return radii
 
 
-def get_element_count(labels: list, heavy_only: bool = False) -> np.ndarray:
-    elems = list(elemdatabase.elementnr.keys())
-    count = np.zeros((len(elems)), dtype=int)
+def get_element_count(labels: list[str], heavy_only: bool = False) -> np.ndarray:
+    elems: list[str] = list(elemdatabase.elementnr.keys())
+    elem_to_idx: dict[str, int] = {elem: idx for idx, elem in enumerate(elems)}
+
+    count = np.zeros(len(elems), dtype=int)
+
     for label in labels:
-        for jdx, elem in enumerate(elems):
-            if label == elem:
-                count[jdx] += 1
-            if (label == "H" or label == "D") and heavy_only:
-                count = 0
+        if heavy_only and label in {"H", "D"}:
+            continue
+
+        idx = elem_to_idx.get(label)
+        if idx is not None:
+            count[idx] += 1
+
     return count

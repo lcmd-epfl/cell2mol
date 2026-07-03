@@ -80,6 +80,10 @@ def compare_species(mol1, mol2, check_coordinates: bool = False):
         mol1.set_element_count()
     if mol2.element_count is None:
         mol2.set_element_count()
+
+    assert mol1.element_count is not None
+    assert mol2.element_count is not None
+
     for kdx, elem in enumerate(mol1.element_count):
         if elem != mol2.element_count[kdx]:
             # logger.debug("FALSE, different %s count", elem)
@@ -89,6 +93,8 @@ def compare_species(mol1, mol2, check_coordinates: bool = False):
         mol1.set_adj_types()
     if mol2.adj_types is None:
         mol2.set_adj_types()
+    assert mol1.adj_types is not None
+    assert mol2.adj_types is not None
 
     count = 0
     for kdx, (elem, row1) in enumerate(zip(elems, mol1.adj_types)):
