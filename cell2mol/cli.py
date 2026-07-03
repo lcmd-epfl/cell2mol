@@ -15,12 +15,12 @@ try:
     from cell2mol.utils.limits import set_memory_limit
 except ImportError:
     # Fallback if the file doesn't exist yet, to prevent import errors
-    def set_memory_limit(gb):
+    def set_memory_limit(max_mem_gb):
         pass
 
 
-RDLogger.DisableLog("rdApp.warning")
-RDLogger.DisableLog("rdApp.error")
+RDLogger.DisableLog("rdApp.warning")  # pyright: ignore[reportAttributeAccessIssue]
+RDLogger.DisableLog("rdApp.error")  # pyright: ignore[reportAttributeAccessIssue]
 warnings.filterwarnings(
     "ignore",
     message="crystal system .* is not interpreted for space group",
