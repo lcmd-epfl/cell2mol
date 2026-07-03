@@ -12,7 +12,7 @@ from cell2mol.classes.specie import Specie
 from cell2mol.connectivity import identify_haptic_mode
 from cell2mol.operations import compute_centroid
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import OptionalRef, OptionalRefList, SubType
+from cell2mol.my_types import OptionalRef, OptionalRefList, SubType, NDArray
 import logging
 
 if TYPE_CHECKING:
@@ -42,9 +42,9 @@ class Group(Specie):
     def from_positional(
         cls,
         labels: list[str],
-        coord: np.ndarray | list[list[float]],
-        frac_coord: np.ndarray | list[list[float]] | None = None,
-        radii: np.ndarray | list[float] | None = None,
+        coord: NDArray | list[list[float]],
+        frac_coord: NDArray | list[list[float]] | None = None,
+        radii: NDArray | list[float] | None = None,
     ) -> "Group":
         return cls(
             labels=labels,

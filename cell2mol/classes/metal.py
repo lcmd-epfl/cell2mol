@@ -14,7 +14,7 @@ from cell2mol.coordination_sphere import (
     handle_metal_coordination,
     define_coordination_geometry,
 )
-from cell2mol.my_types import RefList, Spin, SubType
+from cell2mol.my_types import RefList, Spin, SubType, NDArray
 from cell2mol.connectivity import build_adjacency
 from cell2mol.element_utils import labels2formula
 from cell2mol.utils import config
@@ -60,8 +60,8 @@ class Metal(Atom):
     def from_positional(
         cls,
         label: str,
-        coord: np.ndarray | list[float],
-        frac_coord: np.ndarray | list[float] | None = None,
+        coord: NDArray | list[float],
+        frac_coord: NDArray | list[float] | None = None,
         radii: float | None = None,
     ) -> "Metal":
         return cls(

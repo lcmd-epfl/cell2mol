@@ -13,7 +13,7 @@ from cell2mol.connectivity import build_adjacency
 from cell2mol.utils import config
 from cell2mol.operations import get_angle
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import NOType, OptionalRefList, SubType
+from cell2mol.my_types import NOType, OptionalRefList, SubType, NDArray
 import logging
 
 if TYPE_CHECKING:
@@ -48,9 +48,9 @@ class Ligand(Specie):
     def from_positional(
         cls,
         labels: list[str],
-        coord: np.ndarray | list[list[float]],
-        frac_coord: np.ndarray | list[list[float]] | None = None,
-        radii: np.ndarray | list[float] | None = None,
+        coord: NDArray | list[list[float]],
+        frac_coord: NDArray | list[list[float]] | None = None,
+        radii: NDArray | list[float] | None = None,
     ) -> "Ligand":
         return cls(
             labels=labels,

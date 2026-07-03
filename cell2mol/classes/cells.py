@@ -140,8 +140,8 @@ class Cells(BaseModel):
         name: str,
         reference: Cell,
         unitcell: Cell,
-        cell_vector: np.ndarray | list[list[float]],
-        cell_param: np.ndarray | list[float],
+        cell_vector: NDArray | list[list[float]],
+        cell_param: NDArray | list[float],
     ) -> "Cells":
         return cls(
             name=name,

@@ -15,7 +15,7 @@ from cell2mol.compare import compare_species, compare_metals
 from cell2mol.operations import extract_from_list, get_moiety_indices_from_labels
 from cell2mol.elementdata import ElementData
 from cell2mol.utils import config
-from cell2mol.my_types import SubType
+from cell2mol.my_types import SubType, NDArray
 from cell2mol.charge.specie_assigner import set_charge_state
 
 logger = logging.getLogger(__name__)
@@ -288,6 +288,7 @@ class Reference(Cell):
             logger.debug("Molecule (%d) formula=%s", idx, mol.formula)
             if mol.is_non_complex_molecule:  # Non-complex molecules
                 found = False
+                kdx = None
                 for ldx, typ in enumerate(typelist_mols):
                     issame = compare_species(mol, typ[0])
                     if issame:
@@ -322,6 +323,7 @@ class Reference(Cell):
                 # ligands
                 for jdx, lig in enumerate(mol.ligands or []):
                     found = False
+                    kdx = None
                     for ldx, typ in enumerate(typelist_ligs):
                         if lig.is_nitrosyl is None:
                             lig.evaluate_as_nitrosyl()
@@ -519,10 +521,10 @@ class Reference(Cell):
         cls,
         name: str,
         labels: list[str],
-        pos: np.ndarray | list[list[float]],
-        frac_coord: np.ndarray | list[list[float]],
-        cell_vector: np.ndarray | list[list[float]],
-        cell_param: np.ndarray | list[float],
+        pos: NDArray | list[list[float]],
+        frac_coord: NDArray | list[list[float]],
+        cell_vector: NDArray | list[list[float]],
+        cell_param: NDArray | list[float],
     ) -> "Reference":
         return cls(
             name=name,

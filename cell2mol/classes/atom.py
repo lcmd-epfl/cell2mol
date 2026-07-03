@@ -73,8 +73,8 @@ class Atom(BaseModel):
     def from_positional(
         cls,
         label: str,
-        coord: np.ndarray | list[float],
-        frac_coord: np.ndarray | list[float] | None = None,
+        coord: NDArray,
+        frac_coord: NDArray | list[float] | None = None,
         radii: float | None = None,
     ) -> "Atom":
         """
