@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import logging
+from typing import cast
+
+import numpy as np
 from cell2mol.classes.cell import Cell
 from typing_extensions import deprecated
 from pydantic import Field
+from cell2mol.classes.metal import Metal
 from cell2mol.classes.molecule import Molecule
 from cell2mol.classes.specie import Specie
 from cell2mol.compare import compare_reference_indices
@@ -37,9 +41,9 @@ class UnitCell(Cell):
     is_neutral: bool | None = None
 
     # Frozen fields
-    subtype: SubType = Field(default="unitcell")
+    subtype: SubType | None = Field(default="unitcell")
 
-    def get_species_list(self, reference_species_list: list[Specie]):
+    def get_species_list(self, reference_species_list: list[Specie | Metal]):
         """Get unique indices and species list."""
         self.unique_indices = []
         self.species_list = []
@@ -48,39 +52,49 @@ class UnitCell(Cell):
         ref_molecules = [
             ref
             for ref in reference_species_list
-            if ref.subtype == "molecule" and ref.is_non_complex_molecule
+            if ref.subtype == "molecule"
+            and getattr(ref, "is_non_complex_molecule", False)
         ]
         ref_ligands = [ref for ref in reference_species_list if ref.subtype == "ligand"]
-        ref_metals = [ref for ref in reference_species_list if ref.subtype == "metal"]
+        ref_metals = [
+            cast(Metal, ref)
+            for ref in reference_species_list
+            if ref.subtype == "metal"
+        ]
 
-        for mol in self.moleclist:
+        for mol in self.moleclist or []:
             # Case 1: non-complex molecule
             if mol.is_non_complex_molecule:
                 for ref in ref_molecules:
                     if compare_reference_indices(ref, mol):
-                        mol.unique_index = ref.unique_index
-                        self.unique_indices.append(mol.unique_index)
+                        ref_unique_index = getattr(ref, "unique_index", None)
+                        mol.unique_index = ref_unique_index
+                        if ref_unique_index is not None:
+                            self.unique_indices.append(ref_unique_index)
                         self.species_list.append(mol)
                         break
                 continue
 
             # Case 2: complex molecule with ligands and metals
             # --- ligands ---
-            for lig in mol.ligands:
+            for lig in mol.ligands or []:
                 for ref in ref_ligands:
                     if compare_reference_indices(ref, lig):
-                        lig.unique_index = ref.unique_index
-                        self.unique_indices.append(lig.unique_index)
+                        ref_unique_index = getattr(ref, "unique_index", None)
+                        lig.unique_index = ref_unique_index
+                        if ref_unique_index is not None:
+                            self.unique_indices.append(ref_unique_index)
                         self.species_list.append(lig)
                         break
 
             # --- metals ---
-            for met in mol.metals:
+            for met in mol.metals or []:
                 met_parent_ref = met.get_parent_index("reference")
                 for ref in ref_metals:
                     if ref.get_parent_index("reference") == met_parent_ref:
                         met.unique_index = ref.unique_index
-                        self.unique_indices.append(met.unique_index)
+                        if met.unique_index is not None:
+                            self.unique_indices.append(met.unique_index)
                         self.species_list.append(met)
                         break
 
@@ -91,7 +105,7 @@ class UnitCell(Cell):
         """Logic: Propagate charges from Reference Molecules to Unit Cell Molecules."""
         self.error_assign_charge = False
 
-        for mol in self.moleclist:
+        for mol in self.moleclist or []:
             try:
                 if mol.is_non_complex_molecule:
                     logger.info(
@@ -194,7 +208,7 @@ class UnitCell(Cell):
 
         self.is_neutral = total_charge == 0
 
-    def __repr__(self):
+    def __repr__(self, indirect: bool = False):
         to_print = ""
         to_print += "------------- Cell2mol UnitCell Object --------------\n"
         to_print += Cell.__repr__(self, indirect=True)
@@ -212,16 +226,16 @@ class UnitCell(Cell):
         cls,
         name: str,
         labels: list[str],
-        pos: list[list[float]],
-        frac_coord: list[list[float]],
-        cell_vector: object,
-        cell_param: object,
+        pos: np.ndarray | list[list[float]],
+        frac_coord: np.ndarray | list[list[float]],
+        cell_vector: np.ndarray | list[list[float]],
+        cell_param: np.ndarray | list[float],
     ) -> "UnitCell":
         return cls(
             name=name,
             labels=labels,
-            pos=pos,  # Using pos which gets aliased to coord
-            frac_coord=frac_coord,
-            cell_vector=cell_vector,
-            cell_param=cell_param,
+            pos=np.asarray(pos),  # Using pos which gets aliased to coord
+            frac_coord=np.asarray(frac_coord),
+            cell_vector=np.asarray(cell_vector),
+            cell_param=np.asarray(cell_param),
         )
