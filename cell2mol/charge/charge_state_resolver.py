@@ -1,6 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
+
 import numpy as np
 from collections import defaultdict
+
 from cell2mol.classes.charge_state import ChargeState
+from cell2mol.classes.protonation import Protonation
 import logging
 from cell2mol.operations import reorder_element
 from cell2mol.charge.utils import (
@@ -20,11 +26,17 @@ from rdkit.Chem import rdchem
 from rdkit.Geometry import Point3D
 from rdkit.Chem import rdDetermineBonds
 
+if TYPE_CHECKING:
+    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.ligand import Ligand
+    from cell2mol.classes.molecule import Molecule
+    from cell2mol.classes.metal import Metal
+
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 
-def enumerate_possible_charge_states(spec: object):
+def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
     """
     Generates valid charge states for a given specie.
     Charge states are only generated for:
@@ -66,14 +78,17 @@ def enumerate_possible_charge_states(spec: object):
         return None
 
     # Haptic Ligands
-    is_haptic_c8 = (
-        spec.subtype == "ligand"
-        and len(spec.groups) == 1
-        and spec.groups[0].haptic_type == ["eta8(C8)"]
-    )
+    is_haptic_c8 = False
+    if spec.subtype == "ligand":
+        ligand = cast("Ligand", spec)
+        is_haptic_c8 = (
+            ligand.groups is not None
+            and len(ligand.groups) == 1
+            and ligand.groups[0].haptic_type == ["eta8(C8)"]
+        )
     if is_haptic_c8:
         ch_state = generate_charge_state(-1, spec.protonation_states[0])
-        return [ch_state]
+        return [ch_state] if ch_state is not None else None
 
     for prot in spec.protonation_states:
         logger.debug(
@@ -152,17 +167,17 @@ def check_possible_valence_problems_from_ac(
     """
 
     atoms = [int(a) for a in atoms]
-    AC = np.asarray(AC)
+    ac = np.asarray(AC)
 
     n_atoms = len(atoms)
 
-    if AC.shape != (n_atoms, n_atoms):
-        raise ValueError(f"AC must have shape ({n_atoms}, {n_atoms}), got {AC.shape}")
+    if ac.shape != (n_atoms, n_atoms):
+        raise ValueError(f"AC must have shape ({n_atoms}, {n_atoms}), got {ac.shape}")
 
-    if not np.allclose(AC, AC.T):
+    if not np.allclose(ac, ac.T):
         raise ValueError("AC must be symmetric")
 
-    if np.any(np.diag(AC) != 0):
+    if np.any(np.diag(ac) != 0):
         raise ValueError("AC diagonal must be zero")
 
     pt = Chem.GetPeriodicTable()
@@ -170,15 +185,7 @@ def check_possible_valence_problems_from_ac(
 
     if extra_allowed_valences is None:
         extra_allowed_valences = {}
-    extra_allowed_valences = (
-        {
-            5: [3, 4],  # B, e.g. BF4-
-            7: [3, 4],  # N
-            15: [3, 5, 6],  # P, e.g. PF6-
-            33: [3, 5, 6],  # As, e.g. AsF6-
-            51: [3, 5, 6],  # Sb, e.g. SbF6-
-        },
-    )
+    # print(extra_allowed_valences)
 
     for i, atomic_num in enumerate(atoms):
         symbol = pt.GetElementSymbol(atomic_num)
@@ -186,11 +193,11 @@ def check_possible_valence_problems_from_ac(
         if atomic_num == 0:
             continue
 
-        degree = int(np.count_nonzero(AC[i]))
+        degree = int(np.count_nonzero(ac[i]))
 
         allowed_valences = list(pt.GetValenceList(atomic_num))
 
-        if atomic_num in extra_allowed_valences:
+        if atomic_num in extra_allowed_valences.keys():
             allowed_valences = sorted(
                 set(allowed_valences) | set(extra_allowed_valences[atomic_num])
             )
@@ -206,7 +213,7 @@ def check_possible_valence_problems_from_ac(
                     "atomic_num": int(atoms[j]),
                     "symbol": pt.GetElementSymbol(int(atoms[j])),
                 }
-                for j in np.where(AC[i] != 0)[0]
+                for j in np.where(ac[i] != 0)[0]
             ]
 
             problems.append(
@@ -260,14 +267,14 @@ def generate_rdkit_mol_from_rdDetermineBonds(
 
     atoms = list(map(int, atoms))
     coords = np.asarray(coords, dtype=float)
-    AC = np.asarray(AC)
+    ac = np.asarray(AC)
     n_atoms = len(atoms)
 
     if coords.shape != (n_atoms, 3):
         raise ValueError(f"coords must have shape ({n_atoms}, 3), got {coords.shape}")
 
-    if AC.shape != (n_atoms, n_atoms):
-        raise ValueError(f"AC must have shape ({n_atoms}, {n_atoms}), got {AC.shape}")
+    if ac.shape != (n_atoms, n_atoms):
+        raise ValueError(f"AC must have shape ({n_atoms}, {n_atoms}), got {ac.shape}")
 
     rwMol = Chem.RWMol()
 
@@ -278,7 +285,7 @@ def generate_rdkit_mol_from_rdDetermineBonds(
     # Add connectivity as single bonds first
     for i in range(n_atoms):
         for j in range(i + 1, n_atoms):
-            if AC[i, j] != 0:
+            if ac[i, j] != 0:
                 rwMol.AddBond(i, j, Chem.BondType.SINGLE)
 
     mol = rwMol.GetMol()
@@ -364,11 +371,11 @@ def generate_rdkit_mol_from_AC2mol(
 
 def generate_charge_state(
     charge: int,
-    prot: object,
+    prot: Protonation,
     allow_charged_fragments: bool = True,
     embed_chiral: bool = True,
-    ref_uncorr_atom_charges: list | None = None,
-):
+    ref_uncorr_atom_charges: list[int] | None = None,
+) -> ChargeState | None:
     """
     Generates molecular connectivity and atomistic charges from 3D coordinates
     using xyz2mol, then validates chirality and resonance.
@@ -388,11 +395,20 @@ def generate_charge_state(
         allow_charged_fragments,
         prot.n_protons_added,
     )
+    extra_allowed_valences = {
+        5: [3, 4],  # B, e.g. BF4-
+        7: [3, 4],  # N
+        15: [3, 5, 6],  # P, e.g. PF6-
+        33: [3, 5, 6],  # As, e.g. AsF6-
+        51: [3, 5, 6],  # Sb, e.g. SbF6-
+    }
 
     problems = check_possible_valence_problems_from_ac(
-        atoms=prot.atnums, AC=prot.adjmat
+        atoms=prot.atnums, AC=prot.adjmat, extra_allowed_valences=extra_allowed_valences
     )
-    if len(prot.atnums) == 1 or prot.formula in {"C-Se", "C-Te"}:
+    if prot.atnums is not None and (
+        len(prot.atnums) == 1 or prot.formula in {"C-Se", "C-Te"}
+    ):
         logger.debug(
             "Single-atom or special case detected for %s, generating RDKit Mol object using modified AC2mol",
             prot.formula,
@@ -473,6 +489,7 @@ def generate_charge_state(
 
     # Final Validation and Resonance Search
     smiles = Chem.MolToSmiles(rdkit_obj)
+    assert prot.natoms is not None
     is_correct = check_rdkit_obj_connectivity(rdkit_obj, prot.natoms, charge)
 
     logger.debug(
@@ -567,14 +584,16 @@ def check_rdkit_obj_connectivity(mol: Chem.Mol, natoms: int, charge: int) -> boo
     return is_correct
 
 
-def get_best_resonance_state(charge_state: object) -> object:
+def get_best_resonance_state(charge_state: ChargeState) -> ChargeState:
     """
     Checks for resonance alternatives and returns the best state found.
     """
     prot = charge_state.protonation
     rdkit_obj = charge_state.rdkit_obj
     charge_tried = charge_state.uncorr_total_charge
+    assert prot.natoms is not None
     natoms = prot.natoms
+    parent = cast("Specie", prot.parent)
 
     try:
         # Generate resonance structures
@@ -583,7 +602,7 @@ def get_best_resonance_state(charge_state: object) -> object:
         suppl = rdchem.ResonanceMolSupplier(rdkit_obj)
         num_res = len(suppl)
     except Exception as e:
-        logger.error("ResonanceMolSupplier failed for %s: %s", prot.parent.formula, e)
+        logger.error("ResonanceMolSupplier failed for %s: %s", parent.formula, e)
         return charge_state
 
     if num_res <= 1:
@@ -597,13 +616,13 @@ def get_best_resonance_state(charge_state: object) -> object:
     # Canonical SMILES comparison to see if the structure actually changed
     original_smiles = Chem.MolToSmiles(rdkit_obj, canonical=True)
     best_smiles = Chem.MolToSmiles(best_res_mol, canonical=True)
-    logger.debug("Resonance check for %s: found %d forms", prot.parent.formula, num_res)
+    logger.debug("Resonance check for %s: found %d forms", parent.formula, num_res)
     logger.debug("  Original: %s", original_smiles)
     logger.debug("  Best    : %s", best_smiles)
 
     if original_smiles == best_smiles:
         return charge_state
-    logger.info("Resonance form updated for %s", prot.parent.formula)
+    logger.info("Resonance form updated for %s", parent.formula)
 
     # Extract properties from the best resonance candidate
     atom_charges = [a.GetFormalCharge() for a in best_res_mol.GetAtoms()]
@@ -625,12 +644,12 @@ def get_best_resonance_state(charge_state: object) -> object:
     )
 
 
-def get_candidate_charges(prot: object) -> list:
+def get_candidate_charges(prot: Protonation) -> list[int]:
     """
     Determines the range of formal charges to test for a specific protonation state.
     Uses chemical heuristics based on formula, denticity, and atom connectivity.
     """
-    spec = prot.parent
+    spec = cast("Specie", prot.parent)
     formula = spec.formula
 
     # Quick returns for simple cases
@@ -643,29 +662,33 @@ def get_candidate_charges(prot: object) -> list:
         "Evaluating %s (%s) | Number of protonation states: %d",
         spec.formula,
         spec.subtype,
-        len(spec.protonation_states),
+        len(spec.protonation_states or []),
     )
     # Determine max charge ranges
     if spec.subtype == "molecule" and spec.is_non_complex_molecule:
-        maxcharge = 3
+        maxcharge = 4
     elif spec.subtype == "ligand":
+        ligand = cast("Ligand", spec)
+        atoms = ligand.atoms or []
         # Count terminal oxygens not coordinateed to metals (e.g., in carboxylates or sulfonates)
         num_noncoordinated_oxygen = sum(
-            1 for a in spec.atoms if a.label == "O" and a.mconnec == 0 and a.connec == 1
+            1 for a in atoms if a.label == "O" and a.mconnec == 0 and a.connec == 1
         )
 
-        if not spec.is_haptic:
-            if spec.denticity is None:
-                spec.get_denticity()
+        if not ligand.is_haptic:
+            if ligand.denticity is None:
+                ligand.get_denticity()
             maxcharge = (
-                spec.denticity + num_noncoordinated_oxygen - prot.n_protons_added
+                (ligand.denticity or 0)
+                + num_noncoordinated_oxygen
+                - prot.n_protons_added
             )
         else:
             maxcharge = 2
 
         # Constraints: maxcharge should not exceed atom count, clamped between 2 and 4
-        if all(a.mconnec < 2 for a in spec.atoms):
-            maxcharge = min(maxcharge, spec.natoms)
+        if all((a.mconnec or 0) < 2 for a in atoms):
+            maxcharge = min(maxcharge, ligand.natoms)
 
         maxcharge = max(2, min(maxcharge, 4))
 
@@ -707,6 +730,8 @@ def generate_manual_charge_state(spec):
         target_atom = "O"
         is_bent = getattr(spec, "NO_type", "") == "Bent"
         smiles, charge = ("[N-]=O", -1) if is_bent else ("[N]=O", 0)
+
+    assert smiles is not None, f"No manual SMILES registered for formula {formula}"
 
     # 3. Determine Atom Ordering
     order = list(range(spec.natoms))
@@ -751,19 +776,19 @@ def generate_manual_charge_state(spec):
     )
 
 
-def get_metal_poscharges(metal: object) -> list:
+def get_metal_poscharges(metal: Metal) -> list[int]:
     """
     Retrieve common oxidation states for a given metal atom.
 
     Oxidation state data primarily from:
     Venkataraman et al., J. Chem. Educ. 1997, 74, 915.
     Args:
-        metal (object): Metal atom object.
+        metal (Metal): Metal atom object.
     Returns:
         poscharges (list): List of common oxidation states for the metal.
     """
 
-    mol = metal.get_parent("molecule")
+    mol = cast("Molecule", metal.get_parent("molecule"))
     if mol.is_haptic is None:
         mol.get_hapticity()
 
@@ -772,7 +797,7 @@ def get_metal_poscharges(metal: object) -> list:
     # Allow 0 oxidation state for selected metals under specific conditions
     zero_os_metals = {"Fe", "Ni", "Ru"}
     if metal.label in zero_os_metals:
-        has_CO = any(lig.formula == "C-O" for lig in mol.ligands)
+        has_CO = any(lig.formula == "C-O" for lig in mol.ligands or [])
         if (has_CO or mol.is_haptic) and 0 not in poscharges:
             poscharges.append(0)
 
@@ -780,8 +805,8 @@ def get_metal_poscharges(metal: object) -> list:
 
 
 def _get_atomic_valence_candidates(
-    prot: object, allow_carbenes: bool = False
-) -> tuple[list, list]:
+    prot: Protonation, allow_carbenes: bool = False
+) -> tuple[list[list[int]], list[int]]:
     """
     Determines potential valence states for each atom in a ligand based on connectivity.
     Args:
@@ -796,12 +821,14 @@ def _get_atomic_valence_candidates(
     import itertools
     from cell2mol.charge.xyz2mol import atomic_valence, get_sorted_valences_list
 
+    assert prot.adjmat is not None
+
     # Convert element labels to atomic numbers
     atomic_nums = [elemdatabase.elementnr[label] for label in prot.labels]
     # Calculate current coordination number (sum of bonds for each atom)
     current_valences = prot.adjmat.sum(axis=1).astype(int)
 
-    valences_list_of_lists = []
+    valences_list_of_lists: list[list[int]] = []
     for atomic_num, curr_v in zip(atomic_nums, current_valences):
         # Initial filter: candidate valences must be >= current connectivity
         candidates = [v for v in atomic_valence.get(atomic_num, []) if v >= curr_v]
@@ -824,7 +851,9 @@ def _get_atomic_valence_candidates(
 
     # Use islice to safely take only the first 50 entries
     # This prevents calculating millions of combinations you don't need
-    first_valences = list(itertools.islice(sorted_gen, 1))[0]
+    first_valences: list[int] = (
+        list(list(itertools.islice(sorted_gen, 1))[0]) if sorted_gen is not None else []
+    )
     logger.debug(
         "Specie %s first entry of valences: %s",
         prot.formula,
@@ -835,7 +864,7 @@ def _get_atomic_valence_candidates(
     return valences_list_of_lists, first_valences
 
 
-def identify_best_charge_states(charge_states: list) -> list:
+def identify_best_charge_states(charge_states: list[ChargeState]) -> list[ChargeState]:
     """
     Selects the best charge distributions.
     """
@@ -891,7 +920,7 @@ def identify_best_charge_states(charge_states: list) -> list:
     return final_states
 
 
-def _get_best_candidate_indices(charge_states: list) -> list:
+def _get_best_candidate_indices(charge_states: list[ChargeState]) -> list[int]:
     """
     Helper function containing the core filtering logic.
     Calculates metrics and returns the indices of the best candidates.
@@ -911,16 +940,19 @@ def _get_best_candidate_indices(charge_states: list) -> list:
     added_into_aromatic = []
 
     # Coordinating atoms logic
-    parent = charge_states[0].protonation.parent
+    parent = cast("Specie", charge_states[0].protonation.parent)
+    parent_atoms = parent.atoms or []
     coordinating_atoms_indices = [
-        idx for idx, atom in enumerate(parent.atoms) if atom.mconnec > 0
+        idx for idx, atom in enumerate(parent_atoms) if (atom.mconnec or 0) > 0
     ]
     coordinating_atoms_labels = [
-        atom.label for idx, atom in enumerate(parent.atoms) if atom.mconnec > 0
+        atom.label for idx, atom in enumerate(parent_atoms) if (atom.mconnec or 0) > 0
     ]
     blocked_indices = [
         idx
-        for idx, n_added in enumerate(charge_states[0].protonation.site_proton_counts)
+        for idx, n_added in enumerate(
+            charge_states[0].protonation.site_proton_counts or []
+        )
         if n_added == 0
     ]
     coord_abs_atcharge = []
