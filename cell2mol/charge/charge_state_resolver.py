@@ -35,6 +35,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
+# AC2BO's combinatorial bond-order search can converge on a technically
+# valence-consistent but chemically absurd resonance structure: e.g. an
+# entire ring system drawn with alternating +1/-1 formal charges and no
+# double bonds at all, just to represent a small net charge. Genuine
+# zwitterions/ylides concentrate charge on a handful of atoms; anything
+# far beyond that is a search artifact, not real chemistry.
+MAX_EXCESS_CHARGE_SEPARATION = 4
+
 
 def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
     """
@@ -185,7 +193,6 @@ def check_possible_valence_problems_from_ac(
 
     if extra_allowed_valences is None:
         extra_allowed_valences = {}
-    # print(extra_allowed_valences)
 
     for i, atomic_num in enumerate(atoms):
         symbol = pt.GetElementSymbol(atomic_num)
@@ -206,7 +213,10 @@ def check_possible_valence_problems_from_ac(
         if -1 in allowed_valences:
             continue
 
-        if allowed_valences and degree > max(allowed_valences):
+        if allowed_valences and (
+            degree > max(allowed_valences)
+            or (degree not in allowed_valences and symbol not in ["C", "O"])
+        ):
             neighbors = [
                 {
                     "atom_idx": int(j),
@@ -518,10 +528,50 @@ def generate_charge_state(
 def check_rdkit_obj_connectivity(mol: Chem.Mol, natoms: int, charge: int) -> bool:
     """
     Validates the chemical sanity of an RDKit molecule object by checking
-    valences, lone pairs, and bond connectivity.
+    valences, lone pairs, bond connectivity, and that the total formal
+    charge actually matches the requested target charge.
     """
     pt = Chem.GetPeriodicTable()
     is_correct = True
+
+    # 0. Total Formal Charge Check
+    # AC2BO's internal fallback paths can return a best-effort bond-order
+    # matrix that does NOT actually satisfy the requested target charge
+    # (e.g. when no exact match was found within the try-count budget).
+    # Without this check, such a structure could still pass every
+    # per-atom sanity check below and be marked "correct" even though it
+    # represents a different (and possibly chemically wrong) total charge
+    # than what was asked for -- which then lets it out-compete genuinely
+    # correct candidates downstream via the min-abs-charge tie-break.
+    total_formal_charge = sum(
+        mol.GetAtomWithIdx(i).GetFormalCharge() for i in range(natoms)
+    )
+    if total_formal_charge != charge:
+        logger.debug(
+            "Total formal charge mismatch: got %d, expected %d",
+            total_formal_charge,
+            charge,
+        )
+        is_correct = False
+
+    # 0b. Charge Separation Sanity Check
+    # A valid Lewis structure can concentrate the net charge on a small
+    # number of atoms (a real zwitterion/ylide), but a structure requiring
+    # far more formal charge than the net charge demands is a bond-order
+    # search artifact (see MAX_EXCESS_CHARGE_SEPARATION above), not a
+    # legitimate resonance form.
+    total_abs_atom_charge = sum(
+        abs(mol.GetAtomWithIdx(i).GetFormalCharge()) for i in range(natoms)
+    )
+    if total_abs_atom_charge > abs(charge) + MAX_EXCESS_CHARGE_SEPARATION:
+        logger.debug(
+            "Excessive charge separation: total |formal charge| on atoms = %d, "
+            "target net charge = %d (max allowed excess = %d)",
+            total_abs_atom_charge,
+            charge,
+            MAX_EXCESS_CHARGE_SEPARATION,
+        )
+        is_correct = False
 
     for i in range(natoms):
         atom = mol.GetAtomWithIdx(i)
@@ -608,20 +658,40 @@ def get_best_resonance_state(charge_state: ChargeState) -> ChargeState:
     if num_res <= 1:
         return charge_state
 
-    # The ResonanceMolSupplier ranks structures; index 0 is generally the most 'stable'
-    best_res_mol = suppl[0]
-    if best_res_mol is None:
-        return charge_state
-
-    # Canonical SMILES comparison to see if the structure actually changed
     original_smiles = Chem.MolToSmiles(rdkit_obj, canonical=True)
-    best_smiles = Chem.MolToSmiles(best_res_mol, canonical=True)
     logger.debug("Resonance check for %s: found %d forms", parent.formula, num_res)
     logger.debug("  Original: %s", original_smiles)
-    logger.debug("  Best    : %s", best_smiles)
 
-    if original_smiles == best_smiles:
+    # The ResonanceMolSupplier ranks structures with index 0 as the most 'stable',
+    # but it can still emit over-delocalized structures that are not actually
+    # kekulizable/valid (e.g. an exocyclic double bond combined with a ring
+    # charge that leaves no valid alternating bond pattern). Walk the ranked
+    # candidates and accept the first one that round-trips through SMILES
+    # parsing; per-atom valence bookkeeping (check_rdkit_obj_connectivity)
+    # doesn't catch this since the inconsistency is a whole-ring kekulization
+    # issue, not a per-atom one.
+    best_res_mol = None
+    best_smiles = None
+    for candidate in suppl:
+        if candidate is None:
+            continue
+        candidate_smiles = Chem.MolToSmiles(candidate, canonical=True)
+        if candidate_smiles == original_smiles:
+            return charge_state
+        if Chem.MolFromSmiles(candidate_smiles) is not None:
+            best_res_mol = candidate
+            best_smiles = candidate_smiles
+            break
+        logger.debug("  Rejected (invalid SMILES): %s", candidate_smiles)
+
+    if best_res_mol is None or best_smiles is None:
+        logger.debug(
+            "No valid resonance alternative found for %s; keeping original",
+            parent.formula,
+        )
         return charge_state
+
+    logger.debug("  Best    : %s", best_smiles)
     logger.info("Resonance form updated for %s", parent.formula)
 
     # Extract properties from the best resonance candidate
