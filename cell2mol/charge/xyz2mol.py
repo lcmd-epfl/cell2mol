@@ -632,6 +632,30 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
     return valence_generator()
 
 
+def score_BO(BO, atoms, atomic_valence_electrons, allow_charged_fragments=True):
+    """
+    Score a candidate bond-order matrix that already passed BO_is_OK/charge_is_OK.
+    Lower is better. Prefers the resonance structure with the least total formal
+    charge, and among ties, the one with charge concentrated on fewer atoms.
+
+    Returns a tuple (total_abs_charge, num_charged_atoms) suitable for direct
+    comparison / sorting.
+    """
+    if not allow_charged_fragments:
+        return (0, 0)
+
+    BO_valences = list(BO.sum(axis=1))
+    total_abs_charge = 0
+    num_charged_atoms = 0
+    for atom, BO_valence in zip(atoms, BO_valences):
+        q = get_atomic_charge(atom, atomic_valence_electrons[atom], BO_valence)
+        if q != 0:
+            total_abs_charge += abs(q)
+            num_charged_atoms += 1
+
+    return (total_abs_charge, num_charged_atoms)
+
+
 def AC2BO(
     AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allow_carbenes=True
 ):
@@ -669,6 +693,16 @@ def AC2BO(
         if atomicNum == 6 and valence == 2:
             possible_valence.append(3)
         if atomicNum == 7:
+            if valence not in possible_valence:
+                possible_valence.append(valence)
+        if atomicNum != 6 and allow_charged_fragments:
+            # For any non-carbon atom, the hardcoded valence lists in
+            # get_atomic_valences() are often incomplete
+            # (e.g. I: [1,3,5] missing 2, P: [3,5] missing 4).
+            # If the actual AC valence is not listed, the search may
+            # add artificial bonds to reach a known valence, even when
+            # the as-connected form with formal charge is correct
+            # (e.g. PPh4+, cyclic iodonium).
             if valence not in possible_valence:
                 possible_valence.append(valence)
         if atomicNum == 16 and valence == 1 and formula == "C-S":
@@ -715,6 +749,9 @@ def AC2BO(
         return None, atomic_valence_electrons
 
     best_BO = AC.copy()
+    best_status_BO = None
+    best_status_score = None  # holds (total_abs_charge, num_charged_atoms) tuples
+
     # Get the generator (0 bytes consumed for combinations)
     sorted_gen = get_sorted_valences_list(valences_list_of_lists, atoms)
 
@@ -753,7 +790,9 @@ def AC2BO(
 
             return AC, atomic_valence_electrons
 
-        UA_pairs_list = get_UA_pairs(UA, AC, use_graph=use_graph)
+        # UA_pairs_list = get_UA_pairs(UA, AC, use_graph=use_graph)
+        UA_pairs_list = get_UA_pairs_new(UA, AC, DU_from_AC, use_graph=use_graph)
+
         for UA_pairs in UA_pairs_list:
             BO = get_BO(AC, UA, DU_from_AC, valences, UA_pairs, use_graph=use_graph)
             status = BO_is_OK(
@@ -780,14 +819,36 @@ def AC2BO(
             )
 
             if status:
-                logger.debug(
-                    "  formula=%s status=%s charge=%s count=%s",
-                    formula,
-                    status,
-                    charge,
-                    count,
+                score = score_BO(
+                    BO,
+                    atoms,
+                    atomic_valence_electrons,
+                    allow_charged_fragments=allow_charged_fragments,
                 )
-                return BO, atomic_valence_electrons
+                if best_status_score is None or score < best_status_score:
+                    best_status_BO = BO.copy()
+                    best_status_score = score
+                    logger.debug(
+                        "  formula=%s status=%s charge=%s count=%s score=%s (new best)",
+                        formula,
+                        status,
+                        charge,
+                        count,
+                        score,
+                    )
+                # Best possible case: all the (necessary) charge sits on a
+                # single atom -- no better resonance structure is possible,
+                # so stop searching further valence combinations.
+                if best_status_score == (abs(charge), 1) or best_status_score == (0, 0):
+                    logger.debug(
+                        "  formula=%s charge=%s count=%s reached minimal charge "
+                        "spread %s, stopping early",
+                        formula,
+                        charge,
+                        count,
+                        best_status_score,
+                    )
+                    return best_status_BO, atomic_valence_electrons
             elif (
                 BO.sum() >= best_BO.sum()
                 and valences_not_too_large(BO, valences)
@@ -797,6 +858,16 @@ def AC2BO(
 
             count += 1
             if count > max_count:
+                if best_status_BO is not None:
+                    logger.debug(
+                        "  reached max count %s (charge=%d) count: %d, "
+                        "returning best-scored status BO (score=%s)",
+                        formula,
+                        charge,
+                        count,
+                        best_status_score,
+                    )
+                    return best_status_BO, atomic_valence_electrons
                 logger.debug(
                     "  reached max count %s (charge=%d) count: %d",
                     formula,
@@ -804,6 +875,9 @@ def AC2BO(
                     count,
                 )
                 return best_BO, atomic_valence_electrons
+
+    if best_status_BO is not None:
+        return best_status_BO, atomic_valence_electrons
 
     return best_BO, atomic_valence_electrons
 
