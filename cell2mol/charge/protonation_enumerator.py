@@ -761,9 +761,9 @@ def _handle_non_haptic_group(
                     needs_nonlocal = True
                     non_local_indices.append(idx)
                 elif len(adj_labels) == 2:
-                    if numN == 1 and numO == 1:  # amide
-                        site_proton_counts[idx] = 1
-                    elif numH == 2 and ligand.formula == "H2-C":
+                    # if numN == 1 and numO == 1:  # amide  # exception: FIQHIA
+                    #     site_proton_counts[idx] = 1
+                    if numH == 2 and ligand.formula == "H2-C":
                         site_proton_counts[idx] = 2
                     else:
                         graph = nx.from_numpy_array(ligand.adjmat.astype(float))
