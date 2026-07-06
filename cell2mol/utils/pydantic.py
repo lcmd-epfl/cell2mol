@@ -179,8 +179,16 @@ class BaseModel(pydantic.BaseModel, metaclass=ABCMeta):
         # Serialize each field (can't use handler(self) due to Pydantic caching with cycles)
         data: dict[str, Any] = {"_type": type(self).__name__}
         context = info.context or {}
-        for field_name in type(self).model_fields:
-            value = getattr(self, field_name)
+        for field_name, field_info in type(self).model_fields.items():
+            if hasattr(self, field_name):
+                value = getattr(self, field_name)
+            else:
+                # Backward-compat: plain pickle restores an instance's old
+                # __dict__ verbatim, bypassing field defaults -- an object
+                # pickled before this field existed on the model simply
+                # won't have it set. Fall back to the field's own declared
+                # default rather than crashing serialization.
+                value = field_info.get_default(call_default_factory=True)
             data[field_name] = _serialize_value(value, context)
 
         store.set(self.id, data)
