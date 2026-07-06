@@ -4,11 +4,15 @@ import numpy as np
 import itertools
 import networkx as nx
 from cell2mol.connectivity import add_atom
-from cell2mol.element_utils import get_post_transition_metal_idxs, get_metalloid_idxs
 from dataclasses import dataclass
 from typing import Dict, List, TYPE_CHECKING, cast
 from cell2mol.classes.protonation import Protonation
-from cell2mol.charge.utils import FULLERENES, MANUAL_CHARGE_ASSIGN_SPECIES
+from cell2mol.charge.utils import (
+    MANUAL_CHARGE_ASSIGN_SPECIES,
+    is_fullerene_cage,
+    check_fullerene_sphericity,
+    find_porphyrin_macrocycle_nitrogens,
+)
 from cell2mol.hydrogen import detect_missing_hydrogens, add_hydrogens
 import logging
 
@@ -48,21 +52,46 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
         if specie.is_non_complex_molecule:
             return get_empty_protonation_state(specie)
         else:
+            logger.info(
+                "Specie %s (%s) is a complex molecule. Do not protonate.",
+                specie.formula,
+                specie.subtype,
+            )
             return None
 
-    if specie.formula in MANUAL_CHARGE_ASSIGN_SPECIES or specie.formula in FULLERENES:
+    if specie.formula in MANUAL_CHARGE_ASSIGN_SPECIES:
         return get_empty_protonation_state(specie)
 
-    num_post_tm = len(get_post_transition_metal_idxs(specie.labels))
-    num_metalloids = len(get_metalloid_idxs(specie.labels))
-    if (num_post_tm + num_metalloids) == specie.natoms:
-        logger.info(
-            "Specie %s (%s) consists only of metalloids/post-transition metals. ",
-            specie.formula,
-            specie.subtype,
+    is_fullerene, fullerene_reason = is_fullerene_cage(
+        specie.get_atomic_numbers(), specie.adjmat
+    )
+
+    if is_fullerene:
+        if specie.coord is not None and not check_fullerene_sphericity(specie.coord):
+            logger.warning(
+                "%s passed fullerene topology check but failed sphericity "
+                "check - possible disorder/AC artifact; proceeding anyway",
+                specie.formula,
+            )
+        logger.debug(
+            "Fullerene cage detected for %s (%s)", specie.formula, fullerene_reason
         )
-        logger.info("Skipping protonation enumeration.")
-        return None
+        return get_empty_protonation_state(specie)
+
+    # Porphyrin/porphine N4 macrocycle: enumerate the protonation
+    # states relevant to a metal-coordinated porphyrinato ligand
+    # (see _generate_porphyrin_protonation_states ).
+    is_porphyrin = (
+        specie.is_porphyrin
+        if specie.is_porphyrin is not None
+        else specie.evaluate_as_porphyrin()
+    )
+    if is_porphyrin:
+        logger.debug("Porphyrin macrocycle detected for %s", specie.formula)
+        macrocycle_nitrogens = find_porphyrin_macrocycle_nitrogens(
+            specie.get_atomic_numbers(), specie.adjmat
+        )
+        return _generate_porphyrin_protonation_states(specie, macrocycle_nitrogens)
 
     if specie.subtype == "ligand":
         parent = cast("Specie", specie.get_parent("molecule"))
@@ -87,7 +116,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     process_both_modes: list[int] = []
     protonated_indices_to_reset: list[int] = []  # old : reset_H_indices
 
-    limit_of_nonlocal_sites = 4  # Arbitrary limit to avoid combinatorial explosion
+    limit_of_nonlocal_sites = 8  # Arbitrary limit to avoid combinatorial explosion
 
     logger.info("Processing %s (%s):", specie.formula, specie.subtype)
 
@@ -319,6 +348,72 @@ def get_empty_protonation_state(specie: Specie) -> list[Protonation]:
     return [empty_protonation]
 
 
+def _generate_porphyrin_protonation_states(
+    specie: Specie, macrocycle_nitrogens: list[int] | None
+) -> list[Protonation]:
+    """
+    Five candidate protonation states for a porphyrin/porphine N4
+    macrocycle, covering the chemically relevant forms of the ring:
+      - 0 H added: fully deprotonated (metal-coordinated porphyrinato ligand).
+      - 1 H added: mono-protonated state.
+      - 2 H added on the opposite (non-adjacent) pair of macrocycle
+        nitrogens: the neutral free-base tautomer.
+      - 3 H added: tri-protonated state.
+      - 4 H added on all four macrocycle nitrogens: the doubly-protonated
+        porphyrin dication.
+
+    Falls back to just the empty state if the macrocycle nitrogens
+    could be located.
+    """
+    empty_state = get_empty_protonation_state(specie)[0]
+
+    # negative_moieties = _find_non_coordinated_negative_moiety(specie)
+
+    if macrocycle_nitrogens is None or len(macrocycle_nitrogens) != 4:
+        return [empty_state]
+
+    states = [empty_state]
+
+    # Define the sets of nitrogen atom indices to protonate for each state
+    single_hydrogen = [macrocycle_nitrogens[0]]
+    opposite_pair = [macrocycle_nitrogens[0], macrocycle_nitrogens[2]]
+    triple_hydrogen = [
+        macrocycle_nitrogens[0],
+        macrocycle_nitrogens[1],
+        macrocycle_nitrogens[2],
+    ]
+    all_four = macrocycle_nitrogens
+
+    # Loop through 1, 2, 3, and 4 proton addition states sequentially
+    # for sites in (single_hydrogen, opposite_pair, triple_hydrogen, all_four):
+    for sites in (opposite_pair, all_four):
+        newlab = list(specie.labels)
+        newcoord = list(specie.coord)
+        for site in sites:
+            _, newlab, newcoord = add_atom(
+                newlab, newcoord, site, specie, element="H", unconditional=True
+            )
+
+        site_proton_counts = [0] * len(specie.labels)
+        for site in sites:
+            site_proton_counts[site] = 1
+
+        states.append(
+            Protonation.from_positional(
+                labels=newlab,
+                coord=np.asarray(newcoord),
+                cov_factor=specie.cov_factor,
+                n_protons_added=len(sites),
+                site_proton_counts=site_proton_counts,
+                ligand_donor_electrons=[0] * len(specie.labels),
+                mode="porphyrin",
+                parent=specie,
+            )
+        )
+
+    return states
+
+
 def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     """
     Handle protonation rules for haptic ligand groups.
@@ -491,7 +586,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     # --------------------------------------------------
     if "eta5(Cp)" in g.haptic_type and not selected:
         selected = True
-        # _assign_protonation_sites(1)
+        _assign_protonation_sites(1)
 
     elif "eta6(benzene)" in g.haptic_type and not selected:
         selected = True
