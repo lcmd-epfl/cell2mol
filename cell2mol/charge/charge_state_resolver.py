@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
+import networkx as nx
 from collections import defaultdict
 
 from cell2mol.classes.charge_state import ChargeState
@@ -11,9 +12,14 @@ import logging
 from cell2mol.operations import reorder_element
 from cell2mol.charge.utils import (
     METAL_OXIDATION_STATES,
-    FULLERENES,
+    NOBLE_GASES,
+    TEFLATE,
+    HALOGENS,
     MANUAL_CHARGE_ASSIGN_SPECIES,
     aromatic_info,
+    is_sb_halide_only,
+    is_fullerene_cage,
+    check_fullerene_sphericity,
 )
 from cell2mol.elementdata import ElementData
 from cell2mol.charge.xyz2mol import (
@@ -38,10 +44,11 @@ elemdatabase = ElementData()
 # AC2BO's combinatorial bond-order search can converge on a technically
 # valence-consistent but chemically absurd resonance structure: e.g. an
 # entire ring system drawn with alternating +1/-1 formal charges and no
-# double bonds at all, just to represent a small net charge. Genuine
-# zwitterions/ylides concentrate charge on a handful of atoms; anything
+# double bonds at all, just to represent a small net charge; anything
 # far beyond that is a search artifact, not real chemistry.
 MAX_EXCESS_CHARGE_SEPARATION = 4
+
+ALWAYS_AC2BO_ELEMENTS = {33, 51, 83, 34, 52}  # As, Sb, Bi, Se, Te
 
 
 def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
@@ -76,14 +83,41 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
     # Handle special cases first
     # Manual Assignments
     if spec.formula in MANUAL_CHARGE_ASSIGN_SPECIES:
-        return [generate_manual_charge_state(spec)]
+        charge_state = generate_manual_charge_state(spec)
+        return [charge_state] if charge_state is not None else None
 
     # Fullerenes
-    if spec.formula in FULLERENES:
+    is_fullerene, fullerene_reason = is_fullerene_cage(
+        spec.get_atomic_numbers(), spec.adjmat
+    )
+
+    if is_fullerene:
+        if spec.coord is not None and not check_fullerene_sphericity(spec.coord):
+            logger.warning(
+                "%s passed fullerene topology check but failed sphericity "
+                "check - possible disorder/AC artifact; proceeding anyway",
+                spec.formula,
+            )
         logger.debug(
-            "Skipping charge state enumeration for fullerene: %s", spec.formula
+            "Fullerene cage detected for %s (%s)", spec.formula, fullerene_reason
         )
-        return None
+        charge_state = generate_fullerene_charge_state(spec.protonation_states[0])
+        return [charge_state] if charge_state is not None else None
+
+    # Noble gases (lattice/solvate atoms) are always neutral
+    if spec.formula in NOBLE_GASES:
+        charge_state = generate_noble_gas_charge_state(spec.protonation_states[0])
+        return [charge_state] if charge_state is not None else None
+
+    # Teflate (-OTeF5): fixed hexacoordinate Te(VI) bonding pattern
+    if spec.formula in TEFLATE:
+        charge_state = generate_teflate_charge_state(spec.protonation_states[0])
+        return [charge_state] if charge_state is not None else None
+
+    # Antimony halides: SbX6- (Sb(V)) vs SbX3/X4/X5 (Sb(III)-derived)
+    if is_sb_halide_only(spec.labels):
+        charge_state = generate_sb_halide_charge_state(spec.protonation_states[0])
+        return [charge_state] if charge_state is not None else None
 
     # Haptic Ligands
     is_haptic_c8 = False
@@ -95,8 +129,8 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
             and ligand.groups[0].haptic_type == ["eta8(C8)"]
         )
     if is_haptic_c8:
-        ch_state = generate_charge_state(-1, spec.protonation_states[0])
-        return [ch_state] if ch_state is not None else None
+        charge_state = generate_charge_state(-1, spec.protonation_states[0])
+        return [charge_state] if charge_state is not None else None
 
     for prot in spec.protonation_states:
         logger.debug(
@@ -116,13 +150,19 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
 
     # 3. Enumeration Loop
     valid_charge_states = []
+
     for prot in spec.protonation_states:
         # Get list of integer charges to attempt for this specific protonation
         candidate_charges = get_candidate_charges(prot)
-
         for charge in candidate_charges:
+            if spec.is_porphyrin and charge == 0:
+                allow_charged_fragments = False
+            else:
+                allow_charged_fragments = True
             # Attempt to build the RDKit object and state
-            charge_state = generate_charge_state(charge, prot)
+            charge_state = generate_charge_state(
+                charge, prot, allow_charged_fragments=allow_charged_fragments
+            )
 
             if charge_state:
                 valid_charge_states.append(charge_state)
@@ -201,6 +241,30 @@ def check_possible_valence_problems_from_ac(
             continue
 
         degree = int(np.count_nonzero(ac[i]))
+
+        # Always route through the modified AC2BO bond-order search
+        # (see ALWAYS_AC2BO_ELEMENTS), regardless of whether this
+        # particular degree happens to match a "normal" valence.
+        if atomic_num in ALWAYS_AC2BO_ELEMENTS:
+            neighbors = [
+                {
+                    "atom_idx": int(j),
+                    "atomic_num": int(atoms[j]),
+                    "symbol": pt.GetElementSymbol(int(atoms[j])),
+                }
+                for j in np.where(ac[i] != 0)[0]
+            ]
+            problems.append(
+                {
+                    "atom_idx": int(i),
+                    "atomic_num": int(atomic_num),
+                    "symbol": symbol,
+                    "degree": degree,
+                    "allowed_valences": list(pt.GetValenceList(atomic_num)),
+                    "neighbors": neighbors,
+                }
+            )
+            continue
 
         allowed_valences = list(pt.GetValenceList(atomic_num))
 
@@ -387,8 +451,8 @@ def generate_charge_state(
     ref_uncorr_atom_charges: list[int] | None = None,
 ) -> ChargeState | None:
     """
-    Generates molecular connectivity and atomistic charges from 3D coordinates
-    using xyz2mol, then validates chirality and resonance.
+    Generates molecular connectivity and formal atomic charges from 3D coordinates
+    using modified AC2mol, then validates chirality and resonance.
     """
     # If protonation state is invalid, do not allow charged fragments
     if not prot.status:
@@ -405,9 +469,10 @@ def generate_charge_state(
         allow_charged_fragments,
         prot.n_protons_added,
     )
+
     extra_allowed_valences = {
-        5: [3, 4],  # B, e.g. BF4-
-        7: [3, 4],  # N
+        # 5: [3, 4],  # B, e.g. BF4-
+        7: [2, 3, 4],  # N
         # 15: [3, 5, 6],  # P, e.g. PF6-
         # 33: [3, 5, 6],  # As, e.g. AsF6-
         # 51: [3, 5, 6],  # Sb, e.g. SbF6-
@@ -519,8 +584,8 @@ def generate_charge_state(
         protonation=prot,
     )
 
-    if is_correct:
-        charge_state = get_best_resonance_state(charge_state)
+    # if is_correct:
+    #     charge_state = get_best_resonance_state(charge_state)
 
     return charge_state
 
@@ -535,14 +600,6 @@ def check_rdkit_obj_connectivity(mol: Chem.Mol, natoms: int, charge: int) -> boo
     is_correct = True
 
     # 0. Total Formal Charge Check
-    # AC2BO's internal fallback paths can return a best-effort bond-order
-    # matrix that does NOT actually satisfy the requested target charge
-    # (e.g. when no exact match was found within the try-count budget).
-    # Without this check, such a structure could still pass every
-    # per-atom sanity check below and be marked "correct" even though it
-    # represents a different (and possibly chemically wrong) total charge
-    # than what was asked for -- which then lets it out-compete genuinely
-    # correct candidates downstream via the min-abs-charge tie-break.
     total_formal_charge = sum(
         mol.GetAtomWithIdx(i).GetFormalCharge() for i in range(natoms)
     )
@@ -644,7 +701,6 @@ def get_best_resonance_state(charge_state: ChargeState) -> ChargeState:
     assert prot.natoms is not None
     natoms = prot.natoms
     parent = cast("Specie", prot.parent)
-
     try:
         # Generate resonance structures
         ## We use UNCONSTRAINED_ANIONS/CATIONS if the system is highly charged
@@ -734,37 +790,56 @@ def get_candidate_charges(prot: Protonation) -> list[int]:
         spec.subtype,
         len(spec.protonation_states or []),
     )
+
+    negative_moieties = _find_non_coordinated_negative_moiety(spec)
+    if negative_moieties:
+        # Handle cases with negative moieties
+        logger.debug(
+            "Detected non-coordinated negative moieties for %s: %s",
+            formula,
+            negative_moieties,
+        )
+
     # Determine max charge ranges
     if spec.subtype == "molecule" and spec.is_non_complex_molecule:
         maxcharge = 4
     elif spec.subtype == "ligand":
         ligand = cast("Ligand", spec)
-        atoms = ligand.atoms or []
-        # Count terminal oxygens not coordinateed to metals (e.g., in carboxylates or sulfonates)
-        num_noncoordinated_oxygen = sum(
-            1 for a in atoms if a.label == "O" and a.mconnec == 0 and a.connec == 1
-        )
 
         if not ligand.is_haptic:
             if ligand.denticity is None:
                 ligand.get_denticity()
+
+            is_porphyrin = (
+                ligand.is_porphyrin
+                if ligand.is_porphyrin is not None
+                else ligand.evaluate_as_porphyrin()
+            )
+
+            if is_porphyrin:
+                if len(negative_moieties) > 0:
+                    charges = [-len(negative_moieties)]
+                else:
+                    charges = [0]
+                logger.debug(
+                    "Porphyrin detected for %s; limiting charge states to %s",
+                    formula,
+                    charges,
+                )
+                return charges
+
+            # The count now accurately reflects structural functional groups
             maxcharge = (
-                (ligand.denticity or 0)
-                + num_noncoordinated_oxygen
-                - prot.n_protons_added
+                (ligand.denticity or 0) + len(negative_moieties) - prot.n_protons_added
             )
         else:
             maxcharge = 2
 
         # Constraints: maxcharge should not exceed atom count, clamped between 2 and 4
-        if all((a.mconnec or 0) < 2 for a in atoms):
+        if all((a.mconnec or 0) < 2 for a in ligand.atoms):
             maxcharge = min(maxcharge, ligand.natoms)
 
         maxcharge = max(2, min(maxcharge, 4))
-
-        # If protons were added and it's not nitrosyl, favor neutrality
-        # if not spec.is_nitrosyl and prot.n_protons_added > 0:
-        #     maxcharge = 0
     else:
         maxcharge = 0
 
@@ -790,6 +865,7 @@ def generate_manual_charge_state(spec):
         "H": (None, "[H-]", -1),
         "H2": (None, "[H][H]", 0),
         "N-O3": ("N", "[N+](=O)([O-])[O-]", -1),
+        "Te2": (None, "[Te-][Te-]", -2),
     }
 
     formula = spec.formula
@@ -800,7 +876,6 @@ def generate_manual_charge_state(spec):
         target_atom = "O"
         is_bent = getattr(spec, "NO_type", "") == "Bent"
         smiles, charge = ("[N-]=O", -1) if is_bent else ("[N]=O", 0)
-
     assert smiles is not None, f"No manual SMILES registered for formula {formula}"
 
     # 3. Determine Atom Ordering
@@ -846,6 +921,387 @@ def generate_manual_charge_state(spec):
     )
 
 
+def generate_fullerene_charge_state(prot: Protonation) -> ChargeState | None:
+    """
+    Builds a closed-shell, net-neutral Kekule structure for a fullerene cage.
+
+    A fullerene skeleton is a bridgeless 3-regular graph, which by Petersen's
+    theorem always has a perfect matching. Promoting each matched edge to a
+    double bond gives every carbon its 4th bond directly, with no charge
+    separation and no combinatorial bond-order search -- the kind of search
+    that AC2mol/rdDetermineBonds cannot afford to run over 60+ atoms.
+    """
+    assert (
+        prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
+    )
+
+    graph = nx.from_numpy_array(np.asarray(prot.adjmat))
+    matching = nx.max_weight_matching(graph, maxcardinality=True)
+
+    if len(matching) * 2 != prot.natoms:
+        logger.warning(
+            "No perfect matching found for fullerene %s; cannot build a "
+            "closed-shell Kekule structure",
+            prot.formula,
+        )
+        return None
+
+    double_bonds = {frozenset(pair) for pair in matching}
+
+    rwmol = Chem.RWMol()
+    for atomic_num in prot.atnums:
+        rwmol.AddAtom(Chem.Atom(atomic_num))
+
+    for i, j in graph.edges():
+        bond_type = (
+            Chem.BondType.DOUBLE
+            if frozenset((i, j)) in double_bonds
+            else Chem.BondType.SINGLE
+        )
+        rwmol.AddBond(i, j, bond_type)
+
+    mol = rwmol.GetMol()
+
+    conf = Chem.Conformer(prot.natoms)
+    conf.Set3D(True)
+    for i, xyz in enumerate(np.asarray(prot.coord, dtype=float)):
+        conf.SetAtomPosition(i, Point3D(float(xyz[0]), float(xyz[1]), float(xyz[2])))
+    mol.AddConformer(conf, assignId=True)
+
+    try:
+        # Skip aromaticity perception: RDKit's Hueckel-based model is not
+        # meant for curved, fused 5/6-ring cages and can misfire on it. The
+        # explicit single/double bonds above already fully describe the
+        # structure.
+        Chem.SanitizeMol(
+            mol, sanitizeOps=Chem.SANITIZE_ALL ^ Chem.SANITIZE_SETAROMATICITY
+        )
+    except Exception as e:
+        logger.warning(
+            "Failed to sanitize fullerene Kekule structure for %s: %s",
+            prot.formula,
+            e,
+        )
+        return None
+
+    atom_charges = [atom.GetFormalCharge() for atom in mol.GetAtoms()]
+    total_charge = sum(atom_charges)
+    smiles = Chem.MolToSmiles(mol)
+
+    is_correct = check_rdkit_obj_connectivity(mol, prot.natoms, 0)
+
+    return ChargeState.from_positional(
+        is_correct,
+        total_charge,
+        atom_charges,
+        mol,
+        smiles,
+        0,
+        True,
+        prot,
+    )
+
+
+def generate_noble_gas_charge_state(prot: Protonation) -> ChargeState | None:
+    """
+    Noble gas atoms found in a crystal (solvate/lattice atoms, host cavities,
+    etc.) are always neutral -- they don't form stable ions under these
+    conditions, so skip the bond-order search and assign a single neutral
+    atom directly.
+    """
+    if prot.natoms != 1 or not prot.atnums:
+        logger.warning(
+            "Unexpected structure for noble gas specie %s; expected a single atom",
+            prot.formula,
+        )
+        return None
+
+    rwmol = Chem.RWMol()
+    rwmol.AddAtom(Chem.Atom(prot.atnums[0]))
+    mol = rwmol.GetMol()
+    Chem.SanitizeMol(mol)
+
+    smiles = Chem.MolToSmiles(mol)
+
+    return ChargeState.from_positional(
+        True,
+        0,
+        [0],
+        mol,
+        smiles,
+        0,
+        True,
+        prot,
+    )
+
+
+def generate_teflate_charge_state(prot: Protonation) -> ChargeState | None:
+    """
+    Builds the -OTeF5 ("teflate", pentafluorooxotellurate(VI)) ligand
+    directly from its connectivity: a hexacoordinate Te(VI) bonded to 5 F
+    and 1 O, all single bonds, with the -1 charge sitting on the terminal
+    O. The bonding pattern is fixed and unambiguous, so this skips the
+    general bond-order search entirely.
+    """
+    assert (
+        prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
+    )
+
+    o_indices = [i for i, label in enumerate(prot.labels) if label == "O"]
+    if len(o_indices) != 1:
+        logger.warning(
+            "Unexpected structure for teflate specie %s; expected exactly one O",
+            prot.formula,
+        )
+        return None
+
+    rwmol = Chem.RWMol()
+    for atomic_num in prot.atnums:
+        rwmol.AddAtom(Chem.Atom(atomic_num))
+
+    adjmat = np.asarray(prot.adjmat)
+    for i in range(prot.natoms):
+        for j in range(i + 1, prot.natoms):
+            if adjmat[i, j] != 0:
+                rwmol.AddBond(i, j, Chem.BondType.SINGLE)
+
+    rwmol.GetAtomWithIdx(o_indices[0]).SetFormalCharge(-1)
+
+    mol = rwmol.GetMol()
+
+    conf = Chem.Conformer(prot.natoms)
+    conf.Set3D(True)
+    for i, xyz in enumerate(np.asarray(prot.coord, dtype=float)):
+        conf.SetAtomPosition(i, Point3D(float(xyz[0]), float(xyz[1]), float(xyz[2])))
+    mol.AddConformer(conf, assignId=True)
+
+    try:
+        Chem.SanitizeMol(mol)
+    except Exception as e:
+        logger.warning(
+            "Failed to sanitize teflate structure for %s: %s", prot.formula, e
+        )
+        return None
+
+    atom_charges = [atom.GetFormalCharge() for atom in mol.GetAtoms()]
+    total_charge = sum(atom_charges)
+    smiles = Chem.MolToSmiles(mol)
+
+    is_correct = check_rdkit_obj_connectivity(mol, prot.natoms, -1)
+
+    return ChargeState.from_positional(
+        is_correct,
+        total_charge,
+        atom_charges,
+        mol,
+        smiles,
+        -1,
+        True,
+        prot,
+    )
+
+
+def generate_sb_halide_charge_state(prot: Protonation) -> ChargeState | None:
+    """
+    Builds Sb/halogen-only species directly from connectivity.
+
+    Mononuclear species (single Sb center): each Sb's formal charge is set
+    from its own halogen coordination number, since degree directly tracks
+    oxidation state here. Hexacoordinate Sb (SbX6-) gets formal charge -1
+    (0 lone pairs, matching the existing xyz2mol special case for
+    AsX6-/PX6-). Every other coordination number (3, 4, 5) keeps one lone
+    pair, giving formal charge = 3 - degree: neutral SbX3, SbX4-, SbX5(2-).
+
+    Polynuclear species (multiple Sb centers, e.g. bridged iodoantimonate
+    clusters like [Sb7I25]4-): coordination number stops tracking
+    oxidation state once halogens bridge between metal centers -- a
+    degree-6 Sb here is typically still Sb(III), with the extra
+    coordination coming from sharing ligands with neighboring Sb centers,
+    not from oxidation. These clusters are essentially always built from
+    Sb(III) + halide ligands, so the total charge is fixed at
+    3 * n_Sb - n_halogens, but rather than putting +3 on every Sb and -1
+    on every halogen (which cancel almost everywhere and just clutter the
+    SMILES), Sb centers are drawn neutral and the charge is instead
+    distributed across only as many halogens as needed to hit that total
+    -- one per Sb, round-robin -- so most halogens are drawn as plain
+    covalent X and only the "extra" ones needed to balance the charge are
+    shown as X-.
+    """
+    assert (
+        prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
+    )
+
+    sb_indices = [i for i, label in enumerate(prot.labels) if label == "Sb"]
+    halogen_indices = [i for i, label in enumerate(prot.labels) if label in HALOGENS]
+
+    if not sb_indices or (len(sb_indices) + len(halogen_indices)) != prot.natoms:
+        logger.warning(
+            "Unexpected structure for Sb-halide specie %s; expected only Sb and halogens",
+            prot.formula,
+        )
+        return None
+
+    adjmat = np.asarray(prot.adjmat)
+
+    rwmol = Chem.RWMol()
+    for atomic_num in prot.atnums:
+        rwmol.AddAtom(Chem.Atom(atomic_num))
+
+    for i in range(prot.natoms):
+        for j in range(i + 1, prot.natoms):
+            if adjmat[i, j] != 0:
+                rwmol.AddBond(i, j, Chem.BondType.SINGLE)
+
+    is_polynuclear = len(sb_indices) > 1
+    for idx in sb_indices:
+        sb_atom = rwmol.GetAtomWithIdx(idx)
+        sb_atom.SetNoImplicit(True)
+
+        if not is_polynuclear:
+            degree = int(np.count_nonzero(adjmat[idx]))
+            sb_charge = -1 if degree == 6 else 3 - degree
+            sb_atom.SetFormalCharge(sb_charge)
+        # Polynuclear Sb centers stay formally neutral here -- the total
+        # charge is distributed across the halogens below instead.
+
+    if is_polynuclear:
+        # Every halogen may end up with >1 explicit bond (bridging) or a
+        # -1 charge, either of which violates RDKit's default halogen
+        # valence table, so bypass implicit-valence handling uniformly.
+        for j in halogen_indices:
+            rwmol.GetAtomWithIdx(j).SetNoImplicit(True)
+
+        # Distribute exactly enough -1 charges across the halogens so the
+        # total comes out to 3 * n_Sb - n_halogens: one per Sb, round-robin,
+        # so it's spread evenly across centers rather than piled onto a
+        # few. Bridging halogens aren't required to carry it -- prefer a
+        # terminal neighbor (bonded to just this one Sb) and only fall
+        # back to a bridging one if this Sb has no terminal neighbor left.
+        halogen_sb_degree = {
+            j: sum(1 for idx in sb_indices if adjmat[idx, j] != 0)
+            for j in halogen_indices
+        }
+        n_negative = len(halogen_indices) - 3 * len(sb_indices)
+        assigned: set[int] = set()
+        remaining = n_negative
+        while remaining > 0:
+            progressed = False
+            for idx in sb_indices:
+                if remaining <= 0:
+                    break
+                candidates = [
+                    j
+                    for j in halogen_indices
+                    if j not in assigned and adjmat[idx, j] != 0
+                ]
+                if not candidates:
+                    continue
+                j = min(candidates, key=lambda j: halogen_sb_degree[j])
+                rwmol.GetAtomWithIdx(j).SetFormalCharge(-1)
+                assigned.add(j)
+                remaining -= 1
+                progressed = True
+            if not progressed:
+                logger.warning(
+                    "Could not distribute full negative charge across "
+                    "halogens for %s; %d unit(s) left unassigned",
+                    prot.formula,
+                    remaining,
+                )
+                break
+
+    mol = rwmol.GetMol()
+
+    conf = Chem.Conformer(prot.natoms)
+    conf.Set3D(True)
+    for i, xyz in enumerate(np.asarray(prot.coord, dtype=float)):
+        conf.SetAtomPosition(i, Point3D(float(xyz[0]), float(xyz[1]), float(xyz[2])))
+    mol.AddConformer(conf, assignId=True)
+
+    try:
+        Chem.SanitizeMol(
+            mol,
+            # SANITIZE_PROPERTIES: skip, since a neutral bridging halogen
+            # (2 bonds, e.g. mu-X in a polynuclear cluster) exceeds
+            # RDKit's default halogen valence table.
+            # SANITIZE_CLEANUP_ORGANOMETALLICS: skip too, since otherwise
+            # RDKit "fixes" that same neutral bridging halogen by silently
+            # reinterpreting its second bond as dative (X->Sb) instead of
+            # leaving it as the plain single bond we intend.
+            sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL
+            ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES
+            ^ Chem.SanitizeFlags.SANITIZE_CLEANUP_ORGANOMETALLICS,
+        )
+    except Exception as e:
+        logger.warning(
+            "Failed to sanitize Sb-halide structure for %s: %s", prot.formula, e
+        )
+        return None
+
+    atom_charges = [atom.GetFormalCharge() for atom in mol.GetAtoms()]
+    total_charge = sum(atom_charges)
+    smiles = Chem.MolToSmiles(mol)
+
+    is_correct = True
+
+    return ChargeState.from_positional(
+        is_correct,
+        total_charge,
+        atom_charges,
+        mol,
+        smiles,
+        total_charge,
+        True,
+        prot,
+    )
+
+
+def _find_non_coordinated_negative_moiety(
+    spec: Specie,
+) -> list[tuple[int, list[int], str]]:
+    """
+    Finds non-coordinated carboxylate (C + 2 terminal O),
+    sulfonate (S + 3 terminal O)
+
+    Returns (center_idx, oxygen_idxs, kind) tuples using *local* indices
+    into spec.atoms -- the same ordering used to build any RDKit mol from
+    this specie's protonation states (prot.atnums/prot.adjmat preserve
+    spec.labels order, appending any added protons at the end).
+    """
+    atoms = spec.atoms or []
+    parent_molecule = spec.get_parent("molecule")
+    neighbor_source = (
+        parent_molecule.atoms
+        if parent_molecule is not None and parent_molecule.atoms is not None
+        else atoms
+    )
+    local_idx_by_id = {id(a): idx for idx, a in enumerate(atoms)}
+
+    groups: list[tuple[int, list[int], str]] = []
+    for i, atom in enumerate(atoms):
+        if atom.label not in ("C", "S"):
+            continue
+
+        oxygen_locals = []
+        for j in atom.adjacency:
+            neighbor = neighbor_source[j]
+            if (
+                neighbor.label == "O"
+                and (neighbor.connec or 0) == 1
+                and (neighbor.mconnec or 0) == 0
+            ):
+                local_j = local_idx_by_id.get(id(neighbor))
+                if local_j is not None:
+                    oxygen_locals.append(local_j)
+
+        if atom.label == "C" and len(oxygen_locals) == 2:
+            groups.append((i, oxygen_locals, "carboxylate"))
+        elif atom.label == "S" and len(oxygen_locals) == 3:
+            groups.append((i, oxygen_locals, "sulfonate"))
+
+    return groups
+
+
 def get_metal_poscharges(metal: Metal) -> list[int]:
     """
     Retrieve common oxidation states for a given metal atom.
@@ -872,66 +1328,6 @@ def get_metal_poscharges(metal: Metal) -> list[int]:
             poscharges.append(0)
 
     return poscharges
-
-
-def _get_atomic_valence_candidates(
-    prot: Protonation, allow_carbenes: bool = False
-) -> tuple[list[list[int]], list[int]]:
-    """
-    Determines potential valence states for each atom in a ligand based on connectivity.
-    Args:
-        prot: Protonation object containing 'labels' (element symbols) and 'adjmat' (adjacency matrix).
-        allow_carbenes (bool): If False, excludes divalent Carbon states.
-
-    Returns:
-        tuple: (valences_list_of_lists, sorted_valences_list)
-            - valences_list_of_lists: List of possible valence integers for each atom.
-            - sorted_valences_list: A prioritized/combined list of valence configurations.
-    """
-    import itertools
-    from cell2mol.charge.xyz2mol import atomic_valence, get_sorted_valences_list
-
-    assert prot.adjmat is not None
-
-    # Convert element labels to atomic numbers
-    atomic_nums = [elemdatabase.elementnr[label] for label in prot.labels]
-    # Calculate current coordination number (sum of bonds for each atom)
-    current_valences = prot.adjmat.sum(axis=1).astype(int)
-
-    valences_list_of_lists: list[list[int]] = []
-    for atomic_num, curr_v in zip(atomic_nums, current_valences):
-        # Initial filter: candidate valences must be >= current connectivity
-        candidates = [v for v in atomic_valence.get(atomic_num, []) if v >= curr_v]
-
-        if atomic_num == 6:  # Carbon logic
-            if curr_v == 1 and 2 in candidates:
-                candidates.remove(2)
-            elif curr_v == 2:
-                if not allow_carbenes and 2 in candidates:
-                    candidates.remove(2)
-                candidates.append(3)  #
-
-        elif atomic_num == 7:  # Nitrogen logic
-            if curr_v not in candidates:
-                candidates.append(curr_v)
-
-        valences_list_of_lists.append(candidates)
-
-    sorted_gen = get_sorted_valences_list(valences_list_of_lists, atomic_nums)
-
-    # Use islice to safely take only the first 50 entries
-    # This prevents calculating millions of combinations you don't need
-    first_valences: list[int] = (
-        list(list(itertools.islice(sorted_gen, 1))[0]) if sorted_gen is not None else []
-    )
-    logger.debug(
-        "Specie %s first entry of valences: %s",
-        prot.formula,
-        first_valences,
-    )
-    for label, valences in zip(prot.labels, first_valences):
-        logger.debug("  Atom %s valence: %s", label, valences)
-    return valences_list_of_lists, first_valences
 
 
 def identify_best_charge_states(charge_states: list[ChargeState]) -> list[ChargeState]:
@@ -966,7 +1362,8 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
 
         # CASE 1: Only one candidate for this charge
         if len(group) == 1:
-            best_structure = get_best_resonance_state(group[0])
+            # best_structure = get_best_resonance_state(group[0])
+            best_structure = group[0]
             final_states.append(best_structure)
 
         # CASE 2: Multiple candidates
