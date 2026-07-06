@@ -66,6 +66,7 @@ class Specie(BaseModel):
     madjmat: NDArray | None = None
     madjnum: NDArray | None = None
     protonation_states: list[Protonation] | None = None
+    is_porphyrin: bool | None = None
     rdkit_obj: RDKitObject | None = Field(default=None)
     smiles: str | None = None
     subtype: SubType | None = None
@@ -242,6 +243,19 @@ class Specie(BaseModel):
         for at in self.atoms or []:
             self.atnums.append(at.atnum)
         return self.atnums
+
+    def evaluate_as_porphyrin(self) -> bool:
+        """
+        Detect a porphyrin/porphine N4 macrocycle (applies to both ligands
+        and non-complex molecules) and cache the result on self.is_porphyrin.
+        """
+        from cell2mol.charge.utils import is_porphyrin_macrocycle
+
+        is_porphyrin, _ = is_porphyrin_macrocycle(
+            self.get_atomic_numbers(), self.adjmat
+        )
+        self.is_porphyrin = is_porphyrin
+        return self.is_porphyrin
 
     def set_element_count(self, heavy_only: bool = False):
         self.element_count = get_element_count(self.labels, heavy_only=heavy_only)
