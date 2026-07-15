@@ -359,6 +359,13 @@ class Molecule(Specie):
             logger.debug("ligands=%s", [lig.formula for lig in self.ligands or []])
         else:
             logger.info("No metals found in molecule: %s", self.formula)
+            if self.is_non_complex_molecule:
+                self.evaluate_has_fullerene()
+                if self.has_fullerene:
+                    logger.debug("Molecule %s has a fullerene", self.formula)
+                self.evaluate_has_porphyrin()
+                if self.has_porphyrin:
+                    logger.debug("Molecule %s has a porphyrin", self.formula)
             return
 
         for met in self.metals or []:
@@ -395,6 +402,15 @@ class Molecule(Specie):
                     logger.debug(
                         f"    Atom: {atom.atom_site_label}, connec: {atom.connec} mconnec: {atom.mconnec}"
                     )
+            lig.evaluate_has_fullerene()
+            if lig.has_fullerene:
+                logger.debug("Ligand %s has a fullerene", lig.formula)
+            lig.evaluate_has_porphyrin()
+            if lig.has_porphyrin:
+                logger.debug("Ligand %s has a porphyrin", lig.formula)
+            lig.evaluate_as_nitrosyl()
+            if lig.is_nitrosyl:
+                logger.debug("Ligand %s is a nitrosyl", lig.formula)
 
     def map_metal_groups_to_ligands(self):
         """
