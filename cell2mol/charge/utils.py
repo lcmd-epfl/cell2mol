@@ -1,6 +1,14 @@
-from cell2mol.my_types import RDKitObject
+from __future__ import annotations
+
 import numpy as np
-import networkx as nx
+import logging
+from cell2mol.my_types import RDKitObject
+from rdkit import Chem
+from cell2mol.charge.xyz2mol import get_proto_mol, AC2mol, chiral_stereo_check
+from rdkit.Geometry import Point3D
+from rdkit.Chem import rdDetermineBonds
+
+logger = logging.getLogger(__name__)
 
 # Monatomic noble gases
 NOBLE_GASES = {"He", "Ne", "Ar", "Kr", "Xe", "Rn"}
@@ -21,21 +29,7 @@ MANUAL_CHARGE_ASSIGN_SPECIES = {
     "Te2",
 }
 
-# Pentafluorooxotellurate(VI) ("teflate", -OTeF5) ligand
-TEFLATE = {"O-F5-Te"}
-
 HALOGENS = {"F", "Cl", "Br", "I"}
-
-
-def is_sb_halide_only(labels) -> bool:
-    """
-    True for species made up of only Sb and halogens (SbX3/X4/X5/X6-type),
-    regardless of halogen identity or count.
-    """
-    return "Sb" in labels and all(
-        label in HALOGENS or label == "Sb" for label in labels
-    )
-
 
 # Plausible oxidation states by atomic symbol
 # Source: Venkataraman et al., J. Chem. Educ. 1997, 74, 915.
@@ -130,6 +124,30 @@ METAL_OXIDATION_STATES = {
 }
 
 
+# AC2mol's combinatorial bond-order search can converge on a technically
+# valence-consistent but chemically absurd resonance structure: e.g. an
+# entire ring system drawn with alternating +1/-1 formal charges and no
+# double bonds at all, just to represent a small net charge; anything
+# far beyond that is a search artifact, not real chemistry.
+MAX_EXCESS_CHARGE_SEPARATION = 4
+
+rdkit_atomic_valence: dict[int, list[int]] = {
+    1: [1],  # H
+    5: [3, 4],  # B
+    6: [4],  # C
+    7: [3, 4],  # N
+    8: [2, 1, 3],  # O
+    9: [1],  # F
+    14: [4],  # Si
+    15: [5, 3],  # P
+    16: [6, 3, 2, 1],  # S
+    17: [1],  # Cl
+    32: [4],  # Ge
+    35: [1],  # Br
+    53: [1],  # I
+}
+
+
 def aromatic_info(mol: RDKitObject, added_indices=None):
     if added_indices is None:
         added_indices = []
@@ -155,286 +173,334 @@ def aromatic_info(mol: RDKitObject, added_indices=None):
     }
 
 
-def _valid_fullerene_vertex_count(n: int) -> bool:
-    return n >= 20 and n % 2 == 0 and n != 22
+def _nitro_charge_atom_indices(mol: Chem.Mol, natoms: int) -> set[int]:
+    """Indices of atoms whose formal charge belongs to a nitro group,
+    ``[N+](=O)[O-]`` -- the N(+1) and the single-bonded terminal O(-1).
 
-
-def is_fullerene_cage(atoms, AC) -> tuple[bool, str]:
+    Detected locally (no sanitisation/aromaticity needed): an N with formal
+    charge +1 bearing both a single-bonded O(-1) and a double-bonded O(0).
+    Used to exempt this obligate charge separation from the excess-charge check.
     """
-    Detect any fullerene cage (C20, C60, C70, C76, C84, ...) purely from
-    connectivity - no bond orders, no coordinates required.
+    nitro_atoms: set[int] = set()
+    for i in range(natoms):
+        atom = mol.GetAtomWithIdx(i)
+        if atom.GetAtomicNum() != 7 or atom.GetFormalCharge() != 1:
+            continue
+        o_minus = None
+        has_o_double = False
+        for nb in atom.GetNeighbors():
+            if nb.GetAtomicNum() != 8:
+                continue
+            bond = mol.GetBondBetweenAtoms(i, nb.GetIdx())
+            if nb.GetFormalCharge() == -1 and bond.GetBondType() == Chem.BondType.SINGLE:
+                o_minus = nb.GetIdx()
+            elif nb.GetFormalCharge() == 0 and bond.GetBondType() == Chem.BondType.DOUBLE:
+                has_o_double = True
+        if o_minus is not None and has_o_double:
+            nitro_atoms.add(i)
+            nitro_atoms.add(o_minus)
+    return nitro_atoms
 
-    A graph is a fullerene skeleton iff it is:
-      1. pure carbon
-      2. 3-regular (every atom has exactly 3 neighbors)
-      3. a single connected component
-      4. planar (embeds on a sphere - a topological requirement for any
-         closed convex-ish cage)
-      5. girth >= 5 (no 3- or 4-membered rings/faces; fullerene faces are
-         only pentagons and hexagons by construction)
-      6. has a valid fullerene vertex count (even, >=20, != 22)
 
-    Given 2-6, Euler's formula (V - E + F = 2) combined with the pentagon/
-    hexagon face constraint forces exactly 12 pentagonal faces regardless
-    of n - that part never needs to be checked separately, it's automatic.
+def check_rdkit_obj_connectivity(mol: Chem.Mol, natoms: int, charge: int) -> bool:
+    """
+    Validates the chemical sanity of an RDKit molecule object by checking
+    valences, lone pairs, bond connectivity, and that the total formal
+    charge actually matches the requested target charge.
+    """
+    pt = Chem.GetPeriodicTable()
+    is_correct = True
+
+    # 0. Total Formal Charge Check
+    total_formal_charge = sum(
+        mol.GetAtomWithIdx(i).GetFormalCharge() for i in range(natoms)
+    )
+    if total_formal_charge != charge:
+        logger.debug(
+            "   Total formal charge mismatch: got %d, expected %d",
+            total_formal_charge,
+            charge,
+        )
+        is_correct = False
+
+    # 0b. Charge Separation Sanity Check
+    # A valid Lewis structure can concentrate the net charge on a small
+    # number of atoms (a real zwitterion/ylide), but a structure requiring
+    # far more formal charge than the net charge demands is a bond-order
+    # search artifact (see MAX_EXCESS_CHARGE_SEPARATION above), not a
+    # legitimate resonance form.
+    #
+    # Exception: a nitro group [N+](=O)[O-] is an *obligate* charge-separated
+    # group -- there is no neutral Lewis structure for it -- so its +1/-1 pair
+    # is real chemistry, not a search artifact. A polynitro compound may
+    # legitimately carry many (e.g. an octanitro-porphyrin: 8 * (|+1|+|-1|) =
+    # 16). Exclude nitro N+/O- charges before measuring separation; a genuine
+    # artifact (alternating +/- around a ring/chain) is untouched.
+    nitro_charge_atoms = _nitro_charge_atom_indices(mol, natoms)
+    total_abs_atom_charge = sum(
+        abs(mol.GetAtomWithIdx(i).GetFormalCharge())
+        for i in range(natoms)
+        if i not in nitro_charge_atoms
+    )
+    if total_abs_atom_charge > abs(charge) + MAX_EXCESS_CHARGE_SEPARATION:
+        logger.debug(
+            "   Excessive charge separation: total |formal charge| on atoms = %d, "
+            "target net charge = %d (max allowed excess = %d)",
+            total_abs_atom_charge,
+            charge,
+            MAX_EXCESS_CHARGE_SEPARATION,
+        )
+        is_correct = False
+
+    for i in range(natoms):
+        atom = mol.GetAtomWithIdx(i)
+        symbol = atom.GetSymbol()
+        formal_charge = atom.GetFormalCharge()
+        # Old : valence = atom.GetTotalValence()
+        try:
+            # New RDKit API (2024.03+)
+            valence = atom.GetValence(Chem.ValenceType.TOTAL)
+        except AttributeError:
+            # Fallback for older RDKit versions if ValenceType doesn't exist
+            valence = atom.GetTotalValence()
+
+        # Calculate lone pairs: (Valence Electrons - Formal Charge - Shared Electrons) / 2
+        num_valence_electrons = pt.GetNOuterElecs(atom.GetAtomicNum())
+        lone_pairs = (num_valence_electrons - formal_charge - valence) / 2
+
+        # 1. Lone Pair Sanity Check
+        if lone_pairs not in [0, 1, 2, 3, 4]:
+            logger.debug("   Lone pair error at atom %d (%s): %f", i, symbol, lone_pairs)
+            is_correct = False
+
+        # 2. Aromaticity & Bond Consistency Check
+        # We check total shared electrons (valence) against the RDKit valence model
+        is_aromatic = atom.GetIsAromatic()
+
+        if not is_aromatic:
+            try:
+                # New RDKit API
+                explicit = atom.GetValence(Chem.ValenceType.EXPLICIT)
+                implicit = atom.GetValence(Chem.ValenceType.IMPLICIT)
+            except AttributeError:
+                # Old RDKit API
+                explicit = atom.GetExplicitValence()
+                implicit = atom.GetImplicitValence()
+
+            # Check if calculated shared electrons match expected valence
+            if valence != explicit + implicit:
+                logger.debug("   Valence mismatch at atom %d (%s)", i, symbol)
+                is_correct = False
+
+            # 3. Total Electron Count Check
+            # Shared electrons + electrons in lone pairs + charge should equal outer shell count
+            calc_total_elecs = valence + (int(lone_pairs) * 2) + formal_charge
+            if calc_total_elecs != num_valence_electrons:
+                logger.debug("   Total electron count mismatch at atom %d (%s)", i, symbol)
+                is_correct = False
+
+        # logger.debug(
+        #     "Charge: %d | Atom: %2d %2s | Q: %2d | V: %2d | LP: %2d | Correct: %s",
+        #     charge,
+        #     i,
+        #     symbol,
+        #     formal_charge,
+        #     valence,
+        #     lone_pairs,
+        #     is_correct,
+        # )
+
+    # 4. Reducible charged-carbon pair check
+    # rdDetermineBonds sometimes "pays" for a C=C double bond it fails to
+    # place by splitting it into an adjacent charged-carbon pair, so a bond
+    # that should be C=C comes back as either:
+    #   - [C+]-[C-] (opposite charges): the carbanion lone pair would fill
+    #     the carbocation's empty orbital to give a neutral C=C -- an
+    #     electron-conserving stand-in for the missing double bond; or
+    #   - [C-]-[C-] (both carbanions): the two lone pairs would pair into the
+    #     missing double bond, neutralising both.
+    # Either way a lower-|charge| structure exists at a nearby charge, so the
+    # separated form is a bond-order-search artifact, not a ground-state
+    # Lewis form -- it is what leaves a toluene ring looking like a valid
+    # -2/-4 state or a cyclopentadiene ring like a valid -4 tetra-anion, even
+    # though every per-atom valence check above passes.
+    #
+    # Only C/C pairs are tested, so genuine heteroatom ylides (P+=C-, diazo
+    # C-=N+) are untouched. Opposite-sign pairs are always rejected
+    # (including the aromatic [c+]-[c-] form). Same-sign carbanion pairs are
+    # rejected only when non-aromatic and not already multiply bonded, so a
+    # delocalised aromatic poly-anion (Cp-, cyclooctatetraene dianion, ...)
+    # and an acetylide/carbide triple bond ([C-]#[C-], no room for a further
+    # bond) are both left intact. Two carbocations are never flagged -- with
+    # no lone pair on either, they cannot pair into a double bond.
+    for bond in mol.GetBonds():
+        begin_atom, end_atom = bond.GetBeginAtom(), bond.GetEndAtom()
+        if begin_atom.GetAtomicNum() != 6 or end_atom.GetAtomicNum() != 6:
+            continue
+        q_begin, q_end = begin_atom.GetFormalCharge(), end_atom.GetFormalCharge()
+        if q_begin == 0 or q_end == 0:
+            continue
+
+        opposite_sign = (q_begin > 0) != (q_end > 0)
+        both_carbanion = q_begin < 0 and q_end < 0
+        if both_carbanion:
+            # Only a localised (non-aromatic) single/double bond has a lone
+            # pair pair-up available; an aromatic ring anion or an existing
+            # triple bond does not.
+            if begin_atom.GetIsAromatic() or end_atom.GetIsAromatic():
+                continue
+            if bond.GetBondTypeAsDouble() >= 3:
+                continue
+        elif not opposite_sign:
+            continue  # two carbocations cannot pair into a double bond
+
+        logger.debug(
+            "   Reducible C%+d/C%+d pair at atoms %d-%d (missing C=C double bond)",
+            q_begin,
+            q_end,
+            begin_atom.GetIdx(),
+            end_atom.GetIdx(),
+        )
+        is_correct = False
+        break
+
+    return is_correct
+
+
+def generate_rdkit_mol_from_rdDetermineBonds(
+    atoms,
+    coords,
+    AC,
+    charge=0,
+    sanitize=True,
+    allow_charged_fragments=True,
+    embed_chiral=True,
+):
+    """
+    Build an RDKit Mol object from atomic numbers, coordinates, and
+    adjacency matrix from a protonation state, and
+    then assign bond orders using rdDetermineBonds.DetermineBondOrders.
+    Parameters
+    ----------
+    atoms : list[int]
+        Atomic numbers, e.g. [6, 1, 1, 1, 1]
+    coords : array-like, shape (n_atoms, 3)
+        Cartesian coordinates.
+    AC : array-like, shape (n_atoms, n_atoms)
+        Connectivity matrix. Nonzero means bonded.
+    charge : int
+        Total molecular charge.
+    sanitize : bool
+        Whether to sanitize after bond-order assignment.
+    allow_charged_fragments : bool
+        Whether to allow charged fragments.
+    embed_chiral : bool
+        Whether to embed chiral information.
 
     Returns
     -------
-    (is_fullerene, reason) : tuple[bool, str]
+    mol : rdkit.Chem.Mol
     """
-    atoms = [int(a) for a in atoms]
-    # Ligand adjmats inherited/sliced from a parent molecule's matrix can
-    # come through as dtype=object (values are still plain ints, just
-    # boxed) -- networkx's from_numpy_array rejects that dtype outright,
-    # so force a numeric dtype here rather than passing AC through as-is.
-    ac = np.asarray(AC, dtype=int)
-    n = len(atoms)
 
-    if ac.shape != (n, n):
-        return False, "bad_ac_shape"
-
-    # 1. Composition - classic crystallographic fullerene entries are bare
-    #    carbon cages. (Endohedral/exohedral-functionalized fullerenes need
-    #    a separate, more careful check - flagged, not handled here.)
-    if not all(z == 6 for z in atoms):
-        return False, "not_pure_carbon"
-
-    # 2. Vertex count sanity filter (cheap, do before graph algorithms)
-    if not _valid_fullerene_vertex_count(n):
-        return False, "invalid_fullerene_vertex_count"
-
-    # 3. Degree check - every carbon must be exactly 3-connected
-    degrees = np.count_nonzero(ac, axis=1)
-    if not np.all(degrees == 3):
-        return False, "not_all_degree_3"
-
-    graph = nx.from_numpy_array(ac)
-
-    # 4. Must be one connected cage, not fragments/disorder artifacts
-    if not nx.is_connected(graph):
-        return False, "disconnected_structure"
-
-    # 5. Planarity - required for any genuine closed polyhedral cage
-    is_planar, _ = nx.check_planarity(graph)
-    if not is_planar:
-        return False, "not_planar"
-
-    # 6. Girth >= 5 - rules out graphs with spurious 3/4-membered rings
-    #    (e.g. AC-matrix artifacts from disorder, or a non-fullerene cage)
-    girth = _graph_girth(graph)
-    if girth < 5:
-        return False, f"girth_too_small_{girth}"
-
-    return True, "fullerene_topology_confirmed"
-
-
-def _graph_girth(graph: nx.Graph) -> int:
-    """Length of the shortest cycle in the graph. networkx>=3.0 has
-    nx.girth(); fall back to a BFS-based computation for older versions."""
-    if hasattr(nx, "girth"):
-        g = nx.girth(graph)
-        return g if g != float("inf") else 10**9
-    # Fallback: BFS from every node, shortest cycle through it
-    best = 10**9
-    for src in graph.nodes():
-        dist = {src: 0}
-        parent = {src: None}
-        queue = [src]
-        while queue:
-            u = queue.pop(0)
-            for v in graph.neighbors(u):
-                if v not in dist:
-                    dist[v] = dist[u] + 1
-                    parent[v] = u
-                    queue.append(v)
-                elif parent[u] != v:
-                    best = min(best, dist[u] + dist[v] + 1)
-        if best <= 5:
-            break  # can't do better than girth 5 for a fullerene anyway
-    return best
-
-
-def check_fullerene_sphericity(coords, tol: float = 0.35) -> bool:
-    """
-    Optional geometric cross-check using 3D coordinates: fullerene cages are
-    near-perfect spheres, so all atoms should sit at nearly the same radius
-    from the centroid. Large variance flags a disordered or malformed AC
-    matrix even if the topology check above passed.
-    """
+    atoms = list(map(int, atoms))
     coords = np.asarray(coords, dtype=float)
-    centroid = coords.mean(axis=0)
-    radii = np.linalg.norm(coords - centroid, axis=1)
-    return (radii.std() / radii.mean()) < tol
+    ac = np.asarray(AC)
+    n_atoms = len(atoms)
+
+    if coords.shape != (n_atoms, 3):
+        raise ValueError(f"coords must have shape ({n_atoms}, 3), got {coords.shape}")
+
+    if ac.shape != (n_atoms, n_atoms):
+        raise ValueError(f"AC must have shape ({n_atoms}, {n_atoms}), got {ac.shape}")
+
+    rwMol = Chem.RWMol()
+
+    # Add atoms
+    for atomic_num in atoms:
+        rwMol.AddAtom(Chem.Atom(atomic_num))
+
+    # Add connectivity as single bonds first
+    for i in range(n_atoms):
+        for j in range(i + 1, n_atoms):
+            if ac[i, j] != 0:
+                rwMol.AddBond(i, j, Chem.BondType.SINGLE)
+
+    mol = rwMol.GetMol()
+
+    # Add coordinates
+    conf = Chem.Conformer(n_atoms)
+    conf.Set3D(True)
+
+    for i, xyz in enumerate(coords):
+        conf.SetAtomPosition(i, Point3D(float(xyz[0]), float(xyz[1]), float(xyz[2])))
+
+    mol.AddConformer(conf, assignId=True)
+
+    # Assign bond orders using existing connectivity
+    rdDetermineBonds.DetermineBondOrders(
+        mol,
+        charge=charge,
+        allowChargedFragments=allow_charged_fragments,
+        embedChiral=embed_chiral,
+    )
+
+    if sanitize:
+        Chem.SanitizeMol(mol)
+
+    return mol
 
 
-def _find_porphyrin_rings_and_bridges(
-    atoms, AC
-) -> tuple[list[frozenset[int]], list[int]] | None:
+def generate_rdkit_mol_from_AC2mol(
+    atoms,
+    AC,
+    charge=0,
+    allow_charged_fragments=True,
+    embed_chiral=True,
+):
     """
-    Shared detection for porphyrin/porphine- and phthalocyanine-type N4
-    macrocycles: four five-membered pyrrole-type rings (1 N + 4 C each)
-    bridged pairwise by four meso atoms into one closed 16-membered
-    macrocycle -- carbon meso bridges for a porphyrin, nitrogen (aza)
-    meso bridges for a phthalocyanine. Substituents (aryl/alkyl groups,
-    fused benzo rings on each pyrrole for phthalocyanine, H, a coordinated
-    metal, etc.) are ignored -- only the core ring topology is checked,
-    mirroring is_fullerene_cage's coordinate-free approach.
+    Build an RDKit Mol object from atomic numbers, coordinates, and
+    adjacency matrix from a protonation state, and
+    then assign bond orders
+    - using rdDetermineBonds.DetermineBondOrders.
+    - modified AC2mol from xyz2mol
+    Parameters
+    ----------
+    atoms : list[int]
+        Atomic numbers, e.g. [6, 1, 1, 1, 1]
+    coords : array-like, shape (n_atoms, 3)
+        Cartesian coordinates.
+    AC : array-like, shape (n_atoms, n_atoms)
+        Connectivity matrix. Nonzero means bonded.
+    charge : int
+        Total molecular charge.
+    sanitize : bool
+        Whether to sanitize after bond-order assignment.
+    allow_charged_fragments : bool
+        Whether to allow charged fragments.
+    embed_chiral : bool
+        Whether to embed chiral information.
 
-    Returns (rings, bridges) in cyclic traversal order -- rings[i] and
-    rings[(i+1) % 4] are joined by the single meso atom bridges[i] -- or
-    None if no such macrocycle exists.
+    Returns
+    -------
+    mol : rdkit.Chem.Mol
     """
-    atoms = [int(a) for a in atoms]
-    # See the matching comment in is_fullerene_cage: ligand adjmats can be
-    # dtype=object even though every value is a plain int, which networkx
-    # rejects outright.
-    ac = np.asarray(AC, dtype=int)
-    n = len(atoms)
+    new_mols, BO = AC2mol(
+        mol=get_proto_mol(atoms),
+        AC=AC,
+        atoms=atoms,
+        charge=charge,
+        allow_charged_fragments=allow_charged_fragments,
+    )
 
-    if ac.shape != (n, n):
+    # Early Exit if no candidates found
+    if not new_mols:
+        logger.warning(f"No mol found for charge {charge}")
         return None
 
-    n_nitrogen = sum(1 for z in atoms if z == 7)
-    n_carbon = sum(1 for z in atoms if z == 6)
-    if n_nitrogen < 4 or n_carbon < 20:
-        return None
+    # Stereo and Chirality Validation
+    if embed_chiral:
+        if not all(chiral_stereo_check(mol) for mol in new_mols):
+            logger.error("Chirality check failed for one or more candidates")
+            return None
 
-    graph = nx.from_numpy_array(ac)
-
-    # Candidate pyrrole-type rings: 5-membered cycles with exactly 1 N.
-    pyrrole_rings: set[frozenset[int]] = set()
-    for cycle in nx.simple_cycles(graph, length_bound=5):
-        if len(cycle) != 5:
-            continue
-        n_count = sum(1 for i in cycle if atoms[i] == 7)
-        c_count = sum(1 for i in cycle if atoms[i] == 6)
-        if n_count == 1 and c_count == 4:
-            pyrrole_rings.add(frozenset(cycle))
-
-    if len(pyrrole_rings) < 4:
-        return None
-
-    # Each candidate ring must contribute a distinct nitrogen -- rings
-    # sharing a nitrogen can't both be genuine, separate pyrrole units.
-    rings_by_nitrogen: dict[int, frozenset[int]] = {}
-    for ring in pyrrole_rings:
-        nitrogen = next(i for i in ring if atoms[i] == 7)
-        if nitrogen not in rings_by_nitrogen:
-            rings_by_nitrogen[nitrogen] = ring
-    distinct_rings = list(rings_by_nitrogen.values())
-
-    if len(distinct_rings) < 4:
-        return None
-
-    # Try every combination of 4 candidate rings and check if they close
-    # into one meso-bridged macrocycle (real porphyrins won't have more
-    # than 4 genuine candidates, so this stays cheap in practice).
-    import itertools
-
-    for combo in itertools.combinations(distinct_rings, 4):
-        result = _macrocycle_ring_order_and_bridges(combo, graph, atoms)
-        if result is not None:
-            ring_order, bridge_by_edge = result
-            ordered_rings = [combo[r] for r in ring_order]
-            ordered_bridges = [
-                bridge_by_edge[frozenset((ring_order[i], ring_order[(i + 1) % 4]))]
-                for i in range(4)
-            ]
-            return ordered_rings, ordered_bridges
-
-    return None
-
-
-def find_porphyrin_macrocycle_nitrogens(atoms, AC) -> list[int] | None:
-    """
-    Detect a porphyrin/porphine- or phthalocyanine-type N4 macrocycle
-    purely from connectivity (see _find_porphyrin_rings_and_bridges).
-
-    Returns the 4 macrocycle (pyrrole-type) nitrogen atom indices if
-    found, else None.
-    """
-    result = _find_porphyrin_rings_and_bridges(atoms, AC)
-    if result is None:
-        return None
-    ordered_rings, _bridges = result
-    atoms = [int(a) for a in atoms]
-    # Return the 4 nitrogens in cyclic macrocycle order (not sorted by
-    # index): position i and i+2 are the "opposite" (meso-bridge-
-    # separated-by-two-rings) pair, positions i and i+1 are "adjacent"
-    # (single meso bridge apart) -- callers that need to distinguish the
-    # two rely on this ordering.
-    return [next(i for i in ring if atoms[i] == 7) for ring in ordered_rings]
-
-
-def _macrocycle_ring_order_and_bridges(
-    rings, graph: "nx.Graph[int]", atoms: list[int]
-) -> tuple[list[int], dict[frozenset[int], int]] | None:
-    """
-    Check whether 4 given pyrrole-type rings are connected pairwise, each
-    to exactly two others, via single-atom meso bridges -- i.e. they close
-    into one macrocyclic loop rather than, say, two separate pairs or an
-    open chain. The bridge atom is carbon for a porphyrin (meso-C) or
-    nitrogen for a phthalocyanine (aza-meso-N); either is accepted here,
-    so this one check covers both macrocycle families.
-
-    Returns (order, bridge_by_edge) if so, else None: `order` is the
-    cyclic traversal order (indices into `rings`); `bridge_by_edge` maps
-    each frozenset({ring_idx_a, ring_idx_b}) to the meso atom index
-    bridging that pair.
-    """
-    ring_atoms = [set(r) for r in rings]
-    all_ring_atoms: set[int] = set().union(*ring_atoms)
-
-    outside_candidates: set[int] = set()
-    for atom_set in ring_atoms:
-        for i in atom_set:
-            for j in graph.neighbors(i):
-                if j not in all_ring_atoms:
-                    outside_candidates.add(j)
-
-    bridge_graph: "nx.Graph[int]" = nx.Graph()
-    bridge_graph.add_nodes_from(range(4))
-    bridge_by_edge: dict[frozenset[int], int] = {}
-
-    for bridge_atom in outside_candidates:
-        if atoms[bridge_atom] not in (6, 7):  # C (porphyrin) or N (phthalocyanine)
-            continue
-        connected_rings = [
-            idx
-            for idx, atom_set in enumerate(ring_atoms)
-            if any(nb in atom_set for nb in graph.neighbors(bridge_atom))
-        ]
-        if len(connected_rings) == 2:
-            bridge_graph.add_edge(*connected_rings)
-            bridge_by_edge[frozenset(connected_rings)] = bridge_atom
-
-    if bridge_graph.number_of_edges() != 4:
-        return None
-    if any(degree != 2 for _, degree in bridge_graph.degree()):
-        return None
-    if not nx.is_connected(bridge_graph):
-        return None
-
-    # Walk the 4-cycle to get the traversal order.
-    order = [0]
-    prev, current = None, 0
-    for _ in range(3):
-        nxt = next(n for n in bridge_graph.neighbors(current) if n != prev)
-        order.append(nxt)
-        prev, current = current, nxt
-    return order, bridge_by_edge
-
-
-def is_porphyrin_macrocycle(atoms, AC) -> tuple[bool, str]:
-    """
-    True if the connectivity contains a porphyrin/porphine- or
-    phthalocyanine-type N4 macrocycle (four pyrrole rings bridged into one
-    16-membered ring via either carbon meso bridges (porphyrin) or
-    nitrogen aza-meso bridges (phthalocyanine)), regardless of
-    substituents or fused benzo rings. See
-    find_porphyrin_macrocycle_nitrogens for the detection logic.
-    """
-    macrocycle_nitrogens = find_porphyrin_macrocycle_nitrogens(atoms, AC)
-    if macrocycle_nitrogens is None:
-        return False, "no_porphyrin_macrocycle"
-    return True, "porphyrin_macrocycle_confirmed"
+    return new_mols[0]  # use the first candidate as default
