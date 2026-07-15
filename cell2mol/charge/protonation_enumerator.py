@@ -7,14 +7,18 @@ from cell2mol.connectivity import add_atom
 from dataclasses import dataclass
 from typing import Dict, List, TYPE_CHECKING, cast
 from cell2mol.classes.protonation import Protonation
-from cell2mol.charge.utils import (
-    MANUAL_CHARGE_ASSIGN_SPECIES,
-    is_fullerene_cage,
+from cell2mol.charge.utils import MANUAL_CHARGE_ASSIGN_SPECIES, HALOGENS
+from cell2mol.charge.special_cases import (
     check_fullerene_sphericity,
-    find_porphyrin_macrocycle_nitrogens,
+    find_all_porphyrin_macrocycles,
+    porphyrin_reference_protonation_sites,
 )
+from cell2mol.charge.xyz2mol import atomic_valence
 from cell2mol.hydrogen import detect_missing_hydrogens, add_hydrogens
 import logging
+from cell2mol.elementdata import ElementData
+
+elemdatabase = ElementData()
 
 if TYPE_CHECKING:
     from cell2mol.classes.specie import Specie
@@ -62,36 +66,76 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     if specie.formula in MANUAL_CHARGE_ASSIGN_SPECIES:
         return get_empty_protonation_state(specie)
 
-    is_fullerene, fullerene_reason = is_fullerene_cage(
-        specie.get_atomic_numbers(), specie.adjmat
+    has_fullerene = (
+        specie.has_fullerene
+        if specie.has_fullerene is not None
+        else specie.evaluate_has_fullerene()
     )
 
-    if is_fullerene:
+    if has_fullerene:
         if specie.coord is not None and not check_fullerene_sphericity(specie.coord):
             logger.warning(
                 "%s passed fullerene topology check but failed sphericity "
                 "check - possible disorder/AC artifact; proceeding anyway",
                 specie.formula,
             )
-        logger.debug(
-            "Fullerene cage detected for %s (%s)", specie.formula, fullerene_reason
-        )
+        logger.debug("Fullerene cage detected for %s", specie.formula)
         return get_empty_protonation_state(specie)
 
-    # Porphyrin/porphine N4 macrocycle: enumerate the protonation
-    # states relevant to a metal-coordinated porphyrinato ligand
-    # (see _generate_porphyrin_protonation_states ).
-    is_porphyrin = (
-        specie.is_porphyrin
-        if specie.is_porphyrin is not None
-        else specie.evaluate_as_porphyrin()
+    # Porphyrin/phthalocyanine/corrole/corrin N4 macrocycle: enumerate the
+    # protonation states relevant to a metal-coordinated tetrapyrrolic
+    # ligand (see _generate_porphyrin_protonation_states).
+    has_porphyrin = (
+        specie.has_porphyrin
+        if specie.has_porphyrin is not None
+        else specie.evaluate_has_porphyrin()
     )
-    if is_porphyrin:
-        logger.debug("Porphyrin macrocycle detected for %s", specie.formula)
-        macrocycle_nitrogens = find_porphyrin_macrocycle_nitrogens(
+    # A detected porphyrin-family macrocycle is dispatched by difficulty:
+    #
+    #   * Clean closed-form porphyrin (k = 4 with every metal donor inside a
+    #     core) -- a classic porphyrin / corrole / phthalocyanine, or a fully
+    #     covered fused bis-porphyrin -- is the ONLY family handled
+    #     automatically, via the closed-form free-base builder.
+    #
+    #   * Everything harder is deliberately declined here: an expanded
+    #     macrocycle (k >= 5: penta-/hexa-/octaphyrin, whose free-base N-H count
+    #     is oxidation-level dependent) or a k = 4 core that also binds a metal
+    #     through donors outside it (e.g. EFISEV, furan-fused). These emit only the
+    #     empty protonation state and set specie.protonation_warning, flagging
+    #     the charge result for manual review. The automatic generators for
+    #     these cases are parked in _experimental_macrocycle_protonation.
+    if has_porphyrin:
+        macrocycles = find_all_porphyrin_macrocycles(
             specie.get_atomic_numbers(), specie.adjmat
         )
-        return _generate_porphyrin_protonation_states(specie, macrocycle_nitrogens)
+        is_expanded = any(len(mac_n) >= 5 for mac_n, _c, _core in macrocycles)
+        logger.debug(
+            "%d porphyrin-family macrocycle(s) detected for %s "
+            "(expanded: %s, contracted: %s)",
+            len(macrocycles),
+            specie.formula,
+            is_expanded,
+            [is_contracted for _n, is_contracted, _c in macrocycles],
+        )
+        uncovered = _metal_donors_outside_tetrapyrrole_core(specie, macrocycles)
+        # Clean closed-form k=4 (incl. fully-covered bis-porphyrin): auto-handle.
+        if not is_expanded and not uncovered:
+            return _generate_porphyrin_protonation_states(specie, macrocycles)
+        # Expanded k>=5, or fused/ring-modified k=4: empty state + warning flag.
+        if is_expanded:
+            reason = "expanded porphyrin (k>=5, oxidation-level-dependent free base)"
+            specie.protonation_warning = reason
+        else:
+            uncovered_labels = [
+                (specie.atoms or [])[i].atom_site_label or (specie.atoms or [])[i].label
+                for i in uncovered
+            ]
+            reason = (
+                f"fused/ring-modified k=4 core with {len(uncovered)} metal "
+                f"donor(s) beyond the tetrapyrrole core {uncovered_labels}"
+            )
+            specie.protonation_warning = reason
+        # return _warn_and_return(specie, reason)
 
     if specie.subtype == "ligand":
         parent = cast("Specie", specie.get_parent("molecule"))
@@ -113,6 +157,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     site_proton_counts = np.zeros(ligand.natoms, dtype=int)
     ligand_donor_electrons = np.zeros(ligand.natoms, dtype=int)
     non_local_groups_indices: list[int] = []
+    # nonlocal_site_metal: dict[int, "Metal"] = {}
     process_both_modes: list[int] = []
     protonated_indices_to_reset: list[int] = []  # old : reset_H_indices
 
@@ -159,24 +204,43 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
 
         if result.needs_nonlocal:
             non_local_groups_indices.extend(result.non_local_indices)
+            # Remember which metal each combinatorial site coordinates, so a
+            # tetrapyrrolic ligand whose macrocycle the strict detector missed
+            # (a fused / ring-modified bis-porphyrin such as EHOMUL) can still
+            # be grouped into per-metal N4 pockets below.
+            # group_metals = list(g.metals or [])
+            # for idx in result.non_local_indices:
+            #     if len(group_metals) == 1:
+            #         nonlocal_site_metal[idx] = group_metals[0]
+
 
     # ============================================================
     # Check non_local_groups_indices for decision
     # ============================================================
     logger.debug("    non_local_groups_indices: %s", non_local_groups_indices)
-    if len(non_local_groups_indices) > limit_of_nonlocal_sites:
-        logger.info(
-            "  %d combinatorial protonation sites detected (more than the limit of %d). ",
+    # Collapse symmetry-equivalent coordinating atoms into one all-or-nothing
+    # site each, so a symmetric ligand (e.g. CAPKEJ: 4 equivalent O + 4
+    # equivalent N) enumerates 2**(#classes) states instead of 2**(#atoms).
+    site_classes = _environment_classes(ligand, non_local_groups_indices)
+    if non_local_groups_indices:
+        logger.debug(
+            "    grouped %d non-local site(s) into %d environment class(es): %s",
             len(non_local_groups_indices),
+            len(site_classes),
+            site_classes,
+        )
+    if len(site_classes) > limit_of_nonlocal_sites:
+        logger.info(
+            "  %d combinatorial protonation environment(s) detected (more than the limit of %d). ",
+            len(site_classes),
             limit_of_nonlocal_sites,
         )
-        combinations = list(
-            itertools.product([0, 1], repeat=len(non_local_groups_indices))
-        )
-        logger.info("  Total combinations to evaluate: %d. ", len(combinations))
+        logger.info("  Total combinations to evaluate: %d. ", 2 ** len(site_classes))
         logger.info("  Generating empty protonation state only for %s.", specie.formula)
 
-        return get_empty_protonation_state(specie)
+        reason = f"too many combinatorial protonation environments ({len(site_classes)} > {limit_of_nonlocal_sites})"
+
+        return _warn_and_return(specie, reason, return_empty=True)
 
     # ============================================================
     # LOCAL ATOM ADDITION
@@ -285,7 +349,9 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     local_ligand_donor_electrons = ligand_donor_electrons.copy()
     local_n_protons_added = n_protons_added
 
-    combinations = list(itertools.product([0, 1], repeat=len(non_local_groups_indices)))
+    # One binary flag per environment class (not per atom): a selected class is
+    # protonated on all of its equivalent atoms at once.
+    combinations = list(itertools.product([0, 1], repeat=len(site_classes)))
     combinations.sort(key=sum)
 
     for com in combinations:
@@ -295,13 +361,14 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
         site_proton_counts = local_site_proton_counts.copy()
         ligand_donor_electrons = local_ligand_donor_electrons.copy()
 
-        for flag, idx in zip(com, non_local_groups_indices):
+        for flag, site_class in zip(com, site_classes):
             if flag == 1:
-                site_proton_counts[idx] = 1
-                n_protons_added += site_proton_counts[idx]
-                _, newlab, newcoord = add_atom(
-                    newlab, list(newcoord), idx, ligand, element="H", unconditional=True
-                )
+                for idx in site_class:
+                    site_proton_counts[idx] = 1
+                    n_protons_added += 1
+                    _, newlab, newcoord = add_atom(
+                        newlab, list(newcoord), idx, ligand, element="H", unconditional=True
+                    )
         prot = Protonation.from_positional(
             labels=newlab,
             coord=np.asarray(newcoord),
@@ -348,45 +415,181 @@ def get_empty_protonation_state(specie: Specie) -> list[Protonation]:
     return [empty_protonation]
 
 
-def _generate_porphyrin_protonation_states(
-    specie: Specie, macrocycle_nitrogens: list[int] | None
-) -> list[Protonation]:
+def _warn_and_return(specie: Specie, reason: str, return_empty: bool = False) -> list[Protonation] | None:
+    """Decline to enumerate protonation for a hard cases: log a
+    warning, record ``reason`` on ``specie.protonation_warning`` so the charge
+    result is flagged for review, and return None. If ``return_empty`` is True, 
+    return a single empty protonation state instead of None.
     """
-    Five candidate protonation states for a porphyrin/porphine N4
-    macrocycle, covering the chemically relevant forms of the ring:
-      - 0 H added: fully deprotonated (metal-coordinated porphyrinato ligand).
-      - 1 H added: mono-protonated state.
-      - 2 H added on the opposite (non-adjacent) pair of macrocycle
-        nitrogens: the neutral free-base tautomer.
-      - 3 H added: tri-protonated state.
-      - 4 H added on all four macrocycle nitrogens: the doubly-protonated
-        porphyrin dication.
+    logger.warning(
+        "%s: %s -- not auto-handled",
+        specie.formula,
+        reason
+    )
+    specie.protonation_warning = reason
+    if return_empty:
+        logger.info("Returning empty protonation state and setting protonation_warning.")
+        return get_empty_protonation_state(specie)
+    logger.info("Returning None protonation state and setting protonation_warning.")
+    return None
 
-    Falls back to just the empty state if the macrocycle nitrogens
-    could be located.
+
+
+def _environment_classes(ligand: "Ligand", indices: list[int]) -> list[list[int]]:
+    """Partition ``indices`` (ligand atom indices) into topological-equivalence
+    classes by Weisfeiler-Lehman colour refinement on the element-labelled
+    ligand graph. Two atoms share a class iff they stay indistinguishable under
+    iterated hashing of their neighbour labels, so the 4 symmetry-equivalent
+    carboxylate O (and the 4 amido N) of a binuclear ligand such as CAPKEJ each
+    collapse to a single class -- letting the combinatorial protonation treat a
+    class as one all-or-nothing site rather than enumerating every per-atom
+    combination (2**#classes states instead of 2**#atoms).
+
+    Classes are returned sorted by their smallest atom index; each lists its
+    atom indices sorted. ``indices`` need not be unique.
+    """
+    unique = sorted(set(indices))
+    if not unique:
+        return []
+
+    adj = np.asarray(ligand.adjmat)
+    n = adj.shape[0]
+    neighbours = [np.nonzero(adj[i])[0].tolist() for i in range(n)]
+
+    # Seed each atom's colour with an integer rank of its element label (kept
+    # int throughout so signatures stay comparable), then refine until the
+    # partition stops splitting (at most n rounds).
+    label_rank = {lab: r for r, lab in enumerate(sorted(set(ligand.labels[:n])))}
+    colours: dict[int, int] = {i: label_rank[ligand.labels[i]] for i in range(n)}
+    n_colours = len(set(colours.values()))
+    for _ in range(n):
+        signatures: dict[int, tuple[int, tuple[int, ...]]] = {
+            i: (colours[i], tuple(sorted(colours[j] for j in neighbours[i])))
+            for i in range(n)
+        }
+        remap = {sig: rank for rank, sig in enumerate(sorted(set(signatures.values())))}
+        colours = {i: remap[signatures[i]] for i in range(n)}
+        if len(remap) == n_colours:  # partition stable
+            break
+        n_colours = len(remap)
+
+    grouped: dict[int, list[int]] = {}
+    for idx in unique:
+        grouped.setdefault(colours[idx], []).append(idx)
+    return sorted((sorted(cls) for cls in grouped.values()), key=lambda cls: cls[0])
+
+
+def _metal_donors_outside_tetrapyrrole_core(
+    specie: Specie,
+    macrocycles: list[tuple[list[int], bool, list[int]]],
+) -> list[int]:
+    """Metal-bound donors of ``specie`` (any element) that the ring-nitrogen
+    free-base model can't represent -- i.e. every metal donor that is not a
+    ring nitrogen of a detected tetrapyrrole core (indices into ``specie.atoms``).
+
+    This covers both a donor lying entirely outside the cores (a pendant or
+    second-pocket donor) and an in-core donor that isn't a ring nitrogen (a
+    metal-bound meso or N-confused carbon). A non-empty result means the
+    porphyrin fast-path misses a binding mode, forcing fall-through to the
+    general engine. Ring nitrogens are pooled over ALL macrocycles, so a
+    bis-corrole's two sets of metal-bound nitrogens are both covered.
+    """
+    core: set[int] = set()
+    core_nitrogens: set[int] = set()
+    for nitrogens, _is_contracted, core_atoms in macrocycles:
+        core.update(core_atoms)
+        core_nitrogens.update(nitrogens)
+
+    # A metal donor is "uncovered" if it lies outside every core, OR is an
+    # in-core atom that is not a ring nitrogen (a metal-bound non-N core atom
+    # the ring-nitrogen free-base model can't represent). core_nitrogens is the
+    # union over ALL macrocycles -- so, e.g., a bis-corrole's two sets of ring
+    # nitrogens are both covered.
+    outside_donors = [
+        idx
+        for idx, atom in enumerate(specie.atoms or [])
+        if (atom.mconnec or 0) > 0
+        and (idx not in core or idx not in core_nitrogens)
+    ]
+    return outside_donors
+
+
+def _generate_porphyrin_protonation_states(
+    specie: Specie,
+    macrocycles: list[tuple[list[int], bool, list[int]]],
+) -> list[Protonation]:
+    """Candidate protonation states for a specie with one or more pyrrolic
+    macrocycles, protonating each ring to its neutral free-base tautomer
+    (alternating ring N-H). Protons added = sum over rings:
+
+    - Classic N4 porphyrin/phthalocyanine (meso-bridged): 2 N-H (trans pair;
+      the 4-H dication is disabled).
+    - Ring-contracted k=4 (one direct link): two states -- a corrole
+      (aromatic, 3 N-H, trianionic free base) and a corrin (saturated,
+      1 N-H, monoanionic free base). The two are ambiguous from connectivity.
+    - Expanded porphyrin (k>=5): m0 = alternating N-H (3 for a hexaphyrin).
+
+    Classic N4 families emit exactly this one free-base count (bis-porphyrin ->
+    4). A ring-contracted k=4 emits both the corrole and corrin counts, and an
+    expanded porphyrin has an oxidation-level-dependent count ([26]hexaphyrin=3,
+    [28]=4, ...) so three states m0-1/m0/m0+1 are emitted -- in each case the
+    charge/metal-balance step picks, with invalid parities dropped downstream.
+    Replaces the general combinatorial search (too slow on large macrocycles).
+    Falls back to the empty state if no macrocycle nitrogens are found.
     """
     empty_state = get_empty_protonation_state(specie)[0]
 
-    # negative_moieties = _find_non_coordinated_negative_moiety(specie)
+    # Baseline free-base sites (m0): alternating N-H per ring.
+    all_nitrogens: list[int] = []
+    base_sites: list[int] = []
+    is_expanded = False
+    is_contracted = False
+    for macrocycle_nitrogens, is_contracted_ring, _core_atoms in macrocycles:
+        if macrocycle_nitrogens is None or len(macrocycle_nitrogens) < 4:
+            continue
+        all_nitrogens.extend(macrocycle_nitrogens)
+        base_sites.extend(
+            porphyrin_reference_protonation_sites(macrocycle_nitrogens, is_contracted_ring)
+        )
+        if len(macrocycle_nitrogens) >= 5:
+            is_expanded = True
+        elif is_contracted_ring:
+            is_contracted = True
 
-    if macrocycle_nitrogens is None or len(macrocycle_nitrogens) != 4:
+    # Preserve insertion order while de-duplicating.
+    base_sites = list(dict.fromkeys(base_sites))
+
+    if not base_sites:
         return [empty_state]
 
-    states = [empty_state]
+    # Skip ring nitrogens that already carry an H (e.g. an N-confused pyrrole
+    # N-H); adding another would build a spurious [NH2+].
+    adjmat = np.asarray(specie.adjmat)
 
-    # Define the sets of nitrogen atom indices to protonate for each state
-    single_hydrogen = [macrocycle_nitrogens[0]]
-    opposite_pair = [macrocycle_nitrogens[0], macrocycle_nitrogens[2]]
-    triple_hydrogen = [
-        macrocycle_nitrogens[0],
-        macrocycle_nitrogens[1],
-        macrocycle_nitrogens[2],
+    def _already_has_h(idx: int) -> bool:
+        return any(specie.labels[j] == "H" for j in np.nonzero(adjmat[idx])[0])
+
+    base_add = [n for n in base_sites if not _already_has_h(n)]
+    extra_bare = [
+        n for n in all_nitrogens if n not in base_sites and not _already_has_h(n)
     ]
-    all_four = macrocycle_nitrogens
 
-    # Loop through 1, 2, 3, and 4 proton addition states sequentially
-    # for sites in (single_hydrogen, opposite_pair, triple_hydrogen, all_four):
-    for sites in (opposite_pair, all_four):
+    # Classic N4: just m0. Expanded: also bracket m0 +/- 1. Ring-contracted
+    # k=4: base_add already holds the corrole 3 N-H (trianionic free base);
+    # also emit the corrin 1 N-H (monoanionic free base). The two are hard to
+    # tell apart from connectivity alone, so both counts are offered and the
+    # charge/metal-balance step keeps whichever is valid.
+    site_sets: list[list[int]] = [base_add]
+    if is_expanded:
+        if extra_bare:
+            site_sets.append(base_add + [extra_bare[0]])  # m0 + 1
+        if len(base_add) > 1:
+            site_sets.append(base_add[:-1])  # m0 - 1
+    elif is_contracted and len(base_add) >= 1:
+        site_sets.append(base_add[:1])  # corrin: 1 N-H
+
+    states: list[Protonation] = []
+    for sites in site_sets:
         newlab = list(specie.labels)
         newcoord = list(specie.coord)
         for site in sites:
@@ -405,9 +608,9 @@ def _generate_porphyrin_protonation_states(
                 cov_factor=specie.cov_factor,
                 n_protons_added=len(sites),
                 site_proton_counts=site_proton_counts,
-                ligand_donor_electrons=[0] * len(specie.labels),
                 mode="porphyrin",
                 parent=specie,
+                ligand_donor_electrons=[0] * len(specie.labels),
             )
         )
 
@@ -596,16 +799,16 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
     elif "COT" in g.haptic_type and not selected:
         selected = True
-        # _assign_protonation_sites(2)
+        _assign_protonation_sites(2)
 
     elif "pentalene" in g.haptic_type and not selected:
         selected = True
-        # _assign_protonation_sites(2)
+        _assign_protonation_sites(2)
 
     # --------------------------------------------------
     # As5 / Pentaphosphole (substitution dependent)
     # --------------------------------------------------
-    # e.g. GOCSID
+    # e.g. GOCSID, VENNEH
     elif "eta5(As5)" in g.haptic_type and not selected:
         selected = True
         issubstituted = False
@@ -615,7 +818,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                 for adj in a.adjacency:
                     if ligand.get_parent("molecule").labels[adj] != "As":
                         issubstituted = True
-        # _assign_protonation_sites(0 if issubstituted else 1)
+        _assign_protonation_sites(0 if issubstituted else 1)
 
     # e.g. IMUCAX
     elif "eta5(P5)" in g.haptic_type and not selected:
@@ -627,7 +830,7 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                 for adj in a.adjacency:
                     if ligand.get_parent("molecule").labels[adj] != "P":
                         issubstituted = True
-        # _assign_protonation_sites(0 if issubstituted else 1)
+        _assign_protonation_sites(0 if issubstituted else 1)
 
     elif "eta3(C3)" in g.haptic_type and not selected:
         selected = True
@@ -734,8 +937,6 @@ def _handle_non_haptic_group(
     needs_nonlocal = False
     non_local_indices: List[int] = []
 
-    ions = {"F", "Cl", "Br", "I", "As"}
-
     logger.debug("        HANDLE_NON_HAPTIC_GROUP: %s", g.formula)
     logger.debug("        parent_indices (ligand): %s", parent_indices)
 
@@ -763,7 +964,7 @@ def _handle_non_haptic_group(
         # -----------------------------------------
         # Simple ionic cases
         # -----------------------------------------
-        if a.label in ions:
+        if a.label in HALOGENS:
             if a.connec == 0:
                 site_proton_counts[idx] = 1
 
@@ -801,12 +1002,38 @@ def _handle_non_haptic_group(
                     site_proton_counts[idx] = 1
 
                 else:
+                    # A coordinating N that lies on a 6-membered ring is a
+                    # neutral pyridine-type donor (no proton, no combinatorial
+                    # site). Accept membership in ANY minimal 6-ring, so the N
+                    # of a fused / bridged / substituted pyridine system
+                    # (quinoline, phenanthroline, bipyridine, naphthyridine,
+                    # ...) qualifies too -- not just a bare pyridine ligand.
+                    # The size-6 test is kept to exclude an N on a 5-membered
+                    # ring (pyrrolide-type), which is an anionic donor handled
+                    # combinatorially instead.
                     graph = nx.from_numpy_array(ligand.adjmat.astype(float))
-                    cycles = nx.cycle_basis(graph)
-                    in_cycles = [c for c in cycles if idx in c]
-
-                    if len(in_cycles) == 1 and len(in_cycles[0]) == 6:
+                    rings = nx.minimum_cycle_basis(graph)
+                    in_six_ring = any(idx in ring and len(ring) == 6 for ring in rings)
+                    in_five_ring = any(idx in ring and len(ring) == 5 for ring in rings)
+                    if in_six_ring:
                         pass  # pyridine-like
+                        logger.debug(
+                            "Ligand formula: %s, Atom site label: %s, Adjacency labels: %s, Type: %s",
+                            ligand.formula,
+                            a.atom_site_label,
+                            adj_labels,
+                            "pyridine-like",
+                        )
+                    elif in_five_ring:
+                        logger.debug(
+                            "Ligand formula: %s, Atom site label: %s, Adjacency labels: %s, Type: %s",
+                            ligand.formula,
+                            a.atom_site_label,
+                            adj_labels,
+                            "pyrrolide-type",
+                        )
+                        needs_nonlocal = True
+                        non_local_indices.append(idx)
                     else:
                         needs_nonlocal = True
                         non_local_indices.append(idx)
@@ -823,15 +1050,6 @@ def _handle_non_haptic_group(
         elif a.label == "P":
             if len(adj_labels) >= 3:
                 pass
-            # elif len(adj_labels) == 1:
-            #     if adj_labels[0] in {"N", "C"}:
-            #         pass
-            #     elif adj_labels[0] == "P":
-            #         site_proton_counts[idx] = 1
-
-            #     else:
-            #         needs_nonlocal = True
-            #         non_local_indices.append(idx)
             else:
                 needs_nonlocal = True
                 non_local_indices.append(idx)
@@ -852,9 +1070,12 @@ def _handle_non_haptic_group(
                 numC = adj_labels.count("C")
 
                 if len(adj_labels) == 1:
-                    # site_proton_counts[idx] = 1
-                    needs_nonlocal = True
-                    non_local_indices.append(idx)
+                    if numN == 1:
+                        pass
+                    else:
+                        # site_proton_counts[idx] = 1
+                        needs_nonlocal = True
+                        non_local_indices.append(idx)
                 elif len(adj_labels) == 2:
                     # if numN == 1 and numO == 1:  # amide  # exception: FIQHIA
                     #     site_proton_counts[idx] = 1
@@ -931,8 +1152,31 @@ def _handle_non_haptic_group(
         # Fallback
         # -----------------------------------------
         else:
-            needs_nonlocal = True
-            non_local_indices.append(idx)
+            atomic_num = elemdatabase.elementnr[a.label]
+            min_valence = min(atomic_valence[atomic_num], default=0)
+
+            if len(adj_labels) < min_valence:
+                needs_nonlocal = True
+                non_local_indices.append(idx)
+                logger.debug(
+                    "Atom %s (atomic number %d) has %d non-metal neighbors, "
+                    "below the minimum valence of %d. "
+                    "Combinatorial protonation is required.",
+                    a.label,
+                    atomic_num,
+                    len(adj_labels),
+                    min_valence,
+                )
+            else:
+                logger.debug(
+                    "Atom %s (atomic number %d) has %d non-metal neighbors, "
+                    "which satisfies the minimum valence of %d. "
+                    "No combinatorial protonation is required.",
+                    a.label,
+                    atomic_num,
+                    len(adj_labels),
+                    min_valence,
+                )
 
     return ProtonationGroupResult(
         site_proton_counts=site_proton_counts,
