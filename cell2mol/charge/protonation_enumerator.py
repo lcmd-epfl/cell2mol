@@ -213,7 +213,6 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
             #     if len(group_metals) == 1:
             #         nonlocal_site_metal[idx] = group_metals[0]
 
-
     # ============================================================
     # Check non_local_groups_indices for decision
     # ============================================================
@@ -229,16 +228,27 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
             len(site_classes),
             site_classes,
         )
-    if len(site_classes) > limit_of_nonlocal_sites:
+    # Each class of k equivalent atoms contributes k+1 protonation options
+    # (0..k of them protonated), so the total number of combinatorial states is
+    # the product of (|class| + 1), not 2**(#classes).
+    n_combinations = 1
+    for cls in site_classes:
+        n_combinations *= len(cls) + 1
+    max_combinations = 2 ** limit_of_nonlocal_sites
+    if n_combinations > max_combinations:
         logger.info(
-            "  %d combinatorial protonation environment(s) detected (more than the limit of %d). ",
+            "  %d environment class(es) give %d combinatorial protonation "
+            "state(s) (more than the limit of %d). ",
             len(site_classes),
-            limit_of_nonlocal_sites,
+            n_combinations,
+            max_combinations,
         )
-        logger.info("  Total combinations to evaluate: %d. ", 2 ** len(site_classes))
         logger.info("  Generating empty protonation state only for %s.", specie.formula)
 
-        reason = f"too many combinatorial protonation environments ({len(site_classes)} > {limit_of_nonlocal_sites})"
+        reason = (
+            f"too many combinatorial protonation states "
+            f"({n_combinations} > {max_combinations})"
+        )
 
         return _warn_and_return(specie, reason, return_empty=True)
 
@@ -349,26 +359,35 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     local_ligand_donor_electrons = ligand_donor_electrons.copy()
     local_n_protons_added = n_protons_added
 
-    # One binary flag per environment class (not per atom): a selected class is
-    # protonated on all of its equivalent atoms at once.
-    combinations = list(itertools.product([0, 1], repeat=len(site_classes)))
-    combinations.sort(key=sum)
+    # Per environment class, enumerate HOW MANY of its equivalent atoms get a
+    # proton (0..|class|), not all-or-nothing. Because the atoms in a class are
+    # symmetry-equivalent, protonating any c of them yields the same structure,
+    # so a single representative subset (the first c) is emitted per count. A
+    # class of size k therefore contributes k+1 options -- e.g. two equivalent
+    # sites [0, 1] give exactly three states: none, one (of the pair), both.
+    count_choices = [range(len(cls) + 1) for cls in site_classes]
+    combinations = list(itertools.product(*count_choices))
+    combinations.sort(key=sum)  # order by total protons added
 
-    for com in combinations:
+    for counts in combinations:
         newlab = local_labels.copy()
         newcoord = local_coords.copy()
         n_protons_added = local_n_protons_added
         site_proton_counts = local_site_proton_counts.copy()
         ligand_donor_electrons = local_ligand_donor_electrons.copy()
 
-        for flag, site_class in zip(com, site_classes):
-            if flag == 1:
-                for idx in site_class:
-                    site_proton_counts[idx] = 1
-                    n_protons_added += 1
-                    _, newlab, newcoord = add_atom(
-                        newlab, list(newcoord), idx, ligand, element="H", unconditional=True
-                    )
+        for count, site_class in zip(counts, site_classes):
+            for idx in site_class[:count]:  # representative subset of size `count`
+                site_proton_counts[idx] = 1
+                n_protons_added += 1
+                _, newlab, newcoord = add_atom(
+                    newlab,
+                    list(newcoord),
+                    idx,
+                    ligand,
+                    element="H",
+                    unconditional=True,
+                )
         prot = Protonation.from_positional(
             labels=newlab,
             coord=np.asarray(newcoord),
@@ -415,24 +434,23 @@ def get_empty_protonation_state(specie: Specie) -> list[Protonation]:
     return [empty_protonation]
 
 
-def _warn_and_return(specie: Specie, reason: str, return_empty: bool = False) -> list[Protonation] | None:
+def _warn_and_return(
+    specie: Specie, reason: str, return_empty: bool = False
+) -> list[Protonation] | None:
     """Decline to enumerate protonation for a hard cases: log a
     warning, record ``reason`` on ``specie.protonation_warning`` so the charge
-    result is flagged for review, and return None. If ``return_empty`` is True, 
+    result is flagged for review, and return None. If ``return_empty`` is True,
     return a single empty protonation state instead of None.
     """
-    logger.warning(
-        "%s: %s -- not auto-handled",
-        specie.formula,
-        reason
-    )
+    logger.warning("%s: %s -- not auto-handled", specie.formula, reason)
     specie.protonation_warning = reason
     if return_empty:
-        logger.info("Returning empty protonation state and setting protonation_warning.")
+        logger.info(
+            "Returning empty protonation state and setting protonation_warning."
+        )
         return get_empty_protonation_state(specie)
     logger.info("Returning None protonation state and setting protonation_warning.")
     return None
-
 
 
 def _environment_classes(ligand: "Ligand", indices: list[int]) -> list[list[int]]:
@@ -508,8 +526,7 @@ def _metal_donors_outside_tetrapyrrole_core(
     outside_donors = [
         idx
         for idx, atom in enumerate(specie.atoms or [])
-        if (atom.mconnec or 0) > 0
-        and (idx not in core or idx not in core_nitrogens)
+        if (atom.mconnec or 0) > 0 and (idx not in core or idx not in core_nitrogens)
     ]
     return outside_donors
 
@@ -549,7 +566,9 @@ def _generate_porphyrin_protonation_states(
             continue
         all_nitrogens.extend(macrocycle_nitrogens)
         base_sites.extend(
-            porphyrin_reference_protonation_sites(macrocycle_nitrogens, is_contracted_ring)
+            porphyrin_reference_protonation_sites(
+                macrocycle_nitrogens, is_contracted_ring
+            )
         )
         if len(macrocycle_nitrogens) >= 5:
             is_expanded = True
