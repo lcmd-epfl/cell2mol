@@ -192,9 +192,14 @@ def _nitro_charge_atom_indices(mol: Chem.Mol, natoms: int) -> set[int]:
             if nb.GetAtomicNum() != 8:
                 continue
             bond = mol.GetBondBetweenAtoms(i, nb.GetIdx())
-            if nb.GetFormalCharge() == -1 and bond.GetBondType() == Chem.BondType.SINGLE:
+            if (
+                nb.GetFormalCharge() == -1
+                and bond.GetBondType() == Chem.BondType.SINGLE
+            ):
                 o_minus = nb.GetIdx()
-            elif nb.GetFormalCharge() == 0 and bond.GetBondType() == Chem.BondType.DOUBLE:
+            elif (
+                nb.GetFormalCharge() == 0 and bond.GetBondType() == Chem.BondType.DOUBLE
+            ):
                 has_o_double = True
         if o_minus is not None and has_o_double:
             nitro_atoms.add(i)
@@ -270,7 +275,9 @@ def check_rdkit_obj_connectivity(mol: Chem.Mol, natoms: int, charge: int) -> boo
 
         # 1. Lone Pair Sanity Check
         if lone_pairs not in [0, 1, 2, 3, 4]:
-            logger.debug("   Lone pair error at atom %d (%s): %f", i, symbol, lone_pairs)
+            logger.debug(
+                "   Lone pair error at atom %d (%s): %f", i, symbol, lone_pairs
+            )
             is_correct = False
 
         # 2. Aromaticity & Bond Consistency Check
@@ -296,7 +303,9 @@ def check_rdkit_obj_connectivity(mol: Chem.Mol, natoms: int, charge: int) -> boo
             # Shared electrons + electrons in lone pairs + charge should equal outer shell count
             calc_total_elecs = valence + (int(lone_pairs) * 2) + formal_charge
             if calc_total_elecs != num_valence_electrons:
-                logger.debug("   Total electron count mismatch at atom %d (%s)", i, symbol)
+                logger.debug(
+                    "   Total electron count mismatch at atom %d (%s)", i, symbol
+                )
                 is_correct = False
 
         # logger.debug(
