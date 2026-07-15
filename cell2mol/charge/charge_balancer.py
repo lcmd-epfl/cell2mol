@@ -72,6 +72,26 @@ def balance_unitcell_charge(refcell, unitcell):
     #         unitcell.error_multiple_distrib = retry_count > 1
     #         unitcell.error_empty_distrib = retry_count == 0
 
+    # If nothing summed to neutrality, the usual reason is that the metal's
+    # true oxidation state simply isn't in its candidate list (an unusual
+    # state METAL_OXIDATION_STATES doesn't cover) -- but only when every
+    # other (non-metal) unique specie is already unambiguous, since
+    # otherwise there's no way to know how much of the "missing" charge is
+    # really the metal's vs. a ligand option we didn't consider.
+    if unitcell.error_empty_distrib:
+        inferred_charges = _infer_metal_charge_from_fixed_ligands(
+            unitcell.unique_indices, refcell.unique_species
+        )
+        if inferred_charges is not None:
+            logger.warning(
+                "No standard charge distribution summed to neutrality; "
+                "inferred a non-standard metal oxidation state from the "
+                "unambiguous ligand charges instead: %s",
+                inferred_charges,
+            )
+            unique_species_charges = [inferred_charges]
+            unitcell.error_empty_distrib = False
+
     # Final Error Check
     if unitcell.error_multiple_distrib or unitcell.error_empty_distrib:
         logger.error(
@@ -88,6 +108,86 @@ def balance_unitcell_charge(refcell, unitcell):
         assign_charge_to_specie(specie, charge)
 
     return refcell, unitcell
+
+
+def _infer_metal_charge_from_fixed_ligands(
+    unique_indices, unique_species, input_charge: int = 0
+) -> List[int] | None:
+    """
+    Fallback for when no combination of standard charge options summed to
+    neutrality (unitcell.error_empty_distrib): if every non-metal unique
+    specie already has exactly one feasible charge, the metal's true
+    oxidation state is the one value that makes the total balance out --
+    regardless of whether it's in the metal's usual candidate list
+    (spec.possible_cs, drawn from METAL_OXIDATION_STATES) -- since an
+    unusual/rare oxidation state not in that list is the most likely
+    reason the normal search came up empty in the first place.
+
+    Only handles a single unique metal specie (though it may appear
+    multiple times in the cell via symmetry): with more than one distinct
+    metal type, there's no way to know how to split the "missing" charge
+    between them, so this declines rather than guess.
+
+    Returns a list of charges (one per entry in `unique_species`, in
+    order) if a unique, integer-valued metal charge can be solved for,
+    else None.
+    """
+    metal_unique_indices: set[int] = set()
+    non_metal_options: List[tuple[int, List[int]]] = []
+    for idx, spec in enumerate(unique_species):
+        if spec.subtype == "metal":
+            metal_unique_indices.add(idx)
+        else:
+            options = _get_ligand_options(spec, aromatic=False)
+            if len(set(options)) != 1:
+                logger.debug(
+                    "Cannot infer metal charge: non-metal specie %s (index %d) "
+                    "is still ambiguous (%s).",
+                    spec.formula,
+                    idx,
+                    options,
+                )
+                return None
+            non_metal_options.append((idx, options))
+
+    if len(metal_unique_indices) != 1:
+        logger.debug(
+            "Cannot infer metal charge: found %d distinct metal species "
+            "(need exactly 1).",
+            len(metal_unique_indices),
+        )
+        return None
+
+    fixed_charge_by_index = {idx: options[0] for idx, options in non_metal_options}
+
+    non_metal_sum = 0
+    unique_metal_count = 0
+    for u_idx in unique_indices:
+        if u_idx in fixed_charge_by_index:
+            non_metal_sum += fixed_charge_by_index[u_idx]
+        else:
+            unique_metal_count += 1
+
+    if unique_metal_count == 0:
+        return None
+
+    remainder = input_charge - non_metal_sum
+    if remainder % unique_metal_count != 0:
+        logger.debug(
+            "Cannot infer metal charge: needed total charge %d does not "
+            "split evenly across %d metal occurrence(s).",
+            remainder,
+            unique_metal_count,
+        )
+        return None
+
+    inferred_metal_charge = remainder // unique_metal_count
+    (metal_idx,) = metal_unique_indices
+
+    return [
+        inferred_metal_charge if idx == metal_idx else fixed_charge_by_index[idx]
+        for idx in range(len(unique_species))
+    ]
 
 
 def balance_molecule_charge(molecule, input_charge: int = 0, second_try: bool = True):
