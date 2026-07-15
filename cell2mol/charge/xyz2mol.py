@@ -61,7 +61,6 @@ def get_atomic_valences(k):
     if k == 7:  # N
         return [3, 4]
     if k == 8:  # O
-        # return [2]
         return [2, 1, 3]
     if k == 13:  # Al
         return [3, 4, 5]
@@ -76,7 +75,7 @@ def get_atomic_valences(k):
     if k == 33:  # As
         return [5, 3]  # [5,4,3]
     if k == 51:  # Sb
-        return [6, 5, 3]  # [5,4,3]
+        return [6, 5, 4, 3]  # [5,4,3]
     if k == 52:  # Te
         return [2, 4, 6]
     if k == 53:  # I
@@ -311,13 +310,21 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
     elif atom == 33 and BO_valence == 6 and not found:  # AsX6
         charge = -1
         found = True
-    elif atom == 51 and BO_valence == 6 and not found:  # SbX6
-        charge = -1
-        found = True
     elif atom == 50 and BO_valence == 4 and not found:  # SnX4
         charge = 0
         found = True
-
+    elif atom == 51 and BO_valence in (3, 4, 5) and not found:
+        charge = 0
+        found = True
+    elif atom == 51 and BO_valence == 6 and not found:  # SbX6
+        charge = -1
+        found = True
+    elif atom == 52 and BO_valence in (2, 4, 6) and not found:  # TeX2, TeX4, TeX6
+        charge = 0
+        found = True
+    elif atom == 53 and BO_valence in (3, 5) and not found:  # I(III)/I(V), hypervalent
+        charge = 0
+        found = True
     else:
         charge = atomic_valence_electrons - 8 + BO_valence
 
@@ -560,7 +567,7 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
     nested_inputs = []
     group_counts = []  # Stores the total combinations for each element group
 
-    logger.debug("--- Nested Valence Input Structure ---")
+    # logger.debug("--- Nested Valence Input Structure ---")
 
     # 2. Process prioritized groups
     for num in priority_order:
@@ -574,11 +581,11 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
             current_group_count = math.prod(len(v) for v in group_valences)
             group_counts.append(current_group_count)
 
-            logger.debug(
-                f"Element {elemdatabase.elementsym[num]} : {len(indices)} atoms | "
-                f"Group Combinations: {current_group_count:,}"
-                # f" | Valences: {group_valences}"
-            )
+            # logger.debug(
+            #     f"Element {elemdatabase.elementsym[num]} : {len(indices)} atoms | "
+            #     f"Group Combinations: {current_group_count:,}"
+            #     # f" | Valences: {group_valences}"
+            # )
 
             # Create a product iterator for this group
             nested_inputs.append(itertools.product(*group_valences))
@@ -593,17 +600,17 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
 
         other_nums = [atoms[i] for i in others]
         other_syms = [elemdatabase.elementsym[n] for n in other_nums]
-        logger.debug(
-            f"Element Others ({other_syms}): {len(others)} atoms | "
-            f"Group Combinations: {current_group_count:,}"
-            # f" | Valences: {other_valences}"
-        )
+        # logger.debug(
+        #     f"Element Others ({other_syms}): {len(others)} atoms | "
+        #     f"Group Combinations: {current_group_count:,}"
+        #     # f" | Valences: {other_valences}"
+        # )
 
         nested_inputs.append(itertools.product(*other_valences))
 
     # 4. Complexity Estimation
     total_expected_combinations = math.prod(group_counts)
-    logger.info(f"Total Expected Combinations: {total_expected_combinations:,}")
+    # logger.info(f"Total Expected Combinations: {total_expected_combinations:,}")
 
     # TERMINATION LOGIC:
     if total_expected_combinations > valence_combinations_limit:
@@ -611,7 +618,7 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
             f"Search space too large ({total_expected_combinations:,}). "
             "Terminating valence generation to prevent hang."
         )
-        return None  # Explicitly return None instead of the generator
+        # return None  # Explicitly return None instead of the generator
 
     # 5. Restore Map Calculation
     # Maps the reordered indices back to the original atom sequence in the CIF
@@ -698,16 +705,12 @@ def AC2BO(
         if atomicNum != 6 and allow_charged_fragments:
             # For any non-carbon atom, the hardcoded valence lists in
             # get_atomic_valences() are often incomplete
-            # (e.g. I: [1,3,5] missing 2, P: [3,5] missing 4).
-            # If the actual AC valence is not listed, the search may
-            # add artificial bonds to reach a known valence, even when
-            # the as-connected form with formal charge is correct
-            # (e.g. PPh4+, cyclic iodonium).
+            # (e.g. I: [1,3,5] for cyclic iodonium, missing 2,
+            # P: [3,5]for PPh4+, missing 4).
             if valence not in possible_valence:
                 possible_valence.append(valence)
         if atomicNum == 16 and valence == 1 and formula == "C-S":
             possible_valence = [3]
-            # possible_valence = [1, 2]
         if atomicNum == 34 and valence == 1 and formula == "C-Se":
             possible_valence = [3]
         if atomicNum == 52 and valence == 1 and formula == "C-Te":
@@ -757,7 +760,7 @@ def AC2BO(
 
     if sorted_gen is None:
         logger.warning("AC2BO terminating: Valence search space exceeded limit.")
-        return None, None  # Return None to generate_charge_state
+        return None, None
 
     # Use islice to safely take only the first 50 entries
     # This prevents calculating millions of combinations you don't need
@@ -786,7 +789,7 @@ def AC2BO(
             check_bo = None
 
         if check_len and check_bo:
-            logger.info("  return AC %s charge %d count %d", formula, charge, count)
+            # logger.info("  return AC %s charge %d count %d", formula, charge, count)
 
             return AC, atomic_valence_electrons
 
