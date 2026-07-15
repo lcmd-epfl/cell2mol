@@ -57,10 +57,7 @@ def generate_special_charge_states(spec: Specie) -> list[ChargeState] | None:
       * ``None``  -- not a special case; the caller should run the general
         charge-state search.
       * ``[cs]``  -- a special case whose closed-form builder succeeded.
-      * ``[]``    -- a special case whose builder FAILED. The caller must NOT
-        fall through to the general search: bond perception on a 60+-atom cage
-        is exactly what the closed-form path exists to avoid, so an empty list
-        signals "handled, no valid state" and leaves the charge unassigned.
+      * ``[]``    -- a special case whose builder FAILED.
     """
     # Antimony-halide-only species (SbX3/X4/X5/X6-type)
     if is_sb_halide_only(spec.labels):
@@ -79,22 +76,37 @@ def generate_special_charge_states(spec: Specie) -> list[ChargeState] | None:
         if spec.has_fullerene is not None
         else spec.evaluate_has_fullerene()
     )
+    # Fullerene cage or dimer (has_fullerene is True for both; a dimer is two
+    # cages joined by a single direct C-C bond, e.g. [C60-C60], BAQLUC01). Route
+    # to the matching closed-form builder: the dimer builder needs its own
+    # per-cage Kekule/leftover handling, so a dimer must NOT go through the
+    # single-cage builder (which would fail on the degree-4 bridge carbons).
     if has_fullerene:
-        logger.debug(
-            "Specie %s has a fullerene cage",
-            spec.formula
-        )
-        charge_state = generate_fullerene_charge_state(spec.protonation_states[0])
+        prot0 = spec.protonation_states[0]
+        if find_fullerene_dimer_split(prot0.atnums, prot0.adjmat) is not None:
+            logger.debug("Specie %s is a fullerene dimer", spec.formula)
+            dimer_charge_states = generate_fullerene_dimer_charge_states(prot0)
+            if not dimer_charge_states:
+                logger.warning(
+                    "Fullerene dimer charge builder failed for %s; return None",
+                    spec.formula,
+                )
+                return None
+            return dimer_charge_states or []
+
+        logger.debug("Specie %s has a fullerene cage", spec.formula)
+        charge_state = generate_fullerene_charge_state(prot0)
         if charge_state is None:
             logger.warning(
-                "Fullerene charge builder failed for %s; leaving charge "
-                "unassigned rather than falling back to the general search",
+                "Fullerene charge builder failed for %s; return None",
                 spec.formula,
             )
+            return None
         return [charge_state] if charge_state is not None else []
 
     # Not a special case -- let the caller run the general search.
     return None
+
 
 def is_sb_halide_only(labels) -> bool:
     """
@@ -351,6 +363,14 @@ def has_fullerene(atoms, AC) -> tuple[bool, str]:
     sub_ac = ac[np.ix_(cage_indices, cage_indices)]
     degrees = np.count_nonzero(sub_ac, axis=1)
     if not np.all(degrees == 3):
+        # A fullerene dimer -- two closed cages joined by a single direct C-C
+        # bond (e.g. [C60-C60]) -- fails the 3-regular test: its two bridge
+        # carbons are degree 4 (3 cage bonds + 1 inter-cage bond). Accept it if
+        # find_fullerene_dimer_split confirms both sides are complete cages once
+        # the bridge is removed. No recursion risk: each half is an ordinary
+        # single cage that passes the degree-3 test and never re-enters here.
+        if find_fullerene_dimer_split(atoms, ac) is not None:
+            return True, "fullerene_dimer"
         return False, "not_all_degree_3"
 
     graph = nx.from_numpy_array(sub_ac)
@@ -674,6 +694,88 @@ def check_fullerene_sphericity(coords, tol: float = 0.35) -> bool:
     centroid = coords.mean(axis=0)
     radii = np.linalg.norm(coords - centroid, axis=1)
     return (radii.std() / radii.mean()) < tol
+
+
+def has_open_fullerene(atoms, AC, coords) -> tuple[bool, str]:
+    """
+    Detect an *open* fullerene cage: a fullerene-derived carbon shell whose
+    cage has been opened at an orifice (often functionalised with O/N at the
+    rim, e.g. AFITUH's H16-C73-N2-O2 open-cage C60 derivative).
+
+    ``has_fullerene`` rejects these -- the orifice leaves rim carbons with only
+    two cage neighbours, so the carbon 3-core (which a closed cage survives
+    intact) cascades away to nothing. An open cage is instead recognised from
+    the looser carbon 2-core plus geometry:
+
+      1. a large carbon 2-core (>= 40 atoms; practical open cages are C60/C70-
+         derived, and this floor keeps medium polycyclic aromatics out);
+      2. mostly sp2 -- >= 60% of the 2-core carbons keep three carbon
+         neighbours (the shell), the rest being the 2-connected orifice rim;
+      3. a large fused-ring system (cyclomatic number >= 20; a fullerene shell
+         has ~30 faces). This rejects calixarene/cryptophane-type covalent
+         organic cages, whose aromatic rings are linker-separated (few fused
+         rings);
+      4. genuine 3D thickness -- the smallest / largest principal-axis extent
+         (SVD) is >= 0.25. A closed or open cage is a 3D shell; a flat
+         polycyclic aromatic (coronene, a graphene flake) collapses onto a
+         plane and is rejected here.
+
+    Coordinate-based (unlike ``has_fullerene``). Used to skip missing-hydrogen
+    detection, where curved sp2 cage carbons are otherwise mis-read as
+    under-coordinated. Closed fullerenes are already caught by
+    ``has_fullerene``; this only adds the opened ones.
+
+    Returns (is_open_fullerene, reason).
+    """
+    MIN_CAGE = 40
+    MIN_FUSED_RINGS = 20
+    MIN_SP2_FRACTION = 0.6
+    MIN_THICKNESS = 0.25
+
+    atoms = [int(a) for a in atoms]
+    ac = np.asarray(AC, dtype=int)
+    n = len(atoms)
+    if ac.shape != (n, n):
+        return False, "bad_ac_shape"
+    coords = np.asarray(coords, dtype=float)
+    if coords.shape != (n, 3):
+        return False, "bad_coords_shape"
+
+    carbon_indices = [i for i, z in enumerate(atoms) if z == 6]
+    if len(carbon_indices) < MIN_CAGE:
+        return False, "too_few_carbons"
+
+    # Carbon-only bond graph; node ids are positions into carbon_indices.
+    carbon_graph = nx.from_numpy_array(ac[np.ix_(carbon_indices, carbon_indices)])
+    core = nx.k_core(carbon_graph, k=2)
+    if core.number_of_nodes() < MIN_CAGE:
+        return False, "small_carbon_2core"
+
+    core_nodes = list(core.nodes())
+    sp2_fraction = sum(1 for v in core_nodes if carbon_graph.degree(v) >= 3) / len(
+        core_nodes
+    )
+    if sp2_fraction < MIN_SP2_FRACTION:
+        return False, f"not_mostly_sp2_{sp2_fraction:.2f}"
+
+    cyclomatic = (
+        core.number_of_edges()
+        - core.number_of_nodes()
+        + nx.number_connected_components(core)
+    )
+    if cyclomatic < MIN_FUSED_RINGS:
+        return False, f"too_few_fused_rings_{cyclomatic}"
+
+    # 3D thickness: map 2-core node ids back to original atom indices for coords.
+    cage_atom_indices = [carbon_indices[v] for v in core_nodes]
+    cage_xyz = coords[cage_atom_indices]
+    cage_xyz = cage_xyz - cage_xyz.mean(axis=0)
+    singular = np.linalg.svd(cage_xyz, compute_uv=False)
+    thickness = float(singular[2] / singular[0]) if singular[0] > 0 else 0.0
+    if thickness < MIN_THICKNESS:
+        return False, f"planar_not_a_cage_{thickness:.2f}"
+
+    return True, f"open_fullerene_cage_{core.number_of_nodes()}C_rings{cyclomatic}"
 
 
 def _find_porphyrin_rings_and_bridges(
@@ -2104,16 +2206,19 @@ def _classify_charged_moiety(
     ``n_nonmetal`` and its total non-metal oxygen count ``n_oxygen``. Returns
     ``(kind, net_charge)`` or ``(None, 0)`` if the centre is a net-neutral group.
 
-    Net-neutral look-alikes are deliberately excluded: ``N`` + 2 terminal O is
-    NITRO (not nitrite here), ``S`` + 2 O + 2 C is a sulfone, ``P`` + 1 O is a
-    phosphine oxide. Polyprotic oxo-anions (phosphonate/phosphate) are reported
-    as the mono-anion (-1) -- connectivity cannot fix the protonation level, and
-    the charge-0 gate only needs the sign to be nonzero.
+    Net-neutral look-alikes are deliberately excluded: ``C`` + 2 terminal O
+    with no third substituent is CO2 (O=C=O, neutral) rather than a carboxylate,
+    ``N`` + 2 terminal O is NITRO (not nitrite here), ``S`` + 2 O + 2 C is a
+    sulfone, ``P`` + 1 O is a phosphine oxide. Polyprotic oxo-anions
+    (phosphonate/phosphate) are reported as the mono-anion (-1) -- connectivity
+    cannot fix the protonation level, and the charge-0 gate only needs the sign
+    to be nonzero.
     """
     # --- Anionic oxo-anions: centre + k terminal O ---
     if label == "C":
-        if k == 2:
+        if k == 2 and n_nonmetal == 3:  # R-COO(-): 2 terminal O + 1 substituent
             return "carboxylate", -1
+        # k == 2 and n_nonmetal == 2 -> CO2 (O=C=O), neutral: not a moiety.
         if k == 3:
             return "carbonate", -2
     elif label == "N":
