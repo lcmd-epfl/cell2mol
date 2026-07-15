@@ -74,9 +74,9 @@ class Specie(BaseModel):
     # including when embedded in a larger substituted derivative.
     has_fullerene: bool | None = None
     # Set when protonation-state enumeration deliberately declines to handle a
-    # hard tetrapyrrolic case (expanded k>=5, fused/ring-modified k=4, or a
-    # detector-rejected N4 pocket) and emits only the empty state instead. The
-    # string records why, so the charge result can be flagged for later review.
+    # hard cases (expanded k>=5, fused/ring-modified k=4, or a detector-rejected 
+    # N4 pocket). The string records why, so the charge result can be flagged 
+    # for later review.
     protonation_warning: str | None = None
     rdkit_obj: RDKitObject | None = Field(default=None)
     smiles: str | None = None
