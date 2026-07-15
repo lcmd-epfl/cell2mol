@@ -74,7 +74,8 @@ class ChargeState(BaseModel):
         self.n_protons_added = self.protonation.n_protons_added
 
         logger.debug(
-            "Initializing ChargeState | SMILES: %s | Uncorr Charge: %d | Charge Tried: %d | N Protons Added: %d",
+            "Initializing ChargeState | Status: %s | SMILES: %s | Uncorr Charge: %d | Charge Tried: %d | N Protons Added: %d",
+            self.status,
             self.smiles,
             self.uncorr_total_charge,
             self.charge_tried,

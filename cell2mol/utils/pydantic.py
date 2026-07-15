@@ -138,6 +138,27 @@ class BaseModel(pydantic.BaseModel, metaclass=ABCMeta):
         super().__init_subclass__(**kwargs)
         TypeRegistry.get_instance().register(cls)
 
+    def __getattr__(self, item: str) -> Any:
+        """Read-side counterpart to ``_serialize_to_store``'s missing-field
+        handling. A plain ``pickle`` restores an instance's old ``__dict__``
+        verbatim, bypassing field defaults, so an object pickled before a field
+        was added/renamed on the model simply won't have it set. Rather than
+        crash on access, fall back to the field's declared default for any name
+        that is a real model field; genuinely unknown attributes still raise.
+        """
+        # pydantic.BaseModel defines __getattr__ at runtime (private/extra
+        # attributes) but it isn't in every type stub, so look it up dynamically.
+        parent_getattr = getattr(super(), "__getattr__", None)
+        if parent_getattr is not None:
+            try:
+                return parent_getattr(item)
+            except AttributeError:
+                pass
+        field_info = type(self).model_fields.get(item)
+        if field_info is not None:
+            return field_info.get_default(call_default_factory=True)
+        raise AttributeError(item)
+
     @classmethod
     @deprecated(
         "The constructor using keyword arguments should be used instead. "

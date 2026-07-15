@@ -1,6 +1,6 @@
 import numpy as np
 from cell2mol.elementdata import ElementData
-
+from cell2mol.my_types import NDArray 
 elemdatabase = ElementData()
 
 TRANSITION_METALS = {
@@ -185,7 +185,7 @@ def get_radii(labels: list[str]):
     return radii
 
 
-def get_element_count(labels: list[str], heavy_only: bool = False) -> np.ndarray:
+def get_element_count(labels: list[str], heavy_only: bool = False) -> NDArray:
     elems: list[str] = list(elemdatabase.elementnr.keys())
     elem_to_idx: dict[str, int] = {elem: idx for idx, elem in enumerate(elems)}
 
