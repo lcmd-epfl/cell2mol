@@ -1,18 +1,13 @@
 from __future__ import annotations
 
-import copy
 import logging
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from rdkit import Chem
-from cell2mol.classes.protonation import Protonation
 from cell2mol.classes.charge_state import ChargeState
 from cell2mol.charge.utils import MANUAL_CHARGE_ASSIGN_SPECIES
-from cell2mol.charge.charge_state_resolver import (
-    generate_charge_state,
-    generate_manual_charge_state,
-)
+from cell2mol.charge.charge_state_resolver import generate_manual_charge_state
 from cell2mol.charge.smiles_handler import generate_tmc_rdkit_obj_smiles
 
 if TYPE_CHECKING:
@@ -70,7 +65,9 @@ def assign_charge_to_specie(specie: "Specie | Metal", final_charge: int):
             metal.formula,
             metal.charge,
         )
-    elif getattr(specie, "is_non_complex_molecule", False) or specie.subtype == "ligand":
+    elif (
+        getattr(specie, "is_non_complex_molecule", False) or specie.subtype == "ligand"
+    ):
         target = cast("Specie", specie)
         # Extract list of available charges
         target_possible_cs = cast("list[ChargeState]", target.possible_cs or [])
@@ -115,7 +112,6 @@ def set_charge_state(reference, target, mode: int):
         mode:
             1 = Select pre-calculated state (Reference Cell).
             2 = Transfer and reorder state (Unit Cell - Direct Mapping).
-            3 = Reconstruct state from topology (Unit Cell - Complex/Ligand).
     """
     final_charge = reference.totcharge
 
@@ -130,8 +126,6 @@ def set_charge_state(reference, target, mode: int):
         _apply_precalculated_state(target, final_charge)
     elif mode == 2:
         _transfer_state_to_unit_cell(reference, target, final_charge)
-    elif mode == 3:
-        _construct_state_from_topology(reference, target, final_charge)
     else:
         logger.error("Invalid Mode %d passed to set_charge_state", mode)
 
@@ -233,102 +227,6 @@ def _transfer_state_to_unit_cell(reference, target, final_charge):
 
     target.set_charges(total_charge_calc, atom_charges, smiles, rdkit_obj)
     logger.debug("Mode 2 Applied: %s (Q=%d)", target.formula, target.totcharge)
-
-
-# --- Mode 3: Unit Cell (Topological Reconstruction) ---
-def _construct_state_from_topology(reference, target, final_charge):
-    """Mode 3: Reconstructs state (Protonation/Charges) based on topological mapping."""
-    cs = None
-
-    # Case A: Manual Override
-    if target.formula in MANUAL_CHARGE_ASSIGN_SPECIES:
-        cs = generate_manual_charge_state(target)
-
-    # Case B: Standard Molecule (Create Empty/Neutral State)
-    elif target.is_non_complex_molecule:
-        logger.debug("Mode 3: Creating Empty PROTONATION for %s", target.formula)
-
-        # Construct a neutral/empty protonation object
-        empty_prot = Protonation.from_positional(
-            labels=target.labels,
-            coord=target.coord,
-            cov_factor=target.cov_factor,
-            n_protons_added=0,
-            site_proton_counts=[0] * len(target.labels),
-            ligand_donor_electrons=[0] * len(target.labels),
-            mode="none",
-            parent=target,
-        )
-        cs = generate_charge_state(final_charge, empty_prot)
-
-    # Case C: Ligand (Reorder Protonation from Reference)
-    elif target.subtype == "ligand":
-        cs = _reorder_ligand_protonation(reference, target)
-    # Apply the constructed state
-    if cs:
-        target.charge_state = cs
-        if final_charge != cs.corr_total_charge:
-            logger.warning(
-                "Mode 3 Charge Mismatch: %d vs %d", final_charge, cs.corr_total_charge
-            )
-
-        target.set_charges(
-            cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj
-        )
-        logger.debug("Mode 3 Applied: %s (Q=%d)", target.formula, target.totcharge)
-
-
-def _reorder_ligand_protonation(reference, target):
-    """Helper for Mode 3 Case C: Complex reordering of ligand protonation states."""
-    refcell = reference.get_parent("reference")
-
-    # 1. Clone the reference protonation
-    prot = reference.charge_state.protonation
-    temp_prot = copy.deepcopy(prot)
-    temp_prot.parent = target
-
-    # 2. Calculate Sorting Indices based on parent Reference Cell labels
-    # This maps the order of atoms in the reference ligand to the target ligand
-    ref_indices = reference.get_parent_indices("reference")
-    target_indices = target.get_parent_indices("reference")
-
-    ref_labels = [refcell.atom_site_labels[idx] for idx in ref_indices]
-    target_labels = [refcell.atom_site_labels[idx] for idx in target_indices]
-
-    # Create map: Target Label -> Target Index
-    label_to_index_map = {lbl: idx for idx, lbl in enumerate(target_labels)}
-
-    # Sort reference indices based on where their labels appear in the target list
-    sorted_indices = sorted(
-        range(len(ref_labels)), key=lambda i: label_to_index_map[ref_labels[i]]
-    )
-
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("Reordering Ligand %s:", target.formula)
-        logger.debug("  Sorted Indices: %s", sorted_indices)
-
-    # 3. Reorder the Protonation Object
-    reordered_prot = temp_prot.reorder(sorted_indices)
-
-    # 4. Reorder Atom Charges
-    temp_uncorr_atom_charges = reference.charge_state.uncorr_atom_charges
-    reordered_charges = []
-
-    if len(temp_uncorr_atom_charges) == len(sorted_indices):
-        reordered_charges = [temp_uncorr_atom_charges[idx] for idx in sorted_indices]
-    else:
-        # Handle case where charges length differs (e.g., added protons)
-        reordered_charges = [temp_uncorr_atom_charges[idx] for idx in sorted_indices]
-        # Append remaining charges (usually added protons like H+)
-        remaining = temp_uncorr_atom_charges[len(sorted_indices) :]
-        reordered_charges.extend(remaining)
-
-    # 5. Generate Charge State
-    return generate_charge_state(
-        reference.charge_state.uncorr_total_charge,
-        reordered_prot,
-        ref_uncorr_atom_charges=reordered_charges,
-    )
 
 
 def _reorder_rdkit_atoms(ref_mol, ref_labels, target_labels):
