@@ -64,10 +64,6 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
         charge_state = generate_manual_charge_state(spec)
         return [charge_state] if charge_state is not None else None
 
-    # Closed-form builders for fullerenes / Sb-halides. Keep the `is not None`
-    # test (not a truthiness test): an empty list means "special case, builder
-    # failed" and must still short-circuit, so a 60+-atom cage never degrades
-    # into the general bond-order sweep. Only None means "not special".
     special_charge_states = generate_special_charge_states(spec)
     if special_charge_states is not None:
         return special_charge_states
@@ -84,7 +80,13 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
                 valid_charge_states.append(charge_state)
 
     else:
-        logger.debug("Considering general charge state enumeration for %s", spec.formula)
+        logger.debug(
+            "Considering general charge state enumeration "
+            "for %s with %d candidate charge=%s",
+            spec.formula,
+            len(candidate_charges),
+            candidate_charges,
+        )
         for prot in spec.protonation_states:
             valid_charge_states_dict = generate_valid_charge_states(
                 prot, candidate_charges
@@ -94,7 +96,6 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
                     if charge_state is not None and charge_state.status:
                         valid_charge_states.append(charge_state)
 
-    
     for charge_state in valid_charge_states:
         prot = charge_state.protonation
         logger.debug(
@@ -119,12 +120,14 @@ def get_candidate_charges(prot: Protonation) -> list[int]:
     In decreasing order of specificity:
       * Fixed-charge small formulas (diatomic donors -> 0, a lone halide -> -1,
         a noble gas -> 0).
-      * With charged substituents (free carboxylate -1, ammonium +1, ...): 
+      * With charged substituents (free carboxylate -1, ammonium +1, ...):
         the charge is just their summed net charge (0 if none), so try
-        only that value. Lets a big conjugated macrocycle skip the full sweep.
-      * Large species (>=100 atoms) with no charged substituent: trim the sweep
-        to {0} for a non-complex molecule, or {0, +/-1, +/-2} for a ligand.
-      * Everything else: the general -4..+4 sweep.
+        only that value.
+      * Large (>100 atoms) or heteroatom-rich (>8 charge-flexible O/N/S/P...,
+        halogens excluded) species with no charged substituent: Restricting
+        candidate charge set to {0} for a non-complex molecule and ligand,
+        since bond perception cost scales with the heteroatom count.
+      * Everything else: -4..+4 sweep for non-complex molecules, -2..+2 for ligands.
     """
     spec = cast("Specie", prot.parent)
     formula = spec.formula
@@ -137,8 +140,8 @@ def get_candidate_charges(prot: Protonation) -> list[int]:
     elif formula in NOBLE_GASES:
         return [0]
     else:
-        # If the specie has charged substituents (e.g. a free carboxylate), 
-        # its charge is just the sum of their net charges -- try only that value 
+        # If the specie has charged substituents (e.g. a free carboxylate),
+        # its charge is just the sum of their net charges -- try only that value
         # and skip the sweep
         charged_moieties = _find_charged_moiety(spec)
         if charged_moieties:
@@ -150,12 +153,26 @@ def get_candidate_charges(prot: Protonation) -> list[int]:
                 candidate_charge,
             )
             return [candidate_charge] if candidate_charge != 0 else [0]
-        # Large species: trim the sweep to keep bond perception tractable.
-        elif spec.natoms >= 100:
-            logger.debug("Trimming charge sweep for %s (%d atoms)", formula, spec.natoms)
-            return [0] if spec.is_non_complex_molecule else [0, -1, 1, -2, 2]
-        # General case: full -4..+4 sweep.
-        return [0, -1, 1, -2, 2, -3, 3, -4, 4]
+        # Trim the sweep to keep bond perception + resonance search tractable
+        # for a species that is either large (> 100 atoms) or heteroatom-rich.
+        # Cost scales with the number of *charge-flexible* heteroatoms (O, N,
+        # S, P, ...), each of which can be neutral or charged
+        n_heteroatoms = sum(
+            1 for lab in spec.labels if lab not in ("C", "H") and lab not in HALOGENS
+        )
+        if n_heteroatoms > 8:
+            logger.debug(
+                "Limiting candidate charges for %s (%d atoms, %d heteroatoms)",
+                formula,
+                spec.natoms,
+                n_heteroatoms,
+            )
+            return [0]
+        else:
+            if spec.is_non_complex_molecule:
+                return [0, -1, 1, -2, 2, -3, 3, -4, 4]
+            else:
+                return [0, -1, 1, -2, 2]
 
 
 def generate_manual_charge_state(spec):
@@ -565,7 +582,9 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
     # 3. Process each charge group
     for tgt_charge, candidates in grouped_by_charge.items():
         logger.debug(
-            "Processing target charge %s with %d candidates", tgt_charge, len(candidates)
+            "Processing target charge %s with %d candidates",
+            tgt_charge,
+            len(candidates),
         )
 
         # CASE 1: Only one candidate for this charge
@@ -584,7 +603,9 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
             else:
                 # Take the best one from the filtered result (index 0)
                 logger.debug("Tie-break successful, taking best structure.")
-                best_idx = best_subset_indices[0]            # Generate resonance forms for all candidates in this group first
+                best_idx = best_subset_indices[
+                    0
+                ]  # Generate resonance forms for all candidates in this group first
                 final_states.append(candidates[best_idx])
 
             # resonance_candidates = [get_best_resonance_state(temp) for temp in candidates]
