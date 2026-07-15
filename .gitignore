@@ -16,3 +16,12 @@ dist/
 _build
 /docs/api
 bibtex.json
+
+# Virtual environments
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+.conda/
