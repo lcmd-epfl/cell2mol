@@ -167,7 +167,14 @@ def check_missing_hydrogens(reference_molecules):
     missing_h_in_water = False
     missing_h_in_coordinated_water = False
     missing_h_detected = False
-    fullerenes = {"C60", "C72", "C80"}
+    moiety_skip_check = {"C-N", "C-P", "C-As", "C-Sb", "C-O", "C-S", "C-Se", "C-Te"}
+
+    # Open-cage fullerenes (e.g. AFITUH's open C60) aren't caught by
+    # has_fullerene -- the orifice breaks the closed 3-regular cage. Detect them
+    # inline (coordinate-based) so their curved sp2 cage carbons aren't mis-read
+    # as under-coordinated. Not cached on the Specie: only the missing-H skip
+    # needs it, unlike the closed-cage flag which also drives protonation/charge.
+    from cell2mol.charge.special_cases import has_open_fullerene
 
     logger.info("Detecting any missing hydrogens in reference molecules...")
 
@@ -180,13 +187,26 @@ def check_missing_hydrogens(reference_molecules):
                 )
                 continue
 
-            if (
-                ref.formula in {"C-N", "C-P", "C-As", "C-Sb"}
-                or ref.formula in {"C-O", "C-S", "C-Se", "C-Te"}
-                or ref.formula in fullerenes
-            ):
+            if ref.formula in moiety_skip_check:
                 continue
 
+            has_fullerene = (
+                ref.has_fullerene
+                if ref.has_fullerene is not None
+                else ref.evaluate_has_fullerene()
+            )
+            is_open_cage, _ = has_open_fullerene(
+                ref.get_atomic_numbers(), ref.adjmat, ref.coord
+            )
+            if has_fullerene or is_open_cage:
+                logger.debug(
+                    "Molecule %s has a %s, missing hydrogens detection skipped",
+                    ref.formula,
+                    "closed fullerene cage or dimer"
+                    if has_fullerene
+                    else "open fullerene cage",
+                )
+                continue
             for atom in ref.atoms:
                 if atom.label != "C" or atom.adjacency is None:
                     continue
@@ -234,13 +254,25 @@ def check_missing_hydrogens(reference_molecules):
                         if distance_to_metal > threshold_distance:
                             missing_h_in_coordinated_water = True
 
-                if (
-                    lig.formula in {"C-N", "C-P", "C-As", "C-Sb"}
-                    or lig.formula in {"C-O", "C-S", "C-Se", "C-Te"}
-                    or lig.formula in fullerenes
-                ):
+                if lig.formula in moiety_skip_check:
                     continue
-
+                has_fullerene = (
+                    lig.has_fullerene
+                    if lig.has_fullerene is not None
+                    else lig.evaluate_has_fullerene()
+                )
+                is_open_cage, _ = has_open_fullerene(
+                    lig.get_atomic_numbers(), lig.adjmat, lig.coord
+                )
+                if has_fullerene or is_open_cage:
+                    logger.debug(
+                        "Ligand %s has a %s, missing hydrogens detection skipped",
+                        lig.formula,
+                        "closed fullerene cage or dimer"
+                        if has_fullerene
+                        else "open fullerene cage",
+                    )
+                    continue
                 only_carbon = all(el == "C" for el in lig.labels) and lig.natoms > 2
                 for atom_idx, atom in enumerate(lig.atoms):
                     if atom.label != "C" or atom.adjacency is None:
