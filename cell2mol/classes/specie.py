@@ -66,7 +66,18 @@ class Specie(BaseModel):
     madjmat: NDArray | None = None
     madjnum: NDArray | None = None
     protonation_states: list[Protonation] | None = None
-    is_porphyrin: bool | None = None
+    # True when the structure *contains* a porphyrin-family N4 macrocycle
+    # (containment, not identity: a fused / ring-modified system such as EFISEV
+    # is not a porphyrin but still has a porphyrin core, so this is True there).
+    has_porphyrin: bool | None = None
+    # True when the structure *contains* a fullerene cage (C20, C60, C70, ...),
+    # including when embedded in a larger substituted derivative.
+    has_fullerene: bool | None = None
+    # Set when protonation-state enumeration deliberately declines to handle a
+    # hard tetrapyrrolic case (expanded k>=5, fused/ring-modified k=4, or a
+    # detector-rejected N4 pocket) and emits only the empty state instead. The
+    # string records why, so the charge result can be flagged for later review.
+    protonation_warning: str | None = None
     rdkit_obj: RDKitObject | None = Field(default=None)
     smiles: str | None = None
     subtype: SubType | None = None
@@ -244,18 +255,36 @@ class Specie(BaseModel):
             self.atnums.append(at.atnum)
         return self.atnums
 
-    def evaluate_as_porphyrin(self) -> bool:
+    def evaluate_has_porphyrin(self) -> bool:
         """
-        Detect a porphyrin/porphine N4 macrocycle (applies to both ligands
-        and non-complex molecules) and cache the result on self.is_porphyrin.
-        """
-        from cell2mol.charge.utils import is_porphyrin_macrocycle
+        Detect whether the structure *contains* a porphyrin/phthalocyanine- or
+        corrole/corrin-type N4 macrocycle (applies to both ligands and
+        non-complex molecules) and cache the result on self.has_porphyrin.
 
-        is_porphyrin, _ = is_porphyrin_macrocycle(
+        Named for containment, not identity: a fused / ring-modified system
+        (e.g. EFISEV) is not itself a porphyrin but still *has* a porphyrin
+        core, so the flag is True there too.
+        """
+        from cell2mol.charge.special_cases import is_porphyrin_macrocycle
+
+        has_porphyrin, _ = is_porphyrin_macrocycle(
             self.get_atomic_numbers(), self.adjmat
         )
-        self.is_porphyrin = is_porphyrin
-        return self.is_porphyrin
+        self.has_porphyrin = has_porphyrin
+        return self.has_porphyrin
+
+    def evaluate_has_fullerene(self) -> bool:
+        """
+        Detect whether the structure *contains* a fullerene cage (C20, C60,
+        C70, ...) purely from connectivity -- including when embedded in a
+        larger substituted derivative (applies to both ligands and non-complex
+        molecules) and cache the result on self.has_fullerene.
+        """
+        from cell2mol.charge.special_cases import has_fullerene
+
+        is_cage, _ = has_fullerene(self.get_atomic_numbers(), self.adjmat)
+        self.has_fullerene = is_cage
+        return self.has_fullerene
 
     def set_element_count(self, heavy_only: bool = False):
         self.element_count = get_element_count(self.labels, heavy_only=heavy_only)
@@ -447,6 +476,7 @@ class Specie(BaseModel):
         protonation_states is None.
         """
         self.protonation_states = None
+        self.protonation_warning = None
 
         if not (self.subtype == "ligand" or self.is_non_complex_molecule):
             return self.protonation_states
