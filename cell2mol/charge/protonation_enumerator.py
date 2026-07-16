@@ -234,7 +234,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     n_combinations = 1
     for cls in site_classes:
         n_combinations *= len(cls) + 1
-    max_combinations = 2 ** limit_of_nonlocal_sites
+    max_combinations = 2**limit_of_nonlocal_sites
     if n_combinations > max_combinations:
         logger.info(
             "  %d environment class(es) give %d combinatorial protonation "

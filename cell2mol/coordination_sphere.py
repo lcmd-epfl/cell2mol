@@ -571,7 +571,6 @@ def move_to_front(atoms, target_atom):
 
 
 def get_neighbors_in_group(atom, group_atom_site_labels):
-
     neighboring_nonmetal_atoms = []
     for adj in atom.adjacency:
         if adj not in atom.metal_adjacency:
@@ -664,7 +663,6 @@ def sort_gr_atoms_by_margin(group, metal):
 def remove_atom_from_coordination(
     atom, metal, ligand, removed_ligand_indices, remove_anyway=False
 ):
-
     is_removed = False
     atom_mol_idx = atom.get_parent_index("molecule")
     lig_mol_indices = {

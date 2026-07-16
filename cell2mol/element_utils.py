@@ -1,6 +1,7 @@
 import numpy as np
 from cell2mol.elementdata import ElementData
-from cell2mol.my_types import NDArray 
+from cell2mol.my_types import NDArray
+
 elemdatabase = ElementData()
 
 TRANSITION_METALS = {
