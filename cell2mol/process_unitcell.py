@@ -17,6 +17,7 @@ from cell2mol.write_results import (
     get_reference_error_message,
     get_unitcell_error_message,
     exit_with_error_exception,
+    get_reference_warning_messages,
 )
 from cell2mol.utils.limits import ProcessingTimeoutError, set_time_limit
 
@@ -249,6 +250,17 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
             "Failed to write unit summary",
         )
 
+    # Retrieve pre-formatted messages (Warnings for True, INFO for None)
+    if refcell:
+        warning_messages = get_reference_warning_messages(refcell)
+        if warning_messages:
+            for summary_path in [paths["ref_sum"], paths["unit_sum"]]:
+                with open(summary_path, "a") as f:
+                    print("\nPotential issues and data status detected:", file=f)
+                    for msg in warning_messages:
+                        # Apply appropriate prefix based on the message content
+                        prefix = "  " if msg.startswith("Skipped:") else "  Warning: "
+                        print(f"{prefix}{msg}", file=f)
     # if cells:
     #     _safe_run(
     #         lambda: cells.save(paths["json"], format="json"), "Failed to save JSON"
@@ -261,6 +273,9 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
 
 def _write_ref_detailed_summary(name, refcell, summary_path):
     """Writes the molecules info, species, errors, and warnings to file and log."""
+    # Retrieve pre-formatted messages (Warnings for True, INFO for None)
+    warning_messages = get_reference_warning_messages(refcell)
+
     # Write to File
     with open(summary_path, "w") as f:
         print(name, file=f)
