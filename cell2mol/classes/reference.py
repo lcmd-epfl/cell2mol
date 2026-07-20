@@ -46,7 +46,7 @@ class Reference(Cell):
     # Missing H related attributes
     has_isolated_H: bool | None = None
     missing_H_in_Carbon: bool | None = None
-    missing_H_in_CoordWater: bool | None = None
+    missing_H_on_CoordDonor: bool | None = None
     missing_H_in_Water: bool | None = None
     has_missing_H: bool | None = None
 
@@ -57,6 +57,13 @@ class Reference(Cell):
     # Additional CIF related attributes
     chemical_name: str | None = None
     reported_metal_os: list[tuple[str, int]] | None = None
+    # Reported metal OS matched to Metal_state tokens (e.g. ["Ni_2"]), produced
+    # by standardize_reported_metal_os during compare_metal_oxidation_states.
+    # The confidence is the fraction of reported names that matched a metal
+    # symbol -- i.e. how reliable the matching step was, not a judgement of the
+    # reported values.
+    reported_metal_os_matched: list[str] | None = None
+    metal_os_match_confidence: float | None = None
     moiety_dicts: list[dict[str, Any]] | None = None
 
     # Potential warning flags dictionary allowing True, False, or None
@@ -250,19 +257,20 @@ class Reference(Cell):
         (
             has_missing_h,
             missing_h_in_carbon,
-            missing_h_in_coordinated_water,
+            missing_h_on_coordinated_donor,
             missing_h_in_water,
         ) = check_missing_hydrogens(self.refmoleclist)
         if has_missing_h:
             logger.info(
-                "Missing hydrogens | carbon=%d, coordinated_water=%d, water=%d",
+                "Missing hydrogens | check_hydrogens=%d carbon=%d, coordinated_donor=%d, water=%d",
+                has_missing_h,
                 missing_h_in_carbon,
-                missing_h_in_coordinated_water,
+                missing_h_on_coordinated_donor,
                 missing_h_in_water,
             )
         self.has_missing_H = has_missing_h
         self.missing_H_in_Carbon = missing_h_in_carbon
-        self.missing_H_in_CoordWater = missing_h_in_coordinated_water
+        self.missing_H_on_CoordDonor = missing_h_on_coordinated_donor
         self.missing_H_in_Water = missing_h_in_water
 
         return self.has_missing_H
