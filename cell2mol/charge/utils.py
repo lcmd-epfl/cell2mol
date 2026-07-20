@@ -27,6 +27,8 @@ MANUAL_CHARGE_ASSIGN_SPECIES = {
     "H2",
     "N-O3",
     "Te2",
+    "N",
+    "C",
 }
 
 HALOGENS = {"F", "Cl", "Br", "I"}
