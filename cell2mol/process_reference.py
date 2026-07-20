@@ -249,7 +249,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
             refcell.refmoleclist,
             geom_bond_cif,
             name,
-            report_csv="coordination_report.csv",
+            # report_csv="coordination_report.csv",
         ),
     }
 

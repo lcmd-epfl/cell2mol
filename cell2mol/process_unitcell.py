@@ -275,14 +275,14 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
                         # Apply appropriate prefix based on the message content
                         prefix = "  " if msg.startswith("Skipped:") else "  Warning: "
                         print(f"{prefix}{msg}", file=f)
-    if cells:
-        _safe_run(
-            lambda: cells.save(paths["json"], format="json"), "Failed to save JSON"
-        )
-        _safe_run(
-            lambda: cells.save(paths["pickle"], format="pickle"),
-            "Failed to save pickle",
-        )
+    # if cells:
+    #     _safe_run(
+    #         lambda: cells.save(paths["json"], format="json"), "Failed to save JSON"
+    #     )
+    #     _safe_run(
+    #         lambda: cells.save(paths["pickle"], format="pickle"),
+    #         "Failed to save pickle",
+    #     )
 
 
 def _write_ref_detailed_summary(name, refcell, summary_path):
