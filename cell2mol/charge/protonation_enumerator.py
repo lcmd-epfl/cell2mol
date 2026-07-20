@@ -162,7 +162,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     protonated_indices_to_reset: list[int] = []  # old : reset_H_indices
 
     limit_of_nonlocal_sites = 8  # Arbitrary limit to avoid combinatorial explosion
-
+    max_combinations = 16
     logger.info("Processing %s (%s):", specie.formula, specie.subtype)
 
     # ============================================================
@@ -234,23 +234,31 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     n_combinations = 1
     for cls in site_classes:
         n_combinations *= len(cls) + 1
-    max_combinations = 2**limit_of_nonlocal_sites
-    if n_combinations > max_combinations:
+
+    # When the full 0..k-per-class product is over the limit, fall back to
+    # all-or-nothing per class: each class is protonated either fully (all its
+    # equivalent atoms) or not at all, giving 2**(#classes) states instead of
+    # the product of (|class|+1). E.g. CAPKEJ's two classes [2, 5, 18, 24] and
+    # [3, 8, 19, 30] enumerate 4 states this way rather than 25. If even that is
+    # still over the limit (too many classes), give up with an empty state.
+    limit_exceeded = n_combinations > max_combinations
+    if limit_exceeded:
+        n_all_or_nothing = 2 ** len(site_classes)
         logger.info(
             "  %d environment class(es) give %d combinatorial protonation "
-            "state(s) (more than the limit of %d). ",
+            "state(s) (more than the limit of %d); falling back to "
+            "all-or-nothing per class (%d state(s)).",
             len(site_classes),
             n_combinations,
             max_combinations,
+            n_all_or_nothing,
         )
-        logger.info("  Generating empty protonation state only for %s.", specie.formula)
-
-        reason = (
-            f"too many combinatorial protonation states "
-            f"({n_combinations} > {max_combinations})"
-        )
-
-        return _warn_and_return(specie, reason, return_empty=True)
+        if n_all_or_nothing > max_combinations:
+            reason = (
+                f"too many combinatorial protonation states even all-or-nothing "
+                f"per class ({n_all_or_nothing} > {max_combinations})"
+            )
+            return _warn_and_return(specie, reason, return_empty=True)
 
     # ============================================================
     # LOCAL ATOM ADDITION
@@ -365,7 +373,12 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     # so a single representative subset (the first c) is emitted per count. A
     # class of size k therefore contributes k+1 options -- e.g. two equivalent
     # sites [0, 1] give exactly three states: none, one (of the pair), both.
-    count_choices = [range(len(cls) + 1) for cls in site_classes]
+    # Over the limit: each class is all-or-nothing -- 0 protons, or all |class|
+    # of its equivalent atoms protonated. Otherwise: enumerate 0..|class|.
+    if limit_exceeded:
+        count_choices = [(0, len(cls)) for cls in site_classes]
+    else:
+        count_choices = [range(len(cls) + 1) for cls in site_classes]
     combinations = list(itertools.product(*count_choices))
     combinations.sort(key=sum)  # order by total protons added
 
