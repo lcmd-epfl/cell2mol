@@ -3,6 +3,7 @@
 import os
 import logging
 from ase.io import read
+from cell2mol.standardize_metal_os import standardize_reported_metal_os
 from cell2mol.utils import config
 from cell2mol.args import parsing_arguments
 from cell2mol.classes import Reference
@@ -224,6 +225,25 @@ def create_reference(input_path, name, cell_vector, cell_param):
         refcell.error_cases["ref_molecules"] = -1
         return refcell
 
+    metal_label_list = []
+    for ref in refcell.refmoleclist:
+        if ref.metals:
+            for metal in ref.metals:
+                metal_label_list.append(metal.label)
+
+    logger.debug(
+        f"Reference Metals found: {metal_label_list} with reported oxidation states: {reported_metal_os}"
+    )
+
+    matched_list, confidence = standardize_reported_metal_os(
+        metal_label_list, reported_metal_os
+    )
+    logger.info(
+        f"Reported metal oxidation states standardized to {matched_list} with confidence {confidence:.2f}"
+    )
+    refcell.reported_metal_os_matched = matched_list
+    refcell.metal_os_match_confidence = confidence
+
     logger.info("Generated %d reference molecules.", len(refcell.refmoleclist))
     refcell.error_cases["ref_molecules"] = 0
 
@@ -291,6 +311,22 @@ def _write_ref_detailed_summary(name, refcell, summary_path, mode=None):
     # --- Write to File ---
     with open(summary_path, "w") as f:
         print(name, file=f)
+        print(
+            f"Total charge comparison result: {getattr(refcell, 'total_charge_comparison')}",
+            file=f,
+        )
+        print(
+            f"Metal oxidation state comparison result: {getattr(refcell, 'metal_os_comparison')}",
+            file=f,
+        )
+        reported_os = getattr(refcell, "reported_metal_os", None)
+        matched_os = getattr(refcell, "reported_metal_os_matched", None)
+        os_confidence = getattr(refcell, "metal_os_match_confidence", None)
+        confidence_str = f"{os_confidence:.2f}" if os_confidence is not None else "N/A"
+        print(f"  - Reported:   {reported_os}", file=f)
+        print(f"  - Matched:    {matched_os}", file=f)
+        print(f"  - Confidence: {confidence_str}", file=f)
+
         write_cell_molecules_info(refcell, file=f)
 
         if mode == "possible_charges":

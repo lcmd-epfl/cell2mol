@@ -155,7 +155,6 @@ def compare_metal_oxidation_states(refcell):
     # Create a dictionary to count occurrences of each metal
 
     metal_os_tag_list = []
-    metal_label_list = []
     for ref in refcell.refmoleclist:
         if ref.metals:
             for metal in ref.metals:
@@ -164,32 +163,31 @@ def compare_metal_oxidation_states(refcell):
                 else:
                     m_ox = None
                 label = metal.label
-                metal_label_list.append(label)
                 metal_os_tag = (
                     f"{label}_{m_ox}" if m_ox is not None else f"{label}_None"
                 )
                 metal_os_tag_list.append(metal_os_tag)
 
-    logger.debug(
-        f"Reference Metals found: {metal_label_list} with reported oxidation states: {refcell.reported_metal_os}"
-    )
     if not refcell.reported_metal_os:
         logger.info(
             "No reported metal oxidation states found in CIF, skipping comparison."
         )
         return None
-    matched_list, confidence = standardize_reported_metal_os(
-        metal_label_list, refcell.reported_metal_os
-    )
-    logger.info(
-        f"Reported metal oxidation states standardized to {matched_list} with confidence {confidence:.2f}"
-    )
-    refcell.reported_metal_os_matched = matched_list
-    refcell.metal_os_match_confidence = confidence
 
-    if confidence < 1.0:
+    matched_list = getattr(refcell, "reported_metal_os_matched")
+    confidence = getattr(refcell, "metal_os_match_confidence")
+
+    if confidence is None:
+        logger.warning("No confidence level could be determined, skipping comparison.")
+        return None
+    elif confidence < 1.0:
         logger.info(
             f"Confidence level below 1.0 ({confidence:.2f}), skipping comparison of metal oxidation states."
+        )
+        return None
+    if not matched_list:
+        logger.warning(
+            "No reported metal oxidation states could be matched to the metals found in the structure."
         )
         return None
 
