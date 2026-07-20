@@ -73,6 +73,9 @@ class Specie(BaseModel):
     # True when the structure *contains* a fullerene cage (C20, C60, C70, ...),
     # including when embedded in a larger substituted derivative.
     has_fullerene: bool | None = None
+    # True when the structure *contains* a closo- or nido-type borane/carborane
+    # deltahedral cage (B12H12^2-, o-carborane, a dicarbollide, ...).
+    has_borane: bool | None = None
     # Set when protonation-state enumeration deliberately declines to handle a
     # hard cases (expanded k>=5, fused/ring-modified k=4, or a detector-rejected
     # N4 pocket). The string records why, so the charge result can be flagged
@@ -285,6 +288,20 @@ class Specie(BaseModel):
         is_cage, _ = has_fullerene(self.get_atomic_numbers(), self.adjmat)
         self.has_fullerene = is_cage
         return self.has_fullerene
+
+    def evaluate_has_borane(self) -> bool:
+        """
+        Detect whether the structure *contains* a closo- or nido-type
+        borane/carborane deltahedral cage (closo-B12H12^2-, o-carborane,
+        a dicarbollide, ...) purely from connectivity (applies to both
+        ligands and non-complex molecules) and cache the result on
+        self.has_borane.
+        """
+        from cell2mol.charge.special_cases import is_borane_cage
+
+        is_cage, _ = is_borane_cage(self.get_atomic_numbers(), self.adjmat)
+        self.has_borane = is_cage
+        return self.has_borane
 
     def set_element_count(self, heavy_only: bool = False):
         self.element_count = get_element_count(self.labels, heavy_only=heavy_only)
