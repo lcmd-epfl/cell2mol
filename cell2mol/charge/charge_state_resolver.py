@@ -160,12 +160,14 @@ def get_candidate_charges(prot: Protonation) -> list[int]:
         n_heteroatoms = sum(
             1 for lab in spec.labels if lab not in ("C", "H") and lab not in HALOGENS
         )
-        if n_heteroatoms > 8:
+        n_oxygens = sum(1 for lab in spec.labels if lab == "O")
+        if n_oxygens > 8:
             logger.debug(
-                "Limiting candidate charges for %s (%d atoms, %d heteroatoms)",
+                "Limiting candidate charges for %s (%d atoms, %d heteroatoms, %d oxygens) to [0]",
                 formula,
                 spec.natoms,
                 n_heteroatoms,
+                n_oxygens,
             )
             return [0]
         else:
@@ -190,6 +192,8 @@ def generate_manual_charge_state(spec):
         "H2": (None, "[H][H]", 0),
         "N-O3": ("N", "[N+](=O)([O-])[O-]", -1),
         "Te2": (None, "[Te-][Te-]", -2),
+        "N": (None, "[N-3]", -3),
+        "C": (None, "[C-4]", -4),
     }
 
     formula = spec.formula
@@ -271,7 +275,9 @@ def _specie_supported_by_rddeterminebonds(
     """
     ac = np.asarray(ac)
     n_atoms = len(atoms)
-
+    if n_atoms == 1:
+        logger.debug("Single atom specie - skipping rddeterminebonds")
+        return False
     for i in range(n_atoms):
         atom_num = atoms[i]
         valences = _get_possible_valences(atom_num, atomic_valence)
@@ -308,7 +314,8 @@ def generate_valid_charge_states(prot, candidate_charges, allow_charged_fragment
         # Guaranteed to hit unordered_map for every charge — skip straight
         # to bond assignment using modified AC2mol
         logger.debug(
-            "Element-level pre-check failed for %s, skipping rdDetermineBonds and trying manual bond assignment",
+            "Element-level pre-check failed for %s, skipping rdDetermineBonds "
+            "and trying to use modified AC2mol directly",
             prot.formula,
         )
         return determine_bond_using_modified_AC2mol(
