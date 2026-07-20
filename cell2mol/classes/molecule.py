@@ -58,6 +58,7 @@ class Molecule(Specie):
 
     unique_index: int | None = None
     totcharge_cif: int | None = None
+    totcharge_agree: bool | None = None
 
     ligand_smiles: str | list[str] | None = None
     subtype: SubType | None = Field(default="molecule")
@@ -366,6 +367,9 @@ class Molecule(Specie):
                 self.evaluate_has_porphyrin()
                 if self.has_porphyrin:
                     logger.debug("Molecule %s has a porphyrin", self.formula)
+                self.evaluate_has_borane()
+                if self.has_borane:
+                    logger.debug("Molecule %s has a borane/carborane", self.formula)
             return
 
         for met in self.metals or []:
@@ -408,6 +412,9 @@ class Molecule(Specie):
             lig.evaluate_has_porphyrin()
             if lig.has_porphyrin:
                 logger.debug("Ligand %s has a porphyrin", lig.formula)
+            lig.evaluate_has_borane()
+            if lig.has_borane:
+                logger.debug("Ligand %s has a borane/carborane", lig.formula)
             lig.evaluate_as_nitrosyl()
             if lig.is_nitrosyl:
                 logger.debug("Ligand %s is a nitrosyl", lig.formula)
