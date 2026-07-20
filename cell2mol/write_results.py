@@ -206,7 +206,7 @@ def get_reference_error_message(error_case):
         return "Missing hydrogens in water molecules"
 
     elif error_case == 3:
-        return "Missing hydrogens in coordinated water molecules"
+        return "Missing hydrogens on a coordinated O (water/hydroxide) or N (ammonia)"
 
     elif error_case == 4:
         return "Missing hydrogens in carbon atoms"
@@ -422,6 +422,8 @@ def write_molecule_info(mol, file=None, index=None):
         mol_info_parts.append(f"totcharge={mol.totcharge}")
     if getattr(mol, "totcharge_cif", None) is not None:
         mol_info_parts.append(f"totcharge_cif={mol.totcharge_cif}")
+    if getattr(mol, "totcharge_agree", None) is not None:
+        mol_info_parts.append(f"totcharge_agree={mol.totcharge_agree}")
     if getattr(mol, "spin", None) is not None:
         mol_info_parts.append(f"spin_multiplicity={mol.spin}")
     if mol.smiles is not None:
