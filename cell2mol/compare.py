@@ -1,5 +1,6 @@
 import logging
 from cell2mol.elementdata import ElementData
+from cell2mol.standardize_metal_os import standardize_reported_metal_os
 
 elemdatabase = ElementData()
 logger = logging.getLogger(__name__)
@@ -130,3 +131,83 @@ def compare_reference_indices(ref, mol):
     else:
         issame = False
     return issame
+
+
+def compare_total_charge(refcell):
+    for i, ref in enumerate(refcell.refmoleclist):
+        if ref.totcharge_cif is not None and ref.totcharge is not None:
+            ref.totcharge_agree = ref.totcharge_cif == ref.totcharge
+            logger.debug(
+                f"Ref.Molecule {i} - total charge: CIF={ref.totcharge_cif}, cell2mol={ref.totcharge}, Agree={ref.totcharge_agree}"
+            )
+
+    if any(ref.totcharge_agree is False for ref in refcell.refmoleclist):
+        return False
+    else:
+        return True
+
+
+def compare_metal_oxidation_states(refcell):
+    """
+    Compare the list of metals found in the structure with the reported metal oxidation states.
+    Returns True if they match, False otherwise.
+    """
+    # Create a dictionary to count occurrences of each metal
+
+    metal_os_tag_list = []
+    metal_label_list = []
+    for ref in refcell.refmoleclist:
+        if ref.metals:
+            for metal in ref.metals:
+                if metal.charge is not None:
+                    m_ox = metal.charge
+                else:
+                    m_ox = None
+                label = metal.label
+                metal_label_list.append(label)
+                metal_os_tag = (
+                    f"{label}_{m_ox}" if m_ox is not None else f"{label}_None"
+                )
+                metal_os_tag_list.append(metal_os_tag)
+
+    logger.debug(
+        f"Reference Metals found: {metal_label_list} with reported oxidation states: {refcell.reported_metal_os}"
+    )
+    if not refcell.reported_metal_os:
+        logger.info(
+            "No reported metal oxidation states found in CIF, skipping comparison."
+        )
+        return None
+    matched_list, confidence = standardize_reported_metal_os(
+        metal_label_list, refcell.reported_metal_os
+    )
+    logger.info(
+        f"Reported metal oxidation states standardized to {matched_list} with confidence {confidence:.2f}"
+    )
+    refcell.reported_metal_os_matched = matched_list
+    refcell.metal_os_match_confidence = confidence
+
+    if confidence < 1.0:
+        logger.info(
+            f"Confidence level below 1.0 ({confidence:.2f}), skipping comparison of metal oxidation states."
+        )
+        return None
+
+    metal_os_count = {}
+    for metal_os in metal_os_tag_list:
+        if metal_os in metal_os_count:
+            metal_os_count[metal_os] += 1
+        else:
+            metal_os_count[metal_os] = 1
+
+    # Create a dictionary to count occurrences of each reported oxidation state
+    reported_os_count = {}
+    for reported_metal_os in matched_list:
+        if reported_metal_os in reported_os_count:
+            reported_os_count[reported_metal_os] += 1
+        else:
+            reported_os_count[reported_metal_os] = 1
+    logger.info(
+        f"Metal oxidation states found: {metal_os_count}, Reported metal oxidation states: {reported_os_count}"
+    )
+    return metal_os_count == reported_os_count
