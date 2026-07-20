@@ -37,7 +37,7 @@ ERROR_MAPS = {
         "hydrogens": [
             ("has_isolated_H", 1),
             ("missing_H_in_Water", 2),
-            ("missing_H_in_CoordWater", 3),
+            ("missing_H_on_CoordDonor", 3),
             ("missing_H_in_Carbon", 4),
         ],
         "possible_charges": [("error_get_poscharges", 5)],
@@ -92,6 +92,10 @@ class Cell(BaseModel):
     # error_case: int | None = None
     error_cases: dict[str, int] | None = None
 
+    # Comparison results
+    total_charge_comparison: bool | None = None
+    metal_os_comparison: bool | None = None
+
     # Frozen fields
     version: str = Field(default=config.VERSION, frozen=True)
     type: Type = Field(default="cell")
@@ -103,6 +107,11 @@ class Cell(BaseModel):
 
     def set_subtype(self, subtype: SubType):
         self.subtype = subtype
+
+    def set_comparison_info(self, total_charge_comparison, metal_os_comparison):
+        """Save the results of total charge and metal oxidation state comparisons."""
+        self.total_charge_comparison = total_charge_comparison
+        self.metal_os_comparison = metal_os_comparison
 
     def assign_charges(self, refmoleclist: list[Molecule] | None = None):
         """
