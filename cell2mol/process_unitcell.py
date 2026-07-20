@@ -20,7 +20,7 @@ from cell2mol.write_results import (
     get_reference_warning_messages,
 )
 from cell2mol.utils.limits import ProcessingTimeoutError, set_time_limit
-
+from cell2mol.compare import compare_metal_oxidation_states, compare_total_charge
 import sys
 import gc
 
@@ -93,6 +93,20 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
             # Update cells object with processed data
             if success:
                 logger.info("cell2mol process completed successfully.")
+                total_charge_comparison = compare_total_charge(refcell)
+                metal_os_comparison = compare_metal_oxidation_states(refcell)
+                logger.info(
+                    f" - Total charge comparison result: {total_charge_comparison}"
+                )
+                logger.info(
+                    f" - Metal oxidation states comparison result: {metal_os_comparison}"
+                )
+                refcell.set_comparison_info(
+                    total_charge_comparison, metal_os_comparison
+                )
+                unitcell.set_comparison_info(
+                    total_charge_comparison, metal_os_comparison
+                )
             else:
                 logger.error("cell2mol process encountered errors.")
                 logger.debug(" - Reference error case: %s", refcell.error_cases)
@@ -261,14 +275,14 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
                         # Apply appropriate prefix based on the message content
                         prefix = "  " if msg.startswith("Skipped:") else "  Warning: "
                         print(f"{prefix}{msg}", file=f)
-    # if cells:
-    #     _safe_run(
-    #         lambda: cells.save(paths["json"], format="json"), "Failed to save JSON"
-    #     )
-    #     _safe_run(
-    #         lambda: cells.save(paths["pickle"], format="pickle"),
-    #         "Failed to save pickle",
-    #     )
+    if cells:
+        _safe_run(
+            lambda: cells.save(paths["json"], format="json"), "Failed to save JSON"
+        )
+        _safe_run(
+            lambda: cells.save(paths["pickle"], format="pickle"),
+            "Failed to save pickle",
+        )
 
 
 def _write_ref_detailed_summary(name, refcell, summary_path):
@@ -279,6 +293,22 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
     # Write to File
     with open(summary_path, "w") as f:
         print(name, file=f)
+        print(
+            f"Total charge comparison result: {getattr(refcell, 'total_charge_comparison')}",
+            file=f,
+        )
+        print(
+            f"Metal oxidation state comparison result: {getattr(refcell, 'metal_os_comparison')}",
+            file=f,
+        )
+        reported_os = getattr(refcell, "reported_metal_os", None)
+        matched_os = getattr(refcell, "reported_metal_os_matched", None)
+        os_confidence = getattr(refcell, "metal_os_match_confidence", None)
+        confidence_str = f"{os_confidence:.2f}" if os_confidence is not None else "N/A"
+        print(f"  - Reported:   {reported_os}", file=f)
+        print(f"  - Matched:    {matched_os}", file=f)
+        print(f"  - Confidence: {confidence_str}", file=f)
+
         write_cell_molecules_info(refcell, file=f)
         write_unique_species(refcell, file=f)
         write_possible_charges(refcell, file=f)
@@ -294,6 +324,14 @@ def _write_unit_summary(name: str, unitcell, summary_path: str):
     """Writes the reconstruction results and unit cell info to a text file."""
     with open(summary_path, "w") as f:
         print(name, file=f)
+        print(
+            f"Total charge comparison result: {getattr(unitcell, 'total_charge_comparison', 'N/A')}",
+            file=f,
+        )
+        print(
+            f"Metal oxidation state comparison result: {getattr(unitcell, 'metal_os_comparison', 'N/A')}",
+            file=f,
+        )
         write_cell_molecules_info(unitcell, file=f)
 
         if unitcell.error_cases:
