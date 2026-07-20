@@ -50,7 +50,9 @@ MANUAL_CONJUNCTO_BORANE_P = {
 def generate_special_charge_states(spec: Specie) -> list[ChargeState] | None:
     """Generate charge states for species handled by a closed-form builder
     rather than the general bond-order search: antimony-halide anions
-    (SbX3/X4/X5/X6-type) and fullerene cages (C20, C60, C70, ..., including
+    (SbX3/X4/X5/X6-type), fullerene cages (C20, C60, C70, ..., including
+    substituted derivatives), and closo/nido borane or carborane cages
+    (B12H12^2-, o-carborane, a dicarbollide ligand, ..., including
     substituted derivatives).
 
     Return contract (three outcomes the caller must distinguish):
@@ -99,6 +101,27 @@ def generate_special_charge_states(spec: Specie) -> list[ChargeState] | None:
         if charge_state is None:
             logger.warning(
                 "Fullerene charge builder failed for %s; return None",
+                spec.formula,
+            )
+            return None
+        return [charge_state] if charge_state is not None else []
+
+    # Borane/carborane cage (possibly substituted), single closo or nido
+    # deltahedron. Fused conjuncto (multi-cage) clusters -- e.g. the
+    # docosaborate [B22H22]^2- -- fail is_borane_cage's single-deltahedron
+    # check (it has no dimer-style fallback the way has_fullerene does for
+    # C60-C60), so has_borane is False for them and they fall through to
+    # the general search below rather than generate_conjuncto_borane_charge_state.
+    has_borane = (
+        spec.has_borane if spec.has_borane is not None else spec.evaluate_has_borane()
+    )
+    if has_borane:
+        logger.debug("Specie %s has a borane/carborane cage", spec.formula)
+        prot0 = spec.protonation_states[0]
+        charge_state = generate_borane_charge_state(prot0)
+        if charge_state is None:
+            logger.warning(
+                "Borane/carborane charge builder failed for %s; return None",
                 spec.formula,
             )
             return None
@@ -507,6 +530,46 @@ def _cage_face_sizes(graph: "nx.Graph[int]") -> list[int] | None:
     return sizes
 
 
+def find_borane_cage_indices(atoms, AC) -> list[int] | None:
+    """
+    Identify which atoms form a closo/nido borane or carborane deltahedral
+    cage, including when it's embedded in a larger substituted derivative
+    (e.g. a phosphine-tethered dicarbollide, an alkylated o-carborane, a
+    perhalogenated closo-borate) -- by taking the 3-core of the B/C-only
+    bond graph: repeatedly strip away any B or C atom with fewer than 3
+    B/C neighbors. Mirrors find_fullerene_cage_indices's approach.
+
+    Every vertex of a closo or nido deltahedron has at least 3 cage
+    neighbors (the smallest closo deltahedron, the trigonal bipyramid,
+    has its two apex atoms at exactly 3 -- see is_borane_cage), so
+    genuine cage atoms always survive this regardless of how many of them
+    also carry an exocyclic substituent (which adds a bond but never
+    removes one of the cage bonds). Any substituent -- a lone carbon
+    bonded only through a non-B/C atom, an alkyl chain, or an aromatic
+    ring attached at a single point -- strips away completely: tracing
+    back from its outermost leaves always reaches a point where B/C
+    degree drops below 3, cascading until nothing but the cage remains.
+
+    Returns the sorted list of cage atom indices, or None if there are no
+    boron or carbon atoms at all.
+    """
+    atoms = [int(a) for a in atoms]
+    ac = np.asarray(AC, dtype=int)
+    n = len(atoms)
+    if ac.shape != (n, n):
+        return None
+
+    bc_indices = [i for i, z in enumerate(atoms) if z in (5, 6)]
+    if not bc_indices:
+        return None
+
+    bc_ac = ac[np.ix_(bc_indices, bc_indices)]
+    bc_graph = nx.from_numpy_array(bc_ac)
+    core = nx.k_core(bc_graph, k=3)
+
+    return sorted(bc_indices[i] for i in core.nodes())
+
+
 def is_borane_cage(atoms, AC) -> tuple[bool, str]:
     """
     Detect a closo- or nido-type borane/carborane deltahedral cage
@@ -514,14 +577,16 @@ def is_borane_cage(atoms, AC) -> tuple[bool, str]:
     "dicarbollide", closo-B12Cl12^2-/"dodecachloro-closo-dodecaborate",
     ...) purely from connectivity - no bond orders, no coordinates
     required. Mirrors has_fullerene's coordinate-free, planar-graph-
-    based approach.
+    based approach, including substituent handling (see
+    find_borane_cage_indices).
 
     Cage vertex atoms are B and/or C (a carborane substitutes some cage
     B for C); anything else attached to them - terminal H, a halogen
-    (perhalogenated clusters like B12X12^2- are common), or a metal
-    coordinated through a dicarbollide's open face - is exocyclic and is
-    dropped before the cage-only subgraph is checked, regardless of what
-    it actually is.
+    (perhalogenated clusters like B12X12^2- are common), an organic
+    substituent (e.g. a phosphine-tethered dicarbollide ligand), or a
+    metal coordinated through a dicarbollide's open face - is exocyclic
+    and is dropped before the cage-only subgraph is checked, regardless
+    of what it actually is.
 
     Two Wade's-rules cluster families are recognized from that subgraph's
     planar face sizes:
@@ -547,12 +612,16 @@ def is_borane_cage(atoms, AC) -> tuple[bool, str]:
     if ac.shape != (n_total, n_total):
         return False, "bad_ac_shape"
 
-    # 1. Cage composition - vertex atoms are only B and/or C, with at
-    #    least one B (a pure-carbon deltahedral cage isn't a known
-    #    species; pure-carbon cages are handled by has_fullerene,
-    #    whose 3-regular/girth>=5 signature is disjoint from a
-    #    deltahedron's anyway).
-    cage_indices = [i for i, z in enumerate(atoms) if z in (5, 6)]
+    # 1. Cage composition - find the embedded B/C cage core, if any (see
+    #    find_borane_cage_indices), then require at least one B in it (a
+    #    pure-carbon deltahedral cage isn't a known species; pure-carbon
+    #    cages are handled by has_fullerene, whose 3-regular/girth>=5
+    #    signature is disjoint from a deltahedron's anyway).
+    cage_indices = find_borane_cage_indices(atoms, ac)
+    if cage_indices is None:
+        return False, "no_boron_or_carbon_atoms"
+    if not cage_indices:
+        return False, "no_borane_cage_core"
     if not any(atoms[i] == 5 for i in cage_indices):
         return False, "no_boron_atoms"
 
@@ -634,8 +703,10 @@ def find_conjuncto_borane_split(atoms, AC) -> dict | None:
     if ac.shape != (n_total, n_total):
         return None
 
-    cage_indices = [i for i, z in enumerate(atoms) if z in (5, 6)]
-    if not any(atoms[i] == 5 for i in cage_indices):
+    # See find_borane_cage_indices: strips B/C substituents (alkyl/aryl
+    # tails) so they don't get mistaken for cage vertices.
+    cage_indices = find_borane_cage_indices(atoms, ac)
+    if not cage_indices or not any(atoms[i] == 5 for i in cage_indices):
         return None
     # Smallest sensible 2-polyhedron fusion: two trigonal bipyramids (the
     # smallest closo deltahedron, n=5) sharing an edge is 5+5-2=8 atoms.
@@ -1775,7 +1846,14 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
         prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
     )
 
-    cage_indices = [i for i, z in enumerate(prot.atnums) if z in (5, 6)]
+    adjmat = np.asarray(prot.adjmat)
+
+    # Isolate the true cage atoms from any B/C substituents (e.g. a
+    # phosphine-tethered dicarbollide's alkyl/aryl carbons) -- see
+    # find_borane_cage_indices. Everything else lands in exo_indices and
+    # is split further below into simple terminal substituents vs. larger
+    # fragments that need their own independent charge.
+    cage_indices = find_borane_cage_indices(prot.atnums, adjmat) or []
     boron_indices = [i for i in cage_indices if prot.atnums[i] == 5]
     exo_indices = [i for i in range(prot.natoms) if i not in cage_indices]
 
@@ -1787,7 +1865,6 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
         )
         return None
 
-    adjmat = np.asarray(prot.adjmat)
     n = len(cage_indices)
 
     is_cage, reason = is_borane_cage(prot.atnums, adjmat)
@@ -2208,11 +2285,7 @@ def _classify_charged_moiety(
 
     Net-neutral look-alikes are deliberately excluded: ``C`` + 2 terminal O
     with no third substituent is CO2 (O=C=O, neutral) rather than a carboxylate,
-    ``N`` + 2 terminal O is NITRO (not nitrite here), ``S`` + 2 O + 2 C is a
-    sulfone, ``P`` + 1 O is a phosphine oxide. Polyprotic oxo-anions
-    (phosphonate/phosphate) are reported as the mono-anion (-1) -- connectivity
-    cannot fix the protonation level, and the charge-0 gate only needs the sign
-    to be nonzero.
+    and ``S`` + 2 O + 2 C is a sulfone.
     """
     # --- Anionic oxo-anions: centre + k terminal O ---
     if label == "C":
@@ -2221,10 +2294,6 @@ def _classify_charged_moiety(
         # k == 2 and n_nonmetal == 2 -> CO2 (O=C=O), neutral: not a moiety.
         if k == 3:
             return "carbonate", -2
-    elif label == "N":
-        if k == 3:
-            return "nitrate", -1
-        # k == 2 -> nitro (net-neutral zwitterion): not a charged moiety.
     elif label == "S":
         if k == 3:
             return "sulfonate", -1
@@ -2233,23 +2302,11 @@ def _classify_charged_moiety(
         if k == 2 and n_nonmetal == 3:  # 2 O + 1 C -> R-SO2(-)
             return "sulfinate", -1
         # k == 2 and n_nonmetal == 4 -> sulfone (neutral).
-    elif label == "P":
-        if k == 2:
-            return "phosphinate", -1
-        if k == 3:
-            return "phosphonate", -1
-        if k == 4:
-            return "phosphate", -1
-        # k == 1 (+ 3 C) -> phosphine oxide (neutral).
 
     # --- Cationic onium: full sigma valence to C/H only, no oxygen ---
-    if k == 0 and n_oxygen == 0:
-        if label == "N" and n_nonmetal == 4:
-            return "ammonium", 1
-        if label == "P" and n_nonmetal == 4:
-            return "phosphonium", 1
-        if label == "S" and n_nonmetal == 3:
-            return "sulfonium", 1
+    # if k == 0 and n_oxygen == 0:
+    #     if label == "S" and n_nonmetal == 3:
+    #         return "sulfonium", 1
 
     return None, 0
 
@@ -2258,16 +2315,12 @@ def _find_charged_moiety(
     spec: Specie,
 ) -> list[tuple[int, list[int], str, int]]:
     """Detect functional groups carrying a nonzero *net* formal charge purely
-    from connectivity -- both anionic and cationic. Generalises
-    ``_find_negative_moiety`` (which only found carboxylate/sulfonate).
+    from connectivity.
 
     Anionic groups are ``centre + k terminal O`` patterns, where a terminal O
-    has the centre as its only non-metal neighbour: carboxylate, nitrate,
-    sulfinate/sulfonate/sulfate, phosphinate/phosphonate/phosphate. Net-neutral
-    look-alikes (nitro, sulfone, phosphine oxide) are excluded -- see
-    ``_classify_charged_moiety``. Cationic onium centres (quaternary ammonium /
-    phosphonium / sulfonium) are found by a full sigma complement of carbon
-    neighbours with no oxygen.
+    has the centre as its only non-metal neighbour: carboxylate/carbonate and
+    sulfinate/sulfonate/sulfate. Net-neutral look-alikes (CO2, sulfone) are
+    excluded -- see ``_classify_charged_moiety``.
 
     This is a pure substructure match: metal coordination is ignored, so a
     group is detected whether or not its centre or terminal oxygen binds a
@@ -2289,7 +2342,10 @@ def _find_charged_moiety(
 
     moieties: list[tuple[int, list[int], str, int]] = []
     for i, atom in enumerate(atoms):
-        if atom.label not in ("C", "N", "S", "P"):
+        if atom.label not in (
+            "C",
+            "S",
+        ):
             continue
 
         # Non-metal neighbours only (adjacency minus the metal subset).
