@@ -16,7 +16,6 @@ from cell2mol.element_utils import (
     ACTINIDES,
     POST_TRANSITION_METALS,
 )
-
 import logging
 
 elemdatabase = ElementData()
@@ -489,8 +488,25 @@ def extract_chemical_name(cif_file_path, tag="_chemical_name_systematic"):
     return None
 
 
+# Reported names that encode the oxidation state in the ligand name itself,
+# without an explicit "(roman-numeral)" token. Order matters: more specific
+# fragments must come first, since "ferrocen" is a substring of "ferrocenium".
+METAL_OS_SPECIAL_CASES = [
+    ("ferrocenium", ("iron", 3)),  # ferrocenium cation -> Fe(III)
+    ("ferrocen", ("iron", 2)),  # ferrocene / ferrocenyl -> Fe(II)
+]
+
+
 def extract_metal_oxidation_state(chemical_name):
     oxidation_states = []
+
+    # Special cases: the name pins the oxidation state directly, with no
+    # "(roman-numeral)" token for the regex below to catch (e.g. ferrocene).
+    name_lower = chemical_name.lower()
+    for fragment, (metal, ox_state) in METAL_OS_SPECIAL_CASES:
+        if fragment in name_lower:
+            oxidation_states.append((fragment, ox_state))
+            break
 
     # Regex pattern to capture any format like "iron(iii)"
     pattern = r"(\b[a-zA-Z-]+\b)\((iii|ii|iv|v|vi|vii|viii|ix|x|i|0|o)\)"
