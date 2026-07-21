@@ -39,6 +39,9 @@ class Metal(Atom):
     coord_geometry: str | Literal["Undefined"] | None = None
     geom_deviation: float | Literal["Undefined"] | None = None
     rel_metal_radius: float | None = None
+    rel_metal_radius_test: float | None = None
+    rel_metal_radius_allpoint: float | None = None
+    rel_metal_radius_detail: dict[str, Any] | None = None
     coord_nr_with_metal_bonds: int | None = None
     coord_geometry_with_metal_bonds: str | Literal["Undefined"] | None = None
     geom_deviation_with_metal_bonds: float | Literal["Undefined"] | None = None
@@ -225,6 +228,7 @@ class Metal(Atom):
         )
 
         self.rel_metal_radius = self.get_relative_metal_radius()
+        self.rel_metal_radius_test = self.get_relative_metal_radius_test()
 
         if self.metals is None:
             self.get_connected_metals()
@@ -338,6 +342,120 @@ class Metal(Atom):
             f" ({self.atom_site_label})" if self.atom_site_label else "",
         )
         return self.rel_metal_radius
+
+    def get_relative_metal_radius_test(self):
+        """Test variant of :meth:`get_relative_metal_radius`.
+
+        Point (non-haptic) donors are treated identically to the original: one
+        diff per atom, ``dist(metal, atom) - CovalentRadius3[atom.label]``.
+
+        For a haptic group the original method collapses the group to its
+        centroid and uses a single carbon covalent radius. Here instead we
+        compute a per-atom diff for every atom in the haptic group using each
+        atom's own coordinate and covalent radius, then append the group's
+        *mean* diff as its single contribution (so a haptic group still weighs
+        the same as one point donor in the final average).
+        """
+        if self.groups is None:
+            self.get_connected_groups()
+        metal_radii = elemdatabase.CovalentRadius3[self.label]
+        diff_list = []
+        diff_list_allpoint = []
+        diff_list_original = []
+        group_details = []
+        for group in self.groups or []:
+            coord_atoms = []
+            for atom in group.atoms or []:
+                distance = round(float(get_dist(list(self.coord), list(atom.coord))), 3)
+                radii = elemdatabase.CovalentRadius3[atom.label]
+                coord_atoms.append(
+                    {
+                        "label": atom.label,
+                        "distance": distance,
+                        "radii": round(float(radii), 3),
+                        "diff": round(float(distance - radii), 3),
+                    }
+                )
+            atom_diffs = [ca["diff"] for ca in coord_atoms]
+            group_diff = round(float(np.mean(atom_diffs)), 3) if atom_diffs else None
+
+            # all-point weighting: every atom (haptic or not) counts individually
+            diff_list_allpoint.extend(atom_diffs)
+
+            group_diff_centroid = None
+            if not group.is_haptic:
+                # each point donor contributes its own diff (identical in all variants)
+                diff_list.extend(atom_diffs)
+                diff_list_original.extend(atom_diffs)
+            else:
+                # test variant: haptic group contributes the mean diff of its atoms
+                if group_diff is not None:
+                    diff_list.append(group_diff)
+                # original variant: haptic group -> distance to centroid minus carbon radius
+                if group.atoms:
+                    centroid = compute_centroid(
+                        np.array([atom.coord for atom in group.atoms])
+                    )
+                    group_diff_centroid = round(
+                        float(
+                            get_dist(list(self.coord), list(centroid))
+                            - elemdatabase.CovalentRadius3["C"]
+                        ),
+                        3,
+                    )
+                    diff_list_original.append(group_diff_centroid)
+
+            group_details.append(
+                {
+                    "formula": group.formula,
+                    "is_haptic": group.is_haptic,
+                    "haptic_type": group.haptic_type,
+                    "coord_atoms": coord_atoms,
+                    "group_diff": group_diff,
+                    "group_diff_centroid": group_diff_centroid,
+                }
+            )
+        if len(diff_list) > 0:
+            average = round(float(np.mean(diff_list)), 3)
+        else:
+            average = 0.0
+
+        if len(diff_list_allpoint) > 0:
+            average_allpoint = round(float(np.mean(diff_list_allpoint)), 3)
+        else:
+            average_allpoint = 0.0
+
+        if len(diff_list_original) > 0:
+            average_original = round(float(np.mean(diff_list_original)), 3)
+        else:
+            average_original = 0.0
+
+        logger.debug("diff_list_test(distance-covalent_radius)=%s", diff_list)
+        logger.debug("average_test=%s", average)
+
+        self.rel_metal_radius_test = round(average / metal_radii, 3)
+        self.rel_metal_radius_allpoint = round(average_allpoint / metal_radii, 3)
+        rel_metal_radius_original = round(average_original / metal_radii, 3)
+
+        self.rel_metal_radius_detail = {
+            "metal": self.label,
+            "metal_radii": round(float(metal_radii), 3),
+            "groups": group_details,
+            "average_diff_original": average_original,
+            "rel_metal_radius_original": rel_metal_radius_original,
+            "average_diff_test": average,
+            "rel_metal_radius_test": self.rel_metal_radius_test,
+            "average_diff_allpoint": average_allpoint,
+            "rel_metal_radius_allpoint": self.rel_metal_radius_allpoint,
+        }
+
+        logger.info(
+            "rel_metal_radius_test=%s for Metal %s%s",
+            self.rel_metal_radius_test,
+            self.label,
+            f" ({self.atom_site_label})" if self.atom_site_label else "",
+        )
+        return self.rel_metal_radius_test
 
     def get_possible_cs(self):
         self.possible_cs = get_metal_poscharges(self)
