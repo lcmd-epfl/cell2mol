@@ -13,6 +13,7 @@ from typing import Tuple, TYPE_CHECKING, cast
 from cell2mol.operations import get_angle, unit_vector, perp_unit, kabsch_rotation
 from cell2mol.elementdata import ElementData
 from cell2mol.element_utils import ALKALI_AND_ALKALINE_EARTH_METALS
+from cell2mol.my_types import NDArray
 
 if TYPE_CHECKING:
     from cell2mol.classes.ligand import Ligand
@@ -149,6 +150,297 @@ def infer_coordination_geometry(bond_vectors):
     return geometry, coordination_number, geometry_report
 
 
+# Diatomic C-X moieties whose lone carbon is genuinely 1-coordinate (a triple
+# bond, e.g. cyanide C-N), so it must not be flagged as missing hydrogens.
+MOIETY_SKIP_CHECK = {"C-N", "C-P", "C-As", "C-Sb", "C-O", "C-S", "C-Se", "C-Te"}
+
+
+def _missing_h_in_molecule(mol):
+    """Missing-H check for a single non-complex molecule specie.
+
+    Args:
+        mol: a non-complex molecule Specie (no d-/f-block metals).
+
+    Returns:
+        tuple:
+            missing_h_in_carbon (bool): an under-coordinated carbon was found
+            missing_h_in_water (bool): the molecule is a lone O (dehydrated water)
+    """
+
+    from cell2mol.charge.special_cases import has_open_fullerene
+
+    missing_h_in_carbon = False
+    missing_h_in_water = False
+
+    if mol.natoms == 1 and mol.labels[0] == "O":
+        missing_h_in_water = True
+        logger.warning("Isolated O atom detected (possible water with missing H)")
+        return missing_h_in_carbon, missing_h_in_water
+
+    if mol.formula in MOIETY_SKIP_CHECK:
+        return missing_h_in_carbon, missing_h_in_water
+
+    has_fullerene = (
+        mol.has_fullerene
+        if mol.has_fullerene is not None
+        else mol.evaluate_has_fullerene()
+    )
+    is_open_cage = False
+    if not has_fullerene:
+        is_open_cage, _ = has_open_fullerene(
+            mol.get_atomic_numbers(), mol.adjmat, mol.coord
+        )
+    if has_fullerene or is_open_cage:
+        logger.debug(
+            "Molecule %s has a %s, missing hydrogens detection skipped",
+            mol.formula,
+            "closed fullerene cage or dimer"
+            if has_fullerene
+            else "open fullerene cage",
+        )
+        return missing_h_in_carbon, missing_h_in_water
+
+    for atom in mol.atoms:
+        if atom.label != "C" or atom.adjacency is None:
+            continue
+
+        neighbor_coords = [mol.coord[i] for i in atom.adjacency]
+        neighbor_labels = [mol.labels[i] for i in atom.adjacency]
+
+        missing_h_detected, report, _ = detect_missing_hydrogens(
+            atom.atnum,
+            atom.coord,
+            neighbor_coords,
+            neighbor_labels,
+        )
+
+        if missing_h_detected:
+            logger.warning(
+                "Missing H in Molecule (formula: %s), C atom %s%s (mol idx %s)",
+                mol.formula,
+                atom.coord,
+                f" ({atom.atom_site_label})" if atom.atom_site_label else "",
+                atom.get_parent_index("molecule"),
+            )
+            for line in report.splitlines():
+                logger.warning(line)
+            missing_h_in_carbon = True
+
+    return missing_h_in_carbon, missing_h_in_water
+
+
+def _missing_h_in_ligand(lig, parent=None):
+    """Missing-H check for a single ligand specie.
+
+    Args:
+        lig: a Ligand specie.
+        parent: the parent molecule whose coord/labels arrays the ligand's
+            atom adjacency indexes into. Defaults to ``lig.get_parent("molecule")``.
+
+    Returns:
+        tuple:
+            missing_h_in_carbon (bool)
+            missing_h_on_coordinated_o_donor (bool): lone O donor sitting too far
+                from its metal to be a bare O(2-) (dehydrated water/hydroxide)
+            missing_h_on_coordinated_n_donor (bool): lone N donor sitting too far
+                from its metal to be a bare N(3-) (dehydrated ammonia)
+    """
+    from cell2mol.charge.special_cases import has_open_fullerene
+
+    if parent is None:
+        parent = lig.get_parent("molecule")
+
+    missing_h_in_carbon = False
+    missing_h_on_coordinated_o_donor = False
+    missing_h_on_coordinated_n_donor = False
+
+    is_single_oxygen = lig.formula == "O"
+    is_single_nitrogen = lig.formula == "N"
+    is_single_carbon = lig.formula == "C"
+
+    if is_single_oxygen:
+        oxygen_atom = lig.atoms[0]
+        connected_metals = getattr(lig, "metals", [])
+        if len(connected_metals) >= 2:
+            logger.warning(
+                "Ligand (formula: %s) has multiple connected metals %s; skipping bridged O atom",
+                lig.formula,
+                [m.label for m in connected_metals],
+            )
+        elif len(connected_metals) == 1:
+            metal = connected_metals[0]
+            threshold_distance = 1.9  # Å
+            distance_to_metal = np.linalg.norm(oxygen_atom.coord - metal.coord)
+            if distance_to_metal > threshold_distance:
+                missing_h_on_coordinated_o_donor = True
+    if is_single_nitrogen:
+        nitrogen_atom = lig.atoms[0]
+        connected_metals = getattr(lig, "metals", [])
+        if len(connected_metals) >= 2:
+            logger.warning(
+                "Ligand (formula: %s) has multiple connected metals %s; skipping bridged N atom",
+                lig.formula,
+                [m.label for m in connected_metals],
+            )
+        elif len(connected_metals) == 1:
+            metal = connected_metals[0]
+            threshold_distance = 2.0  # Å
+            distance_to_metal = np.linalg.norm(nitrogen_atom.coord - metal.coord)
+            if distance_to_metal > threshold_distance:
+                logger.warning(
+                    "Missing H in Ligand (formula: %s), N atom connected to metal %s at distance %.2f Å",
+                    lig.formula,
+                    metal.label,
+                    distance_to_metal,
+                )
+                missing_h_on_coordinated_n_donor = True
+
+    if is_single_carbon:
+        connected_metals = getattr(lig, "metals", [])
+        if len(connected_metals) >= 2:
+            logger.warning(
+                "Ligand (formula: %s) has multiple connected metals %s; skipping bridged C atom",
+                lig.formula,
+                [m.label for m in connected_metals],
+            )
+        elif len(connected_metals) == 1:
+            logger.warning(
+                "Ligand (formula: %s) has a single carbon atom connected to metal %s (possibly methyl group with missing H)",
+                lig.formula,
+                connected_metals[0].label,
+            )
+            missing_h_in_carbon = True
+
+    if lig.formula in MOIETY_SKIP_CHECK:
+        return (
+            missing_h_in_carbon,
+            missing_h_on_coordinated_o_donor,
+            missing_h_on_coordinated_n_donor,
+        )
+
+    has_fullerene = (
+        lig.has_fullerene
+        if lig.has_fullerene is not None
+        else lig.evaluate_has_fullerene()
+    )
+    # See the matching comment above: skip the redundant open-cage
+    # check once has_fullerene is already True.
+    is_open_cage = False
+    if not has_fullerene:
+        is_open_cage, _ = has_open_fullerene(
+            lig.get_atomic_numbers(), lig.adjmat, lig.coord
+        )
+    if has_fullerene or is_open_cage:
+        logger.debug(
+            "Ligand %s has a %s, missing hydrogens detection skipped",
+            lig.formula,
+            "closed fullerene cage or dimer"
+            if has_fullerene
+            else "open fullerene cage",
+        )
+        return (
+            missing_h_in_carbon,
+            missing_h_on_coordinated_o_donor,
+            missing_h_on_coordinated_n_donor,
+        )
+
+    only_carbon = all(el == "C" for el in lig.labels) and lig.natoms > 2
+    for atom in lig.atoms:
+        if atom.label != "C" or atom.adjacency is None:
+            continue
+
+        if atom.mconnec >= 1 and not only_carbon:
+            continue
+
+        neighbor_coords = [parent.coord[i] for i in atom.adjacency]
+        neighbor_labels = [parent.labels[i] for i in atom.adjacency]
+
+        missing_h_detected, report, _ = detect_missing_hydrogens(
+            atom.atnum,
+            atom.coord,
+            neighbor_coords,
+            neighbor_labels,
+        )
+
+        if missing_h_detected:
+            logger.warning(
+                "Missing H in Ligand (formula: %s), C atom %s%s (mol idx %s)",
+                lig.formula,
+                atom.coord,
+                f" ({atom.atom_site_label})" if atom.atom_site_label else "",
+                atom.get_parent_index("molecule"),
+            )
+            for line in report.splitlines():
+                logger.warning(line)
+            missing_h_in_carbon = True
+
+    return (
+        missing_h_in_carbon,
+        missing_h_on_coordinated_o_donor,
+        missing_h_on_coordinated_n_donor,
+    )
+
+
+def check_missing_hydrogens_in_specie(specie):
+    """Check for missing hydrogen atoms in a single specie.
+
+    Specie-level counterpart of :func:`check_missing_hydrogens`, meant to be
+    called on entries of a reference cell's ``species_list`` (already-split
+    ligands, non-complex molecules, and metals). Metals carry no hydrogens and
+    always report clean. A complex molecule passed directly is dispatched to its
+    ligands.
+
+    Args:
+        specie: a Specie (Ligand, Molecule, or Metal).
+
+    Returns:
+        tuple:
+            has_missing_h (bool): True if any missing hydrogens are detected
+            missing_h_in_carbon (bool): missing H in coordinated carbon atoms
+            missing_h_on_coordinated_donor (bool): missing H on a coordinated O
+                donor (water/hydroxide) or N donor (ammonia) -- both as error code 3
+            missing_h_in_water (bool): missing H in isolated water
+    """
+    missing_h_in_carbon = False
+    missing_h_in_water = False
+    missing_h_on_coordinated_o_donor = False
+    missing_h_on_coordinated_n_donor = False
+
+    if specie.subtype == "metal":
+        pass  # a bare metal centre has no hydrogens to be missing
+    elif specie.subtype == "ligand":
+        (
+            missing_h_in_carbon,
+            missing_h_on_coordinated_o_donor,
+            missing_h_on_coordinated_n_donor,
+        ) = _missing_h_in_ligand(specie)
+    elif specie.is_non_complex_molecule:
+        missing_h_in_carbon, missing_h_in_water = _missing_h_in_molecule(specie)
+    else:
+        # A complex molecule handed in directly: fold over its ligands.
+        for lig in getattr(specie, "ligands", None) or []:
+            c, o, n = _missing_h_in_ligand(lig, parent=specie)
+            missing_h_in_carbon |= c
+            missing_h_on_coordinated_o_donor |= o
+            missing_h_on_coordinated_n_donor |= n
+
+    # A lone O donor (coordinated water/hydroxide missing its H)
+    # and a lone N donor (coordinated ammonia missing its H) share
+    missing_h_on_coordinated_donor = (
+        missing_h_on_coordinated_o_donor or missing_h_on_coordinated_n_donor
+    )
+    has_missing_h = (
+        missing_h_in_carbon or missing_h_on_coordinated_donor or missing_h_in_water
+    )
+
+    return (
+        has_missing_h,
+        missing_h_in_carbon,
+        missing_h_on_coordinated_donor,
+        missing_h_in_water,
+    )
+
+
 def check_missing_hydrogens(reference_molecules):
     """Check for missing hydrogen atoms in reference molecules.
 
@@ -166,206 +458,15 @@ def check_missing_hydrogens(reference_molecules):
     """
     missing_h_in_carbon = False
     missing_h_in_water = False
-    missing_h_on_coordinated_o_donor = False
-    missing_h_on_coordinated_n_donor = False
-    missing_h_detected = False
-    moiety_skip_check = {"C-N", "C-P", "C-As", "C-Sb", "C-O", "C-S", "C-Se", "C-Te"}
-
-    # Open-cage fullerenes (e.g. AFITUH's open C60) aren't caught by
-    # has_fullerene -- the orifice breaks the closed 3-regular cage. Detect them
-    # inline (coordinate-based) so their curved sp2 cage carbons aren't mis-read
-    # as under-coordinated. Not cached on the Specie: only the missing-H skip
-    # needs it, unlike the closed-cage flag which also drives protonation/charge.
-    from cell2mol.charge.special_cases import has_open_fullerene
+    missing_h_on_coordinated_donor = False
 
     logger.info("Detecting any missing hydrogens in reference molecules...")
 
     for ref in reference_molecules:
-        if ref.is_non_complex_molecule:
-            if ref.natoms == 1 and ref.labels[0] == "O":
-                missing_h_in_water = True
-                logger.warning(
-                    "Isolated O atom detected (possible water with missing H)"
-                )
-                continue
-
-            if ref.formula in moiety_skip_check:
-                continue
-
-            has_fullerene = (
-                ref.has_fullerene
-                if ref.has_fullerene is not None
-                else ref.evaluate_has_fullerene()
-            )
-            # Skip the open-cage check entirely once has_fullerene is already
-            # True -- it's about to be skipped either way, and has_open_fullerene
-            # (get_atomic_numbers() plus, for large-carbon structures, a k-core
-            # and SVD computation) is not cheap to run only to discard.
-            is_open_cage = False
-            if not has_fullerene:
-                is_open_cage, _ = has_open_fullerene(
-                    ref.get_atomic_numbers(), ref.adjmat, ref.coord
-                )
-            if has_fullerene or is_open_cage:
-                logger.debug(
-                    "Molecule %s has a %s, missing hydrogens detection skipped",
-                    ref.formula,
-                    "closed fullerene cage or dimer"
-                    if has_fullerene
-                    else "open fullerene cage",
-                )
-                continue
-            for atom in ref.atoms:
-                if atom.label != "C" or atom.adjacency is None:
-                    continue
-
-                neighbor_coords = [ref.coord[i] for i in atom.adjacency]
-                neighbor_labels = [ref.labels[i] for i in atom.adjacency]
-
-                missing_h_detected, report, _ = detect_missing_hydrogens(
-                    atom.atnum,
-                    atom.coord,
-                    neighbor_coords,
-                    neighbor_labels,
-                )
-
-                if missing_h_detected:
-                    logger.warning(
-                        "Missing H in Molecule (formula: %s), C atom %s%s (mol idx %s)",
-                        ref.formula,
-                        atom.coord,
-                        f" ({atom.atom_site_label})" if atom.atom_site_label else "",
-                        atom.get_parent_index("molecule"),
-                    )
-                    for line in report.splitlines():
-                        logger.warning(line)
-                    missing_h_in_carbon = True
-        else:
-            for lig in ref.ligands:
-                is_single_oxygen = lig.formula == "O"
-                is_single_nitrogen = lig.formula == "N"
-                is_single_carbon = lig.formula == "C"
-
-                if is_single_oxygen:
-                    oxygen_atom = lig.atoms[0]
-                    connected_metals = getattr(lig, "metals", [])
-                    if len(connected_metals) >= 2:
-                        logger.warning(
-                            "Ligand (formula: %s) has multiple connected metals %s; skipping bridged O atom",
-                            lig.formula,
-                            [m.label for m in connected_metals],
-                        )
-                    elif len(connected_metals) == 1:
-                        metal = connected_metals[0]
-                        threshold_distance = 1.9  # Å
-                        distance_to_metal = np.linalg.norm(
-                            oxygen_atom.coord - metal.coord
-                        )
-                        if distance_to_metal > threshold_distance:
-                            missing_h_on_coordinated_o_donor = True
-                if is_single_nitrogen:
-                    nitrogen_atom = lig.atoms[0]
-                    connected_metals = getattr(lig, "metals", [])
-                    if len(connected_metals) >= 2:
-                        logger.warning(
-                            "Ligand (formula: %s) has multiple connected metals %s; skipping bridged N atom",
-                            lig.formula,
-                            [m.label for m in connected_metals],
-                        )
-                    elif len(connected_metals) == 1:
-                        metal = connected_metals[0]
-                        threshold_distance = 2.0  # Å
-                        distance_to_metal = np.linalg.norm(
-                            nitrogen_atom.coord - metal.coord
-                        )
-                        if distance_to_metal > threshold_distance:
-                            logger.warning(
-                                "Missing H in Ligand (formula: %s), N atom connected to metal %s at distance %.2f Å",
-                                lig.formula,
-                                metal.label,
-                                distance_to_metal,
-                            )
-                            missing_h_on_coordinated_n_donor = True
-
-                if is_single_carbon:
-                    carbon_atom = lig.atoms[0]
-                    connected_metals = getattr(lig, "metals", [])
-                    if len(connected_metals) >= 2:
-                        logger.warning(
-                            "Ligand (formula: %s) has multiple connected metals %s; skipping bridged C atom",
-                            lig.formula,
-                            [m.label for m in connected_metals],
-                        )
-                    elif len(connected_metals) == 1:
-                        logger.warning(
-                            "Ligand (formula: %s) has a single carbon atom connected to metal %s (possibly methyl group with missing H)",
-                            lig.formula,
-                            connected_metals[0].label,
-                        )
-                        missing_h_in_carbon = True
-
-                if lig.formula in moiety_skip_check:
-                    continue
-                has_fullerene = (
-                    lig.has_fullerene
-                    if lig.has_fullerene is not None
-                    else lig.evaluate_has_fullerene()
-                )
-                # See the matching comment above: skip the redundant open-cage
-                # check once has_fullerene is already True.
-                is_open_cage = False
-                if not has_fullerene:
-                    is_open_cage, _ = has_open_fullerene(
-                        lig.get_atomic_numbers(), lig.adjmat, lig.coord
-                    )
-                if has_fullerene or is_open_cage:
-                    logger.debug(
-                        "Ligand %s has a %s, missing hydrogens detection skipped",
-                        lig.formula,
-                        "closed fullerene cage or dimer"
-                        if has_fullerene
-                        else "open fullerene cage",
-                    )
-                    continue
-                only_carbon = all(el == "C" for el in lig.labels) and lig.natoms > 2
-                for atom_idx, atom in enumerate(lig.atoms):
-                    if atom.label != "C" or atom.adjacency is None:
-                        continue
-
-                    if atom.mconnec >= 1 and not only_carbon:
-                        continue
-
-                    neighbor_coords = [ref.coord[i] for i in atom.adjacency]
-                    neighbor_labels = [ref.labels[i] for i in atom.adjacency]
-
-                    missing_h_detected, report, _ = detect_missing_hydrogens(
-                        atom.atnum,
-                        atom.coord,
-                        neighbor_coords,
-                        neighbor_labels,
-                    )
-
-                    if missing_h_detected:
-                        logger.warning(
-                            "Missing H in Ligand (formula: %s), C atom %s%s (mol idx %s)",
-                            lig.formula,
-                            atom.coord,
-                            f" ({atom.atom_site_label})"
-                            if atom.atom_site_label
-                            else "",
-                            atom.get_parent_index("molecule"),
-                        )
-                        for line in report.splitlines():
-                            logger.warning(line)
-                        missing_h_in_carbon = True
-
-    # A lone O donor (coordinated water/hydroxide missing its H) and a lone N
-    # donor (coordinated ammonia missing its H) share error code 3 --
-    # both are a single-heteroatom ligand sitting too far from its metal to be
-    # a bare O(2-)/N(3-), so its Hs were dropped. Reported together in that slot.
-    missing_h_on_coordinated_donor = (
-        missing_h_on_coordinated_o_donor or missing_h_on_coordinated_n_donor
-    )
+        has_missing_h, carbon, donor, water = check_missing_hydrogens_in_specie(ref)
+        missing_h_in_carbon |= carbon
+        missing_h_on_coordinated_donor |= donor
+        missing_h_in_water |= water
 
     has_missing_h = (
         missing_h_in_carbon or missing_h_on_coordinated_donor or missing_h_in_water
@@ -535,13 +636,13 @@ def place_hydrogens(
 
 
 def add_hydrogens(
-    labels: list,
-    coords: np.ndarray,
+    labels: list[str],
+    coords: NDArray,
     site: int,
     ligand: "Ligand",
     num_hydrogens: int,
     element: str = "H",
-) -> Tuple[bool, list, np.ndarray]:
+) -> Tuple[bool, list[str], NDArray]:
     """Add hydrogens to a given atom site."""
 
     isadded = True
