@@ -12,6 +12,7 @@ from cell2mol.charge.special_cases import (
     check_fullerene_sphericity,
     find_all_porphyrin_macrocycles,
     porphyrin_reference_protonation_sites,
+    _find_charged_moiety,
 )
 from cell2mol.charge.xyz2mol import atomic_valence
 from cell2mol.hydrogen import detect_missing_hydrogens, add_hydrogens
@@ -31,8 +32,8 @@ logger = logging.getLogger(__name__)
 class ProtonationGroupResult:
     site_proton_counts: Dict[int, int]
     ligand_donor_electrons: Dict[int, int]
-    needs_nonlocal: bool
-    non_local_indices: List[int]
+    needs_combinatorial: bool
+    combinatorial_indices: List[int]
 
 
 def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
@@ -54,7 +55,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
 
     if specie.subtype == "molecule":
         if specie.is_non_complex_molecule:
-            return get_empty_protonation_state(specie)
+            return get_asis_protonation_state(specie)
         else:
             logger.info(
                 "Specie %s (%s) is a complex molecule. Do not protonate.",
@@ -64,7 +65,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
             return None
 
     if specie.formula in MANUAL_CHARGE_ASSIGN_SPECIES:
-        return get_empty_protonation_state(specie)
+        return get_asis_protonation_state(specie)
 
     has_fullerene = (
         specie.has_fullerene
@@ -80,7 +81,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
                 specie.formula,
             )
         logger.debug("Fullerene cage detected for %s", specie.formula)
-        return get_empty_protonation_state(specie)
+        return get_asis_protonation_state(specie)
 
     # Porphyrin/phthalocyanine/corrole/corrin N4 macrocycle: enumerate the
     # protonation states relevant to a metal-coordinated tetrapyrrolic
@@ -101,7 +102,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     #     macrocycle (k >= 5: penta-/hexa-/octaphyrin, whose free-base N-H count
     #     is oxidation-level dependent) or a k = 4 core that also binds a metal
     #     through donors outside it (e.g. EFISEV, furan-fused). These emit only the
-    #     empty protonation state and set specie.protonation_warning, flagging
+    #     as-is protonation state and set specie.protonation_warning, flagging
     #     the charge result for manual review. The automatic generators for
     #     these cases are parked in _experimental_macrocycle_protonation.
     if has_porphyrin:
@@ -121,7 +122,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
         # Clean closed-form k=4 (incl. fully-covered bis-porphyrin): auto-handle.
         if not is_expanded and not uncovered:
             return _generate_porphyrin_protonation_states(specie, macrocycles)
-        # Expanded k>=5, or fused/ring-modified k=4: empty state + warning flag.
+        # Expanded k>=5, or fused/ring-modified k=4: as-is state + warning flag.
         if is_expanded:
             reason = "expanded porphyrin (k>=5, oxidation-level-dependent free base)"
             specie.protonation_warning = reason
@@ -140,7 +141,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     if specie.subtype == "ligand":
         parent = cast("Specie", specie.get_parent("molecule"))
         if parent is not None and parent.has_ia_iia and not parent.iscomplex:
-            return get_empty_protonation_state(specie)
+            return get_asis_protonation_state(specie)
 
     # ============================================================
     # From here on: ligand protonation engine
@@ -156,12 +157,11 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     n_protons_added = 0
     site_proton_counts = np.zeros(ligand.natoms, dtype=int)
     ligand_donor_electrons = np.zeros(ligand.natoms, dtype=int)
-    non_local_groups_indices: list[int] = []
+    combinatorial_site_indices: list[int] = []
     # nonlocal_site_metal: dict[int, "Metal"] = {}
     process_both_modes: list[int] = []
     protonated_indices_to_reset: list[int] = []  # old : reset_H_indices
 
-    limit_of_nonlocal_sites = 8  # Arbitrary limit to avoid combinatorial explosion
     max_combinations = 16
     logger.info("Processing %s (%s):", specie.formula, specie.subtype)
 
@@ -182,6 +182,11 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
             for g in groups
         ],
     )
+    # Oxygens belonging to a carboxylate / sulfonate / ... already have their
+    # charge fixed by _find_charged_moiety, so they are not protonation sites
+    # (see _charged_moiety_atoms).
+    moiety_atoms = _charged_moiety_atoms(ligand)
+
     for g in groups:
         parent_indices = g.get_parent_indices("ligand")
 
@@ -191,7 +196,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
         if g.is_haptic:  # HAPTIC GROUPS
             result = _handle_haptic_group(ligand, g, parent_indices)
         else:  # NON-HAPTIC GROUPS
-            result = _handle_non_haptic_group(ligand, g, parent_indices)
+            result = _handle_non_haptic_group(ligand, g, parent_indices, moiety_atoms)
 
         # --------------------------------------------------
         # Merge results (THIS IS THE IMPORTANT PART)
@@ -202,47 +207,47 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
         for idx, val in result.ligand_donor_electrons.items():
             ligand_donor_electrons[idx] += val
 
-        if result.needs_nonlocal:
-            non_local_groups_indices.extend(result.non_local_indices)
+        if result.needs_combinatorial:
+            combinatorial_site_indices.extend(result.combinatorial_indices)
             # Remember which metal each combinatorial site coordinates, so a
             # tetrapyrrolic ligand whose macrocycle the strict detector missed
             # (a fused / ring-modified bis-porphyrin such as EHOMUL) can still
             # be grouped into per-metal N4 pockets below.
             # group_metals = list(g.metals or [])
-            # for idx in result.non_local_indices:
+            # for idx in result.combinatorial_indices:
             #     if len(group_metals) == 1:
             #         nonlocal_site_metal[idx] = group_metals[0]
 
     # ============================================================
-    # Check non_local_groups_indices for decision
+    # Check combinatorial_site_indices for decision
     # ============================================================
-    logger.debug("    non_local_groups_indices: %s", non_local_groups_indices)
+    logger.debug("    combinatorial_site_indices: %s", combinatorial_site_indices)
     # Collapse symmetry-equivalent coordinating atoms into one all-or-nothing
-    # site each, so a symmetric ligand (e.g. CAPKEJ: 4 equivalent O + 4
-    # equivalent N) enumerates 2**(#classes) states instead of 2**(#atoms).
-    site_classes = _environment_classes(ligand, non_local_groups_indices)
-    if non_local_groups_indices:
+    # site each, so a symmetric ligand
+    site_classes = _environment_classes(ligand, combinatorial_site_indices)
+    if combinatorial_site_indices:
         logger.debug(
-            "    grouped %d non-local site(s) into %d environment class(es): %s",
-            len(non_local_groups_indices),
+            "    grouped %d combinatorial site(s) into %d environment class(es): %s",
+            len(combinatorial_site_indices),
             len(site_classes),
             site_classes,
         )
-    # Each class of k equivalent atoms contributes k+1 protonation options
-    # (0..k of them protonated), so the total number of combinatorial states is
-    # the product of (|class| + 1), not 2**(#classes).
+    # A small class of k equivalent atoms contributes k+1 protonation options
+    # (0..k of them protonated); a large one is all-or-nothing (see
+    # _class_count_choices). The total number of combinatorial states is the
+    # product of the per-class option counts.
+    count_choices = [_class_count_choices(cls) for cls in site_classes]
     n_combinations = 1
-    for cls in site_classes:
-        n_combinations *= len(cls) + 1
+    for choices in count_choices:
+        n_combinations *= len(choices)
 
     # When the full 0..k-per-class product is over the limit, fall back to
     # all-or-nothing per class: each class is protonated either fully (all its
     # equivalent atoms) or not at all, giving 2**(#classes) states instead of
-    # the product of (|class|+1). E.g. CAPKEJ's two classes [2, 5, 18, 24] and
-    # [3, 8, 19, 30] enumerate 4 states this way rather than 25. If even that is
-    # still over the limit (too many classes), give up with an empty state.
+    # the product of (|class|+1).
     limit_exceeded = n_combinations > max_combinations
     if limit_exceeded:
+        count_choices = [(0, len(cls)) for cls in site_classes]
         n_all_or_nothing = 2 ** len(site_classes)
         logger.info(
             "  %d environment class(es) give %d combinatorial protonation "
@@ -258,10 +263,10 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
                 f"too many combinatorial protonation states even all-or-nothing "
                 f"per class ({n_all_or_nothing} > {max_combinations})"
             )
-            return _warn_and_return(specie, reason, return_empty=True)
+            return _warn_and_return(specie, reason, return_asis=True)
 
     # ============================================================
-    # LOCAL ATOM ADDITION
+    # DETERMINISTIC ATOM ADDITION
     # ============================================================
     for idx, a in enumerate(ligand.atoms or []):
         atom_label = (
@@ -296,7 +301,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
                 num_hydrogens=site_proton_counts[idx],
             )
 
-            if ligand_donor_electrons[idx] >= 2 and idx in non_local_groups_indices:
+            if ligand_donor_electrons[idx] >= 2 and idx in combinatorial_site_indices:
                 process_both_modes.append(idx)
                 logger.debug(
                     "    Atom %s (ligand idx %d) is also proccessed for combinatorial protonation.",
@@ -306,12 +311,12 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
                 protonated_indices_to_reset.extend(list(range(start_idx, end_idx)))
 
     # ============================================================
-    # Heuristic protonation
+    # Deterministic protonation
     # ============================================================
-    no_nonlocal_sites = len(non_local_groups_indices) == 0
-    force_local_mode = process_both_modes
+    is_fully_deterministic = len(combinatorial_site_indices) == 0
+    force_deterministic_mode = process_both_modes
 
-    if no_nonlocal_sites or force_local_mode:
+    if is_fully_deterministic or force_deterministic_mode:
         protonation_states.append(
             Protonation.from_positional(
                 labels=newlab,
@@ -320,11 +325,11 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
                 n_protons_added=n_protons_added,
                 site_proton_counts=site_proton_counts.tolist(),
                 ligand_donor_electrons=ligand_donor_electrons.tolist(),
-                mode="heuristic",
+                mode="deterministic",
                 parent=ligand,
             )
         )
-        if not force_local_mode:
+        if not force_deterministic_mode:
             return protonation_states
 
     # ============================================================
@@ -367,18 +372,12 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     local_ligand_donor_electrons = ligand_donor_electrons.copy()
     local_n_protons_added = n_protons_added
 
-    # Per environment class, enumerate HOW MANY of its equivalent atoms get a
-    # proton (0..|class|), not all-or-nothing. Because the atoms in a class are
+    # Per environment class, ``count_choices`` (built above) says HOW MANY of
+    # its equivalent atoms may get a proton. Because the atoms in a class are
     # symmetry-equivalent, protonating any c of them yields the same structure,
-    # so a single representative subset (the first c) is emitted per count. A
-    # class of size k therefore contributes k+1 options -- e.g. two equivalent
-    # sites [0, 1] give exactly three states: none, one (of the pair), both.
-    # Over the limit: each class is all-or-nothing -- 0 protons, or all |class|
-    # of its equivalent atoms protonated. Otherwise: enumerate 0..|class|.
-    if limit_exceeded:
-        count_choices = [(0, len(cls)) for cls in site_classes]
-    else:
-        count_choices = [range(len(cls) + 1) for cls in site_classes]
+    # so a single representative subset (the first c) is emitted per count --
+    # e.g. two equivalent sites [0, 1] give exactly three states: none, one (of
+    # the pair), both.
     combinations = list(itertools.product(*count_choices))
     combinations.sort(key=sum)  # order by total protons added
 
@@ -418,22 +417,27 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     return protonation_states
 
 
-def get_empty_protonation_state(specie: Specie) -> list[Protonation]:
-    """
-    Create a placeholder protonation state with no added hydrogens.
+def get_asis_protonation_state(specie: Specie) -> list[Protonation]:
+    """Return the specie's structure as-is, wrapped in a single Protonation.
 
-    This "empty" protonation state does NOT represent a chemical
-    protonation. It is created solely as a preprocessing step for
-    charge-state enumeration, where a Protonation object is required
-    even when no protons are added.
+    No hydrogens are added (``mode="none"``, ``n_protons_added=0``, zero
+    ``site_proton_counts`` / ``ligand_donor_electrons``): the labels, coords and
+    adjacency are exactly the specie's own. It is not a chemical protonation --
+    it exists only so charge-state enumeration always has a Protonation to read
+    (adjacency, per-site counts, donor electrons) even when nothing is added.
+
+    Used for species that must not be protonated but still need a charge state:
+    non-complex molecules, manual-charge formulas, fullerenes, ligands
+    coordinating to alkali/alkaline-earth metals, and macrocycles declined by
+    the porphyrin engine.
     """
     logger.debug(
-        "Creating empty protonation placeholder for %s (%s)",
+        "Creating as-is (no-proton) protonation for %s (%s)",
         specie.formula,
         specie.subtype,
     )
 
-    empty_protonation = Protonation.from_positional(
+    asis_protonation = Protonation.from_positional(
         labels=specie.labels,
         coord=specie.coord,
         cov_factor=specie.cov_factor,
@@ -444,37 +448,57 @@ def get_empty_protonation_state(specie: Specie) -> list[Protonation]:
         parent=specie,
     )
 
-    return [empty_protonation]
+    return [asis_protonation]
 
 
 def _warn_and_return(
-    specie: Specie, reason: str, return_empty: bool = False
+    specie: Specie, reason: str, return_asis: bool = False
 ) -> list[Protonation] | None:
     """Decline to enumerate protonation for a hard cases: log a
     warning, record ``reason`` on ``specie.protonation_warning`` so the charge
-    result is flagged for review, and return None. If ``return_empty`` is True,
-    return a single empty protonation state instead of None.
+    result is flagged for review, and return None. If ``return_asis`` is True,
+    return a single as-is protonation state instead of None.
     """
     logger.warning("%s: %s -- not auto-handled", specie.formula, reason)
     specie.protonation_warning = reason
-    if return_empty:
+    if return_asis:
         logger.info(
-            "Returning empty protonation state and setting protonation_warning."
+            "Returning as-is protonation state and setting protonation_warning."
         )
-        return get_empty_protonation_state(specie)
+        return get_asis_protonation_state(specie)
     logger.info("Returning None protonation state and setting protonation_warning.")
     return None
+
+
+# From this many symmetry-equivalent sites up, a class is protonated
+# all-or-nothing rather than 0..k. See _class_count_choices.
+ALL_OR_NOTHING_CLASS_SIZE = 3
+
+
+def _class_count_choices(cls: list[int]):
+    """How many of an environment class's equivalent sites may be protonated.
+
+    A class of one or two sites enumerates every count (0..k). Mono-protonation
+    of a two-site class is real chemistry: acetylacetonate's two equivalent
+    oxygens share ONE proton, so dropping its nH=1 state would lose the enol.
+
+    From three equivalent sites up the partial counts are refused, and only
+    "none" or "all" are offered. The class exists precisely because the atoms
+    are indistinguishable, so protonating some-but-not-all of them invents an
+    asymmetry the structure does not show.
+    """
+    if len(cls) >= ALL_OR_NOTHING_CLASS_SIZE:
+        return (0, len(cls))
+    return range(len(cls) + 1)
 
 
 def _environment_classes(ligand: "Ligand", indices: list[int]) -> list[list[int]]:
     """Partition ``indices`` (ligand atom indices) into topological-equivalence
     classes by Weisfeiler-Lehman colour refinement on the element-labelled
-    ligand graph. Two atoms share a class iff they stay indistinguishable under
-    iterated hashing of their neighbour labels, so the 4 symmetry-equivalent
-    carboxylate O (and the 4 amido N) of a binuclear ligand such as CAPKEJ each
-    collapse to a single class -- letting the combinatorial protonation treat a
-    class as one all-or-nothing site rather than enumerating every per-atom
-    combination (2**#classes states instead of 2**#atoms).
+    ligand graph. Two atoms share a class if they stay indistinguishable under
+    iterated hashing of their neighbour labels, letting the combinatorial
+    protonation treat a class as one all-or-nothing site rather than enumerating
+    every per-atom combination (2**#classes states instead of 2**#atoms).
 
     Classes are returned sorted by their smallest atom index; each lists its
     atom indices sorted. ``indices`` need not be unique.
@@ -565,9 +589,9 @@ def _generate_porphyrin_protonation_states(
     [28]=4, ...) so three states m0-1/m0/m0+1 are emitted -- in each case the
     charge/metal-balance step picks, with invalid parities dropped downstream.
     Replaces the general combinatorial search (too slow on large macrocycles).
-    Falls back to the empty state if no macrocycle nitrogens are found.
+    Falls back to the as-is state if no macrocycle nitrogens are found.
     """
-    empty_state = get_empty_protonation_state(specie)[0]
+    asis_state = get_asis_protonation_state(specie)[0]
 
     # Baseline free-base sites (m0): alternating N-H per ring.
     all_nitrogens: list[int] = []
@@ -592,7 +616,7 @@ def _generate_porphyrin_protonation_states(
     base_sites = list(dict.fromkeys(base_sites))
 
     if not base_sites:
-        return [empty_state]
+        return [asis_state]
 
     # Skip ring nitrogens that already carry an H (e.g. an N-confused pyrrole
     # N-H); adding another would build a spurious [NH2+].
@@ -659,8 +683,8 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
     site_proton_counts: Dict[int, int] = {}
     ligand_donor_electrons: Dict[int, int] = {}
-    needs_nonlocal = False
-    non_local_indices: List[int] = []
+    needs_combinatorial = False
+    combinatorial_indices: List[int] = []
 
     selected = False
 
@@ -929,8 +953,8 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
                         )
                     )
                     if num_missing_h > 0:
-                        needs_nonlocal = True
-                        non_local_indices.append(idx)
+                        needs_combinatorial = True
+                        combinatorial_indices.append(idx)
                         logger.debug(
                             "  Needing combinatorial protonation for atom %d (%s): %s",
                             idx,
@@ -947,27 +971,63 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
     return ProtonationGroupResult(
         site_proton_counts=site_proton_counts,
         ligand_donor_electrons=ligand_donor_electrons,
-        needs_nonlocal=needs_nonlocal,
-        non_local_indices=non_local_indices,
+        needs_combinatorial=needs_combinatorial,
+        combinatorial_indices=combinatorial_indices,
     )
+
+
+def _charged_moiety_atoms(specie) -> set[int]:
+    """Atom indices whose formal charge ``_find_charged_moiety`` already fixes.
+
+    These are the terminal oxygens of a carboxylate / carbonate / sulfinate /
+    sulfonate / sulfate. Such an oxygen is NOT a protonation site: the group is
+    already a valid closed-shell anion, so bond perception needs no hydrogen on
+    it, and its charge is supplied directly by the moiety scan.
+
+    Excluding them is what keeps a polycarboxylate tractable -- a ligand with n
+    carboxylates would otherwise open 2n combinatorial sites and blow up the
+    protonation enumeration, which is the very cost the moiety shortcut in
+    ``get_candidate_charges`` exists to avoid. It also keeps the two mechanisms
+    from double-counting: no proton ever lands on a moiety atom, so every
+    protonation site is an anionic centre the moiety sum did NOT account for.
+
+    A genuine ``-C(=O)OH`` is unaffected -- its hydroxyl oxygen has two
+    non-metal neighbours (C and H), so it is not terminal and the scan never
+    reports it.
+    """
+    try:
+        return {
+            idx
+            for _centre, atom_locals, _kind, _nc in _find_charged_moiety(specie)
+            for idx in atom_locals
+        }
+    except Exception as exc:  # detection is an optimisation, never a hard gate
+        logger.debug("Charged-moiety detection failed for %s: %s", specie.formula, exc)
+        return set()
 
 
 def _handle_non_haptic_group(
     ligand,
     g,
     parent_indices,
+    moiety_atoms: set[int] | None = None,
 ) -> ProtonationGroupResult:
     """
     Handle protonation rules for non-haptic ligand groups.
 
+    ``moiety_atoms`` are atoms whose charge is already fixed by
+    ``_find_charged_moiety`` (carboxylate/sulfonate oxygens); they are skipped
+    as protonation sites.
+
     No global state is mutated.
     All intended changes are returned via ProtonationGroupResult.
     """
+    moiety_atoms = moiety_atoms or set()
 
     site_proton_counts: Dict[int, int] = {}
     ligand_donor_electrons: Dict[int, int] = {}
-    needs_nonlocal = False
-    non_local_indices: List[int] = []
+    needs_combinatorial = False
+    combinatorial_indices: List[int] = []
 
     logger.debug("        HANDLE_NON_HAPTIC_GROUP: %s", g.formula)
     logger.debug("        parent_indices (ligand): %s", parent_indices)
@@ -982,6 +1042,18 @@ def _handle_non_haptic_group(
             a.connec,
             a.mconnec,
         )
+
+        # A carboxylate/sulfonate oxygen is already a closed-shell anion whose
+        # charge _find_charged_moiety supplies, so it is not a protonation site.
+        if idx in moiety_atoms:
+            logger.debug(
+                "        Atom %s (idx %d) belongs to a charged moiety; "
+                "its charge is fixed there, so it is not protonated.",
+                atom_label,
+                idx,
+            )
+            continue
+
         # -----------------------------------------
         # Collect non-metal adjacent atom labels
         # -----------------------------------------
@@ -1005,16 +1077,16 @@ def _handle_non_haptic_group(
         # -----------------------------------------
         elif a.label == "O":
             if len(adj_labels) == 1:
-                needs_nonlocal = True
-                non_local_indices.append(idx)
+                needs_combinatorial = True
+                combinatorial_indices.append(idx)
 
         # -----------------------------------------
         # Sulfur / Selenium
         # -----------------------------------------
         elif a.label in {"S", "Se"}:
             if len(adj_labels) == 1:
-                needs_nonlocal = True
-                non_local_indices.append(idx)
+                needs_combinatorial = True
+                combinatorial_indices.append(idx)
 
         # -----------------------------------------
         # Hydrides (handle manually)
@@ -1064,15 +1136,15 @@ def _handle_non_haptic_group(
                             adj_labels,
                             "pyrrolide-type",
                         )
-                        needs_nonlocal = True
-                        non_local_indices.append(idx)
+                        needs_combinatorial = True
+                        combinatorial_indices.append(idx)
                     else:
-                        needs_nonlocal = True
-                        non_local_indices.append(idx)
+                        needs_combinatorial = True
+                        combinatorial_indices.append(idx)
             elif len(adj_labels) == 1:
                 # Nitrosyl ligand (handle manually)
-                needs_nonlocal = True
-                non_local_indices.append(idx)
+                needs_combinatorial = True
+                combinatorial_indices.append(idx)
 
             else:  # only N atom in the ligand
                 pass
@@ -1083,8 +1155,8 @@ def _handle_non_haptic_group(
             if len(adj_labels) >= 3:
                 pass
             else:
-                needs_nonlocal = True
-                non_local_indices.append(idx)
+                needs_combinatorial = True
+                combinatorial_indices.append(idx)
 
         # -----------------------------------------
         # Carbon
@@ -1106,8 +1178,8 @@ def _handle_non_haptic_group(
                         pass
                     else:
                         # site_proton_counts[idx] = 1
-                        needs_nonlocal = True
-                        non_local_indices.append(idx)
+                        needs_combinatorial = True
+                        combinatorial_indices.append(idx)
                 elif len(adj_labels) == 2:
                     # if numN == 1 and numO == 1:  # amide  # exception: FIQHIA
                     #     site_proton_counts[idx] = 1
@@ -1130,24 +1202,24 @@ def _handle_non_haptic_group(
                                 site_proton_counts[idx] = 2
                                 ligand_donor_electrons[idx] = 2
                             elif numC == 2:
-                                needs_nonlocal = True
-                                non_local_indices.append(idx)
+                                needs_combinatorial = True
+                                combinatorial_indices.append(idx)
                             elif (numO == 1 and numC == 1) or (numN == 1 and numC == 1):
                                 site_proton_counts[idx] = 2
                                 ligand_donor_electrons[idx] = 2
-                                needs_nonlocal = True
-                                non_local_indices.append(idx)
+                                needs_combinatorial = True
+                                combinatorial_indices.append(idx)
                             else:
-                                needs_nonlocal = True
-                                non_local_indices.append(idx)
+                                needs_combinatorial = True
+                                combinatorial_indices.append(idx)
                         else:
                             site_proton_counts[idx] = 2
                             ligand_donor_electrons[idx] = 2
-                            needs_nonlocal = True
-                            non_local_indices.append(idx)
+                            needs_combinatorial = True
+                            combinatorial_indices.append(idx)
                 else:
-                    needs_nonlocal = True
-                    non_local_indices.append(idx)
+                    needs_combinatorial = True
+                    combinatorial_indices.append(idx)
 
         # -----------------------------------------
         # Silicon
@@ -1165,11 +1237,11 @@ def _handle_non_haptic_group(
                     site_proton_counts[idx] = 2
                     ligand_donor_electrons[idx] = 2
                 else:
-                    needs_nonlocal = True
-                    non_local_indices.append(idx)
+                    needs_combinatorial = True
+                    combinatorial_indices.append(idx)
             else:
-                needs_nonlocal = True
-                non_local_indices.append(idx)
+                needs_combinatorial = True
+                combinatorial_indices.append(idx)
 
         # -----------------------------------------
         # Boron
@@ -1188,8 +1260,8 @@ def _handle_non_haptic_group(
             min_valence = min(atomic_valence[atomic_num], default=0)
 
             if len(adj_labels) < min_valence:
-                needs_nonlocal = True
-                non_local_indices.append(idx)
+                needs_combinatorial = True
+                combinatorial_indices.append(idx)
                 logger.debug(
                     "Atom %s (atomic number %d) has %d non-metal neighbors, "
                     "below the minimum valence of %d. "
@@ -1213,6 +1285,6 @@ def _handle_non_haptic_group(
     return ProtonationGroupResult(
         site_proton_counts=site_proton_counts,
         ligand_donor_electrons=ligand_donor_electrons,
-        needs_nonlocal=needs_nonlocal,
-        non_local_indices=non_local_indices,
+        needs_combinatorial=needs_combinatorial,
+        combinatorial_indices=combinatorial_indices,
     )
