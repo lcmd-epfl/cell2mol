@@ -410,18 +410,25 @@ class TestEdgeCases:
         charge_states_checked = 0
         for mol in cells_loaded.reference.refmoleclist or []:
             for lig in mol.ligands or []:
-                if hasattr(lig, "possible_cs") and lig.possible_cs:
-                    for cs in lig.possible_cs:
+                if getattr(lig, "plausible_charge_states", None):
+                    for cs in lig.plausible_charge_states:
                         # These should have values (computed originally, saved, restored)
-                        assert cs.uncorr_abstotal is not None, (
-                            "uncorr_abstotal should be set"
+                        assert cs.protonated_abstotal is not None, (
+                            "protonated_abstotal should be set"
                         )
-                        assert cs.corr_total_charge is not None, (
-                            "corr_total_charge should be set"
+                        assert cs.specie_total_charge is not None, (
+                            "specie_total_charge should be set"
                         )
                         charge_states_checked += 1
 
         print(f"Checked {charge_states_checked} ChargeState objects")
+        # Guard against the loop going vacuous again: a fixture written with
+        # renamed fields would otherwise leave this test green but checking
+        # nothing.
+        assert charge_states_checked > 0, (
+            "No ChargeState objects were inspected -- the fixture's field names "
+            "likely no longer match the model"
+        )
 
     def test_frozen_fields_preserved(self, cells_pickle_path, tmp_path):
         """Test that frozen fields (version, type) are preserved correctly."""
