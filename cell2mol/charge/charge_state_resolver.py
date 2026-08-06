@@ -16,6 +16,7 @@ from cell2mol.charge.utils import (
     aromatic_info,
     rdkit_atomic_valence,
     MANUAL_CHARGE_ASSIGN_SPECIES,
+    BRIDGED_CLUSTER_CHARGES,
     check_rdkit_obj_connectivity,
     generate_rdkit_mol_from_AC2mol,
     generate_rdkit_mol_from_rdDetermineBonds,
@@ -241,6 +242,65 @@ def _dedupe(values: list[int]) -> list[int]:
     return list(dict.fromkeys(values))
 
 
+def _manual_charge_state_from_adjacency(spec, charge: int):
+    """ChargeState for a bridged cluster, built from the specie's own adjacency.
+
+    Species like arachno-[B3H8]- are held together by 3-centre-2-electron B-H-B
+    bridges, which no SMILES string and no bond-perception search can express --
+    a bridging H is bonded to two borons at once, and the borons exceed the
+    valence RDKit will accept. Their total charge is nevertheless known from the
+    formula, so the graph is taken straight from the specie (every contact a
+    single bond) and the known charge asserted on it.
+
+    The charge is delocalized over the cluster framework; it is recorded on the
+    lowest-indexed heavy atom purely as a convention, so that the per-atom
+    charges sum to the right total.
+    """
+    adjmat = np.asarray(spec.adjmat, dtype=int)
+
+    rwmol = Chem.RWMol()
+    for atnum in spec.get_atomic_numbers():
+        rwmol.AddAtom(Chem.Atom(int(atnum)))
+    for i in range(spec.natoms):
+        for j in range(i + 1, spec.natoms):
+            if adjmat[i, j] != 0:
+                rwmol.AddBond(i, j, Chem.BondType.SINGLE)
+
+    for atom in rwmol.GetAtoms():
+        # Bridge-bonded atoms already carry every bond they have; never let
+        # RDKit pad the open valences with implicit hydrogens.
+        atom.SetNoImplicit(True)
+
+    heavy = [i for i, label in enumerate(spec.labels) if label != "H"]
+    charge_site = heavy[0] if heavy else 0
+    rwmol.GetAtomWithIdx(charge_site).SetFormalCharge(charge)
+
+    mol = rwmol.GetMol()
+    atom_charges = [a.GetFormalCharge() for a in mol.GetAtoms()]
+    smiles = Chem.MolToSmiles(mol)
+
+    logger.debug(
+        "Manual bridged-cluster charge: %s | total %d on atom %d | SMILES: %s",
+        spec.formula,
+        charge,
+        charge_site,
+        smiles,
+    )
+
+    return ChargeState(
+        status=True,
+        protonated_total_charge=charge,
+        protonated_atom_charges=atom_charges,
+        rdkit_obj=mol,
+        smiles=smiles,
+        charge_tried=charge,
+        allow=True,
+        protonation=spec.protonation_states[0],
+        specie_rdkit_obj=mol,
+        specie_smiles=smiles,
+    )
+
+
 def generate_manual_charge_state(spec):
     """Generates a ChargeState for special species using formula-based lookups."""
     # 1. Configuration Registry
@@ -261,6 +321,13 @@ def generate_manual_charge_state(spec):
     }
 
     formula = spec.formula
+
+    # 1b. Bridged clusters are built from adjacency, not from a SMILES string.
+    if formula in BRIDGED_CLUSTER_CHARGES:
+        return _manual_charge_state_from_adjacency(
+            spec, BRIDGED_CLUSTER_CHARGES[formula]
+        )
+
     target_atom, smiles, charge = REGISTRY.get(formula, (None, None, 0))
 
     # 2. Handle specific NO Logic
@@ -292,7 +359,6 @@ def generate_manual_charge_state(spec):
     # 4. RDKit Processing
     mol = Chem.MolFromSmiles(smiles, sanitize=False)
     mol = Chem.RenumberAtoms(mol, new_order)
-    mol = Chem.RemoveHs(mol)
 
     atom_charges = [a.GetFormalCharge() for a in mol.GetAtoms()]
     total_charge = sum(atom_charges)
@@ -301,15 +367,22 @@ def generate_manual_charge_state(spec):
         "Manual Charge: %s | SMILES: %s | Order: %s", formula, smiles, new_order
     )
 
-    return ChargeState.from_positional(
-        True,
-        total_charge,
-        atom_charges,
-        mol,
-        smiles,
-        charge,
-        True,
-        spec.protonation_states[0],
+    # Supply the specie fields directly instead of letting ChargeState rebuild
+    # them. A manual specie has no protons to strip (nH is always 0 here -- see
+    # get_asis_protonation_state), so the specie IS the protonated structure.
+    # _build_specie_mol would sanitize on the way through and undo the registry
+    # Lewis structure the comment above protects.
+    return ChargeState(
+        status=True,
+        protonated_total_charge=total_charge,
+        protonated_atom_charges=atom_charges,
+        rdkit_obj=mol,
+        smiles=smiles,
+        charge_tried=charge,
+        allow=True,
+        protonation=spec.protonation_states[0],
+        specie_rdkit_obj=mol,
+        specie_smiles=smiles,
     )
 
 
@@ -327,6 +400,7 @@ def _specie_supported_by_rddeterminebonds(
     atoms: list[int],
     ac,  # adjacency matrix
     atomic_valence: dict[int, list[int]] = rdkit_atomic_valence,
+    atom_site_labels: list[str] | None = None,
 ) -> bool:
     """
     Charge-independent pre-check for a specie.
@@ -344,10 +418,22 @@ def _specie_supported_by_rddeterminebonds(
         return False
     for i in range(n_atoms):
         atom_num = atoms[i]
+        atom_symbol = elemdatabase.elementsym[atom_num]
+        # atom_site_labels covers only the specie's original atoms; a
+        # protonation state's added protons sit past the end and have no CIF
+        # site label of their own.
+        atom_site_label = (
+            atom_site_labels[i]
+            if atom_site_labels and i < len(atom_site_labels)
+            else None
+        )
+        atom_info = (
+            f"{atom_symbol} ({atom_site_label})" if atom_site_label else atom_symbol
+        )
         valences = _get_possible_valences(atom_num, atomic_valence)
 
         if not valences:
-            logger.debug(f"Atom {atom_num} has no possible valences defined")
+            logger.debug(f"Atom {atom_info} has no possible valences defined")
             return False
 
         degree = int(np.count_nonzero(ac[i]))
@@ -355,14 +441,14 @@ def _specie_supported_by_rddeterminebonds(
 
         if degree > max_valence:
             logger.debug(
-                f"Atom {atom_num} has degree {degree} exceeding max "
+                f"Atom {atom_info} has degree {degree} exceeding max "
                 f"possible valence {max_valence} (valences: {valences}) "
                 "— no bond ordering possible at any charge"
             )
             return False
         elif degree not in valences and atom_num in [15, 33, 51, 52]:  # P, As, Sb, Te
             logger.debug(
-                f"Atom {atom_num} has degree {degree} not in possible valences "
+                f"Atom {atom_info} has degree {degree} not in possible valences "
                 f"{valences} — may require special handling"
             )
             return False
@@ -374,7 +460,9 @@ def generate_valid_charge_states(prot, candidate_charges, allow_charged_fragment
     valid_charge_states_dict = {charge: [] for charge in candidate_charges}
 
     # --- Tier 0: element-level pre-check (charge-independent) ---
-    if not _specie_supported_by_rddeterminebonds(prot.atnums, prot.adjmat):
+    if not _specie_supported_by_rddeterminebonds(
+        prot.atnums, prot.adjmat, atom_site_labels=prot.atom_site_labels
+    ):
         # Guaranteed to hit unordered_map for every charge — skip straight
         # to bond assignment using modified AC2mol
         logger.debug(

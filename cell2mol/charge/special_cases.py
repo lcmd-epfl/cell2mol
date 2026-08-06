@@ -1283,6 +1283,26 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
             atom_charges[global_i] = charge
         fragment_bond_orders.update(frag_bond_orders)
 
+    # Ring atoms that are saturated (four connections) cannot carry a pi system:
+    # a reduced macrocycle -- chlorin, bacteriochlorin, or a bridged/fused
+    # variant -- has sp3 carbons sitting inside the ring set. Four aromatic
+    # bonds on such a carbon means an explicit valence of 4 x 1.5 = 6, and
+    # sanitization rejects the whole molecule. Bond them as single instead and
+    # leave the rest of the macrocycle aromatic.
+    saturated_core = {
+        i
+        for i in core_atoms
+        if int(np.count_nonzero(adjmat[i])) >= 4 and prot.labels[i] in ("C", "N")
+    }
+    if saturated_core:
+        logger.debug(
+            "Porphyrin-family specie %s has %d saturated ring atom(s) %s; "
+            "bonding them as single rather than aromatic",
+            prot.formula,
+            len(saturated_core),
+            sorted(saturated_core),
+        )
+
     rwmol = Chem.RWMol()
     for atomic_num in prot.atnums:
         rwmol.AddAtom(Chem.Atom(atomic_num))
@@ -1294,7 +1314,11 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
             pair = frozenset((i, j))
             if pair in fragment_bond_orders:
                 bond_type = fragment_bond_orders[pair]
-            elif any(i in cs and j in cs for cs in core_sets):
+            elif (
+                any(i in cs and j in cs for cs in core_sets)
+                and i not in saturated_core
+                and j not in saturated_core
+            ):
                 # A macrocycle's own bonds (ring + meso bridges) are left
                 # aromatic and Kekulized by RDKit below, rather than
                 # hand-assigned, since -- unlike a fullerene cage or a
@@ -1310,7 +1334,8 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
             rwmol.AddBond(i, j, bond_type)
 
     for i in core_atoms:
-        rwmol.GetAtomWithIdx(i).SetIsAromatic(True)
+        if i not in saturated_core:
+            rwmol.GetAtomWithIdx(i).SetIsAromatic(True)
 
     for n in nitrogens:
         # Force RDKit to satisfy this atom's valence from the ring's own
@@ -1341,8 +1366,14 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
             mol, sanitizeOps=Chem.SANITIZE_ALL ^ Chem.SANITIZE_SETAROMATICITY
         )
     except Exception as e:
+        # Not fatal: the specie falls back to the general charge enumeration.
+        # Reaching here means the ring matched the macrocycle topology but is
+        # not an aromatic tetrapyrrole after all -- e.g. a cyclopropane-fused or
+        # otherwise reduced core, where the remaining ring bonds are localized
+        # imines rather than one delocalized system.
         logger.warning(
-            "Failed to sanitize porphyrin-family structure for %s: %s",
+            "Porphyrin fast path declined for %s (not a kekulizable aromatic "
+            "macrocycle: %s); falling back to general charge enumeration",
             prot.formula,
             e,
         )

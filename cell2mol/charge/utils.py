@@ -29,6 +29,18 @@ MANUAL_CHARGE_ASSIGN_SPECIES = {
     "Te2",
     "N",
     "C",
+    "H8-B3",
+}
+
+# Manual species whose structure cannot be written as a plain SMILES because it
+# relies on 3-centre-2-electron bridge bonds. Their mol is built from the
+# specie's own adjacency instead of a registry SMILES (see
+# generate_manual_charge_state), which also keeps them independent of the
+# per-CIF atom ordering a fixed SMILES string could not track.
+BRIDGED_CLUSTER_CHARGES = {
+    # arachno-[B3H8]-, octahydrotriborate: 6 terminal H + 2 bridging H over a
+    # B3 framework. Not deltahedral, so is_borane_cage does not claim it.
+    "H8-B3": -1,
 }
 
 HALOGENS = {"F", "Cl", "Br", "I"}
