@@ -6,7 +6,7 @@ import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
 from cell2mol.classes.atom import Atom
-from cell2mol.charge.charge_state_resolver import get_metal_poscharges
+from cell2mol.charge.charge_state_resolver import get_plausible_metal_os
 from cell2mol.spin import assign_spin_metal, predict_ox_state
 from cell2mol.operations import compute_centroid, get_dist
 from cell2mol.elementdata import ElementData
@@ -51,7 +51,7 @@ class Metal(Atom):
     coord_sphere_formula: str | None = None
     unique_index: int | None = None
     charge: int | None = None
-    possible_cs: list[int] | None = None
+    plausible_os: list[int] | None = None
     spin: Spin | None = None
     valence_elec: int | None = None
     removed_from_coordination: list[Atom] | None = None
@@ -457,9 +457,9 @@ class Metal(Atom):
         )
         return self.rel_metal_radius_test
 
-    def get_possible_cs(self):
-        self.possible_cs = get_metal_poscharges(self)
-        return self.possible_cs
+    def get_plausible_os(self):
+        self.plausible_os = get_plausible_metal_os(self)
+        return self.plausible_os
 
     def get_spin(self):
         self.spin = assign_spin_metal(self)
@@ -475,7 +475,7 @@ class Metal(Atom):
         Atom.reset_charge(
             self
         )  ## First uses the generic atom class function for itself
-        self.possible_cs = None
+        self.plausible_os = None
 
     def __str__(self):
         # This will make print(object) behave like before
@@ -487,7 +487,7 @@ class Metal(Atom):
         to_print += Atom.__repr__(self, indirect=True)
         if self.coord_sphere_formula is not None:
             to_print += f" Coordination Sphere Formula  = {self.coord_sphere_formula}\n"
-        if self.possible_cs is not None:
-            to_print += f" Possible Charges             = {self.possible_cs}\n"
+        if self.plausible_os is not None:
+            to_print += f" Plausible Oxidation States   = {self.plausible_os}\n"
         to_print += "----------------------------------------------------\n"
         return to_print
