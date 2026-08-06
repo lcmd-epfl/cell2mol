@@ -2,6 +2,7 @@
 
 import os
 import logging
+import numpy as np
 from ase.io import read
 from cell2mol.standardize_metal_os import standardize_reported_metal_os
 from cell2mol.utils import config
@@ -56,9 +57,10 @@ def interpret_reference(input_path, name, current_dir):
     logger.debug("Timeout set to %d seconds", config.TIMEOUT)
 
     refcell = None
+    structure = None
     exit_code = 0
     process_failure = False
-    mode = None
+
     try:
         logger.info("Processing CIF file")
 
@@ -82,43 +84,41 @@ def interpret_reference(input_path, name, current_dir):
             cell_vector, cell_param, _ = get_cell_parameters(structure)
             refcell = create_reference(input_path, name, cell_vector, cell_param)
 
-            # Check missing hydrogens and assess errors
             if refcell.has_error():
                 logger.error(
                     "Fails generating reference molecules (case=%s)",
-                    refcell.error_cases.get("ref_molecules"),
+                    (refcell.error_cases or {}).get("ref_molecules"),
                 )
                 process_failure = True
-                mode = "ref_molecules"
-                return refcell
-
-            refcell.check_hydrogens()
-            refcell.assess_errors(mode="hydrogens")
-            if refcell.has_error():
-                logger.error(
-                    "Detects missing hydrogens (case=%s)",
-                    refcell.error_cases.get("hydrogens"),
-                )
-                process_failure = True
-                mode = "hydrogens"
                 return refcell
 
             # Save intermediate success
-            _handle_reference_outputs(name, current_dir, refcell, mode="hydrogens")
+            _handle_reference_outputs(name, current_dir, refcell)
 
-            # Possible charge states for unique species
+            # Identify unique species and full species list
             refcell.get_unique_species()
-            refcell.get_selected_cs()
-            refcell.assess_errors(mode="possible_charges")
 
+            # Check for missing hydrogens
+            refcell.check_hydrogens()
+
+            # Identify the plausible charge states for specie in the reference molecules
+            refcell.get_selected_cs()
+
+            refcell.assess_errors(mode="hydrogens")
             if refcell.has_error():
                 logger.error(
-                    "Fails retrieving possible charges (case=%s)",
-                    refcell.error_cases.get("possible_charges"),
+                    "Fails checking hydrogens (case=%s)",
+                    (refcell.error_cases or {}).get("hydrogens"),
                 )
                 process_failure = True
-                mode = "possible_charges"
-                return refcell
+
+            refcell.assess_errors(mode="possible_charges")
+            if refcell.has_error():
+                logger.error(
+                    "Fails checking possible charges (case=%s)",
+                    (refcell.error_cases or {}).get("possible_charges"),
+                )
+                process_failure = True
 
     except ASEParseError as exc:
         logger.error("ASE parsing failed.")
@@ -127,7 +127,7 @@ def interpret_reference(input_path, name, current_dir):
 
     except MemoryError as exc:
         # CRITICAL: Delete large objects and force GC *before* doing anything else
-        if "structure" in locals():
+        if structure is not None:
             del structure
         gc.collect()
 
@@ -167,9 +167,7 @@ def interpret_reference(input_path, name, current_dir):
     finally:
         logger.info("Executing final output handling...")
         # Ensure we try to save whatever valid data we have (refcell might be None)
-        if mode is None:
-            mode = "possible_charges"  # Default to hydrogens if no mode set
-        _handle_reference_outputs(name, current_dir, refcell, mode=mode)
+        _handle_reference_outputs(name, current_dir, refcell)
 
         if exit_code == 0 and process_failure:
             exit_code = ERR_CELL2MOL
@@ -194,7 +192,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
     """
 
     atom_site_labels, ref_labels, ref_fracs = get_wyckoff_positions(input_path)
-    ref_pos = frac2cart_fromparam(ref_fracs, cell_param)
+    ref_pos = np.asarray(frac2cart_fromparam(ref_fracs, cell_param))
 
     refcell = Reference.from_positional(
         name=name,
@@ -279,7 +277,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
     return refcell
 
 
-def _handle_reference_outputs(name, current_dir, refcell, mode=None):
+def _handle_reference_outputs(name, current_dir, refcell):
     """Manages saving files and writing summaries."""
     if refcell is None:
         return
@@ -287,7 +285,7 @@ def _handle_reference_outputs(name, current_dir, refcell, mode=None):
     # 1. Write the .out summary file
     summary_path = os.path.join(current_dir, "reference_summary.txt")
     _safe_run(
-        lambda: _write_ref_detailed_summary(name, refcell, summary_path, mode=mode),
+        lambda: _write_ref_detailed_summary(name, refcell, summary_path),
         "Failed to write reference summary",
     )
 
@@ -303,7 +301,7 @@ def _handle_reference_outputs(name, current_dir, refcell, mode=None):
     _safe_run(save_ref, "Failed to save reference cell")
 
 
-def _write_ref_detailed_summary(name, refcell, summary_path, mode=None):
+def _write_ref_detailed_summary(name, refcell, summary_path):
     """Writes the molecules info, species, errors, and warnings to file and log."""
     # Retrieve pre-formatted messages (Warnings for True, INFO for None)
     warning_messages = get_reference_warning_messages(refcell)
@@ -329,9 +327,8 @@ def _write_ref_detailed_summary(name, refcell, summary_path, mode=None):
 
         write_cell_molecules_info(refcell, file=f)
 
-        if mode == "possible_charges":
-            write_unique_species(refcell, file=f)
-            write_possible_charges(refcell, file=f)
+        write_unique_species(refcell, file=f)
+        write_possible_charges(refcell, file=f)
 
         # Print step-specific reference errors
         if refcell.error_cases:
@@ -349,9 +346,10 @@ def _write_ref_detailed_summary(name, refcell, summary_path, mode=None):
 
     # --- Write to Logger ---
     # Log the specific error for the current operation mode
-    current_err_code = refcell.error_cases.get(mode, 0)
-    current_err_msg = get_reference_error_message(current_err_code)
-    logger.info("Reference Error (mode=%s): %s", mode, current_err_msg)
+    for err_mode, code in refcell.error_cases.items():
+        current_err_code = refcell.error_cases.get(err_mode, 0)
+        current_err_msg = get_reference_error_message(current_err_code)
+        logger.info("Reference Error (mode=%s): %s", err_mode, current_err_msg)
 
     if not warning_messages:
         logger.info("No potential issues or skipped checks detected.")
