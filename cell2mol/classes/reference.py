@@ -9,7 +9,6 @@ from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.molecule import Molecule
 from cell2mol.classes.specie import Specie
-from cell2mol.classes.charge_state import ChargeState
 from cell2mol.connectivity import split_species
 from cell2mol.compare import compare_species, compare_metals
 from cell2mol.operations import extract_from_list, get_moiety_indices_from_labels
@@ -50,9 +49,13 @@ class Reference(Cell):
     missing_H_in_Water: bool | None = None
     has_missing_H: bool | None = None
 
-    # Retrieving possible charges related attributes
-    selected_cs: list[object] | None = None
-    error_get_poscharges: bool | None = None
+    # Retrieving plausible charges related attributes
+    # Plausible integer charges per specie: metal oxidation states, or a
+    # ligand/molecule's total charges. NOT one entry per specie -- it is
+    # unique_species first, then all of species_list, so species recur at
+    # two indices. None marks a specie whose charges could not be found.
+    plausible_charges: list[list[int] | None] | None = None
+    error_plausible_charges: bool | None = None
 
     # Additional CIF related attributes
     chemical_name: str | None = None
@@ -93,7 +96,10 @@ class Reference(Cell):
         )
 
     def set_additional_cif_info(self, chemical_name, reported_metal_os, moiety_dicts):
-        """Set additional CIF information such as chemical name, reported metal oxidation states, and moiety dictionaries."""
+        """
+        Set additional CIF information such as chemical name, reported metal
+        oxidation states, and moiety dictionaries.
+        """
         self.chemical_name = chemical_name
         self.reported_metal_os = reported_metal_os
         self.moiety_dicts = moiety_dicts
@@ -223,60 +229,90 @@ class Reference(Cell):
         logger.info("Found %d reference molecules", len(self.refmoleclist))
         logger.info("Formulas: %s", [ref.formula for ref in self.refmoleclist])
 
-        # Check for isolated atoms
-        has_isolated_h = False
-        for ref in self.refmoleclist:
-            if ref.natoms == 1:
-                label = (ref.atoms or [])[0].label
-                if label in {"H", "D"}:
-                    has_isolated_h = True
-                    logger.warning(
-                        "  Isolated hydrogen found %s (%s)",
-                        ref.labels[0],
-                        ref.atom_site_labels[0] if ref.atom_site_labels else "N/A",
-                    )
-                else:
-                    logger.warning(
-                        "  Isolated atom found %s (%s)",
-                        ref.labels[0],
-                        ref.atom_site_labels[0] if ref.atom_site_labels else "N/A",
-                    )
-
-        self.has_isolated_H = has_isolated_h
-        logger.info("Has isolated hydrogen: %s", self.has_isolated_H)
-
-        # Post-processing: coordination analysis
+        # Post-processing: coordination analysis and structural-motif screening
         for ref in self.refmoleclist:
             ref.analyze_coordination()
+            ref.detect_special_moieties()
 
         return self.refmoleclist
 
     def check_hydrogens(self):
-        from cell2mol.hydrogen import check_missing_hydrogens
+        """Check every specie for missing hydrogens and aggregate the flags.
+        Scans the reference molecules for isolated hydrogens (dangling H/D), then
+        runs ``Specie.check_hydrogens`` per specie (metals skipped) and OR-folds
+        their flags into the reference-level ``has_missing_H`` / ``missing_H_*``
+        used by ``assess_errors(mode="hydrogens")``. Call after
+        ``get_unique_species``.
+        """
+        if self.species_list is None:
+            self.get_unique_species()
 
-        (
-            has_missing_h,
-            missing_h_in_carbon,
-            missing_h_on_coordinated_donor,
-            missing_h_in_water,
-        ) = check_missing_hydrogens(self.refmoleclist)
-        if has_missing_h:
+        # Isolated single-atom species. A lone H/D is a dangling hydrogen
+        # (error code 1); any other lone atom is only reported.
+        has_isolated_h = False
+        for ref in self.refmoleclist or []:
+            if ref.natoms != 1:
+                continue
+            label = (ref.atoms or [])[0].label
+            site_label = ref.atom_site_labels[0] if ref.atom_site_labels else "N/A"
+            if label in {"H", "D"}:
+                has_isolated_h = True
+                logger.warning(
+                    "  Isolated hydrogen found %s (%s)", ref.labels[0], site_label
+                )
+            else:
+                logger.warning(
+                    "  Isolated atom found %s (%s)", ref.labels[0], site_label
+                )
+
+        self.has_isolated_H = has_isolated_h
+        logger.info("Has isolated hydrogen: %s", self.has_isolated_H)
+
+        missing = []
+        for specie in self.species_list or []:
+            # Metals subclass Atom (not Specie) and carry no hydrogens, so they
+            # have no check_hydrogens() and are always clean -- skip them.
+            if specie.subtype == "metal":
+                continue
+            if specie.check_hydrogens():
+                missing.append(specie)
+
+        logger.info(
+            "Missing hydrogens found in %d/%d species: %s",
+            len(missing),
+            len(self.species_list or []),
+            [s.formula for s in missing],
+        )
+
+        species = self.species_list or []
+        self.missing_H_in_Carbon = any(
+            getattr(s, "missing_H_in_Carbon", False) for s in species
+        )
+        self.missing_H_on_CoordDonor = any(
+            getattr(s, "missing_H_on_CoordDonor", False) for s in species
+        )
+        self.missing_H_in_Water = any(
+            getattr(s, "missing_H_in_Water", False) for s in species
+        )
+        self.has_missing_H = (
+            self.missing_H_in_Carbon
+            or self.missing_H_on_CoordDonor
+            or self.missing_H_in_Water
+        )
+
+        if self.has_missing_H:
             logger.info(
-                "Missing hydrogens | check_hydrogens=%d carbon=%d, coordinated_donor=%d, water=%d",
-                has_missing_h,
-                missing_h_in_carbon,
-                missing_h_on_coordinated_donor,
-                missing_h_in_water,
+                "Missing hydrogens | check_hydrogens=%s carbon=%s, coordinated_donor=%s, water=%s",
+                self.has_missing_H,
+                self.missing_H_in_Carbon,
+                self.missing_H_on_CoordDonor,
+                self.missing_H_in_Water,
             )
-        self.has_missing_H = has_missing_h
-        self.missing_H_in_Carbon = missing_h_in_carbon
-        self.missing_H_on_CoordDonor = missing_h_on_coordinated_donor
-        self.missing_H_in_Water = missing_h_in_water
 
         return self.has_missing_H
 
     def get_unique_species(self):
-        """Get unique species, unique indices, and species list in the Reference cell."""
+        """Get unique species, unique indices, and species list in the Reference Cell."""
         logger.info("Getting unique species in %s", self.subtype)
 
         self.unique_species = []
@@ -287,7 +323,7 @@ class Reference(Cell):
         typelist_mets = []  # temporary variable
 
         specs_found = -1
-        if not self.refmoleclist:  # None or empty
+        if not self.refmoleclist:
             logger.error("Reference molecule list is None")
             return
         moleclist = self.refmoleclist
@@ -323,6 +359,36 @@ class Reference(Cell):
                 mol.unique_index = kdx
                 self.species_list.append(mol)
             else:  # Complex molecules
+                # metals
+                for jdx, met in enumerate(mol.metals or []):
+                    found = False
+                    kdx: int | None = None
+                    for ldx, typ in enumerate(typelist_mets):
+                        issame = compare_metals(met, typ[0])
+                        if issame:
+                            found = True
+                            kdx = typ[1]
+                            logger.debug(
+                                "Metal %s (%d) is the same with type %d in type list",
+                                met.formula,
+                                jdx,
+                                ldx,
+                            )
+                    if not found:
+                        specs_found += 1
+                        kdx = specs_found
+                        typelist_mets.append(list([met, kdx]))
+                        self.unique_species.append(met)
+                        logger.debug(
+                            "New metal found with: formula=%s and added in specie type %d",
+                            met.formula,
+                            kdx,
+                        )
+                    assert kdx is not None
+                    self.unique_indices.append(kdx)
+                    met.unique_index = kdx
+                    self.species_list.append(met)
+
                 if mol.ligands is None:
                     if mol.iscomplex or mol.has_ia_iia:
                         mol.split_complex()
@@ -383,53 +449,26 @@ class Reference(Cell):
                     self.unique_indices.append(kdx)
                     lig.unique_index = kdx
                     self.species_list.append(lig)
-                # metals
-                for jdx, met in enumerate(mol.metals or []):
-                    found = False
-                    kdx: int | None = None
-                    for ldx, typ in enumerate(typelist_mets):
-                        issame = compare_metals(met, typ[0])
-                        if issame:
-                            found = True
-                            kdx = typ[1]
-                            logger.debug(
-                                "Metal %s (%d) is the same with type %d in type list",
-                                met.formula,
-                                jdx,
-                                ldx,
-                            )
-                    if not found:
-                        specs_found += 1
-                        kdx = specs_found
-                        typelist_mets.append(list([met, kdx]))
-                        self.unique_species.append(met)
-                        logger.debug(
-                            "New metal found with: formula=%s and added in specie type %d",
-                            met.formula,
-                            kdx,
-                        )
-                    assert kdx is not None
-                    self.unique_indices.append(kdx)
-                    met.unique_index = kdx
-                    self.species_list.append(met)
 
         logger.info("Unique species: %s", [s.formula for s in self.unique_species])
         logger.info("Unique indices: %s", self.unique_indices)
         logger.info("Species list: %s", [s.formula for s in self.species_list])
 
-    def get_selected_cs(self) -> None:
+    def get_plausible_charges(self) -> None:
         """
-        Get selected (valid) charge states for unique species and species list.
-        Updates self.selected_cs and sets error flags if any None is found.
+        Collect the plausible integer charges for every unique specie and every
+        entry of the species list. Nothing is selected here -- the final choice
+        is made later by the charge balancer. A specie with no options (or with
+        missing hydrogens) records None, which sets error_plausible_charges.
         """
         assert self.subtype == "reference", (
-            "get_selected_cs should only be called on reference"
+            "get_plausible_charges should only be called on reference"
         )
 
         if self.unique_species is None:
             self.get_unique_species()
 
-        self.selected_cs = []
+        self.plausible_charges = []
 
         # Process unique_species first, then the full species_list
         all_targets = [
@@ -441,28 +480,41 @@ class Reference(Cell):
 
         for specie, context_label in all_targets:
             logger.info(
-                "Get possible charge states for %s: %s",
+                "Get plausible charge states for %s: %s",
                 context_label,
                 specie.formula,
             )
-            possible_cs = specie.get_possible_cs()
-
-            if not possible_cs:
-                # Appending None indicates a failure to find options for this species
-                self.selected_cs.append(None)
-                continue
 
             if specie.subtype != "metal":
-                charges = [
-                    cs.corr_total_charge
-                    for cs in cast("list[ChargeState]", specie.possible_cs)
-                ]
-                self.selected_cs.append(charges)
+                if specie.has_missing_H is None:
+                    specie.check_hydrogens()
+                if specie.has_missing_H:
+                    logger.warning(
+                        "Specie %s has missing hydrogens; skipping charge-state "
+                        "enumeration and recording None",
+                        specie.formula,
+                    )
+                    self.plausible_charges.append(None)
+                    continue
+
+            if specie.subtype == "metal":
+                plausible = specie.get_plausible_os()
+                if not plausible:
+                    # Appending None indicates a failure to find options for this species
+                    self.plausible_charges.append(None)
+                    continue
+                self.plausible_charges.append(plausible)
             else:
-                self.selected_cs.append(specie.possible_cs)
+                plausible = specie.get_plausible_charge_states()
+                if not plausible:
+                    self.plausible_charges.append(None)
+                    continue
+                self.plausible_charges.append(
+                    [cs.specie_total_charge for cs in plausible]
+                )
 
         # Update error flag
-        self.error_get_poscharges = None in self.selected_cs
+        self.error_plausible_charges = None in self.plausible_charges
 
     def map_charges_to_reference(self):
         """Logic: Propagate charges from Unique Species to Reference Molecules."""
