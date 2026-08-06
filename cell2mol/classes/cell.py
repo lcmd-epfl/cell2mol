@@ -90,7 +90,14 @@ class Cell(BaseModel):
     error_create_bonds: bool | None = None
     error_get_spin: bool | None = None
     # error_case: int | None = None
+    # Primary (first-matching, most severe) error code per processing mode.
     error_cases: dict[str, int] | None = None
+    # Every code that fired for that mode. A mode can trigger several rules at
+    # once -- "hydrogens" is the usual case, where a structure can be short of
+    # hydrogens on a coordinated donor AND on carbon -- and reporting only the
+    # first hides the rest. error_cases keeps the single primary code, so exit
+    # codes and has_error() are unaffected.
+    error_cases_all: dict[str, list[int]] | None = None
 
     # Comparison results
     total_charge_comparison: bool | None = None
@@ -266,6 +273,8 @@ class Cell(BaseModel):
         """Assess error conditions for a specific processing mode."""
         if self.error_cases is None:
             self.error_cases = {}
+        if self.error_cases_all is None:
+            self.error_cases_all = {}
 
         subtype_map = ERROR_MAPS.get(self.subtype or "")
         if not subtype_map:
@@ -275,6 +284,7 @@ class Cell(BaseModel):
         if rules is None:
             raise ValueError(f"Invalid mode '{mode}' for subtype '{self.subtype}'")
 
+        triggered = []
         for attr, code in rules:
             is_triggered = getattr(self, attr, False)
 
@@ -287,11 +297,12 @@ class Cell(BaseModel):
             )
 
             if is_triggered:
-                self.error_cases[mode] = code
-                return
+                triggered.append(code)
 
-        # No error in this mode
-        self.error_cases[mode] = 0
+        # Rules are listed most-severe-first, so the first hit is the primary
+        # code; keep every hit alongside it so nothing is silently dropped.
+        self.error_cases_all[mode] = triggered
+        self.error_cases[mode] = triggered[0] if triggered else 0
 
     def has_error(self, mode: str | None = None) -> bool:
         """
