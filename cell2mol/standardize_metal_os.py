@@ -227,7 +227,13 @@ def expand_reported_list(reported_list, metal_list):
 # Single-entry matching / scoring (list inputs, no row dict)
 # ===============================================================
 def _as_list(value):
-    """Accept a real list or its string form ("['Ni']") and return a list."""
+    """Accept a real list, its string form ("['Ni']"), or None; return a list.
+
+    None (e.g. a CIF with no reported metal oxidation states) yields an empty
+    list rather than raising.
+    """
+    if value is None:
+        return []
     if isinstance(value, str):
         value = ast.literal_eval(value)
     return list(value)
