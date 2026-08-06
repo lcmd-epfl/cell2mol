@@ -86,6 +86,13 @@ class Specie(BaseModel):
     subtype: SubType | None = None
     totcharge: int | None = None
 
+    # Missing-hydrogen diagnostics, populated by check_hydrogens(). Mirror the
+    # reference-cell flags but scoped to this single specie.
+    has_missing_H: bool | None = None
+    missing_H_in_Carbon: bool | None = None
+    missing_H_on_CoordDonor: bool | None = None
+    missing_H_in_Water: bool | None = None
+
     charge_state: ChargeState | None = None
     possible_cs: list[ChargeState] | list[int] | None = Field(default=None)
     origin: str | None = None
@@ -202,21 +209,36 @@ class Specie(BaseModel):
 
         # 2nd-evaluates parents of parent
         if isinstance(parent, Specie):
-            for jdx, p2 in enumerate(parent.parents):
+            for p2 in parent.parents:
+                # self's atoms sit at `indices` within `parent`, and parent's atoms
+                # sit at `parent_in_grandparent` within p2, so self's positions in p2
+                # are the composition of the two maps. Copying the parent's map
+                # verbatim would record the parent's whole atom range as if it were
+                # self's -- an eta5-C5 group would claim its ligand's 47 atoms.
+                parent_in_grandparent = parent.get_parent_indices(p2.subtype or "")
+                if parent_in_grandparent is None:
+                    continue
+                try:
+                    own_indices = [parent_in_grandparent[i] for i in indices]
+                except IndexError:
+                    logger.warning(
+                        "Cannot map %s onto %s: index out of range in parent %s",
+                        self.subtype,
+                        p2.subtype,
+                        parent.subtype,
+                    )
+                    continue
+
                 append = True
                 for idx, p in enumerate(self.parents):
                     if p.subtype == p2.subtype:
                         if overwrite:
                             self.parents[idx] = p2
-                            self.parents_indices[idx] = (
-                                parent.get_parent_indices(p2.subtype or "") or []
-                            )
+                            self.parents_indices[idx] = own_indices
                         append = False
                 if append:
                     self.parents.append(p2)
-                    self.parents_indices.append(
-                        parent.get_parent_indices(p2.subtype or "") or []
-                    )
+                    self.parents_indices.append(own_indices)
 
     def check_parent(self, subtype: str):
         ## checks if parent of a given subtype exists
@@ -302,6 +324,25 @@ class Specie(BaseModel):
         is_cage, _ = is_borane_cage(self.get_atomic_numbers(), self.adjmat)
         self.has_borane = is_cage
         return self.has_borane
+
+    def detect_special_moieties(self):
+        """
+        Screen this specie for structural motifs that need special treatment.
+
+        Returns:
+            None. Flags are stored on this specie.
+        """
+        self.evaluate_has_fullerene()
+        if self.has_fullerene:
+            logger.debug("%s %s has a fullerene", self.subtype, self.formula)
+
+        self.evaluate_has_porphyrin()
+        if self.has_porphyrin:
+            logger.debug("%s %s has a porphyrin", self.subtype, self.formula)
+
+        self.evaluate_has_borane()
+        if self.has_borane:
+            logger.debug("%s %s has a borane/carborane", self.subtype, self.formula)
 
     def set_element_count(self, heavy_only: bool = False):
         self.element_count = get_element_count(self.labels, heavy_only=heavy_only)
@@ -483,6 +524,38 @@ class Specie(BaseModel):
         self.adjnum = np.stack(
             extract_from_list(indices, parent.adjnum.tolist(), dimension=1), axis=0
         )
+
+    def check_hydrogens(self):
+        """Detect missing hydrogens on this single specie.
+
+        Specie-level counterpart of ``Reference.check_hydrogens``. Populates
+        ``has_missing_H`` and the three detail flags, and returns
+        ``has_missing_H``.
+        """
+        from cell2mol.hydrogen import check_missing_hydrogens_in_specie
+
+        (
+            has_missing_h,
+            missing_h_in_carbon,
+            missing_h_on_coordinated_donor,
+            missing_h_in_water,
+        ) = check_missing_hydrogens_in_specie(self)
+
+        if has_missing_h:
+            logger.info(
+                "Missing hydrogens in specie %s | carbon=%s, coordinated_donor=%s, water=%s",
+                self.formula,
+                missing_h_in_carbon,
+                missing_h_on_coordinated_donor,
+                missing_h_in_water,
+            )
+
+        self.has_missing_H = has_missing_h
+        self.missing_H_in_Carbon = missing_h_in_carbon
+        self.missing_H_on_CoordDonor = missing_h_on_coordinated_donor
+        self.missing_H_in_Water = missing_h_in_water
+
+        return self.has_missing_H
 
     def get_protonation_states(self):
         """
