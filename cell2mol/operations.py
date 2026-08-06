@@ -3,6 +3,10 @@
 import numpy as np
 import itertools
 import logging
+from typing import Any, TypeVar
+from cell2mol.my_types import NDArray
+
+_T = TypeVar("_T")
 from cell2mol.elementdata import ElementData
 from cell2mol.element_utils import (
     TRANSITION_METALS,
@@ -193,7 +197,9 @@ def translate(vector, coords, cellvec):
     return newcoord
 
 
-def extract_from_list(entrylist: list, old_array: list, dimension: int = 2) -> list:
+def extract_from_list(
+    entrylist: list[int], old_array: list[Any], dimension: int = 2
+) -> list[Any]:
     """Extract a 1D or 2D sub-array using a list of indices.
 
     Args:
@@ -213,10 +219,12 @@ def extract_from_list(entrylist: list, old_array: list, dimension: int = 2) -> l
         new_array = np.empty((length), dtype=object)
         for idx, val in enumerate(entrylist):
             new_array[idx] = old_array[val]
+    else:
+        raise ValueError(f"dimension must be 1 or 2, got {dimension}")
     return list(new_array)
 
 
-def reorder_element(lst: list, old_idx: int, new_idx: int) -> list:
+def reorder_element(lst: list[_T], old_idx: int, new_idx: int) -> list[_T]:
     """Moves an element from old_idx to new_idx and returns a new list."""
     new_lst = list(lst)
     new_lst.insert(new_idx, new_lst.pop(old_idx))
@@ -246,7 +254,7 @@ def absolute_value(num):
     return abs(sum)
 
 
-def inv(perm: list) -> list:
+def inv(perm: list[int]) -> list[int]:
     """Compute the inverse of a permutation.
 
     Args:
@@ -261,7 +269,7 @@ def inv(perm: list) -> list:
     return inverse
 
 
-def compute_centroid(arr: np.ndarray) -> list:
+def compute_centroid(arr: NDArray) -> NDArray:
     """Compute the centroid of a set of 3D coordinates.
 
     Args:
@@ -278,7 +286,7 @@ def compute_centroid(arr: np.ndarray) -> list:
     return np.array(centroid)
 
 
-def get_dist(atom1_pos: list, atom2_pos: list) -> float:
+def get_dist(atom1_pos: list[float], atom2_pos: list[float]) -> float:
     """Compute the Euclidean distance between two points.
 
     Args:
@@ -321,7 +329,7 @@ def get_angle(vec1, vec2) -> float:
     return float(angle)
 
 
-def unit_vector(v: np.ndarray) -> np.ndarray:
+def unit_vector(v: NDArray) -> NDArray:
     """Return the unit vector of v.
 
     For zero vectors, returns the original vector.
@@ -474,7 +482,7 @@ def tmatgenerator(centroid, thres=0.40, full=False):
                     tmatrix = additem((0, -1, -1), tmatrix)
                 if centroid[1] <= tmin:
                     tmatrix = additem((0, 1, -1), tmatrix)
-    elif full:
+    else:
         x = [-1, 0, 1]
         tmatrix = [p for p in itertools.product(x, repeat=3)]
 
@@ -519,12 +527,12 @@ def kabsch_rotation(P, Q):
     """
     H = P @ Q.T
     U, S, Vt = np.linalg.svd(H)
-    R = Vt.T @ U.T
+    rot = Vt.T @ U.T
     # Right-handed fix
-    if np.linalg.det(R) < 0:
+    if np.linalg.det(rot) < 0:
         Vt[-1, :] *= -1
-        R = Vt.T @ U.T
-    return R
+        rot = Vt.T @ U.T
+    return rot
 
 
 def perp_unit(u):
@@ -558,7 +566,7 @@ def get_moiety_indices_from_labels(atom_site_labels, moiety_list):
     return moiety_indices
 
 
-def count_metals(labels: list[str]) -> dict[str, int]:
+def count_metals(labels: list[str]) -> tuple[dict[str, int], dict[str, int]]:
     metal_counts = {
         "tm": 0,
         "f_block": 0,
@@ -772,6 +780,7 @@ def has_different_metal_coordination(
                 if key in recorded_keys:
                     return
                 recorded_keys.add(key)
+                distance = None
                 for b in bond_data:
                     if met_label in (b[0], b[1]) and site in (b[0], b[1]):
                         distance = b[2] if len(b) > 2 else None

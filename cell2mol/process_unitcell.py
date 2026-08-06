@@ -39,7 +39,7 @@ ERR_MEMORY = config.ERR_MEMORY
 def interpret_unitcell(input_path: str, name: str, current_dir: str):
     """Orchestrates the cell2mol process for a CIF file."""
 
-    refcell = None
+    refcell: Reference | None = None
     unitcell = None
     cells = None
 
@@ -51,7 +51,7 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
             # ------------------------------------------------------
             # Run Reference Interpretation and Initialize Unit Cell
             # ------------------------------------------------------
-            refcell: Reference = interpret_reference(input_path, name, current_dir)
+            refcell = interpret_reference(input_path, name, current_dir)
 
             if not refcell:
                 logger.error("Failed to create reference cell from CIF.")
@@ -223,6 +223,7 @@ def _has_step_failed(obj, mode):
     """Assess errors for a specific processing step and log them."""
     obj.assess_errors(mode=mode)
 
+    error_message = ""
     if obj.subtype == "reference":
         code = obj.error_cases.get(mode, 0)
         error_message = get_reference_error_message(code)
