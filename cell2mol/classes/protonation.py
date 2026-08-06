@@ -38,9 +38,9 @@ class Protonation(BaseModel):
 
     # Protonation mode
     # "none" : no protonation
-    # "heuristic": apply chemical rules
+    # "deterministic": apply chemical rules (fixed proton count per site)
     # "combinatorial": explore combinations
-    mode: str | Literal["none", "heuristic", "combinatorial"] | None = None
+    mode: str | Literal["none", "deterministic", "combinatorial"] | None = None
 
     parent: Specie | None = Field(default=None)
 
@@ -108,6 +108,28 @@ class Protonation(BaseModel):
                 self.atom_site_labels = [
                     refcell_labels[idx] for idx in self.atom_site_labels_indices
                 ]
+
+            # Zero-proton ("as-is") state: labels and coords are the parent
+            # specie's, unchanged, and the specie's adjacency was built with the
+            # same cov_factor / USE_BOND_INFO convention -- so it is valid as-is.
+            # Reuse it and skip the O(n^2) rebuild (get_adjmatrix / CIF-bond
+            # parsing followed by a no-op proton-fix loop). Falls through to the
+            # full recompute if the parent has no usable adjacency.
+            parent = self.parent
+            if (
+                self.n_protons_added == 0
+                and parent.adjmat is not None
+                and parent.adjmat.shape[0] == len(self.labels)
+            ):
+                self.status = True
+                self.adjmat = np.array(parent.adjmat, copy=True)
+                self.adjnum = (
+                    np.array(parent.adjnum, copy=True)
+                    if parent.adjnum is not None
+                    else self.adjmat.sum(axis=1)
+                )
+                return
+
             use_bond_info = config.USE_BOND_INFO
             if use_bond_info:
                 self.status = True
