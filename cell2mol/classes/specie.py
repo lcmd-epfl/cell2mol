@@ -94,7 +94,7 @@ class Specie(BaseModel):
     missing_H_in_Water: bool | None = None
 
     charge_state: ChargeState | None = None
-    possible_cs: list[ChargeState] | list[int] | None = Field(default=None)
+    plausible_charge_states: list[ChargeState] | None = Field(default=None)
     origin: str | None = None
 
     # Frozen fields
@@ -583,22 +583,22 @@ class Specie(BaseModel):
         self.protonation_states = enumerate_protonation_states(self)
         return self.protonation_states
 
-    def get_possible_cs(self):
+    def get_plausible_charge_states(self):
         """
-        Enumerate possible charge states for this Specie.
+        Enumerate plausible charge states for this Specie.
 
-        Possible charge states are only defined for ligands and
+        Plausible charge states are only defined for ligands and
         non-complex molecules. Final charge selection is handled
         later at the cell level.
         """
-        if self.possible_cs is not None:
-            return self.possible_cs
+        if self.plausible_charge_states is not None:
+            return self.plausible_charge_states
 
         # Default behavior
-        self.possible_cs = None
+        self.plausible_charge_states = None
 
         if not (self.subtype == "ligand" or self.is_non_complex_molecule):
-            return self.possible_cs
+            return self.plausible_charge_states
 
         if self.protonation_states is None:
             self.get_protonation_states()
@@ -609,8 +609,8 @@ class Specie(BaseModel):
             # )
         logger.debug("Enumerating charge states for %s", self.formula)
 
-        self.possible_cs = enumerate_possible_charge_states(self)
-        return self.possible_cs
+        self.plausible_charge_states = enumerate_possible_charge_states(self)
+        return self.plausible_charge_states
 
     def set_charges(
         self,
@@ -643,7 +643,7 @@ class Specie(BaseModel):
         self.atomic_charges = None
         self.smiles = None
         self.rdkit_obj = None
-        self.possible_cs = None
+        self.plausible_charge_states = None
 
         for a in self.atoms or []:
             a.reset_charge()
