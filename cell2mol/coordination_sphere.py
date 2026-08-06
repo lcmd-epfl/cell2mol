@@ -381,9 +381,9 @@ def handle_metal_coordination(metal: object) -> list:
         f"{metal.label}{f' ({metal.atom_site_label})' if metal.atom_site_label else ''}"
     )
 
-    # Ensure the metal has its connected atoms list initialized
-    if getattr(metal, "connected_nonmetal_atoms", None) is not None:
-        metal.get_connected_nonmetal_atoms()
+    # Ensure the metal has its connected atoms list initialized.
+    # The getter is memoized, so calling it unconditionally is idempotent.
+    metal.get_connected_nonmetal_atoms()
 
     if not metal.connected_nonmetal_atoms:
         logger.info(f"No coordinating non-metal atoms found for metal {metal_info}")
@@ -438,11 +438,17 @@ def handle_metal_coordination(metal: object) -> list:
 
     # Iterate through refined results to create Group objects
     for lig_idx, groups_list in final_refined_data.items():
+        # Every ligand of the molecule has an entry here, including ones with no
+        # validated contact to this metal. Only the coordinating ones may record it.
+        if not groups_list:
+            continue
+
         current_lig_m_indices = lig_mol_indices[lig_idx]
         current_lig = ligands[lig_idx]
         if getattr(current_lig, "metals", None) is None:
             object.__setattr__(current_lig, "metals", [])
-        current_lig.metals.append(metal)
+        if metal not in current_lig.metals:
+            current_lig.metals.append(metal)
         for group_info in groups_list:
             atoms = group_info["atoms"]
 
