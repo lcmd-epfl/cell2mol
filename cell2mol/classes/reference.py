@@ -458,8 +458,14 @@ class Reference(Cell):
         """
         Collect the plausible integer charges for every unique specie and every
         entry of the species list. Nothing is selected here -- the final choice
-        is made later by the charge balancer. A specie with no options (or with
-        missing hydrogens) records None, which sets error_plausible_charges.
+        is made later by the charge balancer.
+
+        A specie with no options records None. Species skipped up front because
+        they are missing hydrogens record None too (to keep the list positionally
+        aligned with unique_species + species_list) but do NOT set
+        error_plausible_charges -- that failure is already reported by
+        assess_errors(mode="hydrogens"), and double-reporting it hides which
+        structures failed on charge perception alone.
         """
         assert self.subtype == "reference", (
             "get_plausible_charges should only be called on reference"
@@ -478,7 +484,11 @@ class Reference(Cell):
             [(specie, "species list") for specie in self.species_list or []]
         )
 
-        for specie, context_label in all_targets:
+        # Positions of entries that are None because enumeration was never
+        # attempted, as opposed to attempted and failed.
+        skipped_for_missing_h: set[int] = set()
+
+        for idx, (specie, context_label) in enumerate(all_targets):
             logger.info(
                 "Get plausible charge states for %s: %s",
                 context_label,
@@ -495,6 +505,7 @@ class Reference(Cell):
                         specie.formula,
                     )
                     self.plausible_charges.append(None)
+                    skipped_for_missing_h.add(idx)
                     continue
 
             if specie.subtype == "metal":
@@ -513,8 +524,27 @@ class Reference(Cell):
                     [cs.specie_total_charge for cs in plausible]
                 )
 
-        # Update error flag
-        self.error_plausible_charges = None in self.plausible_charges
+        # Error flag covers only genuine enumeration failures -- a specie skipped
+        # for missing hydrogens is reported by the "hydrogens" mode instead.
+        unexplained = [
+            idx
+            for idx, charges in enumerate(self.plausible_charges)
+            if charges is None and idx not in skipped_for_missing_h
+        ]
+        self.error_plausible_charges = bool(unexplained)
+
+        if skipped_for_missing_h:
+            logger.info(
+                "Plausible charges: %d specie entr(ies) skipped for missing "
+                "hydrogens (not counted as a charge error)",
+                len(skipped_for_missing_h),
+            )
+        if unexplained:
+            logger.error(
+                "Plausible charges: %d specie entr(ies) with no charges found: %s",
+                len(unexplained),
+                [all_targets[i][0].formula for i in unexplained],
+            )
 
     def map_charges_to_reference(self):
         """Logic: Propagate charges from Unique Species to Reference Molecules."""
