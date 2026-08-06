@@ -512,18 +512,22 @@ class Specie(BaseModel):
         assert parent.adjmat is not None
         assert parent.adjnum is not None
 
+        # extract_from_list builds dtype=object arrays (it is generic over
+        # labels/coords too), and np.stack keeps that dtype -- so cast back to
+        # int. Adjacency is integer connectivity, and an object-dtype matrix is
+        # rejected outright by consumers such as nx.from_numpy_array.
         self.madjmat = np.stack(
             extract_from_list(indices, parent.madjmat.tolist(), dimension=2), axis=0
-        )
+        ).astype(int)
         self.madjnum = np.stack(
             extract_from_list(indices, parent.madjnum.tolist(), dimension=1), axis=0
-        )
+        ).astype(int)
         self.adjmat = np.stack(
             extract_from_list(indices, parent.adjmat.tolist(), dimension=2), axis=0
-        )
+        ).astype(int)
         self.adjnum = np.stack(
             extract_from_list(indices, parent.adjnum.tolist(), dimension=1), axis=0
-        )
+        ).astype(int)
 
     def check_hydrogens(self):
         """Detect missing hydrogens on this single specie.

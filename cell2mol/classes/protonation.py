@@ -122,9 +122,13 @@ class Protonation(BaseModel):
                 and parent.adjmat.shape[0] == len(self.labels)
             ):
                 self.status = True
-                self.adjmat = np.array(parent.adjmat, copy=True)
+                # dtype=int, not a bare copy: the full-recompute path below
+                # always yields a numeric matrix, so reusing the parent's must
+                # too. A specie that inherited its adjacency carries dtype=object,
+                # which consumers like nx.from_numpy_array reject.
+                self.adjmat = np.array(parent.adjmat, dtype=int, copy=True)
                 self.adjnum = (
-                    np.array(parent.adjnum, copy=True)
+                    np.array(parent.adjnum, dtype=int, copy=True)
                     if parent.adjnum is not None
                     else self.adjmat.sum(axis=1)
                 )
