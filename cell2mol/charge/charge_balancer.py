@@ -21,7 +21,7 @@ def balance_unitcell_charge(refcell, unitcell):
         logger.warning(" Not proceed due to reconstruction error.")
         return refcell, unitcell
 
-    if refcell.error_get_poscharges:
+    if refcell.error_plausible_charges:
         logger.error(" Not proceed due to no charge states for some unique species.")
         return refcell, unitcell
     log_charge_state_details(unitcell, refcell)
@@ -119,7 +119,7 @@ def _infer_metal_charge_from_fixed_ligands(
     specie already has exactly one feasible charge, the metal's true
     oxidation state is the one value that makes the total balance out --
     regardless of whether it's in the metal's usual candidate list
-    (spec.possible_cs, drawn from METAL_OXIDATION_STATES) -- since an
+    (spec.plausible_os, drawn from METAL_OXIDATION_STATES) -- since an
     unusual/rare oxidation state not in that list is the most likely
     reason the normal search came up empty in the first place.
 
@@ -197,14 +197,14 @@ def balance_molecule_charge(molecule, input_charge: int = 0, second_try: bool = 
     """
     if molecule.unique_species is None:
         molecule.get_unique_species()
-    if molecule.selected_cs is None:
-        molecule.get_selected_cs()
+    if molecule.plausible_charges is None:
+        molecule.get_plausible_charges()
 
-    # Flag error if selected_cs is missing or contains None entries
-    molecule.error_get_poscharges = (molecule.selected_cs is None) or (
-        None in molecule.selected_cs
+    # Flag error if plausible_charges is missing or contains None entries
+    molecule.error_plausible_charges = (molecule.plausible_charges is None) or (
+        None in molecule.plausible_charges
     )
-    if molecule.error_get_poscharges:
+    if molecule.error_plausible_charges:
         logger.error("No charge states available for some species.")
         return molecule
 
@@ -333,7 +333,7 @@ def _get_metal_options(spec, rare: bool, predict: bool) -> List[int]:
     all_possible_m_ox = [0, 1, 2, 3, 4, 5, 6, 7]
 
     if rare:
-        rare_states = [x for x in all_possible_m_ox if x not in spec.possible_cs]
+        rare_states = [x for x in all_possible_m_ox if x not in spec.plausible_os]
         logger.debug("RARE METAL OXIDATION STATES: %s %s", spec.formula, rare_states)
         return rare_states
 
@@ -341,29 +341,29 @@ def _get_metal_options(spec, rare: bool, predict: bool) -> List[int]:
     #     predicted_charge = predict_metal_ox(spec)
     #     return [predicted_charge]
 
-    return list(spec.possible_cs)
+    return list(spec.plausible_os)
 
 
 def _get_ligand_options(spec, aromatic: bool) -> List[int]:
     """Determines valid charges for ligand species, optionally filtering by aromaticity."""
-    possible_cs = spec.possible_cs
+    plausible = spec.plausible_charge_states
 
-    if not possible_cs:
+    if not plausible:
         return []
 
-    if len(possible_cs) == 1:
-        return [possible_cs[0].corr_total_charge]
+    if len(plausible) == 1:
+        return [plausible[0].specie_total_charge]
 
     if aromatic:
-        return _filter_by_aromaticity(spec, possible_cs)
+        return _filter_by_aromaticity(spec, plausible)
 
-    return [cs.corr_total_charge for cs in possible_cs]
+    return [cs.specie_total_charge for cs in plausible]
 
 
-def _filter_by_aromaticity(spec, possible_cs) -> List[int]:
+def _filter_by_aromaticity(spec, plausible) -> List[int]:
     """Selects charge states that maximize aromatic atoms, then aromatic rings."""
     aromatic_stats = []
-    for cs in possible_cs:
+    for cs in plausible:
         # Get indices of added protons
         added_indices = [
             i
@@ -374,7 +374,7 @@ def _filter_by_aromaticity(spec, possible_cs) -> List[int]:
         info = aromatic_info(cs.rdkit_obj, added_indices)
         aromatic_stats.append(
             {
-                "charge": cs.corr_total_charge,
+                "charge": cs.specie_total_charge,
                 "smiles": cs.smiles,
                 "atoms": info["Aromatic atoms"],
                 "rings": info["Number of aromatic rings"],
@@ -396,7 +396,7 @@ def _filter_by_aromaticity(spec, possible_cs) -> List[int]:
     max_atoms = max(atoms_counts)
     candidates = [x for x in aromatic_stats if x["atoms"] == max_atoms]
 
-    candidate_indices = [possible_cs.index(c["obj"]) for c in candidates]
+    candidate_indices = [plausible.index(c["obj"]) for c in candidates]
     logger.debug(
         "  Primary indices with max aromatic atoms (%d): %s",
         max_atoms,
@@ -409,7 +409,7 @@ def _filter_by_aromaticity(spec, possible_cs) -> List[int]:
 
     # Logging details for best candidates
     if logger.isEnabledFor(logging.DEBUG):
-        indices = [possible_cs.index(c["obj"]) for c in best_candidates]
+        indices = [plausible.index(c["obj"]) for c in best_candidates]
         logger.debug("  Max aromatic rings (%d) at indices: %s", max_rings, indices)
         for c in best_candidates:
             logger.debug("  - Selected: %s (Charge: %s)", c["smiles"], c["charge"])
