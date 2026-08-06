@@ -8,7 +8,6 @@ from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.ligand import Ligand
 from cell2mol.classes.specie import Specie
-from cell2mol.classes.charge_state import ChargeState
 from cell2mol.connectivity import split_species, merge_multiple_groups
 from cell2mol.element_utils import (
     labels2formula,
@@ -19,12 +18,14 @@ from cell2mol.element_utils import (
     METALLOIDS,
 )
 from cell2mol.compare import compare_species, compare_metals
-from cell2mol.charge.specie_assigner import set_charge_state, prepare_mol
+from cell2mol.charge.specie_assigner import (
+    set_charge_state,
+    assemble_complex_charge_state,
+)
 from cell2mol.charge.smiles_handler import (
     create_bonds_specie,
     create_metal_ligand_bonds,
     create_metal_metal_bonds,
-    correct_smiles_ligand,
 )
 from cell2mol.spin import assign_spin_complexes
 from cell2mol.operations import extract_from_list
@@ -68,8 +69,12 @@ class Molecule(Specie):
     unique_species: list[Specie | Metal] | None = None
     unique_indices: list[int] | None = None
     species_list: list[Specie | Metal] | None = None
-    selected_cs: list[object] | None = None
-    error_get_poscharges: bool | None = None
+    # Plausible integer charges per specie: metal oxidation states, or a
+    # ligand/molecule's total charges. NOT one entry per specie -- it is
+    # unique_species first, then all of species_list, so species recur at
+    # two indices. None marks a specie whose charges could not be found.
+    plausible_charges: list[list[int] | None] | None = None
+    error_plausible_charges: bool | None = None
     error_multiple_distrib: bool | None = None
     error_empty_distrib: bool | None = None
     error_assign_charge: bool | None = None
@@ -340,12 +345,17 @@ class Molecule(Specie):
 
         return self.ligands, self.metals
 
-    def analyze_coordination(self):
-        """
-        Analyze the coordination environment of the molecule.
-        Determines hapticity and connected metals for ligands.
-        """
+    @property
+    def contains_metal(self) -> bool:
+        """True if the molecule contains transition, alkali/alkaline-earth or
+        post-transition metals."""
+        return self.iscomplex or self.has_ia_iia or self.has_post_transition_metal
 
+    def _log_metal_content(self) -> bool:
+        """
+        Log which metal category this molecule falls into and return whether it
+        contains any metal at all.
+        """
         if self.iscomplex:
             logger.info("Has transition metals %s", self.formula)
             if not self.ligands:
@@ -360,16 +370,36 @@ class Molecule(Specie):
             logger.debug("ligands=%s", [lig.formula for lig in self.ligands or []])
         else:
             logger.info("No metals found in molecule: %s", self.formula)
-            if self.is_non_complex_molecule:
-                self.evaluate_has_fullerene()
-                if self.has_fullerene:
-                    logger.debug("Molecule %s has a fullerene", self.formula)
-                self.evaluate_has_porphyrin()
-                if self.has_porphyrin:
-                    logger.debug("Molecule %s has a porphyrin", self.formula)
-                self.evaluate_has_borane()
-                if self.has_borane:
-                    logger.debug("Molecule %s has a borane/carborane", self.formula)
+            return False
+        return True
+
+    def analyze_coordination(self):
+        """
+        Analyze the metal coordination environment of this molecule, in place.
+
+        Metal-free molecules return early without any analysis; molecules
+        containing transition, alkali/alkaline-earth, or post-transition metals
+        go through the full analysis below.
+
+        For every metal:
+            - ``get_connected_metals`` -> ``metal.metals``
+            - ``get_connected_nonmetal_atoms`` -> ``metal.connected_nonmetal_atoms``
+            - ``get_connected_groups`` -> ``metal.groups``
+            - ``get_coordination_geometry`` -> ``coord_nr``, ``coord_geometry``,
+              ``geom_deviation`` and the relative-metal-radius values
+            - ``get_coord_sphere_formula`` -> ``coord_sphere_formula``
+
+        Coordinating groups are then mapped onto ligands
+        (``map_metal_groups_to_ligands``) and groups bridging the same ligand are
+        merged (``merge_connected_groups``).
+
+        Hapticity/denticity of every ligand of this molecule are then determined.
+
+        Returns:
+            None. All results are stored on the metal, group and ligand objects.
+        """
+
+        if not self._log_metal_content():
             return
 
         for met in self.metals or []:
@@ -406,18 +436,25 @@ class Molecule(Specie):
                     logger.debug(
                         f"    Atom: {atom.atom_site_label}, connec: {atom.connec} mconnec: {atom.mconnec}"
                     )
-            lig.evaluate_has_fullerene()
-            if lig.has_fullerene:
-                logger.debug("Ligand %s has a fullerene", lig.formula)
-            lig.evaluate_has_porphyrin()
-            if lig.has_porphyrin:
-                logger.debug("Ligand %s has a porphyrin", lig.formula)
-            lig.evaluate_has_borane()
-            if lig.has_borane:
-                logger.debug("Ligand %s has a borane/carborane", lig.formula)
-            lig.evaluate_as_nitrosyl()
-            if lig.is_nitrosyl:
-                logger.debug("Ligand %s is a nitrosyl", lig.formula)
+
+    def detect_special_moieties(self):
+        """
+        Screen this molecule for structural motifs that need special treatment.
+
+        In a metal-containing molecule the motifs sit on the ligands, so the
+        screen is delegated to each of them (which adds the nitrosyl check). A
+        metal-free molecule is screened as a whole by the Specie implementation.
+
+        Returns:
+            None. Flags are stored on the molecule or on the ligand objects.
+        """
+
+        if not self.contains_metal:
+            super().detect_special_moieties()
+            return
+
+        for lig in self.ligands or []:
+            lig.detect_special_moieties()
 
     def map_metal_groups_to_ligands(self):
         """
@@ -682,11 +719,7 @@ class Molecule(Specie):
         specs_found = -1
 
         # Case 1: simple molecule (not complex, not IA/IIA)
-        if (
-            not self.iscomplex
-            and not self.has_ia_iia
-            and not self.has_post_transition_metal
-        ):
+        if not self.contains_metal:
             found = False
             kdx = None
             for ldx, typ in enumerate(typelist_mols):
@@ -806,53 +839,42 @@ class Molecule(Specie):
 
         return self.unique_species
 
-    def get_selected_cs(self):
+    def get_plausible_charges(self):
         if not self.unique_species is not None:
             self.get_unique_species()
 
-        self.selected_cs = []
+        self.plausible_charges = []
         for unique_specie in self.unique_species or []:
             logger.info(
-                "Get possible charge states for unique specie %s", unique_specie.formula
+                "Get plausible charge states for unique specie %s",
+                unique_specie.formula,
             )
-            tmp = unique_specie.get_possible_cs()
-            if tmp is None:
-                self.selected_cs.append(None)
-            elif len(tmp) == 0:
-                self.selected_cs.append(None)
-            elif unique_specie.subtype != "metal":
-                self.selected_cs.append(
-                    [
-                        cs.corr_total_charge
-                        for cs in cast("list[ChargeState]", unique_specie.possible_cs)
-                    ]
-                )
+            if unique_specie.subtype == "metal":
+                tmp = unique_specie.get_plausible_os()
+                self.plausible_charges.append(tmp if tmp else None)
             else:
-                self.selected_cs.append(unique_specie.possible_cs)
+                tmp = unique_specie.get_plausible_charge_states()
+                self.plausible_charges.append(
+                    [cs.specie_total_charge for cs in tmp] if tmp else None
+                )
 
         for specie in self.species_list or []:
             logger.info(
-                "Get possible charge states for species list %s", specie.formula
+                "Get plausible charge states for species list %s", specie.formula
             )
-            tmp = specie.get_possible_cs()
-            if tmp is None:
-                self.selected_cs.append(None)
-            elif len(tmp) == 0:
-                self.selected_cs.append(None)
-            elif specie.subtype != "metal":
-                self.selected_cs.append(
-                    [
-                        cs.corr_total_charge
-                        for cs in cast("list[ChargeState]", specie.possible_cs)
-                    ]
-                )
+            if specie.subtype == "metal":
+                tmp = specie.get_plausible_os()
+                self.plausible_charges.append(tmp if tmp else None)
             else:
-                self.selected_cs.append(specie.possible_cs)
+                tmp = specie.get_plausible_charge_states()
+                self.plausible_charges.append(
+                    [cs.specie_total_charge for cs in tmp] if tmp else None
+                )
 
-        if None in self.selected_cs:
-            self.error_get_poscharges = True
+        if None in self.plausible_charges:
+            self.error_plausible_charges = True
         else:
-            self.error_get_poscharges = False
+            self.error_plausible_charges = False
 
     def assign_charges(self):
         logger.info("Assigning charges for molecule: %s", self.formula)
@@ -874,7 +896,7 @@ class Molecule(Specie):
         self.create_bonds()
         temp.append(self.error_create_bonds)
         if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
-            prepare_mol(self)
+            assemble_complex_charge_state(self)
 
         if any(temp):
             self.error_create_bonds = True
@@ -882,7 +904,7 @@ class Molecule(Specie):
             self.error_create_bonds = False
 
         if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
-            prepare_mol(self)
+            assemble_complex_charge_state(self)
             logger.info("Complex %s %s", self.formula, self.totcharge)
             for jdx, lig in enumerate(self.ligands or []):
                 logger.info(
@@ -911,62 +933,26 @@ class Molecule(Specie):
             else:
                 logger.debug("Bonds created for non-complex molecule %s", self.formula)
 
-        # Second part: Complex molecule, add bonds for ligands
+        # Second part: Complex molecule, add bonds for ligands.
+        # SMILES + zwitterion corrections are already baked into each ligand's
+        # specie rdkit_obj/smiles (ChargeState), so this only builds the bond
+        # graph -- no separate SMILES correction / zwitterion re-creation needed.
         if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
+            self.ligand_smiles = []
             for lig in self.ligands or []:
                 if lig.smiles is None:
                     logger.error(
                         "Ligand %s has no SMILES after charge assignment. Cannot create bonds.",
                         lig.formula,
                     )
-            self.ligand_smiles = []
-            fix_zwitterions_ligands = []
-
-            for lig in self.ligands or []:
                 # Creates bonds between ligand.atoms, using the ligand.rdkit_object
                 result = create_bonds_specie(lig)
                 if not result:
                     logger.error("Error for ligand %s", lig.formula)
-
                     self.error_create_bonds = True
-                    return  # Exit the function entirely if creating bonds fails for any ligand
+                    return  # Exit if creating bonds fails for any ligand
 
                 logger.debug("Bonds created for ligand %s", lig.formula)
-                logger.debug("Correcting Smiles for ligand %s", lig.formula)
-                result, fix_zwitterions = correct_smiles_ligand(lig)
-                if not result:
-                    logger.error(
-                        "Error for ligand %s in correcting smiles", lig.formula
-                    )
-                    self.error_create_bonds = True
-                    return  # Exit the function entirely
-
-                logger.debug("Smiles corrected for ligand %s", lig.formula)
-                if fix_zwitterions:
-                    fix_zwitterions_ligands.append(lig)
-                else:
-                    self.ligand_smiles.append(lig.smiles or "")
-
-            for lig in fix_zwitterions_ligands:
-                for atom in lig.atoms or []:
-                    atom.bonds = []
-
-                    logger.debug(
-                        "Re-running create_bonds_specie for ligand %s due to zwitterion correction.",
-                        lig.formula,
-                    )
-                result = create_bonds_specie(lig)
-                if not result:
-                    logger.error(
-                        "Error for ligand %s in re-creating bonds", lig.formula
-                    )
-                    self.error_create_bonds = True
-                    return
-
-                logger.debug(
-                    "Bonds re-created for ligand %s after zwitterion correction.",
-                    lig.formula,
-                )
                 self.ligand_smiles.append(lig.smiles or "")
 
         # Third part : adds metal-ligand bonds, metal-metal bonds, with a zero order
@@ -977,7 +963,7 @@ class Molecule(Specie):
         self.error_create_bonds = False
 
     def assess_errors(self):
-        if self.error_get_poscharges:
+        if self.error_plausible_charges:
             case = 5
         elif self.error_multiple_distrib:
             case = 6
