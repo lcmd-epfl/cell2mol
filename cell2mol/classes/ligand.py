@@ -108,6 +108,19 @@ class Ligand(Specie):
                         "Ligand %s is connected to %s", self.formula, met.label
                     )
 
+    def detect_special_moieties(self):
+        """
+        Screen this ligand for structural motifs that need special treatment.
+
+        Extends the Specie screen (fullerene / porphyrin / borane) with the
+        nitrosyl check, which only applies to ligands.
+        """
+        super().detect_special_moieties()
+
+        self.evaluate_as_nitrosyl()
+        if self.is_nitrosyl:
+            logger.debug("Ligand %s is a nitrosyl", self.formula)
+
     def evaluate_as_nitrosyl(self):
         self.is_nitrosyl = False
         if self.natoms == 2 and "N" in self.labels and "O" in self.labels:
