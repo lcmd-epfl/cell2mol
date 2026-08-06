@@ -13,7 +13,7 @@ from cell2mol.read_cif import get_cell_atoms, get_cell_parameters
 from cell2mol.write_results import (
     write_cell_molecules_info,
     write_unique_species,
-    write_possible_charges,
+    write_plausible_charges,
     get_reference_error_message,
     get_unitcell_error_message,
     exit_with_error_exception,
@@ -312,7 +312,7 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
 
         write_cell_molecules_info(refcell, file=f)
         write_unique_species(refcell, file=f)
-        write_possible_charges(refcell, file=f)
+        write_plausible_charges(refcell, file=f)
 
         # Print step-specific reference errors
         if refcell.error_cases:

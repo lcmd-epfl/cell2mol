@@ -25,7 +25,7 @@ from cell2mol.read_cif import (
 from cell2mol.write_results import (
     write_cell_molecules_info,
     write_unique_species,
-    write_possible_charges,
+    write_plausible_charges,
     get_reference_error_message,
     get_reference_warning_messages,
     exit_with_error_input,
@@ -102,7 +102,7 @@ def interpret_reference(input_path, name, current_dir):
             refcell.check_hydrogens()
 
             # Identify the plausible charge states for specie in the reference molecules
-            refcell.get_selected_cs()
+            refcell.get_plausible_charges()
 
             refcell.assess_errors(mode="hydrogens")
             if refcell.has_error():
@@ -112,11 +112,11 @@ def interpret_reference(input_path, name, current_dir):
                 )
                 process_failure = True
 
-            refcell.assess_errors(mode="possible_charges")
+            refcell.assess_errors(mode="plausible_charges")
             if refcell.has_error():
                 logger.error(
-                    "Fails checking possible charges (case=%s)",
-                    (refcell.error_cases or {}).get("possible_charges"),
+                    "Fails checking plausible charges (case=%s)",
+                    (refcell.error_cases or {}).get("plausible_charges"),
                 )
                 process_failure = True
 
@@ -328,7 +328,7 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
         write_cell_molecules_info(refcell, file=f)
 
         write_unique_species(refcell, file=f)
-        write_possible_charges(refcell, file=f)
+        write_plausible_charges(refcell, file=f)
 
         # Print step-specific reference errors
         if refcell.error_cases:

@@ -3,6 +3,8 @@
 import os
 import logging
 import argparse
+from typing import cast
+from ase import Atoms
 from ase.io import read
 from cell2mol.classes import Molecule
 from cell2mol.element_utils import labels2formula
@@ -11,7 +13,7 @@ from cell2mol.write_results import (
     get_molecule_error_message,
     write_molecule_info,
     write_unique_species,
-    write_possible_charges,
+    write_plausible_charges,
 )
 from cell2mol.charge.charge_balancer import balance_molecule_charge
 from cell2mol.utils import config
@@ -37,15 +39,19 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
 
     try:
         try:
-            structure = read(input_path, format="xyz")
+            # read(...) is typed Atoms | list[Atoms]; a single-frame xyz yields one Atoms.
+            structure = cast(Atoms, read(input_path, format="xyz"))
         except (AssertionError, Exception) as e:
             logger.error(f"ASE failed to parse {input_path}: {e}")
             raise
         labels = structure.get_chemical_symbols()
         coords = structure.get_positions()
 
-        blocklist = split_species(
-            labels, coords, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR
+        blocklist = cast(
+            "list[list[int]]",
+            split_species(
+                labels, coords, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR
+            ),
         )
         logger.info("Number of molecules in xyz: %d", len(blocklist))
 
@@ -87,6 +93,7 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
             newmolec.add_parent(newmolec, indices=list(range(newmolec.natoms)))
 
         newmolec.analyze_coordination()
+        newmolec.detect_special_moieties()
         # --- charge assignment ---
         newmolec.input_charge = input_charge
         if input_charge is None:
@@ -95,7 +102,7 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
 
         logger.info("Assigning total charge: %d", input_charge)
         newmolec.get_unique_species()
-        newmolec.get_selected_cs()
+        newmolec.get_plausible_charges()
         newmolec = balance_molecule_charge(newmolec, input_charge=input_charge)
         newmolec.assess_errors()
         if newmolec.error_case != 0:
@@ -130,7 +137,7 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
                 print(name, file=f)
                 write_molecule_info(newmolec, file=f)
                 write_unique_species(newmolec, file=f)
-                write_possible_charges(newmolec, file=f)
+                write_plausible_charges(newmolec, file=f)
                 print(
                     get_molecule_error_message(newmolec.error_case),
                     file=f,
