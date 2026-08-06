@@ -41,7 +41,7 @@ elemdatabase = ElementData()
 
 def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
     """
-    Generates valid charge states for a given specie.
+    Generates valid charge states (Lewis structures) for a given specie.
     Charge states are only generated for:
     - ligands
     - non-complex molecules
@@ -70,8 +70,6 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
 
     # 3. Enumeration Loop
     valid_charge_states = []
-    # Get list of integer charges to attempt
-    candidate_charges = get_candidate_charges(spec.protonation_states[0])
 
     if spec.has_porphyrin and not spec.protonation_warning:
         for prot in spec.protonation_states:
@@ -80,14 +78,21 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
                 valid_charge_states.append(charge_state)
 
     else:
-        logger.debug(
-            "Considering general charge state enumeration "
-            "for %s with %d candidate charge=%s",
-            spec.formula,
-            len(candidate_charges),
-            candidate_charges,
-        )
         for prot in spec.protonation_states:
+            # Charges to attempt are per protonation state: an anchor derived
+            # from the specie's chemistry has to be shifted into this state's
+            # frame, and the closed-shell parity screen depends on how many
+            # protons this state added.
+            candidate_charges = get_candidate_charges(spec, prot)
+            logger.debug(
+                "Considering general charge state enumeration for specie %s "
+                "| protonation %s (nH=%d) | %d candidate charge=%s",
+                spec.formula,
+                prot.formula,
+                prot.n_protons_added,
+                len(candidate_charges),
+                candidate_charges,
+            )
             valid_charge_states_dict = generate_valid_charge_states(
                 prot, candidate_charges
             )
@@ -99,11 +104,11 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
     for charge_state in valid_charge_states:
         prot = charge_state.protonation
         logger.debug(
-            "    [Success] %s | Protonation: %s | Charge: %d | Corrected Charge: %d | Added atoms: %d | SMILES: %s",
+            "    [Success] %s | Protonation: %s | Protonated Charge: %d | Specie Charge: %d | Added atoms: %d | SMILES: %s",
             spec.formula,
             prot.formula,
-            charge_state.uncorr_total_charge,
-            charge_state.corr_total_charge,
+            charge_state.protonated_total_charge,
+            charge_state.specie_total_charge,
             prot.n_protons_added,
             charge_state.smiles,
         )
@@ -114,67 +119,126 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
     return best_candidates if best_candidates else None
 
 
-def get_candidate_charges(prot: Protonation) -> list[int]:
-    """Formal charges to try for a protonation state.
+def get_candidate_charges(spec: Specie, prot: Protonation) -> list[int]:
+    """Formal charges to try for ONE protonation state of a specie.
 
-    In decreasing order of specificity:
-      * Fixed-charge small formulas (diatomic donors -> 0, a lone halide -> -1,
-        a noble gas -> 0).
-      * With charged substituents (free carboxylate -1, ammonium +1, ...):
-        the charge is just their summed net charge (0 if none), so try
-        only that value.
-      * Large (>100 atoms) or heteroatom-rich (>8 charge-flexible O/N/S/P...,
-        halogens excluded) species with no charged substituent: Restricting
-        candidate charge set to {0} for a non-complex molecule and ligand,
-        since bond perception cost scales with the heteroatom count.
-      * Everything else: -4..+4 sweep for non-complex molecules, -2..+2 for ligands.
+    These are charges of the PROTONATED structure, deliberately NOT re-based
+    per protonation state: holding them fixed while ``n_protons_added`` grows
+    is what walks the specie charge down (``ChargeState`` recovers it as about
+    ``q - n_protons_added``). That sweep is the only route to strongly anionic
+    answers, where deprotonated donors take the moiety sum further down.
+
+    Sources, most specific first: fixed-charge small formulas, the summed
+    charge of any charged substituents, else a sweep (see
+    ``_anchored_specie_charges`` / ``_sweep_charges``). The parity screen then
+    halves whatever comes back.
     """
-    spec = cast("Specie", prot.parent)
+    anchor = _anchored_specie_charges(spec)
+    candidates = list(anchor) if anchor is not None else _sweep_charges(spec)
+
+    kept = _filter_by_electron_parity(candidates, prot)
+    if not kept:
+        # Wrong parity everywhere proves the anchor wrong: some anionic centre
+        # the moiety scan can't see (a metal-bound carbanion, say). Widen
+        # DOWNWARD only -- every kind _classify_charged_moiety reports is
+        # anionic, so an anchor is a lower bound. One step down also flips the
+        # parity, so the widened set always survives.
+        widened = [c - 1 for c in candidates]
+        kept = _filter_by_electron_parity(widened, prot)
+        logger.debug(
+            "Anchor %s is parity-forbidden for %s; widening downward to %s",
+            candidates,
+            prot.formula,
+            kept,
+        )
+    if not kept:  # defensive: never hand back an empty candidate list
+        kept = candidates
+    return kept
+
+
+def _filter_by_electron_parity(charges: list[int], prot: Protonation) -> list[int]:
+    """Drop charges that cannot give a closed-shell Lewis structure.
+
+    Bond perception pairs every electron, so ``sum(outer electrons) - q`` must
+    be even; other charges are provably unsolvable. May return an empty list --
+    the caller reads that as the anchor being wrong.
+    """
+    atnums = prot.atnums
+    if not atnums:
+        return list(charges)
+
+    pt = Chem.GetPeriodicTable()
+    n_valence = sum(pt.GetNOuterElecs(int(z)) for z in atnums)
+    kept = [c for c in charges if (n_valence - c) % 2 == 0]
+
+    if kept and len(kept) < len(charges):
+        logger.debug(
+            "Electron-parity screen for %s (%d valence electrons): %s -> %s",
+            prot.formula,
+            n_valence,
+            charges,
+            kept,
+        )
+    return kept
+
+
+def _anchored_specie_charges(spec: Specie) -> list[int] | None:
+    """SPECIE charges when the specie's own chemistry pins them; None otherwise."""
     formula = spec.formula
 
-    # Quick returns for simple cases
     if formula in {"C-O", "H2-O", "C-N", "C-S", "C-Se", "C-Te", "C-P", "C-As", "C-Sb"}:
         return [0]
-    elif formula in HALOGENS:
+    if formula in HALOGENS:
         return [-1]
-    elif formula in NOBLE_GASES:
+    if formula in NOBLE_GASES:
         return [0]
-    else:
-        # If the specie has charged substituents (e.g. a free carboxylate),
-        # its charge is just the sum of their net charges -- try only that value
-        # and skip the sweep
-        charged_moieties = _find_charged_moiety(spec)
-        if charged_moieties:
-            candidate_charge = sum(net_charge for *_, net_charge in charged_moieties)
-            logger.debug(
-                "Charged moieties in %s: %s -> candidate charge %d",
-                formula,
-                [(kind, nc) for _c, _a, kind, nc in charged_moieties],
-                candidate_charge,
-            )
-            return [candidate_charge] if candidate_charge != 0 else [0]
-        # Trim the sweep to keep bond perception + resonance search tractable
-        # for a species that is either large (> 100 atoms) or heteroatom-rich.
-        # Cost scales with the number of *charge-flexible* heteroatoms (O, N,
-        # S, P, ...), each of which can be neutral or charged
-        n_heteroatoms = sum(
-            1 for lab in spec.labels if lab not in ("C", "H") and lab not in HALOGENS
+
+    # Anchor on the summed charge of any charged substituents rather than
+    # sweeping -- the sweep is what makes a polycarboxylate intractable.
+    charged_moieties = _find_charged_moiety(spec)
+    if not charged_moieties:
+        return None
+
+    # The summed moiety charge ALONE -- don't try to guess what the scan
+    # misses. Subtracting outside protonation sites over-counts, since some of
+    # those sites are neutral, and sweeping down to that bound lets
+    # min |charge| in identify_best_charge_states settle too positive. The
+    # protonation sweep reaches the missing charge instead.
+    anchor = sum(net_charge for *_, net_charge in charged_moieties)
+    logger.debug(
+        "Charged moieties in %s: %s -> candidate charge %d",
+        formula,
+        [(kind, nc) for _c, _a, kind, nc in charged_moieties],
+        anchor,
+    )
+    return [anchor]
+
+
+def _sweep_charges(spec: Specie) -> list[int]:
+    """Fallback SPECIE-charge sweep for a specie with no chemical anchor."""
+    # Trim the sweep for heteroatom-rich species: bond perception + resonance
+    # cost scales with the charge-flexible heteroatom count.
+    n_heteroatoms = sum(
+        1 for lab in spec.labels if lab not in ("C", "H") and lab not in HALOGENS
+    )
+    n_oxygens = sum(1 for lab in spec.labels if lab == "O")
+    if n_oxygens > 8:
+        logger.debug(
+            "Limiting candidate charges for %s (%d atoms, %d heteroatoms, %d oxygens) to [0]",
+            spec.formula,
+            spec.natoms,
+            n_heteroatoms,
+            n_oxygens,
         )
-        n_oxygens = sum(1 for lab in spec.labels if lab == "O")
-        if n_oxygens > 8:
-            logger.debug(
-                "Limiting candidate charges for %s (%d atoms, %d heteroatoms, %d oxygens) to [0]",
-                formula,
-                spec.natoms,
-                n_heteroatoms,
-                n_oxygens,
-            )
-            return [0]
-        else:
-            if spec.is_non_complex_molecule:
-                return [0, -1, 1, -2, 2, -3, 3, -4, 4]
-            else:
-                return [0, -1, 1, -2, 2]
+        return [0]
+    if spec.is_non_complex_molecule:
+        return [0, -1, 1, -2, 2, -3, 3, -4, 4]
+    return [0, -1, 1, -2, 2]
+
+
+def _dedupe(values: list[int]) -> list[int]:
+    """Order-preserving de-duplication."""
+    return list(dict.fromkeys(values))
 
 
 def generate_manual_charge_state(spec):
@@ -307,7 +371,7 @@ def _specie_supported_by_rddeterminebonds(
 
 
 def generate_valid_charge_states(prot, candidate_charges, allow_charged_fragments=True):
-    valid_charge_states = {charge: [] for charge in candidate_charges}
+    valid_charge_states_dict = {charge: [] for charge in candidate_charges}
 
     # --- Tier 0: element-level pre-check (charge-independent) ---
     if not _specie_supported_by_rddeterminebonds(prot.atnums, prot.adjmat):
@@ -321,34 +385,37 @@ def generate_valid_charge_states(prot, candidate_charges, allow_charged_fragment
         return determine_bond_using_modified_AC2mol(
             prot,
             candidate_charges,
-            valid_charge_states,
+            valid_charge_states_dict,
             allow_charged_fragments=allow_charged_fragments,
         )
 
     # --- Tier 1: try rdDetermineBonds across ALL candidate charges ---
-    valid_charge_states = determine_bond_using_rdDetermineBonds(
-        prot, candidate_charges, valid_charge_states, allow_charged_fragments
+    valid_charge_states_dict = determine_bond_using_rdDetermineBonds(
+        prot, candidate_charges, valid_charge_states_dict, allow_charged_fragments
     )
-
-    if any(valid_charge_states.values()):
+    if any(valid_charge_states_dict.values()):
         logger.debug(
             "rdDetermineBonds found valid charge states for %s: %s",
             prot.formula,
-            valid_charge_states,
+            valid_charge_states_dict,
         )
-        return valid_charge_states
-
+        return valid_charge_states_dict
+    logger.debug(
+        "rdDetermineBonds failed to find valid charge states for %s, "
+        "falling back to modified AC2mol",
+        prot.formula,
+    )
     # --- Tier 2: every candidate charge failed rdDetermineBonds ---
     return determine_bond_using_modified_AC2mol(
         prot,
         candidate_charges,
-        valid_charge_states,
+        valid_charge_states_dict,
         allow_charged_fragments=allow_charged_fragments,
     )
 
 
 def determine_bond_using_modified_AC2mol(
-    prot, candidate_charges, valid_charge_states, allow_charged_fragments=True
+    prot, candidate_charges, valid_charge_states_dict, allow_charged_fragments=True
 ):
     for charge in candidate_charges:
         rdkit_obj = generate_rdkit_mol_from_AC2mol(
@@ -362,13 +429,13 @@ def determine_bond_using_modified_AC2mol(
                 rdkit_obj, prot, charge, allow_charged_fragments=allow_charged_fragments
             )
             if charge_state.status:
-                valid_charge_states[charge].append(charge_state)
+                valid_charge_states_dict[charge].append(charge_state)
 
-    return valid_charge_states
+    return valid_charge_states_dict
 
 
 def determine_bond_using_rdDetermineBonds(
-    prot, candidate_charges, valid_charge_states, allow_charged_fragments=True
+    prot, candidate_charges, valid_charge_states_dict, allow_charged_fragments=True
 ):
     for charge in candidate_charges:
         try:
@@ -388,7 +455,7 @@ def determine_bond_using_rdDetermineBonds(
                     allow_charged_fragments=allow_charged_fragments,
                 )
                 if charge_state.status:
-                    valid_charge_states[charge].append(charge_state)
+                    valid_charge_states_dict[charge].append(charge_state)
         except ValueError as e:
             logger.error(
                 f"  ValueError occurred using rdDetermineBonds: {e} with {charge} charge for {prot.formula}"
@@ -402,7 +469,7 @@ def determine_bond_using_rdDetermineBonds(
                 )
             continue
 
-    return valid_charge_states
+    return valid_charge_states_dict
 
 
 def prepare_ChargeState_from_rdkit_obj(
@@ -434,16 +501,10 @@ def prepare_ChargeState_from_rdkit_obj(
     smiles = Chem.MolToSmiles(rdkit_obj)
     is_correct = check_rdkit_obj_connectivity(rdkit_obj, prot.natoms, charge)
 
-    # logger.debug(
-    #     "Generated ChargeState | SMILES: %s | Total Charge: %d | Correct: %s",
-    #     smiles,
-    #     total_charge,
-    #     is_correct,
-    # )
     charge_state = ChargeState.from_positional(
         status=is_correct,
-        uncorr_total_charge=total_charge,
-        uncorr_atom_charges=atom_charges,
+        protonated_total_charge=total_charge,
+        protonated_atom_charges=atom_charges,
         rdkit_obj=rdkit_obj,
         smiles=smiles,
         charge_tried=charge,
@@ -460,7 +521,7 @@ def get_best_resonance_state(charge_state: ChargeState) -> ChargeState:
     """
     prot = charge_state.protonation
     rdkit_obj = charge_state.rdkit_obj
-    charge_tried = charge_state.uncorr_total_charge
+    charge_tried = charge_state.protonated_total_charge
     assert prot.natoms is not None
     natoms = prot.natoms
     parent = cast("Specie", prot.parent)
@@ -534,7 +595,7 @@ def get_best_resonance_state(charge_state: ChargeState) -> ChargeState:
     )
 
 
-def get_metal_poscharges(metal: Metal) -> list[int]:
+def get_plausible_metal_os(metal: Metal) -> list[int]:
     """
     Retrieve common oxidation states for a given metal atom.
 
@@ -543,23 +604,23 @@ def get_metal_poscharges(metal: Metal) -> list[int]:
     Args:
         metal (Metal): Metal atom object.
     Returns:
-        poscharges (list): List of common oxidation states for the metal.
+        metal_os (list): List of common oxidation states for the metal.
     """
 
     mol = cast("Molecule", metal.get_parent("molecule"))
     if mol.is_haptic is None:
         mol.get_hapticity()
 
-    poscharges = METAL_OXIDATION_STATES[metal.label]
+    metal_os = METAL_OXIDATION_STATES[metal.label]
 
     # Allow 0 oxidation state for selected metals under specific conditions
     zero_os_metals = {"Fe", "Ni", "Ru"}
     if metal.label in zero_os_metals:
         has_CO = any(lig.formula == "C-O" for lig in mol.ligands or [])
-        if (has_CO or mol.is_haptic) and 0 not in poscharges:
-            poscharges.append(0)
+        if (has_CO or mol.is_haptic) and 0 not in metal_os:
+            metal_os.append(0)
 
-    return poscharges
+    return metal_os
 
 
 def identify_best_charge_states(charge_states: list[ChargeState]) -> list[ChargeState]:
@@ -580,7 +641,7 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
     # 2. Group candidates by their 'corrected total charge'
     grouped_by_charge = defaultdict(list)
     for state in initial_candidates:
-        grouped_by_charge[state.corr_total_charge].append(state)
+        grouped_by_charge[state.specie_total_charge].append(state)
 
     logger.debug("Found target charges: %s", list(grouped_by_charge.keys()))
 
@@ -644,9 +705,9 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
 
     # --- 1. Extract Metrics ---
     # Using lists to store metrics for all candidates
-    uncorr_abs_total = []
-    uncorr_abs_atcharge = []
-    uncorr_zwitt = []
+    specie_abs_totals = []
+    specie_abs_atcharges = []
+    specie_zwitt = []
     coincide = []
     aromatic_atoms = []
     aromatic_rings = []
@@ -672,9 +733,9 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
     coord_raw_atcharge = []
 
     for chs in valid_charge_states:
-        uncorr_abs_total.append(chs.uncorr_abstotal)
-        uncorr_abs_atcharge.append(chs.uncorr_abs_atcharge)
-        uncorr_zwitt.append(chs.uncorr_zwitt)
+        specie_abs_totals.append(chs.specie_abstotal)
+        specie_abs_atcharges.append(chs.specie_abs_atcharge)
+        specie_zwitt.append(chs.specie_zwitt)
         coincide.append(chs.coincide)
 
         # Aromatic calculations
@@ -691,19 +752,24 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
 
         # Coordinating atom charges
         coord_abs_atcharge.append(
-            sum([abs(chs.uncorr_atom_charges[i]) for i in coordinating_atoms_indices])
+            sum(
+                [
+                    abs(chs.protonated_atom_charges[i])
+                    for i in coordinating_atoms_indices
+                ]
+            )
         )
         coord_raw_atcharge.append(
-            [chs.uncorr_atom_charges[i] for i in coordinating_atoms_indices]
+            [chs.protonated_atom_charges[i] for i in coordinating_atoms_indices]
         )
 
     # --- 2. Determine Minima/Maxima ---
-    min_tot = np.min(uncorr_abs_total)
-    min_abs = np.min(uncorr_abs_atcharge)
+    min_tot = np.min(specie_abs_totals)
+    min_abs = np.min(specie_abs_atcharges)
     max_aromatic = np.max(aromatic_atoms)
 
-    indices_min_tot = {i for i, x in enumerate(uncorr_abs_total) if x == min_tot}
-    indices_min_abs = {i for i, x in enumerate(uncorr_abs_atcharge) if x == min_abs}
+    indices_min_tot = {i for i, x in enumerate(specie_abs_totals) if x == min_tot}
+    indices_min_abs = {i for i, x in enumerate(specie_abs_atcharges) if x == min_abs}
     indices_max_aromatic = [
         i for i, x in enumerate(aromatic_atoms) if x == max_aromatic
     ]
@@ -728,7 +794,7 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
         if (coordinating_atoms_indices == blocked_indices) and (
             "C" in coordinating_atoms_labels
         ):
-            if (uncorr_abs_atcharge[idx] == coord_abs_atcharge[idx]) and coincide[idx]:
+            if (specie_abs_atcharges[idx] == coord_abs_atcharge[idx]) and coincide[idx]:
                 if all(c < 0 for c in coord_raw_atcharge[idx]):
                     is_coord_valid = True
 
@@ -742,7 +808,7 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
             if (
                 ((idx in indices_min_abs) or (idx in indices_min_tot))
                 and coincide[idx]
-                and not uncorr_zwitt[idx]
+                and not specie_zwitt[idx]
             ):
                 tmplist.append(idx)
 
@@ -782,27 +848,24 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
             tmplist = new_tmplist
 
     elif len(indices_max_aromatic) > 1:
-        # If multiple candidates share max aromaticity
+        # Several candidates share max aromaticity: keep those and drop the
+        # rest, which is what the `== 1` branch above already does for the
+        # singleton case. This body used to copy tmplist and never modify it,
+        # so aromaticity was silently ignored here and selection fell through
+        # to "take the first" -- letting a non-aromatic tautomer beat an
+        # equally charged aromatic one.
         if len(tmplist) > 1:
-            new_tmplist = tmplist.copy()
-            for idx in range(nlists):
-                if idx in indices_max_aromatic and coincide[idx]:
-                    if idx in new_tmplist:
-                        if added_into_aromatic[idx]:
-                            # Exclude if H added to aromatic ring (breaking aromaticity)
-                            logger.debug(f"      Removing {idx} (H added to aromatic)")
-                            # Note: Original code commented out the remove, but logic implies filtering.
-                            # If you want to strictly follow original commented code, do nothing.
-                            # Assuming intent was to filter based on variable name logic:
-                            # if added_into_aromatic[idx]: new_tmplist.remove(idx)
-                            pass
-                    else:
-                        # Logic for adding new candidates if they are max aromatic
-                        logger.debug(
-                            f"      Considering adding {idx} (High aromaticity)"
-                        )
-
-            if new_tmplist:
-                tmplist = new_tmplist
+            preferred = [
+                idx for idx in tmplist if idx in indices_max_aromatic and coincide[idx]
+            ]
+            # Among equally aromatic candidates, prefer those that did NOT put
+            # an added proton on an aromatic atom -- that H saturates the ring
+            # atom it is counted for.
+            intact = [idx for idx in preferred if not added_into_aromatic[idx]]
+            if intact:
+                preferred = intact
+            if preferred and len(preferred) < len(tmplist):
+                logger.debug("      Aromaticity filter: %s -> %s", tmplist, preferred)
+                tmplist = preferred
 
     return tmplist
