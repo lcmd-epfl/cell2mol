@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from rdkit import Chem
-from cell2mol.classes.charge_state import ChargeState
 from cell2mol.charge.utils import MANUAL_CHARGE_ASSIGN_SPECIES
 from cell2mol.charge.charge_state_resolver import generate_manual_charge_state
 from cell2mol.charge.smiles_handler import generate_tmc_rdkit_obj_smiles
@@ -17,7 +16,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def prepare_mol(mol):
+def assemble_complex_charge_state(mol):
+    """Roll the per-specie charges of a metal complex up to the molecule level.
+
+    Gathers the already-assigned atomic charges from the complex's ligands and
+    metals, builds the whole metal complex rdkit_obj/SMILES via
+    ``generate_tmc_rdkit_obj_smiles``, and stores the molecule's total charge,
+    atomic charges, SMILES and rdkit_obj. Metal-complex only.
+    """
     tmp_atcharge = np.zeros((mol.natoms), dtype=int)
 
     for lig in mol.ligands:
@@ -70,17 +76,21 @@ def assign_charge_to_specie(specie: "Specie | Metal", final_charge: int):
     ):
         target = cast("Specie", specie)
         # Extract list of available charges
-        target_possible_cs = cast("list[ChargeState]", target.possible_cs or [])
-        available_charges = [cs.corr_total_charge for cs in target_possible_cs]
+        target_states = target.plausible_charge_states or []
+        available_charges = [cs.specie_total_charge for cs in target_states]
 
         try:
             idx = available_charges.index(final_charge)
-            cs = target_possible_cs[idx]
+            cs = target_states[idx]
 
-            # Update the species state
+            # Update the species state (specie_* = the deprotonated specie, as
+            # opposed to the protonated smiles/rdkit_obj)
             target.charge_state = cs
             target.set_charges(
-                cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj
+                cs.specie_total_charge,
+                cs.specie_atom_charges,
+                cs.specie_smiles,
+                cs.specie_rdkit_obj,
             )
 
             logger.debug(
@@ -132,7 +142,7 @@ def set_charge_state(reference, target, mode: int):
 
 # --- Mode 1: Reference Cell (Selection) ---
 def _apply_precalculated_state(target: "Specie", final_charge):
-    """Mode 1: Selects an existing charge state from target.possible_cs."""
+    """Mode 1: Selects an existing charge state from target.plausible_charge_states."""
 
     # 1. Determine the Charge State (cs) object
     cs = None
@@ -140,16 +150,16 @@ def _apply_precalculated_state(target: "Specie", final_charge):
     if target.formula in MANUAL_CHARGE_ASSIGN_SPECIES:
         cs = generate_manual_charge_state(target)
     else:
-        if target.possible_cs is None:
-            target.get_possible_cs()
+        if target.plausible_charge_states is None:
+            target.get_plausible_charge_states()
 
         # Extract charges to find the index matching final_charge
-        target_possible_cs = cast("list[ChargeState]", target.possible_cs or [])
-        charge_list = [c.corr_total_charge for c in target_possible_cs]
+        target_states = target.plausible_charge_states or []
+        charge_list = [c.specie_total_charge for c in target_states]
 
         try:
             idx = charge_list.index(final_charge)
-            cs = target_possible_cs[idx]
+            cs = target_states[idx]
         except ValueError:
             logger.error(
                 "Charge Mismatch: Target %s needs charge %d, but options are %s",
@@ -164,16 +174,19 @@ def _apply_precalculated_state(target: "Specie", final_charge):
     target.charge_state = cs
 
     # Validation
-    if final_charge != cs.corr_total_charge:
+    if final_charge != cs.specie_total_charge:
         logger.warning(
             "Target %s: Requested charge %d != Selected state charge %d",
             target.formula,
             final_charge,
-            cs.corr_total_charge,
+            cs.specie_total_charge,
         )
 
     target.set_charges(
-        cs.corr_total_charge, cs.corr_atom_charges, cs.smiles, cs.rdkit_obj
+        cs.specie_total_charge,
+        cs.specie_atom_charges,
+        cs.specie_smiles,
+        cs.specie_rdkit_obj,
     )
     logger.debug(
         "Mode 1 Applied: %s (Q=%d) %s", target.formula, target.totcharge, target.smiles
@@ -230,32 +243,11 @@ def _transfer_state_to_unit_cell(reference, target, final_charge):
 
 
 def _reorder_rdkit_atoms(ref_mol, ref_labels, target_labels):
-    # 1. Create label → atom index map from ref_data
+    # Reorder atoms so position i holds the ref atom whose label == target_labels[i].
+    # Use RenumberAtoms (not a manual rebuild) so ALL atom properties are kept --
+    # formal charge, NoImplicit / explicit-H, aromaticity, chirality. A manual
+    # rebuild that copies only atomic number + charge drops NoImplicit, letting
+    # RDKit add implicit H to fill open valences (e.g. [Al-] -> [AlH2-]).
     label_to_index = {label: idx for idx, label in enumerate(ref_labels)}
-
-    # 2. Create old index → new index map
-    old_to_new = {label_to_index[label]: i for i, label in enumerate(target_labels)}
-    new_to_old = {v: k for k, v in old_to_new.items()}
-
-    # 3. Create editable mol
-    new_mol = Chem.RWMol()
-
-    # 4. Add atoms in new order
-    for new_idx in range(len(target_labels)):
-        old_idx = new_to_old[new_idx]
-        atom = ref_mol.GetAtomWithIdx(old_idx)
-        new_atom = Chem.Atom(atom.GetAtomicNum())
-        new_atom.SetFormalCharge(atom.GetFormalCharge())
-        new_mol.AddAtom(new_atom)
-
-    # 5. Add bonds based on original molecule
-    for bond in ref_mol.GetBonds():
-        begin_old = bond.GetBeginAtomIdx()
-        end_old = bond.GetEndAtomIdx()
-        bond_type = bond.GetBondType()
-        # remap to new indices
-        begin_new = old_to_new[begin_old]
-        end_new = old_to_new[end_old]
-        new_mol.AddBond(begin_new, end_new, bond_type)
-
-    return new_mol.GetMol()
+    new_order = [label_to_index[label] for label in target_labels]
+    return Chem.RenumberAtoms(ref_mol, new_order)

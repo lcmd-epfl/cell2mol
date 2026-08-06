@@ -9,7 +9,7 @@ from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
 from cell2mol.classes.molecule import Molecule
-from cell2mol.charge.specie_assigner import prepare_mol
+from cell2mol.charge.specie_assigner import assemble_complex_charge_state
 from cell2mol.elementdata import ElementData
 from cell2mol.utils import BaseModel, config
 from cell2mol.my_types import NDArray, Type, SubType, Format
@@ -40,7 +40,7 @@ ERROR_MAPS = {
             ("missing_H_on_CoordDonor", 3),
             ("missing_H_in_Carbon", 4),
         ],
-        "possible_charges": [("error_get_poscharges", 5)],
+        "plausible_charges": [("error_plausible_charges", 5)],
         "charge_assignment": _CHARGE_ERRORS,
         "spin_assignment": _SPIN_ERRORS,
         "general": [("general_error", config.ERR_GENERAL)],
@@ -161,7 +161,7 @@ class Cell(BaseModel):
             #  Prepare Complex Molecules (if bonding succeeded)
             if not mol.is_non_complex_molecule and not mol.error_create_bonds:
                 try:
-                    prepare_mol(mol)
+                    assemble_complex_charge_state(mol)
                 except Exception as e:
                     # We flag the error state here as well
                     mol.error_create_bonds = True
