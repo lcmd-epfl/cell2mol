@@ -367,10 +367,6 @@ def get_pair_cutoff(
     - Cu/Hg bonded to N/O/S/halogens: use 0.75 Å
     - Zn/Ag/Cd bonded to N/O/S/halogens: use 0.65 Å
     - otherwise: use default_cutoff, usually 0.45 Å
-
-    Note:
-    Cd was included in both requested rules. Here, the 0.75 Å rule has
-    priority for Cd.
     """
 
     pair = {label_i, label_j}
