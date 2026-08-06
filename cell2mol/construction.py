@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+from typing import Any, cast
 from ase import Atoms
 from cell2mol.classes import Molecule
 from cell2mol.compare import compare_reference_indices
@@ -56,6 +57,19 @@ def construct_unitcell(refcell, unitcell, sym_ops):
             reconstructed_molecules,
             remaining_fragments_by_reference,
         )
+
+        # Every unit-cell atom is matched -- remaining symmetry operations can
+        # only re-match already-found atoms (the matcher skips those), so they
+        # add nothing. Stop early. This also skips ASE's duplicate P-1 ops.
+        if len(found_atom_indices) == len(unitcell.coord):
+            logger.debug(
+                "All %d atoms matched after %d symmetry operation(s); "
+                "skipping the remaining %d.",
+                len(unitcell.coord),
+                idx + 1,
+                len(sym_atoms_list) - (idx + 1),
+            )
+            break
 
     all_molecules = direct_molecules + reconstructed_molecules
     # --- early validation ---
@@ -116,6 +130,7 @@ def apply_symmetry_operations(refcell, sym_ops, normalize: bool = True):
     fractional_coords = np.array(refcell.frac_coord)
     cell_vector = refcell.cell_vector
 
+    numbers: list[int] = []
     if "D" in ref_labels:
         logger.debug("Deuterium is in the reference")
         # Atoms object cannot handle Deuterium in the symbols
@@ -519,9 +534,9 @@ def generate_unitcell_molecules(
             atom_site_labels=mol_atom_site_labels,
             use_bond_info=use_bond_info,
         )
-        for atom, idx in zip(newmolec.atoms, mol.cell_indices):
+        for atom, idx in zip(newmolec.atoms or [], mol.cell_indices):
             atom.add_parent(unitcell, index=idx)
-        for atom, idx in zip(newmolec.atoms, mol.ref_indices):
+        for atom, idx in zip(newmolec.atoms or [], mol.ref_indices):
             atom.add_parent(refcell, index=idx)
         if newmolec.iscomplex or newmolec.has_ia_iia:
             logger.debug("Is complex: %s", newmolec.formula)
@@ -536,6 +551,7 @@ def generate_unitcell_molecules(
 
     for mol in unitcell.moleclist:
         mol.analyze_coordination()
+        mol.detect_special_moieties()
 
     return unitcell
 
@@ -667,7 +683,7 @@ def _generate_blocklist_in_updated(
         updated_coord = extract_from_list(
             indices_in_updated, unitcell.coord, dimension=1
         )
-        blocklist = split_species(updated_labels, updated_coord)
+        blocklist = split_species(updated_labels, np.asarray(updated_coord))
         return blocklist
 
     # Generate blocklist based on distance or CIF bond information
@@ -692,14 +708,14 @@ def _generate_blocklist_in_updated(
 
         blocks = split_species(
             labels=moiety_labels,
-            positions=moiety_coord,
+            positions=np.asarray(moiety_coord),
             indices=cell_indices,
             atom_site_labels=moiety_atom_site_labels,
             bond_data=bond_data,
             use_bond_info=use_bond_info,
         )
 
-        tmp_blocklist.extend(blocks)
+        tmp_blocklist.extend(cast("list[Any]", blocks))
 
     value_to_index = {val: idx for idx, val in enumerate(indices_in_updated)}
     blocklist = [
@@ -834,8 +850,8 @@ def _merge_fragments_iterative(
 
 
 def _merge_fragment_pair(
-    frag_pair: tuple,
-    refcell: object,
+    frag_pair: "tuple[Any, Any]",
+    refcell: Any,
     use_bond_info: bool | None = None,
     full: bool = False,
 ):
@@ -896,7 +912,7 @@ def _merge_fragment_pair(
         # --- fast reject: must form exactly one species ---
         numspecs = split_species(
             labels=merged_labels,
-            positions=merged_coord,
+            positions=np.asarray(merged_coord),
             atom_site_labels=merged_atom_site_labels,
             bond_data=bond_data,
             use_bond_info=use_bond_info,
@@ -907,14 +923,17 @@ def _merge_fragment_pair(
         if numspecs != 1:
             continue
 
-        blocklist = split_species(
-            labels=merged_labels,
-            positions=merged_coord,
-            atom_site_labels=merged_atom_site_labels,
-            bond_data=bond_data,
-            use_bond_info=use_bond_info,
-            cov_factor=cov_factor,
-            metal_factor=metal_factor,
+        blocklist = cast(
+            "list[Any]",
+            split_species(
+                labels=merged_labels,
+                positions=np.asarray(merged_coord),
+                atom_site_labels=merged_atom_site_labels,
+                bond_data=bond_data,
+                use_bond_info=use_bond_info,
+                cov_factor=cov_factor,
+                metal_factor=metal_factor,
+            ),
         )
 
         if not blocklist or len(blocklist) != 1:
