@@ -212,7 +212,7 @@ def get_reference_error_message(error_case):
         return "Missing hydrogens in carbon atoms"
 
     elif error_case == 5:
-        return "Some unique species have no possible charge states"
+        return "Some unique species have no plausible charge states"
 
     elif error_case == 8:
         return "Error in assigning charges"
@@ -309,7 +309,7 @@ def get_unitcell_error_message(error_case):
         return "Error in unit cell construction"
 
     # elif error_case == 5:
-    #     return "Some unique species have no possible charge states"
+    #     return "Some unique species have no plausible charge states"
 
     elif error_case == 6:
         return "Multiple valid charge distributions detected"
@@ -350,7 +350,7 @@ def get_molecule_error_message(error_case):
         return "No errors found"
 
     elif error_case == 5:
-        return "Some unique species have no possible charge states"
+        return "Some unique species have no plausible charge states"
 
     elif error_case == 6:
         return "Multiple valid charge distributions detected"
@@ -445,8 +445,8 @@ def write_molecule_info(mol, file=None, index=None):
             # Oxidation state
             if met.charge is not None:
                 met_info += f" metal_OS={met.charge}"
-            elif getattr(met, "possible_cs", None) is not None:
-                met_info += f" metal_possible_OS={met.possible_cs}"
+            elif getattr(met, "plausible_os", None) is not None:
+                met_info += f" metal_plausible_OS={met.plausible_os}"
 
             if getattr(met, "spin", None) is not None:
                 met_info += f" metal_spin={met.spin}"
@@ -507,11 +507,11 @@ def write_molecule_info(mol, file=None, index=None):
                 if val is not None:
                     lig_info += f" {attr}={val}"
             if (
-                getattr(lig, "possible_cs", None) is not None
+                getattr(lig, "plausible_charge_states", None) is not None
                 and getattr(lig, "totcharge", None) is None
             ):
-                status = "Exists" if lig.possible_cs else "Does not exist"
-                lig_info += f" lig.possible_cs {status}"
+                status = "Exists" if lig.plausible_charge_states else "Does not exist"
+                lig_info += f" lig.plausible_charge_states {status}"
 
             print(lig_info, file=file)
 
@@ -587,9 +587,9 @@ def write_unique_species(object, file):
         print("\t" + " ".join(parts), file=file)
 
 
-def write_possible_charges(object, file=None):
+def write_plausible_charges(object, file=None):
     """
-    Write the possible charges for each species in the object.
+    Write the plausible charges for each species in the object.
 
     Args:
         object: Object containing species_list.
@@ -606,74 +606,24 @@ def write_possible_charges(object, file=None):
                 info += f" coord_sphere_formula={getattr(specie, 'coord_sphere_formula', 'N/A')}"
 
             # Add charge state information
-            if getattr(specie, "possible_cs", None) is not None:
+            if specie.subtype == "metal":
+                plausible = getattr(specie, "plausible_os", None)
+            else:
+                plausible = getattr(specie, "plausible_charge_states", None)
+
+            if plausible is not None:
                 if specie.subtype == "metal":
-                    info += f" possible_cs={specie.possible_cs}"
+                    info += f" plausible_os={plausible}"
                 else:
                     # Non-metals use a new line for charge states as per original logic
-                    info += f"\n\tpossible_cs={specie.possible_cs}"
+                    info += f"\n\tplausible_charge_states={plausible}"
             else:
-                info += " NO POSSIBLE CHARGE STATES FOUND"
+                info += " NO PLAUSIBLE CHARGE STATES FOUND"
 
             print(info, file=file)
     else:
         print("\nNo species list found in the cell object.", file=file)
     print("", file=file)
-
-
-def write_possible_and_selected_cs(newcell, refcell, file=None):
-    """
-    Write possible charge states and selected charge state for unique species.
-
-    Args:
-        newcell: Unit cell object.
-        refcell: Reference cell object.
-        file: File-like object. Defaults to None.
-    """
-
-    print(
-        "\nPossible charge states and charge of selected charge state for unique species:",
-        file=file,
-    )
-
-    # Check unique species and their selected charge states
-    for idx, (specie, select) in enumerate(
-        zip(refcell.unique_species, refcell.selected_cs)
-    ):
-        print(
-            f"Unique unique_index={specie.unique_index} formula={specie.formula}",
-            file=file,
-        )
-        print(
-            f"charge of selected charge state={select}\npossible_cs={specie.possible_cs}\n",
-            file=file,
-        )
-
-    # Reference cell species vs unique index mapping
-    print("Species list in the reference and their unique indices:", file=file)
-    for specie, idx in zip(refcell.species_list, refcell.unique_indices):
-        print(
-            f"\tformula={specie.formula} unique_index={specie.unique_index}", file=file
-        )
-        if idx != specie.unique_index:
-            print(
-                f"\tWARNING: formula={specie.formula} unique_index={specie.unique_index} "
-                f"differs from refcell unique indices {idx=}",
-                file=file,
-            )
-
-    # Unit cell species vs unique index mapping
-    print("Species list in the unit cell and their unique indices:", file=file)
-    for specie, idx in zip(newcell.species_list, newcell.unique_indices):
-        print(
-            f"\tformula={specie.formula} unique_index={specie.unique_index}", file=file
-        )
-        if idx != specie.unique_index:
-            print(
-                f"\tWARNING: formula={specie.formula} unique_index={specie.unique_index} "
-                f"differs from newcell unique indices {idx=}",
-                file=file,
-            )
 
 
 def log_charge_state_details(newcell, refcell) -> None:
@@ -685,15 +635,15 @@ def log_charge_state_details(newcell, refcell) -> None:
     logger.debug("#### Charge State & Index Validation ####")
 
     # --- 1. Log Charge Options for Unique Species ---
-    if hasattr(refcell, "selected_cs") and refcell.selected_cs:
-        for specie, options in zip(refcell.unique_species, refcell.selected_cs):
+    if hasattr(refcell, "plausible_charges") and refcell.plausible_charges:
+        for specie, options in zip(refcell.unique_species, refcell.plausible_charges):
             logger.debug(
                 "Unique Specie %s (Formula: %s):", specie.unique_index, specie.formula
             )
-            logger.debug("  > Possible Charge Options: %s", options)
-            # logger.debug("  > Full Possible States:     %s", specie.possible_cs)
+            logger.debug("  > Plausible Charge Options: %s", options)
+            # logger.debug("  > Full Plausible States:    %s", plausible)
     else:
-        logger.warning("RefCell has no 'selected_cs' populated to display.")
+        logger.warning("RefCell has no 'plausible_charges' populated to display.")
 
     # --- 2. Validate Indices in Reference and Unit Cells ---
     _validate_species_indices(refcell, "Reference Cell")
