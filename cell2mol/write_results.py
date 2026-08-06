@@ -230,6 +230,19 @@ def get_reference_error_message(error_case):
         return f"Unhandled error case: {error_case}"
 
 
+def get_reference_error_message_all(codes, fallback_code=0):
+    """Join the messages for every error code a mode triggered.
+
+    error_cases stores only the first match, so a structure missing hydrogens on
+    both a coordinated donor and a carbon would report code 3 and hide code 4.
+    `codes` is that mode's entry in error_cases_all; falls back to the stored
+    single code when it is absent (e.g. a cell serialized before the field).
+    """
+    if not codes:
+        return get_reference_error_message(fallback_code)
+    return "; ".join(get_reference_error_message(code) for code in codes)
+
+
 def get_reference_warning_messages(refcell):
     """
     Returns a list of messages based on potential_warnings.
@@ -587,6 +600,36 @@ def write_unique_species(object, file):
         print("\t" + " ".join(parts), file=file)
 
 
+def _no_charge_state_reason(specie) -> str:
+    """Why a specie has no plausible charge states.
+
+    Reports SKIPPED (with the diagnosable cause) when enumeration was never
+    attempted, and NO PLAUSIBLE CHARGE STATES FOUND only when it ran and came up
+    empty -- so a structure that failed purely on charge perception can be told
+    apart from one whose CIF is short of hydrogens.
+    """
+    if getattr(specie, "has_missing_H", False):
+        kinds = [
+            name
+            for flag, name in (
+                ("missing_H_in_Carbon", "carbon"),
+                ("missing_H_on_CoordDonor", "coordinated donor"),
+                ("missing_H_in_Water", "water"),
+            )
+            if getattr(specie, flag, False)
+        ]
+        detail = ", ".join(kinds) if kinds else "unspecified site"
+        if detail == "coordinated donor":
+            detail += f" {specie.formula}"
+        return f"SKIPPED: missing hydrogens on {detail}"
+
+    warning = getattr(specie, "protonation_warning", None)
+    if warning:
+        return f"SKIPPED: protonation not auto-handled ({warning})"
+
+    return "NO PLAUSIBLE CHARGE STATES FOUND"
+
+
 def write_plausible_charges(object, file=None):
     """
     Write the plausible charges for each species in the object.
@@ -618,7 +661,7 @@ def write_plausible_charges(object, file=None):
                     # Non-metals use a new line for charge states as per original logic
                     info += f"\n\tplausible_charge_states={plausible}"
             else:
-                info += " NO PLAUSIBLE CHARGE STATES FOUND"
+                info += f" {_no_charge_state_reason(specie)}"
 
             print(info, file=file)
     else:

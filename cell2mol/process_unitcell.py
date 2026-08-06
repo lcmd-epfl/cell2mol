@@ -15,6 +15,7 @@ from cell2mol.write_results import (
     write_unique_species,
     write_plausible_charges,
     get_reference_error_message,
+    get_reference_error_message_all,
     get_unitcell_error_message,
     exit_with_error_exception,
     get_reference_warning_messages,
@@ -316,8 +317,9 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
 
         # Print step-specific reference errors
         if refcell.error_cases:
+            all_codes = refcell.error_cases_all or {}
             for err_mode, code in refcell.error_cases.items():
-                msg = get_reference_error_message(code)
+                msg = get_reference_error_message_all(all_codes.get(err_mode), code)
                 print(f"Reference Error (mode={err_mode}): {msg}", file=f)
 
 
