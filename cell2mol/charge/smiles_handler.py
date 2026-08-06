@@ -1,154 +1,17 @@
 from __future__ import annotations
 
-from typing import Tuple, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from rdkit import Chem
-from cell2mol.element_utils import (
-    get_metal_idxs,
-    get_alkali_alkaline_earth_metal_idxs,
-    get_post_transition_metal_idxs,
-)
 from cell2mol.elementdata import ElementData
 from cell2mol.my_types import RDKitObject
 import logging
 
 if TYPE_CHECKING:
-    from cell2mol.classes.ligand import Ligand
     from cell2mol.classes.molecule import Molecule
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
-
-
-def correct_smiles_ligand(ligand: "Ligand") -> Tuple[bool, bool]:
-    """
-    Constructs an RDKit molecule from cell2mol ligand object.
-    This function synchronizes the cell2mol ligand object with RDKit,
-    handling bond orders, hybridization, and zwitterionic corrections.
-    """
-
-    rwlig = Chem.RWMol()
-
-    # --- atoms ---
-    for atom in ligand.atoms or []:
-        rd_atom = Chem.Atom(atom.atnum)
-        rd_atom.SetFormalCharge(int(atom.charge or 0))
-        rd_atom.SetNoImplicit(True)
-        rwlig.AddAtom(rd_atom)
-
-    # --- metal context ---
-    molecule_parent = cast("Molecule", ligand.get_parent("molecule"))
-    labels = molecule_parent.labels
-    metal_idxs = get_metal_idxs(labels)
-    alkali_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
-
-    def skip_bond(bond) -> bool:
-        blabels = [bond.atom1.label, bond.atom2.label]
-
-        if any(elemdatabase.elementblock[l] in {"d", "f"} for l in blabels):
-            return True
-        if get_alkali_alkaline_earth_metal_idxs(blabels):
-            return True
-        if (
-            not metal_idxs
-            and not alkali_idxs
-            and get_post_transition_metal_idxs(blabels)
-        ):
-            return True
-        return False
-
-    btype_map = {
-        1.0: Chem.BondType.SINGLE,
-        2.0: Chem.BondType.DOUBLE,
-        3.0: Chem.BondType.TRIPLE,
-        1.5: Chem.BondType.AROMATIC,
-    }
-
-    hyb_map = {
-        1: Chem.HybridizationType.S,
-        2: Chem.HybridizationType.SP,
-        3: Chem.HybridizationType.SP2,
-        4: Chem.HybridizationType.SP3,
-    }
-
-    # --- bonds & hybridization ---
-    for jdx, atom in enumerate(ligand.atoms or []):
-        if atom.bonds is None:
-            logger.error("Ligand atom %s has no bond information.", atom.label)
-            raise ValueError("Ligand atom bonds are not set")
-
-        nbonds = 0
-
-        for b in atom.bonds:
-            if skip_bond(b):
-                continue
-
-            begin_idx = b.atom1.get_parent_index("ligand")
-            end_idx = b.atom2.get_parent_index("ligand")
-            assert begin_idx is not None
-            assert end_idx is not None
-            nbonds += 1
-
-            btype = btype_map.get(b.order, Chem.BondType.SINGLE)
-
-            if b.order == 1.5:
-                rwlig.GetAtomWithIdx(begin_idx).SetIsAromatic(True)
-                rwlig.GetAtomWithIdx(end_idx).SetIsAromatic(True)
-
-            if begin_idx == jdx and end_idx > jdx:
-                rwlig.AddBond(begin_idx, end_idx, btype)
-
-        rwlig.GetAtomWithIdx(jdx).SetHybridization(
-            hyb_map.get(nbonds, Chem.HybridizationType.UNSPECIFIED)
-        )
-
-    # --- zwitterion correction ---
-    temp_obj = rwlig.GetMol()
-    # logger.debug(
-    #     "Ligand structure before zwitterion fix: %s", Chem.MolToSmiles(temp_obj)
-    # )
-
-    obj, fixed = fix_zwitterions(temp_obj)
-
-    if fixed:
-        logger.debug("Zwitterions fixed. Updated SMILES: %s", Chem.MolToSmiles(obj))
-
-    try:
-        Chem.SanitizeMol(
-            obj,
-            sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL
-            ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES,
-            catchErrors=True,
-        )
-
-        Chem.DetectBondStereochemistry(obj, -1)
-        Chem.AssignStereochemistry(obj, flagPossibleStereoCenters=True, force=True)
-        Chem.AssignAtomChiralTagsFromStructure(obj, -1)
-
-        final_smiles = Chem.MolToSmiles(obj)
-
-        if ligand.smiles == final_smiles:
-            logger.debug(
-                "Ligand %s SMILES unchanged: %s", ligand.formula, ligand.smiles
-            )
-        else:
-            logger.debug("Ligand %s", ligand.formula)
-            logger.debug("  Original SMILES: %s", ligand.smiles)
-            logger.debug("  Corrected SMILES: %s", final_smiles)
-
-        ligand.smiles = final_smiles
-        ligand.rdkit_obj = obj
-
-        if fixed:
-            ligand.set_charges(
-                atomic_charges=[a.GetFormalCharge() for a in obj.GetAtoms()]
-            )
-
-        return True, fixed
-
-    except Exception as e:
-        logger.error("RDKit processing failed for ligand %s: %s", ligand.formula, e)
-        return False, False
 
 
 def fix_zwitterions(mol):
@@ -285,6 +148,33 @@ def fix_zwitterions(mol):
     return rw_mol.GetMol(), fixed
 
 
+def finalize_specie_mol(mol):
+    """Zwitterion-fix, sanitize and canonicalize a specie RDKit mol.
+
+    Used by `ChargeState._build_specie_mol` to finalize the deprotonated specie
+    mol. Any 3D conformer is dropped so the structure-based stereo perception
+    below is a no-op and the SMILES is conformer-independent.
+
+    Returns:
+        tuple: (Chem.Mol, canonical SMILES, bool whether a zwitterion was fixed).
+    """
+    obj, fixed = fix_zwitterions(mol)
+    obj.RemoveAllConformers()
+    # Strip any chiral tags inherited from the 3D-perceived rdkit_obj so the
+    # SMILES is stereo-free and conformer-independent.
+    Chem.RemoveStereochemistry(obj)
+    Chem.SanitizeMol(
+        obj,
+        sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL
+        ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES,
+        catchErrors=True,
+    )
+    Chem.DetectBondStereochemistry(obj, -1)
+    Chem.AssignStereochemistry(obj, flagPossibleStereoCenters=True, force=True)
+    Chem.AssignAtomChiralTagsFromStructure(obj, -1)
+    return obj, Chem.MolToSmiles(obj), fixed
+
+
 def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
     metals = mol.metals or []
     all_metals_indices = [met.get_parent_index("molecule") for met in metals]
@@ -414,199 +304,56 @@ def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
 
 
 def create_bonds_specie(specie, rdkit_obj: RDKitObject | None = None):
+    """Build cell2mol Bond objects on ``specie.atoms`` from an RDKit mol.
+
+    The mol is the specie's own (deprotonated) ``rdkit_obj`` -- SMILES and
+    zwitterion corrections are already baked into it upstream (ChargeState) --
+    so it has exactly ``specie.natoms`` atoms in the same order. One cell2mol
+    Bond is created per RDKit bond; nothing else is computed here.
+    """
     from cell2mol.classes import Bond
 
-    # logger.debug(
-    #     "CREATE_bonds_specie: %s %s %s", specie.formula, specie.subtype, specie.smiles
-    # )
-    n_atoms = specie.natoms  # e.g. 9
     if rdkit_obj is None:
         rdkit_obj = specie.rdkit_obj
     assert rdkit_obj is not None
 
-    n_atoms_rdkit = rdkit_obj.GetNumAtoms()  # e.g.10
-
-    if n_atoms == n_atoms_rdkit:
-        logger.debug(
-            "Number of atoms in %s object and RDKit object are equal: %d %d",
+    n_atoms = specie.natoms
+    n_atoms_rdkit = rdkit_obj.GetNumAtoms()
+    if n_atoms != n_atoms_rdkit:
+        logger.error(
+            "create_bonds_specie: %s atom-count mismatch (specie %d vs rdkit %d); "
+            "expected the deprotonated specie rdkit_obj",
             specie.subtype,
             n_atoms,
             n_atoms_rdkit,
         )
+        return False
 
-        # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8
-        for idx, rdkit_atom in enumerate(rdkit_obj.GetAtoms()):
-            # logger.debug(
-            #     "%d %s Number of bonds : %d",
-            #     idx,
-            #     rdkit_atom.GetSymbol(),
-            #     len(rdkit_atom.GetBonds()),
-            # )
-            if len(rdkit_atom.GetBonds()) == 0:
-                logger.debug(
-                    "NO BONDS CREATED for %s due to no bonds in %s RDKit object",
-                    specie.atoms[idx].label,
-                    specie.subtype,
+    for idx, rdkit_atom in enumerate(rdkit_obj.GetAtoms()):
+        for b in rdkit_atom.GetBonds():
+            a1 = b.GetBeginAtomIdx()
+            a2 = b.GetEndAtomIdx()
+            end_label = specie.atoms[a2].label
+            end_symbol = rdkit_obj.GetAtomWithIdx(a2).GetSymbol()
+            # Skip if the end-atom element disagrees (allow D<->H for deuterium).
+            if end_label != end_symbol and not (end_label == "D" and end_symbol == "H"):
+                logger.debug("Bond end-atom mismatch %s vs %s", end_label, end_symbol)
+                continue
+            start, end = (a2, a1) if a2 == idx else (a1, a2)
+            specie.atoms[idx].add_bond(
+                Bond.from_positional(
+                    specie.atoms[start], specie.atoms[end], b.GetBondTypeAsDouble()
                 )
-            else:
-                for b in rdkit_atom.GetBonds():
-                    bond_startatom = b.GetBeginAtomIdx()
-                    bond_endatom = b.GetEndAtomIdx()
-                    bond_order = b.GetBondTypeAsDouble()
-                    if (
-                        specie.atoms[bond_endatom].label == "D"
-                        and rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol() == "H"
-                    ):
-                        if bond_endatom == idx:
-                            start = bond_endatom
-                            end = bond_startatom
-                        else:
-                            start = bond_startatom
-                            end = bond_endatom
-                        # create new bond object
-                        # logger.debug(
-                        #     "BOND CREATED %d %d %d %f %s %s",
-                        #     idx,
-                        #     start,
-                        #     end,
-                        #     bond_order,
-                        #     specie.atoms[start].label,
-                        #     specie.atoms[end].label,
-                        # )
-                        new_bond = Bond.from_positional(
-                            specie.atoms[start], specie.atoms[end], bond_order
-                        )
-                        specie.atoms[idx].add_bond(new_bond)
+            )
 
-                    elif (
-                        specie.atoms[bond_endatom].label
-                        != rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol()
-                    ):
-                        logger.debug(
-                            "Error with Bond EndAtom %s %s",
-                            specie.atoms[bond_endatom].label,
-                            rdkit_obj.GetAtomWithIdx(bond_endatom).GetSymbol(),
-                        )
-                    else:
-                        if bond_endatom == idx:
-                            start = bond_endatom
-                            end = bond_startatom
-                        else:
-                            start = bond_startatom
-                            end = bond_endatom
-
-                        # create new bond object
-                        # logger.debug(
-                        #     "BOND CREATED %d %d %d %f %s %s",
-                        #     idx,
-                        #     start,
-                        #     end,
-                        #     bond_order,
-                        #     specie.atoms[start].label,
-                        #     specie.atoms[end].label,
-                        # )
-                        new_bond = Bond.from_positional(
-                            specie.atoms[start], specie.atoms[end], bond_order
-                        )
-                        specie.atoms[idx].add_bond(new_bond)
-
-                if specie.atoms[idx].bonds is not None:
-                    pass
-                else:
-                    if specie.natoms == 1:
-                        pass
-                    else:
-                        logger.error(
-                            "NO BONDS for %s with %s RDKit object index %d. Please check the RDKit object.",
-                            specie.atoms[idx].label,
-                            specie.subtype,
-                            idx,
-                        )
-                        return False  # return False if no bonds are created
-    else:
-        logger.debug(
-            "Number of atoms in %s object and RDKit object are different: %d %d",
-            specie.subtype,
-            n_atoms,
-            n_atoms_rdkit,
-        )
-        non_bonded_atoms = list(range(0, n_atoms_rdkit))[n_atoms:]
-        logger.debug("NON_BONDED_ATOMS %s", non_bonded_atoms)
-
-        # e.g. idx 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-        for idx, rdkit_atom in enumerate(rdkit_obj.GetAtoms()):
-            # logger.debug(
-            #     "\t%d %s Number of bonds : %d",
-            #     idx,
-            #     rdkit_atom.GetSymbol(),
-            #     len(rdkit_atom.GetBonds()),
-            # )
-            if len(rdkit_atom.GetBonds()) == 0:
-                logger.debug(
-                    "NO BONDS CREATED for %s due to no bonds in %s RDKit object",
-                    rdkit_atom.GetSymbol(),
-                    specie.subtype,
-                )
-            else:
-                for b in rdkit_atom.GetBonds():
-                    bond_startatom = b.GetBeginAtomIdx()
-                    bond_endatom = b.GetEndAtomIdx()
-                    bond_order = b.GetBondTypeAsDouble()
-
-                    if (
-                        bond_startatom in non_bonded_atoms
-                        or bond_endatom in non_bonded_atoms
-                    ):
-                        logger.debug(
-                            "NO BOND CREATED %d or %d is not in the specie.atoms. It belongs to %s.",
-                            bond_startatom,
-                            bond_endatom,
-                            non_bonded_atoms,
-                        )
-                    else:
-                        if bond_endatom == idx:
-                            start = bond_endatom
-                            end = bond_startatom
-                        else:
-                            start = bond_startatom
-                            end = bond_endatom
-
-                        # create new bond object
-                        # logger.debug(
-                        #     "BOND CREATED %d %d %d %f %s %s",
-                        #     idx,
-                        #     start,
-                        #     end,
-                        #     bond_order,
-                        #     specie.atoms[start].label,
-                        #     specie.atoms[end].label,
-                        # )
-                        new_bond = Bond.from_positional(
-                            specie.atoms[start], specie.atoms[end], bond_order
-                        )
-                        specie.atoms[idx].add_bond(new_bond)
-
-                if idx not in non_bonded_atoms:
-                    if specie.atoms[idx].bonds is not None:
-                        pass
-                    else:
-                        if specie.natoms == 1:
-                            pass
-                        else:
-                            logger.error(
-                                "NO BONDS for %s with %s RDKit object index %d. Please check the RDKit object.",
-                                specie.atoms[idx].label,
-                                specie.subtype,
-                                idx,
-                            )
-                            return False  # return False if no bonds are created
-                else:
-                    logger.debug(
-                        "NO BONDS for %s with %s RDKit object index %d because it is an added atom",
-                        rdkit_atom.GetSymbol(),
-                        specie.subtype,
-                        idx,
-                    )
+        if not specie.atoms[idx].bonds and specie.natoms != 1:
+            logger.error(
+                "NO BONDS for %s with %s RDKit object index %d.",
+                specie.atoms[idx].label,
+                specie.subtype,
+                idx,
+            )
+            return False
 
     return True
 
