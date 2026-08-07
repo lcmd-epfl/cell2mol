@@ -526,6 +526,7 @@ def generate_rdkit_mol_from_AC2mol(
     charge=0,
     allow_charged_fragments=True,
     embed_chiral=True,
+    diagnostics=None,
 ):
     """
     Build an RDKit Mol object from atomic numbers, coordinates, and
@@ -549,6 +550,9 @@ def generate_rdkit_mol_from_AC2mol(
         Whether to allow charged fragments.
     embed_chiral : bool
         Whether to embed chiral information.
+    diagnostics : dict, optional
+        Filled in with why bond assignment gave up, when it gives up for a
+        reason worth telling the user about.
 
     Returns
     -------
@@ -560,6 +564,7 @@ def generate_rdkit_mol_from_AC2mol(
         atoms=atoms,
         charge=charge,
         allow_charged_fragments=allow_charged_fragments,
+        diagnostics=diagnostics,
     )
 
     # Early Exit if no candidates found

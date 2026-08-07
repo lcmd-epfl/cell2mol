@@ -44,7 +44,7 @@ global atomic_valence_electrons
 
 atomic_valence_electrons = dict(zip(elemdatabase.elementsym, valence_electrons))
 
-valence_combinations_limit = 1_000_000
+valence_combinations_limit = 1_000_000_000
 num_try_limit = 50
 
 
@@ -623,7 +623,7 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
             f"Search space too large ({total_expected_combinations:,}). "
             "Terminating valence generation to prevent hang."
         )
-        # return None  # Explicitly return None instead of the generator
+        return None  # Explicitly return None instead of the generator
 
     # 5. Restore Map Calculation
     # Maps the reordered indices back to the original atom sequence in the CIF
@@ -669,7 +669,13 @@ def score_BO(BO, atoms, atomic_valence_electrons, allow_charged_fragments=True):
 
 
 def AC2BO(
-    AC, atoms, charge, allow_charged_fragments=True, use_graph=True, allow_carbenes=True
+    AC,
+    atoms,
+    charge,
+    allow_charged_fragments=True,
+    use_graph=True,
+    allow_carbenes=True,
+    diagnostics=None,
 ):
     """
     implemenation of algorithm shown in Figure 2
@@ -765,6 +771,11 @@ def AC2BO(
 
     if sorted_gen is None:
         logger.warning("AC2BO terminating: Valence search space exceeded limit.")
+        # Charge-independent -- the count depends only on atoms and adjacency --
+        # so this aborts every candidate charge alike. Recorded so callers can
+        # report the specie as skipped rather than as genuinely uncharacterised.
+        if diagnostics is not None:
+            diagnostics["valence_search_too_large"] = True
         return None, None
 
     # Use islice to safely take only the first 50 entries
@@ -898,6 +909,7 @@ def AC2mol(
     allow_charged_fragments=True,
     use_graph=True,
     allow_carbenes=True,
+    diagnostics=None,
 ):
     """Build mol from AC; temporarily override atomic_valence without persisting changes."""
     overrides = None
@@ -920,6 +932,7 @@ def AC2mol(
             allow_charged_fragments=allow_charged_fragments,
             use_graph=use_graph,
             allow_carbenes=allow_carbenes,
+            diagnostics=diagnostics,
         )
         if BO is None:
             return [], None

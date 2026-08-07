@@ -627,6 +627,9 @@ def _no_charge_state_reason(specie) -> str:
     if warning:
         return f"SKIPPED: protonation not auto-handled ({warning})"
 
+    if getattr(specie, "valence_search_too_large", False):
+        return "SKIPPED: valence search space too large, enumeration terminated"
+
     return "NO PLAUSIBLE CHARGE STATES FOUND"
 
 

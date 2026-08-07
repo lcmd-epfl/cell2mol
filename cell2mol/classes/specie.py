@@ -93,6 +93,11 @@ class Specie(BaseModel):
     missing_H_on_CoordDonor: bool | None = None
     missing_H_in_Water: bool | None = None
 
+    # Set when AC2BO refused to enumerate valences because the search space
+    # exceeded its limit, and nothing else found a charge either. The specie was
+    # never really tried, so it must not be reported as having no valid charge.
+    valence_search_too_large: bool | None = None
+
     charge_state: ChargeState | None = None
     plausible_charge_states: list[ChargeState] | None = Field(default=None)
     origin: str | None = None

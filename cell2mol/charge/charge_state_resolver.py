@@ -72,6 +72,8 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
 
     # 3. Enumeration Loop
     valid_charge_states = []
+    # Why bond assignment gave up, when it gave up for a reportable reason.
+    diagnostics: dict = {}
 
     if spec.has_porphyrin and not spec.protonation_warning:
         for prot in spec.protonation_states:
@@ -96,7 +98,7 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
                 candidate_charges,
             )
             valid_charge_states_dict = generate_valid_charge_states(
-                prot, candidate_charges
+                prot, candidate_charges, diagnostics=diagnostics
             )
             for _charge, charge_states in valid_charge_states_dict.items():
                 for charge_state in charge_states:
@@ -117,6 +119,12 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
 
     # 4. Final Selection / Filtering
     best_candidates = identify_best_charge_states(valid_charge_states)
+
+    # Only meaningful when nothing was found: a specie that aborted on one
+    # protonation state and succeeded on another is characterised, not skipped.
+    spec.valence_search_too_large = bool(
+        diagnostics.get("valence_search_too_large") and not best_candidates
+    )
 
     return best_candidates if best_candidates else None
 
@@ -494,7 +502,9 @@ def _specie_supported_by_rddeterminebonds(
     return True
 
 
-def generate_valid_charge_states(prot, candidate_charges, allow_charged_fragments=True):
+def generate_valid_charge_states(
+    prot, candidate_charges, allow_charged_fragments=True, diagnostics=None
+):
     valid_charge_states_dict = {charge: [] for charge in candidate_charges}
 
     # --- Tier 0: element-level pre-check (charge-independent) ---
@@ -513,6 +523,7 @@ def generate_valid_charge_states(prot, candidate_charges, allow_charged_fragment
             candidate_charges,
             valid_charge_states_dict,
             allow_charged_fragments=allow_charged_fragments,
+            diagnostics=diagnostics,
         )
 
     # --- Tier 1: try rdDetermineBonds across ALL candidate charges ---
@@ -546,11 +557,16 @@ def generate_valid_charge_states(prot, candidate_charges, allow_charged_fragment
         candidate_charges,
         valid_charge_states_dict,
         allow_charged_fragments=allow_charged_fragments,
+        diagnostics=diagnostics,
     )
 
 
 def determine_bond_using_modified_AC2mol(
-    prot, candidate_charges, valid_charge_states_dict, allow_charged_fragments=True
+    prot,
+    candidate_charges,
+    valid_charge_states_dict,
+    allow_charged_fragments=True,
+    diagnostics=None,
 ):
     for charge in candidate_charges:
         rdkit_obj = generate_rdkit_mol_from_AC2mol(
@@ -558,6 +574,7 @@ def determine_bond_using_modified_AC2mol(
             AC=prot.adjmat,
             charge=charge,
             allow_charged_fragments=allow_charged_fragments,
+            diagnostics=diagnostics,
         )
         if rdkit_obj is not None:
             charge_state = prepare_ChargeState_from_rdkit_obj(
