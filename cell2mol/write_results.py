@@ -627,8 +627,15 @@ def _no_charge_state_reason(specie) -> str:
     if warning:
         return f"SKIPPED: protonation not auto-handled ({warning})"
 
+    # Both can be set: the iteration cap hands the specie to AC2mol, which may
+    # then decline for size as well. AC2mol is the last-resort tier, so when it
+    # is the one that gave up that is the binding constraint and the more
+    # actionable thing to report.
     if getattr(specie, "valence_search_too_large", False):
         return "SKIPPED: valence search space too large, enumeration terminated"
+
+    if getattr(specie, "bond_perception_capped", False):
+        return "SKIPPED: bond perception exceeded its iteration limit"
 
     return "NO PLAUSIBLE CHARGE STATES FOUND"
 

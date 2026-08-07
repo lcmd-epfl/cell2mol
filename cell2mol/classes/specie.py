@@ -97,6 +97,10 @@ class Specie(BaseModel):
     # exceeded its limit, and nothing else found a charge either. The specie was
     # never really tried, so it must not be reported as having no valid charge.
     valence_search_too_large: bool | None = None
+    # As above, but for rdDetermineBonds giving up at its iteration cap. Both
+    # can be set at once: the cap sends the specie on to AC2mol, which may then
+    # decline for size too.
+    bond_perception_capped: bool | None = None
 
     charge_state: ChargeState | None = None
     plausible_charge_states: list[ChargeState] | None = Field(default=None)

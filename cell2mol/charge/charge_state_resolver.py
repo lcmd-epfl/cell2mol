@@ -122,8 +122,12 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
 
     # Only meaningful when nothing was found: a specie that aborted on one
     # protonation state and succeeded on another is characterised, not skipped.
+    found_nothing = not best_candidates
     spec.valence_search_too_large = bool(
-        diagnostics.get("valence_search_too_large") and not best_candidates
+        diagnostics.get("valence_search_too_large") and found_nothing
+    )
+    spec.bond_perception_capped = bool(
+        diagnostics.get("bond_perception_capped") and found_nothing
     )
 
     return best_candidates if best_candidates else None
@@ -528,7 +532,11 @@ def generate_valid_charge_states(
 
     # --- Tier 1: try rdDetermineBonds across ALL candidate charges ---
     valid_charge_states_dict = determine_bond_using_rdDetermineBonds(
-        prot, candidate_charges, valid_charge_states_dict, allow_charged_fragments
+        prot,
+        candidate_charges,
+        valid_charge_states_dict,
+        allow_charged_fragments,
+        diagnostics=diagnostics,
     )
     if any(valid_charge_states_dict.values()):
         logger.debug(
@@ -587,7 +595,11 @@ def determine_bond_using_modified_AC2mol(
 
 
 def determine_bond_using_rdDetermineBonds(
-    prot, candidate_charges, valid_charge_states_dict, allow_charged_fragments=True
+    prot,
+    candidate_charges,
+    valid_charge_states_dict,
+    allow_charged_fragments=True,
+    diagnostics=None,
 ):
     for charge in candidate_charges:
         try:
@@ -612,6 +624,21 @@ def determine_bond_using_rdDetermineBonds(
             logger.error(
                 f"  ValueError occurred using rdDetermineBonds: {e} with {charge} charge for {prot.formula}"
             )
+            continue
+        except RuntimeError as e:
+            # The iteration cap. RDKit raises a bare RuntimeError for it, so
+            # match on the message rather than swallow every RuntimeError --
+            # anything else here is a real fault and must keep propagating.
+            if "Max Iterations Exceeded" not in str(e):
+                raise
+            logger.error(
+                "  rdDetermineBonds hit its iteration cap with %s charge for %s; "
+                "falling back to modified AC2mol",
+                charge,
+                prot.formula,
+            )
+            if diagnostics is not None:
+                diagnostics["bond_perception_capped"] = True
             continue
         except IndexError as e:
             if "unordered_map::at" in str(e):

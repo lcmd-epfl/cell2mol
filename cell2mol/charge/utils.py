@@ -10,6 +10,19 @@ from rdkit.Chem import rdDetermineBonds
 
 logger = logging.getLogger(__name__)
 
+# Backtracking steps rdDetermineBonds may take per call before giving up.
+#
+# Its cost is bimodal, not gradual: every ordinary specie measured -- benzene,
+# terpyridine, porphine, coronene, phthalocyanine -- resolves within four
+# steps, while a pathological one runs unbounded (ADIZAO and AYUPOB both hang
+# indefinitely at the default of 0, "no limit"). Nothing sits in between, so
+# the exact value hardly matters; 1000 is ~250x the worst legitimate case
+# measured. Raising it cannot rescue a hang, only postpone it.
+#
+# This is a cap on the search, NOT a wall-clock timeout: it is deterministic
+# and reproducible across machines, and needs no threads or signals.
+rddeterminebonds_max_iterations = 1000
+
 # Monatomic noble gases
 NOBLE_GASES = {"He", "Ne", "Ar", "Kr", "Xe", "Rn"}
 
@@ -506,12 +519,15 @@ def generate_rdkit_mol_from_rdDetermineBonds(
 
     mol.AddConformer(conf, assignId=True)
 
-    # Assign bond orders using existing connectivity
+    # Assign bond orders using existing connectivity. Capped: without a limit
+    # this hangs outright on some species, and the caller cannot tell a slow
+    # search from a stuck one. Raises RuntimeError when the cap is reached.
     rdDetermineBonds.DetermineBondOrders(
         mol,
         charge=charge,
         allowChargedFragments=allow_charged_fragments,
         embedChiral=embed_chiral,
+        maxIterations=rddeterminebonds_max_iterations,
     )
 
     if sanitize:
