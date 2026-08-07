@@ -26,6 +26,7 @@ from cell2mol.charge.special_cases import (
     _find_charged_moiety,
     generate_special_charge_states,
 )
+from cell2mol.charge.smiles_handler import obligate_charge_separation_atoms
 
 from cell2mol.elementdata import ElementData
 from rdkit import Chem
@@ -301,6 +302,26 @@ def _manual_charge_state_from_adjacency(spec, charge: int):
     )
 
 
+def _manual_anchor_index(mol, target_atom: str) -> int | None:
+    """Index of a registry SMILES' anchor atom -- the one aligned against the
+    matching atom of the specie so the rest of the order follows.
+
+    Read off the SMILES rather than assumed, so adding a registry entry cannot
+    silently mis-order its atoms.
+    """
+    if target_atom == "central":
+        # The middle of a symmetric chain: azide's inner N, triiodide's inner I.
+        for atom in mol.GetAtoms():
+            if atom.GetDegree() == 2:
+                return atom.GetIdx()
+        return None
+
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() == target_atom:
+            return atom.GetIdx()
+    return None
+
+
 def generate_manual_charge_state(spec):
     """Generates a ChargeState for special species using formula-based lookups."""
     # 1. Configuration Registry
@@ -318,6 +339,7 @@ def generate_manual_charge_state(spec):
         "Te2": (None, "[Te-][Te-]", -2),
         "N": (None, "[N-3]", -3),
         "C": (None, "[C-4]", -4),
+        "F6-Si": ("Si", "F[Si-2](F)(F)(F)(F)F", -2),
     }
 
     formula = spec.formula
@@ -338,26 +360,42 @@ def generate_manual_charge_state(spec):
     assert smiles is not None, f"No manual SMILES registered for formula {formula}"
 
     # 3. Determine Atom Ordering
+    mol = Chem.MolFromSmiles(smiles, sanitize=False)
     order = list(range(spec.natoms))
     new_order = order
 
     if target_atom:
-        for idx, atom in enumerate(spec.atoms):
-            # 'central' means the atom connected to two others of the same type
-            if target_atom == "central":
-                adj_labels = [
-                    spec.get_parent("molecule").labels[a] for a in atom.adjacency
-                ]
-                if adj_labels.count(atom.label) == 2:
-                    new_order = reorder_element(order, 1, idx)
+        # Where the anchor sits in the registry SMILES. This used to be
+        # hard-coded as 1, which is right for every entry except "N-O3":
+        # nitrate is written [N+](=O)([O-])[O-] with its nitrogen first, so the
+        # wrong atom was moved and the mol came back permuted against
+        # spec.atoms. create_bonds_specie then skipped every bond as an
+        # element mismatch and failed with "NO BONDS for N" (ABAMUO).
+        smiles_idx = _manual_anchor_index(mol, target_atom)
+        if smiles_idx is None:
+            logger.warning(
+                "Manual Charge: anchor %r not found in SMILES %s for %s; "
+                "keeping the SMILES atom order",
+                target_atom,
+                smiles,
+                formula,
+            )
+        else:
+            for idx, atom in enumerate(spec.atoms):
+                # 'central' means the atom connected to two others of the same type
+                if target_atom == "central":
+                    adj_labels = [
+                        spec.get_parent("molecule").labels[a] for a in atom.adjacency
+                    ]
+                    if adj_labels.count(atom.label) == 2:
+                        new_order = reorder_element(order, smiles_idx, idx)
+                        break
+                # Specific label match (e.g., "Cl" in O4-Cl)
+                elif atom.label == target_atom:
+                    new_order = reorder_element(order, smiles_idx, idx)
                     break
-            # Specific label match (e.g., "Cl" in O4-Cl)
-            elif atom.label == target_atom:
-                new_order = reorder_element(order, 1, idx)
-                break
 
     # 4. RDKit Processing
-    mol = Chem.MolFromSmiles(smiles, sanitize=False)
     mol = Chem.RenumberAtoms(mol, new_order)
 
     atom_charges = [a.GetFormalCharge() for a in mol.GetAtoms()]
@@ -494,6 +532,15 @@ def generate_valid_charge_states(prot, candidate_charges, allow_charged_fragment
         prot.formula,
     )
     # --- Tier 2: every candidate charge failed rdDetermineBonds ---
+    #
+    # Deliberately all-or-nothing, not per charge. Retrying only the charges
+    # rdDetermineBonds abandoned looks strictly additive but is not:
+    # enumerate_possible_charge_states returns only the BEST-ranked states, so a
+    # recovered candidate that wins the ranking *displaces* the charge that was
+    # being reported before, narrowing the ballot the balancer sees. Measured
+    # over the manuscript corpus a per-charge retry fixed nothing and cost
+    # GEKDIJ (no valid charge distribution). Revisit only alongside a change
+    # that lets a specie report every valid charge, not just the best one.
     return determine_bond_using_modified_AC2mol(
         prot,
         candidate_charges,
@@ -711,6 +758,57 @@ def get_plausible_metal_os(metal: Metal) -> list[int]:
     return metal_os
 
 
+def _cleaned_of_resonance_artifacts(
+    charge_states: list[ChargeState],
+) -> list[ChargeState]:
+    """Let charge-separated candidates resonate into a cleaner form before they
+    are judged.
+
+    A candidate can carry the right total charge on a poor Lewis structure --
+    AC2mol in particular tends to strand a spurious ``[N-]``/``[N+]`` pair
+    across a conjugated chain. Ranked as-is such a candidate loses on
+    ``specie_abs_atcharge`` to a structure that is cleaner but has the wrong
+    charge, so the right answer is discarded for the wrong reason.
+
+    Resonance is exactly the right test for "is this separation real or just a
+    bad way of drawing it". Only artifact-zwitterionic candidates are tried
+    (obligate separation has nothing to gain), and a resonance form is adopted
+    only when it strictly reduces charge separation at the same total charge --
+    ``get_best_resonance_state`` returns the first *valid* form, not
+    necessarily the least charged, so its output has to be earned.
+    """
+    cleaned: list[ChargeState] = []
+    for state in charge_states:
+        if not _is_artifact_zwitterion(state):
+            cleaned.append(state)
+            continue
+
+        try:
+            candidate = get_best_resonance_state(state)
+        except Exception as exc:  # resonance is best-effort, never fatal
+            logger.debug("   Resonance cleanup failed for a candidate: %s", exc)
+            cleaned.append(state)
+            continue
+
+        if (
+            candidate is not state
+            and candidate.status
+            and candidate.specie_total_charge == state.specie_total_charge
+            and candidate.specie_abs_atcharge < state.specie_abs_atcharge
+        ):
+            logger.debug(
+                "   Resonance cleanup: q=%+d charge separation %d -> %d",
+                state.specie_total_charge,
+                state.specie_abs_atcharge,
+                candidate.specie_abs_atcharge,
+            )
+            cleaned.append(candidate)
+        else:
+            cleaned.append(state)
+
+    return cleaned
+
+
 def identify_best_charge_states(charge_states: list[ChargeState]) -> list[ChargeState]:
     """
     Selects the best charge distributions.
@@ -719,6 +817,8 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
     valid_charge_states = [ch for ch in charge_states if ch is not None and ch.status]
     if not valid_charge_states:
         return []
+
+    valid_charge_states = _cleaned_of_resonance_artifacts(valid_charge_states)
 
     # 1. Get initial best candidates indices using the core logic
     best_indices = _get_best_candidate_indices(valid_charge_states)
@@ -782,6 +882,28 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
     return final_states
 
 
+def _is_artifact_zwitterion(charge_state: ChargeState) -> bool:
+    """``specie_zwitt`` with obligate charge separation discounted.
+
+    A nitro group or an N-oxide makes a specie "zwitterionic" by the plain
+    any-positive-and-any-negative test, but those charges are forced -- no
+    neutral Lewis structure exists for them. Only the *remaining* separation
+    says anything about whether bond perception went astray, and that is what
+    the ranking below should react to.
+    """
+    mol = charge_state.specie_rdkit_obj
+    charges = charge_state.specie_atom_charges or []
+    if mol is None or mol.GetNumAtoms() != len(charges):
+        return bool(charge_state.specie_zwitt)
+
+    obligate = obligate_charge_separation_atoms(mol)
+    if not obligate:
+        return bool(charge_state.specie_zwitt)
+
+    remaining = [q for idx, q in enumerate(charges) if idx not in obligate]
+    return any(q > 0 for q in remaining) and any(q < 0 for q in remaining)
+
+
 def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[int]:
     """
     Helper function containing the core filtering logic.
@@ -796,6 +918,7 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
     specie_abs_totals = []
     specie_abs_atcharges = []
     specie_zwitt = []
+    artifact_zwitt = []
     coincide = []
     aromatic_atoms = []
     aromatic_rings = []
@@ -824,6 +947,7 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
         specie_abs_totals.append(chs.specie_abstotal)
         specie_abs_atcharges.append(chs.specie_abs_atcharge)
         specie_zwitt.append(chs.specie_zwitt)
+        artifact_zwitt.append(_is_artifact_zwitterion(chs))
         coincide.append(chs.coincide)
 
         # Aromatic calculations
@@ -852,8 +976,52 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
         )
 
     # --- 2. Determine Minima/Maxima ---
-    min_tot = np.min(specie_abs_totals)
-    min_abs = np.min(specie_abs_atcharges)
+    min_abs = int(np.min(specie_abs_atcharges))
+
+    # A zwitterionic candidate can post a smaller |net charge| than a
+    # non-zwitterionic one purely by pairing a spurious +1 against a spurious
+    # -1, and rdDetermineBonds' search is not atom-order invariant, so one
+    # symmetry copy of a ligand can find such a solution while its twin does
+    # not (ABOFAY: copy A -> -2, copy B -> 0, same graph, permuted indices).
+    # Whenever a candidate free of *artifact* charge separation already reaches
+    # the best per-atom charge separation, it describes the same amount of
+    # charge with none of it cancelled, so let it set the |net charge| target
+    # instead. Obligate separation (nitro, N-oxide) does not count as artifact,
+    # so those candidates still compete on their own terms.
+    #
+    # Aromaticity vetoes the swap. Remote charges are not by themselves a sign
+    # of a bad structure -- BEJFON's ligand is a methylpyridinium tethered to a
+    # cyclopentadienide, permanently zwitterionic with the charges rings apart
+    # -- and there the charge-free alternative is the one that is wrong,
+    # dearomatising both rings to avoid the charges. Aromaticity separates the
+    # two cases where the charge bookkeeping cannot: never buy a lower |net
+    # charge| at the cost of aromatic rings.
+    naive_min_tot = int(np.min(specie_abs_totals))
+    best_aromatic_at_naive_min = max(
+        aromatic_atoms[idx]
+        for idx in range(nlists)
+        if specie_abs_totals[idx] == naive_min_tot
+    )
+    clean_at_min_abs = [
+        idx
+        for idx in range(nlists)
+        if specie_abs_atcharges[idx] == min_abs
+        and not artifact_zwitt[idx]
+        and aromatic_atoms[idx] >= best_aromatic_at_naive_min
+    ]
+    if clean_at_min_abs:
+        min_tot = int(min(specie_abs_totals[idx] for idx in clean_at_min_abs))
+        if min_tot != naive_min_tot:
+            logger.debug(
+                "   Artifact-zwitterion guard: |net charge| target %d -> %d "
+                "(a charge-separated candidate claimed the lower value without "
+                "gaining aromaticity)",
+                naive_min_tot,
+                min_tot,
+            )
+    else:
+        min_tot = naive_min_tot
+
     max_aromatic = np.max(aromatic_atoms)
 
     indices_min_tot = {i for i, x in enumerate(specie_abs_totals) if x == min_tot}

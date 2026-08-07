@@ -74,6 +74,11 @@ def get_atomic_valences(k):
         return [4, 6]
     if k == 33:  # As
         return [5, 3]  # [5,4,3]
+    if k == 34:  # Se
+        # Same expandable set as its congeners S and Te; without this Se falls
+        # through to the generic `8 - ave` branch below and gets [2] only, so
+        # selenoxides/selenones have no neutral solution here either.
+        return [2, 4, 6]
     if k == 51:  # Sb
         return [6, 5, 4, 3]  # [5,4,3]
     if k == 52:  # Te

@@ -133,7 +133,7 @@ def set_charge_state(reference, target, mode: int):
     # )
 
     if mode == 1:
-        _apply_precalculated_state(target, final_charge)
+        _apply_precalculated_state(target, final_charge, reference=reference)
     elif mode == 2:
         _transfer_state_to_unit_cell(reference, target, final_charge)
     else:
@@ -141,14 +141,33 @@ def set_charge_state(reference, target, mode: int):
 
 
 # --- Mode 1: Reference Cell (Selection) ---
-def _apply_precalculated_state(target: "Specie", final_charge):
-    """Mode 1: Selects an existing charge state from target.plausible_charge_states."""
+def _apply_precalculated_state(target: "Specie", final_charge, reference=None):
+    """Mode 1: Gives the target the unique specie's already-solved structure.
+
+    Entries sharing a ``unique_index`` are the same specie, so the copy should
+    *inherit* the solved Lewis structure rather than re-derive one and hope the
+    two agree. They frequently do not: ``rdDetermineBonds`` explores in atom
+    index order with a bounded budget, so symmetry-related copies -- identical
+    graphs, permuted numbering -- come back with different candidate sets, and
+    the copy is then asked for a charge it never found ("Charge Mismatch").
+
+    This is Mode 2's operation keyed on connectivity instead of atom site
+    labels, which do not correspond between two crystallographically distinct
+    copies. Falls back to the old lookup when no isomorphism is available.
+    """
 
     # 1. Determine the Charge State (cs) object
     cs = None
 
     if target.formula in MANUAL_CHARGE_ASSIGN_SPECIES:
         cs = generate_manual_charge_state(target)
+    elif (
+        reference is not None
+        and reference is not target
+        and getattr(reference, "rdkit_obj", None) is not None
+        and _transfer_state_by_connectivity(reference, target, final_charge)
+    ):
+        return
     else:
         if target.plausible_charge_states is None:
             target.get_plausible_charge_states()
@@ -240,6 +259,142 @@ def _transfer_state_to_unit_cell(reference, target, final_charge):
 
     target.set_charges(total_charge_calc, atom_charges, smiles, rdkit_obj)
     logger.debug("Mode 2 Applied: %s (Q=%d)", target.formula, target.totcharge)
+
+
+def _single_bond_graph(spec):
+    """The specie's bare connectivity as an RDKit mol: right elements, every
+    contact a single bond, no implicit H. Bond orders are deliberately absent
+    -- the point is to match the graph, not a particular Lewis structure."""
+    rwmol = Chem.RWMol()
+    for atomic_num in spec.get_atomic_numbers():
+        rwmol.AddAtom(Chem.Atom(int(atomic_num)))
+
+    adjmat = np.asarray(spec.adjmat)
+    for i in range(spec.natoms):
+        for j in range(i + 1, spec.natoms):
+            if adjmat[i, j]:
+                rwmol.AddBond(i, j, Chem.BondType.SINGLE)
+
+    mol = rwmol.GetMol()
+    for atom in mol.GetAtoms():
+        atom.SetNoImplicit(True)
+    Chem.FastFindRings(mol)
+    return mol
+
+
+# Flexible ligands have many graph automorphisms (mostly methyl-hydrogen
+# permutations), and enumerating all of them is combinatorial. We only need
+# enough to find one that also aligns metal coordination.
+_MAX_ISOMORPHISM_MATCHES = 5000
+
+
+def _connectivity_new_order(ref_spec, target_spec) -> list[int] | None:
+    """Atom order mapping ``ref_spec``'s indices onto ``target_spec``'s, from
+    graph isomorphism alone. Returns a ``new_order`` for ``Chem.RenumberAtoms``,
+    or None when the two graphs do not match.
+
+    ``compare_species`` assigns a shared ``unique_index`` on a fingerprint
+    (atom/electron counts and element-pair adjacency counts), not a true
+    isomorphism test, so two species can share an index without matching. That
+    is why None is a normal outcome and the caller must have a fallback.
+
+    Where several automorphisms exist, one that also aligns metal coordination
+    is preferred: two graph-equivalent donors (a carboxylate's oxygens, say)
+    may carry different formal charges, and the charge must not land on the
+    oxygen that is not bound to the metal.
+    """
+    # Declining must never raise: the caller treats None as "fall back to the
+    # target's own charge states", whereas an exception would surface as a bare
+    # error_assign_charge with no explanation. Metals and any specie without a
+    # usable graph land here.
+    if getattr(ref_spec, "natoms", None) != getattr(target_spec, "natoms", None):
+        return None
+    try:
+        ref_graph = _single_bond_graph(ref_spec)
+        target_graph = _single_bond_graph(target_spec)
+    except (AttributeError, TypeError, ValueError) as exc:
+        logger.debug(
+            "Cannot build a connectivity graph for %s: %s",
+            getattr(target_spec, "formula", "?"),
+            exc,
+        )
+        return None
+
+    matches = target_graph.GetSubstructMatches(
+        ref_graph,
+        uniquify=False,
+        maxMatches=_MAX_ISOMORPHISM_MATCHES,
+        useChirality=False,
+    )
+    # A same-size substructure match is an isomorphism; anything shorter is not.
+    matches = [m for m in matches if len(m) == target_spec.natoms]
+    if not matches:
+        return None
+
+    ref_mconnec = [a.mconnec or 0 for a in ref_spec.atoms or []]
+    target_mconnec = [a.mconnec or 0 for a in target_spec.atoms or []]
+    if len(ref_mconnec) == len(target_mconnec) == target_spec.natoms:
+        aligned = [
+            m
+            for m in matches
+            if all(ref_mconnec[i] == target_mconnec[j] for i, j in enumerate(m))
+        ]
+        if aligned:
+            matches = aligned
+        else:
+            logger.debug(
+                "No isomorphism of %s aligns metal coordination; using the first "
+                "of %d matches",
+                target_spec.formula,
+                len(matches),
+            )
+
+    chosen = matches[0]
+    new_order = [0] * len(chosen)
+    for ref_idx, target_idx in enumerate(chosen):
+        new_order[target_idx] = ref_idx
+    return new_order
+
+
+def _transfer_state_by_connectivity(reference, target, final_charge) -> bool:
+    """Renumber the unique specie's solved rdkit_obj onto ``target``.
+
+    Returns True when the state was transferred; False leaves the caller to
+    fall back on the target's own charge states.
+    """
+    new_order = _connectivity_new_order(reference, target)
+    if new_order is None:
+        logger.debug(
+            "No graph isomorphism between unique specie %s and its copy; "
+            "falling back to the copy's own charge states",
+            target.formula,
+        )
+        return False
+
+    rdkit_obj = Chem.RenumberAtoms(reference.rdkit_obj, new_order)
+    atom_charges = [
+        rdkit_obj.GetAtomWithIdx(i).GetFormalCharge() for i in range(target.natoms)
+    ]
+    total_charge = int(sum(atom_charges))
+
+    if total_charge != final_charge:
+        logger.warning(
+            "Mode 1 transfer for %s produced charge %d, expected %d; falling back",
+            target.formula,
+            total_charge,
+            final_charge,
+        )
+        return False
+
+    target.charge_state = reference.charge_state
+    target.set_charges(total_charge, atom_charges, reference.smiles, rdkit_obj)
+    logger.debug(
+        "Mode 1 transferred by connectivity: %s (Q=%d) %s",
+        target.formula,
+        target.totcharge,
+        target.smiles,
+    )
+    return True
 
 
 def _reorder_rdkit_atoms(ref_mol, ref_labels, target_labels):

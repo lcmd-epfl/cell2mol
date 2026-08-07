@@ -30,6 +30,7 @@ MANUAL_CHARGE_ASSIGN_SPECIES = {
     "N",
     "C",
     "H8-B3",
+    "F6-Si",
 }
 
 # Manual species whose structure cannot be written as a plain SMILES because it
@@ -221,6 +222,42 @@ def _nitro_charge_atom_indices(mol: Chem.Mol, natoms: int) -> set[int]:
     return nitro_atoms
 
 
+def _malformed_nitro_atom(mol: Chem.Mol, natoms: int) -> int | None:
+    """Index of a nitrogen drawn as ``N([O-])[O-]`` rather than ``[N+](=O)[O-]``.
+
+    Nitrogen cannot expand its octet, so one of its terminal oxygens is always
+    doubly bonded. The all-single form still passes every valence check, so
+    bond perception accepts it, but it is two charge units too negative
+    (AXAXUS: a -2 ligand, hence Pt(VI)). Rejected rather than repaired --
+    promoting the bond would change the requested total charge; failing here
+    sends the specie to the AC2mol tier, which draws the nitro correctly.
+    """
+    for i in range(natoms):
+        atom = mol.GetAtomWithIdx(i)
+        if atom.GetAtomicNum() != 7:
+            continue
+
+        terminal_o_minus = 0
+        has_double_bonded_o = False
+        for neighbor in atom.GetNeighbors():
+            if neighbor.GetAtomicNum() != 8:
+                continue
+            bond = mol.GetBondBetweenAtoms(i, neighbor.GetIdx())
+            if bond.GetBondType() == Chem.BondType.DOUBLE:
+                has_double_bonded_o = True
+            elif (
+                bond.GetBondType() == Chem.BondType.SINGLE
+                and neighbor.GetDegree() == 1
+                and neighbor.GetFormalCharge() == -1
+            ):
+                terminal_o_minus += 1
+
+        if terminal_o_minus >= 2 and not has_double_bonded_o:
+            return i
+
+    return None
+
+
 def check_rdkit_obj_connectivity(mol: Chem.Mol, natoms: int, charge: int) -> bool:
     """
     Validates the chemical sanity of an RDKit molecule object by checking
@@ -255,6 +292,16 @@ def check_rdkit_obj_connectivity(mol: Chem.Mol, natoms: int, charge: int) -> boo
     # legitimately carry many (e.g. an octanitro-porphyrin: 8 * (|+1|+|-1|) =
     # 16). Exclude nitro N+/O- charges before measuring separation; a genuine
     # artifact (alternating +/- around a ring/chain) is untouched.
+    # 0c. Nitro groups must be drawn [N+](=O)[O-], never N([O-])[O-].
+    bad_nitro = _malformed_nitro_atom(mol, natoms)
+    if bad_nitro is not None:
+        logger.debug(
+            "   Malformed nitro on atom %d: two terminal O(-1) and no N=O; "
+            "the correct [N+](=O)[O-] carries a different total charge",
+            bad_nitro,
+        )
+        is_correct = False
+
     nitro_charge_atoms = _nitro_charge_atom_indices(mol, natoms)
     total_abs_atom_charge = sum(
         abs(mol.GetAtomWithIdx(i).GetFormalCharge())

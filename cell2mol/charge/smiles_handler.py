@@ -13,6 +13,166 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
+# Anionic partners worth promoting to a double bond at a hypervalent centre:
+# the sulfoxide/selenoxide O, the sulfilimine N, the thio analogues. Carbanions
+# are deliberately excluded -- a sulfonium ylide (Me2S(+)-CH2(-)) is a real,
+# isolable species usually drawn charge-separated, so collapsing it would be a
+# chemical opinion rather than an artifact fix.
+_YLIDE_ACCEPTORS = frozenset(("O", "S", "Se", "N"))
+
+
+def _can_expand_octet(symbol: str) -> bool:
+    """True for p-block elements from period 3 down, which have d orbitals
+    available and so can hold more than an octet (S, P, Se, I, Te, ...).
+
+    This is what separates a bond-perception artifact from real chemistry: an
+    S(+)-O(-) pair is just an unrecognised S=O, whereas the N(+)-O(-) of an
+    amine N-oxide is obligate -- period-2 nitrogen cannot expand, so there is
+    no neutral Lewis structure to collapse to.
+    """
+    return (
+        elemdatabase.elementblock[symbol] == "p"
+        and elemdatabase.elementperiod[symbol] >= 3
+    )
+
+
+def _neutral_valences(symbol: str) -> tuple[int, ...]:
+    """Bond-order sums a *neutral* atom of this element can carry.
+
+    ``8 - valence electrons`` is the octet value; octet-expandable elements may
+    additionally take one or two further electron pairs (S(II)/S(IV)/S(VI),
+    I(I)/I(III)/I(V)). Derived from the periodic table rather than a lookup
+    table, so elements missing from ``xyz2mol.get_atomic_valences`` (Se, for
+    one) are still handled correctly.
+    """
+    base = 8 - elemdatabase.valenceelectrons[symbol]
+    if base < 1:
+        return ()
+    if _can_expand_octet(symbol):
+        return tuple(base + 2 * k for k in range(3))
+    return (base,)
+
+
+def _total_bond_order(atom) -> int:
+    return int(sum(bond.GetBondTypeAsDouble() for bond in atom.GetBonds()))
+
+
+def collapse_hypervalent_ylides(mol):
+    """Collapse charge-separated hypervalent centres, X(+)-Y(-) -> X=Y.
+
+    RDKit's ``rdDetermineBonds`` carries a valence table in which sulfur may be
+    2-, 3- or 6-valent but never 4-valent, so a sulfoxide -- S with three
+    neighbours -- has no neutral solution and comes back as the ylide
+    ``C[S+]([O-])C`` instead of ``CS(=O)C``. The same gap hits sulfite esters,
+    sulfinamides, sulfilimines, sulfinates and the selenium analogues.
+
+    Both forms describe the same molecule (identical InChI), but the spurious
+    formal charges propagate: they land on the ligand's per-atom charges and on
+    the ``specie_abs_atcharge`` / ``specie_zwitt`` metrics that
+    ``identify_best_charge_states`` ranks candidates by, so a cosmetic artifact
+    can bias which total charge is selected.
+
+    This is the mirror of :func:`fix_zwitterions`, which demotes a charged
+    DOUBLE bond to a neutral single one; here a charged SINGLE bond is promoted
+    to a neutral double one. A promotion is applied only when it leaves *both*
+    atoms at a valence a neutral atom of that element can actually hold, which
+    is what keeps amine N-oxides, nitro groups and phosphorus ylides untouched.
+
+    Args:
+        mol: Input RDKit molecule.
+
+    Returns:
+        tuple: (Chem.Mol, bool indicating if changes were made).
+    """
+    rw_mol = Chem.RWMol(mol)
+    fixed = False
+
+    for bond in list(rw_mol.GetBonds()):
+        if bond.GetBondType() != Chem.BondType.SINGLE:
+            continue
+
+        begin, end = bond.GetBeginAtom(), bond.GetEndAtom()
+        for center, partner in ((begin, end), (end, begin)):
+            # Exactly one unit of charge separation each way: anything larger
+            # would still leave a charge behind after promotion.
+            if center.GetFormalCharge() != 1 or partner.GetFormalCharge() != -1:
+                continue
+
+            center_label, partner_label = center.GetSymbol(), partner.GetSymbol()
+            if not _can_expand_octet(center_label):
+                logger.debug(
+                    "\tKeeping %s(+)-%s(-): %s cannot expand its octet",
+                    center_label,
+                    partner_label,
+                    center_label,
+                )
+                continue
+            if partner_label not in _YLIDE_ACCEPTORS:
+                continue
+
+            center_valence = _total_bond_order(center) + 1
+            partner_valence = _total_bond_order(partner) + 1
+            if center_valence not in _neutral_valences(center_label):
+                continue
+            if partner_valence not in _neutral_valences(partner_label):
+                continue
+
+            bond.SetBondType(Chem.BondType.DOUBLE)
+            center.SetFormalCharge(0)
+            partner.SetFormalCharge(0)
+            fixed = True
+
+            logger.debug(
+                "\tCollapsed hypervalent ylide %s(+)-%s(-) to %s(=%s) "
+                "(valences %d / %d)",
+                center_label,
+                partner_label,
+                center_label,
+                partner_label,
+                center_valence,
+                partner_valence,
+            )
+            break
+
+    return rw_mol.GetMol(), fixed
+
+
+def obligate_charge_separation_atoms(mol) -> set[int]:
+    """Indices of atoms whose formal charge is *obligate* rather than optional.
+
+    An adjacent X(+)-Y(-) pair whose cation cannot expand its octet has no
+    neutral Lewis structure to collapse to, so its charges are real chemistry:
+    nitro groups, amine and pyridine N-oxides, diazo, azide.
+
+    This is the complement of :func:`collapse_hypervalent_ylides`, which
+    removes the separations that *are* avoidable. Charge separation surviving
+    both -- charges stranded on non-adjacent atoms, e.g. a ``[C+]`` and a
+    ``[c-]`` at opposite ends of a conjugated system -- is what a
+    bond-perception artifact actually looks like, and is what callers ranking
+    candidate Lewis structures should penalise.
+
+    Args:
+        mol: Input RDKit molecule (already sanitized).
+
+    Returns:
+        set[int]: Atom indices participating in obligate charge separation.
+    """
+    obligate: set[int] = set()
+
+    for bond in mol.GetBonds():
+        begin, end = bond.GetBeginAtom(), bond.GetEndAtom()
+        for center, partner in ((begin, end), (end, begin)):
+            if center.GetFormalCharge() <= 0 or partner.GetFormalCharge() >= 0:
+                continue
+            if _can_expand_octet(center.GetSymbol()):
+                # A neutral alternative exists (collapse_hypervalent_ylides
+                # would have taken it), so these charges are not obligate.
+                continue
+            obligate.add(center.GetIdx())
+            obligate.add(partner.GetIdx())
+
+    return obligate
+
 
 def fix_zwitterions(mol):
     """
@@ -156,9 +316,16 @@ def finalize_specie_mol(mol):
     below is a no-op and the SMILES is conformer-independent.
 
     Returns:
-        tuple: (Chem.Mol, canonical SMILES, bool whether a zwitterion was fixed).
+        tuple: (Chem.Mol, canonical SMILES, bool whether formal charges were
+        rearranged -- by the zwitterion fix or the hypervalent-ylide collapse).
+        When True the caller must resync its per-atom charges to the returned
+        mol.
     """
     obj, fixed = fix_zwitterions(mol)
+    # Runs after fix_zwitterions: that pass can demote a charged double bond to
+    # a charged single one, which is exactly the pattern collapsed here.
+    obj, collapsed = collapse_hypervalent_ylides(obj)
+    fixed = fixed or collapsed
     obj.RemoveAllConformers()
     # Strip any chiral tags inherited from the 3D-perceived rdkit_obj so the
     # SMILES is stereo-free and conformer-independent.
