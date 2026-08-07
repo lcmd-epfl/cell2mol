@@ -56,6 +56,13 @@ class Reference(Cell):
     # two indices. None marks a specie whose charges could not be found.
     plausible_charges: list[list[int] | None] | None = None
     error_plausible_charges: bool | None = None
+    # Set when two entries sharing a unique_index -- i.e. copies of the SAME
+    # specie -- enumerated to different charges. Populated by
+    # get_plausible_charges; see inconsistent_plausible_charges for the detail.
+    error_inconsistent_plausible_charges: bool | None = None
+    # {unique_index: sorted list of the distinct charge sets that were found},
+    # for reporting. Empty/None when every copy agreed.
+    inconsistent_plausible_charges: dict[int, list[list[int] | None]] | None = None
 
     # Additional CIF related attributes
     chemical_name: str | None = None
@@ -544,6 +551,73 @@ class Reference(Cell):
                 "Plausible charges: %d specie entr(ies) with no charges found: %s",
                 len(unexplained),
                 [all_targets[i][0].formula for i in unexplained],
+            )
+
+        self._check_plausible_charges_consistency(all_targets, skipped_for_missing_h)
+
+    def _check_plausible_charges_consistency(
+        self, all_targets, skipped_for_missing_h: set[int]
+    ) -> None:
+        """Flag unique species whose copies did not enumerate to the same charges.
+
+        Entries sharing a ``unique_index`` are, by ``compare_species``, the same
+        specie -- symmetry-related copies differing only in atom ordering. They
+        must therefore yield the same charge options. When they do not, the
+        selected charge depends on which copy happened to be stored first (the
+        balancer reads ``unique_species`` only), which is never a property of
+        the chemistry.
+
+        The usual cause is that bond perception is not atom-order invariant, so
+        one copy finds a Lewis structure the other misses. Recorded rather than
+        raised: a disagreement means the answer is order-dependent, not
+        necessarily wrong.
+        """
+        self.error_inconsistent_plausible_charges = False
+        self.inconsistent_plausible_charges = {}
+
+        if not self.plausible_charges:
+            return
+
+        # Charges by unique_index, skipping entries that were never attempted.
+        by_unique_index: dict[int, list[list[int] | None]] = {}
+        for idx, (specie, _context) in enumerate(all_targets):
+            if idx in skipped_for_missing_h:
+                continue
+            unique_index = getattr(specie, "unique_index", None)
+            if unique_index is None:
+                continue
+            charges = self.plausible_charges[idx]
+            by_unique_index.setdefault(unique_index, []).append(charges)
+
+        for unique_index, recorded in sorted(by_unique_index.items()):
+            # Order within a charge list carries no meaning, so compare as sets.
+            distinct = {
+                None if charges is None else tuple(sorted(set(charges)))
+                for charges in recorded
+            }
+            if len(distinct) <= 1:
+                continue
+
+            self.error_inconsistent_plausible_charges = True
+            self.inconsistent_plausible_charges[unique_index] = [
+                None if entry is None else list(entry)
+                for entry in sorted(distinct, key=lambda e: (e is None, e or ()))
+            ]
+            formula = next(
+                (
+                    spec.formula
+                    for spec, _ in all_targets
+                    if getattr(spec, "unique_index", None) == unique_index
+                ),
+                "?",
+            )
+            logger.warning(
+                "Plausible charges disagree between copies of the same specie "
+                "%s (unique_index=%d): %s. The charge finally assigned depends "
+                "on which copy is stored first.",
+                formula,
+                unique_index,
+                self.inconsistent_plausible_charges[unique_index],
             )
 
     def map_charges_to_reference(self):

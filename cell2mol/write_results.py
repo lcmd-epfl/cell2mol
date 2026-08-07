@@ -666,6 +666,29 @@ def write_plausible_charges(object, file=None):
             print(info, file=file)
     else:
         print("\nNo species list found in the cell object.", file=file)
+
+    # Copies of one specie that enumerated differently: the final charge then
+    # depends on which copy was stored first, not on the chemistry.
+    inconsistent = getattr(object, "inconsistent_plausible_charges", None)
+    if inconsistent:
+        print(
+            "\nWARNING: plausible charges disagree between copies of the same specie:",
+            file=file,
+        )
+        for unique_index, variants in sorted(inconsistent.items()):
+            formula = next(
+                (
+                    spec.formula
+                    for spec in (object.species_list or [])
+                    if getattr(spec, "unique_index", None) == unique_index
+                ),
+                "?",
+            )
+            print(
+                f"\tunique_index={unique_index} {formula} enumerated to {variants}",
+                file=file,
+            )
+
     print("", file=file)
 
 
