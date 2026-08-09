@@ -35,49 +35,8 @@ def balance_unitcell_charge(refcell, unitcell):
     unitcell.error_multiple_distrib = dist_count > 1
     unitcell.error_empty_distrib = dist_count == 0
 
-    # If the primary attempt failed (too many or empty results), try heuristics.
-    # if dist_count != 1:
-    #     retry_expanded, retry_charges = [], []
-    #     if unitcell.error_multiple_distrib:
-    #         logger.info(
-    #             "Ambiguity found (%d distributions). Retrying with Aromaticity preference ...",
-    #             dist_count,
-    #         )
-    #         retry_expanded, retry_charges = resolve_charge_distributions(
-    #             unitcell.unique_indices,
-    #             refcell.unique_species,
-    #             aromatic=True,
-    #         )
-    #     elif unitcell.error_empty_distrib:
-    #         logger.info(
-    #             "No valid distribution found. Retrying with Rare Metal Oxidation States...",
-    #             dist_count,
-    #         )
-    #         retry_expanded, retry_charges = resolve_charge_distributions(
-    #             unitcell.unique_indices,
-    #             refcell.unique_species,
-    #             rare=True,
-    #         )
-
-    #     # Evaluate retry results
-    #     retry_count = len(retry_expanded)
-    #     if len(retry_expanded) == 1:
-    #         logger.info("Retry success. Valid distribution found.")
-    #         expanded_species_charges = retry_expanded
-    #         unique_species_charges = retry_charges
-    #         unitcell.error_multiple_distrib = False
-    #         unitcell.error_empty_distrib = False
-    #     else:
-    #         # Update flags based on retry failure (e.g., still multiple or still empty)
-    #         unitcell.error_multiple_distrib = retry_count > 1
-    #         unitcell.error_empty_distrib = retry_count == 0
-
-    # If nothing summed to neutrality, the usual reason is that the metal's
-    # true oxidation state simply isn't in its candidate list (an unusual
-    # state METAL_OXIDATION_STATES doesn't cover) -- but only when every
-    # other (non-metal) unique specie is already unambiguous, since
-    # otherwise there's no way to know how much of the "missing" charge is
-    # really the metal's vs. a ligand option we didn't consider.
+    # Nothing balanced: usually the metal's true oxidation state is missing from
+    # METAL_OXIDATION_STATES. Only safe when every other specie is unambiguous.
     if unitcell.error_empty_distrib:
         inferred_charges = _infer_metal_charge_from_fixed_ligands(
             unitcell.unique_indices, refcell.unique_species
@@ -113,24 +72,10 @@ def balance_unitcell_charge(refcell, unitcell):
 def _infer_metal_charge_from_fixed_ligands(
     unique_indices, unique_species, input_charge: int = 0
 ) -> List[int] | None:
-    """
-    Fallback for when no combination of standard charge options summed to
-    neutrality (unitcell.error_empty_distrib): if every non-metal unique
-    specie already has exactly one feasible charge, the metal's true
-    oxidation state is the one value that makes the total balance out --
-    regardless of whether it's in the metal's usual candidate list
-    (spec.plausible_os, drawn from METAL_OXIDATION_STATES) -- since an
-    unusual/rare oxidation state not in that list is the most likely
-    reason the normal search came up empty in the first place.
-
-    Only handles a single unique metal specie (though it may appear
-    multiple times in the cell via symmetry): with more than one distinct
-    metal type, there's no way to know how to split the "missing" charge
-    between them, so this declines rather than guess.
-
-    Returns a list of charges (one per entry in `unique_species`, in
-    order) if a unique, integer-valued metal charge can be solved for,
-    else None.
+    """Fallback when nothing balanced: if every non-metal specie has exactly one
+    feasible charge, solve the metal's oxidation state as the value that balances,
+    even one outside its candidate list. Declines when several metals are distinct.
+    Returns one charge per ``unique_species`` entry, or None.
     """
     metal_unique_indices: set[int] = set()
     non_metal_options: List[tuple[int, List[int]]] = []
@@ -218,23 +163,6 @@ def balance_molecule_charge(molecule, input_charge: int = 0, second_try: bool = 
     # Refinement for the retry logic inside balance_molecule_charge
     # if len(expanded_species_charges) != 1 and second_try:
     #     logger.info("Retrying with fallbacks...")
-
-    #     # Capture the retry results
-    #     res_expanded, res_unique = [], []
-    #     if len(expanded_species_charges) > 1:
-    #         res_expanded, res_unique = resolve_charge_distributions(
-    #             unique_indices,
-    #             molecule.unique_species,
-    #             input_charge=input_charge,
-    #             aromatic=True,
-    #         )
-    #     elif len(expanded_species_charges) == 0:
-    #         res_expanded, res_unique = resolve_charge_distributions(
-    #             unique_indices,
-    #             molecule.unique_species,
-    #             input_charge=input_charge,
-    #             rare=True,
-    #         )
 
     #     # If the retry found a unique solution, update the main variables
     #     if len(res_expanded) == 1:
