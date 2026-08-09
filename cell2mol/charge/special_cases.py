@@ -26,18 +26,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
-# Manually-verified Jemmis mno-rule "p" term (total vertices missing across
-# all fused sub-polyhedra, relative to their own closo parents) for specific
-# conjuncto/condensed borane cage compositions -- keyed by cage-only
-# composition (e.g. "B22" for 22 boron cage atoms, ignoring substituents),
-# since the same fused cage can carry different substituents (-OH, -OEt,
-# ...) under different overall formulas. See
-# generate_conjuncto_borane_charge_state's docstring for why p can't be
-# derived generically from connectivity for these: unlike m, n, and o
-# (which come straight out of the graph cut in find_conjuncto_borane_split),
-# classifying each fused sub-polyhedron's own openness independently of the
-# fusion seam is unreliable from a naive graph slice. Each entry here has
-# been checked against a literature-reported charge, not guessed.
+# Jemmis mno-rule "p" (vertices missing across all fused sub-polyhedra), keyed
+# by cage-only composition since substituents vary. Not derivable from a naive
+# graph slice, so each entry is checked against a literature charge.
 MANUAL_CONJUNCTO_BORANE_P = {
     # [B22H22]^2- docosaborate: closo-B12 icosahedron (p=0) fused to a
     # nido-B10 cluster (p=1) sharing a common edge. Verified against
@@ -48,18 +39,9 @@ MANUAL_CONJUNCTO_BORANE_P = {
 
 
 def generate_special_charge_states(spec: Specie) -> list[ChargeState] | None:
-    """Generate charge states for species handled by a closed-form builder
-    rather than the general bond-order search: antimony-halide anions
-    (SbX3/X4/X5/X6-type), fullerene cages (C20, C60, C70, ..., including
-    substituted derivatives), and closo/nido borane or carborane cages
-    (B12H12^2-, o-carborane, a dicarbollide ligand, ..., including
-    substituted derivatives).
-
-    Return contract (three outcomes the caller must distinguish):
-      * ``None``  -- not a special case; the caller should run the general
-        charge-state search.
-      * ``[cs]``  -- a special case whose closed-form builder succeeded.
-      * ``[]``    -- a special case whose builder FAILED.
+    """Charge states for species built in closed form rather than searched: antimony
+    halides, fullerene cages, closo/nido boranes. Three outcomes -- None (not
+    special, run the general search), [charge_state] (built), [] (special but failed).
     """
     # Antimony-halide-only species (SbX3/X4/X5/X6-type)
     if is_sb_halide_only(spec.labels):
@@ -78,11 +60,8 @@ def generate_special_charge_states(spec: Specie) -> list[ChargeState] | None:
         if spec.has_fullerene is not None
         else spec.evaluate_has_fullerene()
     )
-    # Fullerene cage or dimer (has_fullerene is True for both; a dimer is two
-    # cages joined by a single direct C-C bond, e.g. [C60-C60], BAQLUC01). Route
-    # to the matching closed-form builder: the dimer builder needs its own
-    # per-cage Kekule/leftover handling, so a dimer must NOT go through the
-    # single-cage builder (which would fail on the degree-4 bridge carbons).
+    # has_fullerene covers cage and dimer alike, so route each to its own builder:
+    # the single-cage one would fail on a dimer's degree-4 bridge carbons.
     if has_fullerene:
         prot0 = spec.protonation_states[0]
         if find_fullerene_dimer_split(prot0.atnums, prot0.adjmat) is not None:
@@ -106,12 +85,8 @@ def generate_special_charge_states(spec: Specie) -> list[ChargeState] | None:
             return None
         return [charge_state] if charge_state is not None else []
 
-    # Borane/carborane cage (possibly substituted), single closo or nido
-    # deltahedron. Fused conjuncto (multi-cage) clusters -- e.g. the
-    # docosaborate [B22H22]^2- -- fail is_borane_cage's single-deltahedron
-    # check (it has no dimer-style fallback the way has_fullerene does for
-    # C60-C60), so has_borane is False for them and they fall through to
-    # the general search below rather than generate_conjuncto_borane_charge_state.
+    # Single closo/nido deltahedron only. Fused conjuncto clusters fail
+    # is_borane_cage (no dimer-style fallback) and reach the general search.
     has_borane = (
         spec.has_borane if spec.has_borane is not None else spec.evaluate_has_borane()
     )
@@ -142,20 +117,9 @@ def is_sb_halide_only(labels) -> bool:
 
 
 def generate_sb_halide_charge_state(prot: Protonation) -> ChargeState | None:
-    """
-    Builds Sb/halogen-only species directly from connectivity.
-
-    Mononuclear species (single Sb center): each Sb's formal charge is set
-    from its own halogen coordination number, since degree directly tracks
-    oxidation state here. Hexacoordinate Sb (SbX6-) gets formal charge -1.
-    Every other coordination number (3, 4, 5) keeps one lone
-    pair, giving formal charge = 3 - degree: neutral SbX3, SbX4-, SbX5(2-).
-
-    Polynuclear species (multiple Sb centers, e.g. bridged iodoantimonate
-    clusters like [Sb7I25]4-). These clusters are always built from
-    Sb(III) + halide ligands, so the total charge is fixed at
-    3 * n_Sb - n_halogens, Sb centers are drawn neutral and the charge
-    is instead distributed across only as many halogens as needed.
+    """Sb/halogen species charged from connectivity. Mononuclear: -1 for SbX6-, else
+    ``3 - degree``. Polynuclear clusters are always Sb(III) + halides, so the total
+    is ``3 * n_Sb - n_halogens`` with Sb neutral and the charge on the halogens.
     """
     assert (
         prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
@@ -201,12 +165,8 @@ def generate_sb_halide_charge_state(prot: Protonation) -> ChargeState | None:
         for j in halogen_indices:
             rwmol.GetAtomWithIdx(j).SetNoImplicit(True)
 
-        # Distribute exactly enough -1 charges across the halogens so the
-        # total comes out to 3 * n_Sb - n_halogens: one per Sb, round-robin,
-        # so it's spread evenly across centers rather than piled onto a
-        # few. Bridging halogens aren't required to carry it -- prefer a
-        # terminal neighbor (bonded to just this one Sb) and only fall
-        # back to a bridging one if this Sb has no terminal neighbor left.
+        # Spread -1 charges round-robin, one per Sb, to reach
+        # 3 * n_Sb - n_halogens. Prefer terminal halogens over bridging ones.
         halogen_sb_degree = {
             j: sum(1 for idx in sb_indices if adjmat[idx, j] != 0)
             for j in halogen_indices
@@ -284,30 +244,9 @@ def _valid_fullerene_vertex_count(n: int) -> bool:
 
 
 def find_fullerene_cage_indices(atoms, AC) -> list[int] | None:
-    """
-    Identify which atoms form a fullerene cage, including when it's
-    embedded in a larger substituted derivative (e.g. a methanofullerene
-    like PCBM, a fullerenol C60(OH)n, a halofullerene, or a fullerane
-    C60H2n) -- by taking the 3-core of the carbon-only bond graph:
-    repeatedly strip away any carbon with fewer than 3 *carbon* neighbors.
-
-    Cage carbons are inherently 3-connected to other cage carbons and
-    always survive this, regardless of how many of them also carry an
-    exocyclic substituent (which adds a 4th bond but never removes one of
-    the 3 cage bonds). Any substituent -- a lone terminal atom (H, a
-    halogen), an -OH, or an organic tail/ring bonded through the cage at a
-    single point -- eventually strips away completely: tracing back along
-    any real substituent from its outermost leaves always reaches a point
-    where degree drops below 3, and removing it can only lower the degree
-    of what's left, cascading until nothing but the cage remains.
-
-    For a bare, unsubstituted fullerene, every atom is already carbon and
-    already 3-connected, so this returns every atom -- identical to the
-    cage this function replaces determining via `all(z == 6 for z in
-    atoms)` before substituent support existed.
-
-    Returns the sorted list of cage atom indices, or None if there are no
-    carbon atoms at all.
+    """Cage atoms of a fullerene, including one inside a substituted derivative, via
+    the 3-core of the carbon-only graph: cage carbons are inherently 3-connected
+    and survive, substituents strip away. None if there are no carbons.
     """
     atoms = [int(a) for a in atoms]
     ac = np.asarray(AC, dtype=int)
@@ -327,31 +266,10 @@ def find_fullerene_cage_indices(atoms, AC) -> list[int] | None:
 
 
 def has_fullerene(atoms, AC) -> tuple[bool, str]:
-    """
-    Detect any fullerene cage (C20, C60, C70, C76, C84, ...) purely from
-    connectivity - no bond orders, no coordinates required - including
-    when it's embedded in a larger substituted derivative (see
-    find_fullerene_cage_indices).
-
-    A graph is a fullerene skeleton iff its cage-only atoms (see
-    find_fullerene_cage_indices) form a subgraph that is:
-      1. all carbon
-      2. 3-regular among themselves (every cage atom has exactly 3 cage
-         neighbors -- any exocyclic substituent bond doesn't count here)
-      3. a single connected component
-      4. planar (embeds on a sphere - a topological requirement for any
-         closed convex-ish cage)
-      5. girth >= 5 (no 3- or 4-membered rings/faces; fullerene faces are
-         only pentagons and hexagons by construction)
-      6. has a valid fullerene vertex count (even, >=20, != 22)
-
-    Given 2-6, Euler's formula (V - E + F = 2) combined with the pentagon/
-    hexagon face constraint forces exactly 12 pentagonal faces regardless
-    of n - that part never needs to be checked separately, it's automatic.
-
-    Returns
-    -------
-    (is_fullerene, reason) : tuple[bool, str]
+    """Detect a fullerene cage from connectivity alone. The cage subgraph must be all
+    carbon, 3-regular, connected, planar, girth >= 5, and of valid vertex count
+    (even, >= 20, != 22) -- which forces 12 pentagons by Euler. Returns
+    (is_fullerene, reason).
     """
     atoms = [int(a) for a in atoms]
     # Ligand adjmats inherited/sliced from a parent molecule's matrix can
@@ -386,12 +304,9 @@ def has_fullerene(atoms, AC) -> tuple[bool, str]:
     sub_ac = ac[np.ix_(cage_indices, cage_indices)]
     degrees = np.count_nonzero(sub_ac, axis=1)
     if not np.all(degrees == 3):
-        # A fullerene dimer -- two closed cages joined by a single direct C-C
-        # bond (e.g. [C60-C60]) -- fails the 3-regular test: its two bridge
-        # carbons are degree 4 (3 cage bonds + 1 inter-cage bond). Accept it if
-        # find_fullerene_dimer_split confirms both sides are complete cages once
-        # the bridge is removed. No recursion risk: each half is an ordinary
-        # single cage that passes the degree-3 test and never re-enters here.
+        # A dimer fails the 3-regular test at its two degree-4 bridge carbons.
+        # Accept if both sides are complete cages once cut; each half is an
+        # ordinary single cage, so this never recurses.
         if find_fullerene_dimer_split(atoms, ac) is not None:
             return True, "fullerene_dimer"
         return False, "not_all_degree_3"
@@ -417,31 +332,9 @@ def has_fullerene(atoms, AC) -> tuple[bool, str]:
 
 
 def find_fullerene_dimer_split(atoms, AC) -> dict | None:
-    """
-    For two fullerene cages joined by a single direct C-C bond -- e.g.
-    1,1'-bi-C60fulleride, [C60-C60]^2- -- find that bridging bond and
-    confirm each side is an independently valid, complete fullerene cage
-    in its own right.
-
-    This is a different situation from a substituted single fullerene
-    (find_fullerene_cage_indices): there, a substituent gets excluded via
-    a 3-core because it doesn't sustain degree-3 connectivity on its own.
-    Here, BOTH sides of the cut are themselves complete, ordinary
-    fullerene topologies once the bridging bond is removed (every atom,
-    including the former bridge atom, reverts to degree exactly 3) -- so
-    a 3-core can't separate them; the two full cages have to be told
-    apart directly by trying each bridge (an edge whose removal
-    disconnects the graph -- necessarily true of a direct inter-cage
-    bond, since removing any cage-internal edge can't disconnect a
-    3-connected polyhedral cage) and checking has_fullerene on each
-    side independently.
-
-    Only a plain two-cage split is handled (not three or more cages, and
-    not a spacer-mediated link through non-cage atoms).
-
-    Returns {"cages": [[...], [...]], "bridge": (atom_in_cage0,
-    atom_in_cage1)} (atom indices into `atoms`), or None if no such split
-    is found.
+    """Two cages joined by one direct C-C bond. A 3-core cannot separate them (both
+    sides revert to degree 3 once cut), so each bridge edge is tried and
+    has_fullerene checked per side. Returns {"cages", "bridge"} or None.
     """
     atoms_list = [int(a) for a in atoms]
     ac = np.asarray(AC, dtype=int)
@@ -531,27 +424,9 @@ def _cage_face_sizes(graph: "nx.Graph[int]") -> list[int] | None:
 
 
 def find_borane_cage_indices(atoms, AC) -> list[int] | None:
-    """
-    Identify which atoms form a closo/nido borane or carborane deltahedral
-    cage, including when it's embedded in a larger substituted derivative
-    (e.g. a phosphine-tethered dicarbollide, an alkylated o-carborane, a
-    perhalogenated closo-borate) -- by taking the 3-core of the B/C-only
-    bond graph: repeatedly strip away any B or C atom with fewer than 3
-    B/C neighbors. Mirrors find_fullerene_cage_indices's approach.
-
-    Every vertex of a closo or nido deltahedron has at least 3 cage
-    neighbors (the smallest closo deltahedron, the trigonal bipyramid,
-    has its two apex atoms at exactly 3 -- see is_borane_cage), so
-    genuine cage atoms always survive this regardless of how many of them
-    also carry an exocyclic substituent (which adds a bond but never
-    removes one of the cage bonds). Any substituent -- a lone carbon
-    bonded only through a non-B/C atom, an alkyl chain, or an aromatic
-    ring attached at a single point -- strips away completely: tracing
-    back from its outermost leaves always reaches a point where B/C
-    degree drops below 3, cascading until nothing but the cage remains.
-
-    Returns the sorted list of cage atom indices, or None if there are no
-    boron or carbon atoms at all.
+    """Cage atoms of a closo/nido deltahedron, via the 3-core of the B/C-only graph.
+    Every deltahedron vertex has at least 3 cage neighbours, so cage atoms survive
+    and substituents strip away. None if there are no B or C atoms.
     """
     atoms = [int(a) for a in atoms]
     ac = np.asarray(AC, dtype=int)
@@ -571,36 +446,10 @@ def find_borane_cage_indices(atoms, AC) -> list[int] | None:
 
 
 def is_borane_cage(atoms, AC) -> tuple[bool, str]:
-    """
-    Detect a closo- or nido-type borane/carborane deltahedral cage
-    (closo-B12H12^2-, closo-C2B10H12/o-carborane, nido-[C2B9H11]^2-
-    "dicarbollide", closo-B12Cl12^2-/"dodecachloro-closo-dodecaborate",
-    ...) purely from connectivity - no bond orders, no coordinates
-    required. Mirrors has_fullerene's coordinate-free, planar-graph-
-    based approach, including substituent handling (see
-    find_borane_cage_indices).
-
-    Cage vertex atoms are B and/or C (a carborane substitutes some cage
-    B for C); anything else attached to them - terminal H, a halogen
-    (perhalogenated clusters like B12X12^2- are common), an organic
-    substituent (e.g. a phosphine-tethered dicarbollide ligand), or a
-    metal coordinated through a dicarbollide's open face - is exocyclic
-    and is dropped before the cage-only subgraph is checked, regardless
-    of what it actually is.
-
-    Two Wade's-rules cluster families are recognized from that subgraph's
-    planar face sizes:
-      - closo (n >= 5 cage atoms): a full deltahedron - every face is a
-        triangle. These are the free, typically dianionic clusters
-        (B12H12^2-, closo-carboranes).
-      - nido (n >= 6 cage atoms): a closo (n+1)-vertex deltahedron with
-        one vertex removed, leaving exactly one open pentagonal face and
-        every other face triangular. This is the dicarbollide ligand
-        family, which binds a metal eta5 through that open face like Cp-.
-
-    Returns
-    -------
-    (is_cage, reason) : tuple[bool, str]
+    """Detect a closo- or nido-type deltahedron from connectivity, exocyclic atoms
+    dropped first. Read off the cage's planar faces: closo (n >= 5) is all
+    triangles, nido (n >= 6) has exactly one open pentagonal face. Returns
+    (is_cage, reason).
     """
     atoms = [int(a) for a in atoms]
     # See the matching comment in has_fullerene: ligand adjmats can be
@@ -612,11 +461,8 @@ def is_borane_cage(atoms, AC) -> tuple[bool, str]:
     if ac.shape != (n_total, n_total):
         return False, "bad_ac_shape"
 
-    # 1. Cage composition - find the embedded B/C cage core, if any (see
-    #    find_borane_cage_indices), then require at least one B in it (a
-    #    pure-carbon deltahedral cage isn't a known species; pure-carbon
-    #    cages are handled by has_fullerene, whose 3-regular/girth>=5
-    #    signature is disjoint from a deltahedron's anyway).
+    # 1. Cage composition -- require at least one B; a pure-carbon deltahedron
+    #    is not a known species, and carbon cages go to has_fullerene.
     cage_indices = find_borane_cage_indices(atoms, ac)
     if cage_indices is None:
         return False, "no_boron_or_carbon_atoms"
@@ -667,35 +513,10 @@ def is_borane_cage(atoms, AC) -> tuple[bool, str]:
 
 
 def find_conjuncto_borane_split(atoms, AC) -> dict | None:
-    """
-    For a condensed/conjuncto borane cage that fails the single-deltahedron
-    check (is_borane_cage) -- e.g. the docosaborate [B22H22]^2- anion, a
-    closo-B12 icosahedron fused to a nido-B10 cluster -- look for a small
-    vertex cut (a single shared vertex, or a shared edge of 2 atoms) that
-    splits the B/C cage graph into exactly two separate, genuinely
-    polyhedral pieces.
-
-    This only identifies *that* a valid 2-polyhedron split exists and what
-    the shared/cut atoms are; it does NOT classify either side as
-    closo/nido/arachno. Isolating one fused sub-polyhedron's own atoms
-    (its unique atoms plus the shared cut atoms) and checking its face
-    sizes directly does not reliably reveal that classification -- the
-    shared cut atoms' bonds to the *other* sub-polyhedron aren't part of
-    this side's own subgraph, which distorts the local face pattern at
-    the fusion seam (verified directly on the docosaborate case: the
-    nido-B10 side comes out with one square and one hexagonal face rather
-    than the single pentagonal opening a clean nido shape would show).
-    Callers needing that classification (the mno rule's "p" term) use a
-    manual, literature-verified lookup instead -- see
-    MANUAL_CONJUNCTO_BORANE_P.
-
-    Returns a dict with:
-      "cage_indices": all B/C cage atom indices (both sub-polyhedra)
-      "cut_indices": the 1 or 2 atoms shared between the two sub-polyhedra
-      "components": [[...], [...]], the atoms unique to each side
-      "o": 1 if the two sub-polyhedra share a single vertex, else 0 (an
-           edge/2-atom share)
-    or None if no such split is found.
+    """Split a fused multi-cage cluster on a shared vertex or edge. Identifies only
+    THAT a split exists, never each side's closo/nido class -- a naive graph slice
+    distorts faces at the fusion seam. Returns {"cage_indices", "cut_indices",
+    "components", "o"} (o = 1 for a shared vertex, 0 for an edge), or None.
     """
     atoms = [int(a) for a in atoms]
     ac = np.asarray(AC, dtype=int)
@@ -768,35 +589,10 @@ def check_fullerene_sphericity(coords, tol: float = 0.35) -> bool:
 
 
 def has_open_fullerene(atoms, AC, coords) -> tuple[bool, str]:
-    """
-    Detect an *open* fullerene cage: a fullerene-derived carbon shell whose
-    cage has been opened at an orifice (often functionalised with O/N at the
-    rim, e.g. AFITUH's H16-C73-N2-O2 open-cage C60 derivative).
-
-    ``has_fullerene`` rejects these -- the orifice leaves rim carbons with only
-    two cage neighbours, so the carbon 3-core (which a closed cage survives
-    intact) cascades away to nothing. An open cage is instead recognised from
-    the looser carbon 2-core plus geometry:
-
-      1. a large carbon 2-core (>= 40 atoms; practical open cages are C60/C70-
-         derived, and this floor keeps medium polycyclic aromatics out);
-      2. mostly sp2 -- >= 60% of the 2-core carbons keep three carbon
-         neighbours (the shell), the rest being the 2-connected orifice rim;
-      3. a large fused-ring system (cyclomatic number >= 20; a fullerene shell
-         has ~30 faces). This rejects calixarene/cryptophane-type covalent
-         organic cages, whose aromatic rings are linker-separated (few fused
-         rings);
-      4. genuine 3D thickness -- the smallest / largest principal-axis extent
-         (SVD) is >= 0.25. A closed or open cage is a 3D shell; a flat
-         polycyclic aromatic (coronene, a graphene flake) collapses onto a
-         plane and is rejected here.
-
-    Coordinate-based (unlike ``has_fullerene``). Used to skip missing-hydrogen
-    detection, where curved sp2 cage carbons are otherwise mis-read as
-    under-coordinated. Closed fullerenes are already caught by
-    ``has_fullerene``; this only adds the opened ones.
-
-    Returns (is_open_fullerene, reason).
+    """Detect a fullerene shell opened at an orifice, which has_fullerene rejects
+    because the rim breaks the 3-core. Uses the carbon 2-core plus geometry: >= 40
+    atoms, >= 60% still 3-connected, cyclomatic number >= 20, and real 3D thickness
+    by SVD. Coordinate-based. Returns (is_open_fullerene, reason).
     """
     MIN_CAGE = 40
     MIN_FUSED_RINGS = 20
@@ -852,28 +648,10 @@ def has_open_fullerene(atoms, AC, coords) -> tuple[bool, str]:
 def _find_porphyrin_rings_and_bridges(
     atoms, AC
 ) -> list[tuple[list[frozenset[int]], list[int | None]]]:
-    """
-    Shared detection for porphyrin/porphine-, phthalocyanine-, and
-    corrole/corrin-type N4 macrocycles: four five-membered pyrrole-type
-    rings (1 N + 4 C each) joined pairwise into one closed macrocycle.
-    Three (corrole/corrin) or four (porphyrin/phthalocyanine) of those
-    links go through a single meso bridge atom -- carbon for a porphyrin,
-    nitrogen (aza) for a phthalocyanine -- while corrole and corrin are
-    "ring-contracted": one link is a direct bond between an atom of each
-    ring instead of going through a meso atom, giving a 15-membered core
-    instead of the 16-membered porphyrin/phthalocyanine core. Substituents
-    (aryl/alkyl groups, fused benzo rings on each pyrrole for
-    phthalocyanine, H, a coordinated metal, etc.) are ignored -- only the
-    core ring topology is checked, mirroring has_fullerene's
-    coordinate-free approach.
-
-    Returns one (rings, bridges) entry per disjoint macrocycle found --
-    e.g. two entries for a bis-porphyrin ligand bridging two metals -- or
-    an empty list if none exists. In each entry the rings/bridges are in
-    cyclic traversal order: rings[i] and rings[(i+1) % 4] are joined by
-    bridges[i], the meso atom index, or by a direct bond if bridges[i] is
-    None. Macrocycles are peeled off greedily and never share a pyrrole
-    ring, so their cores are disjoint.
+    """Four pyrrole-type rings joined pairwise into one closed loop, through a meso
+    atom (C or N) or, for corrole/corrin, one direct ring-to-ring bond. Returns
+    (rings, bridges) per disjoint macrocycle in cyclic order, bridges[i] being the
+    meso atom joining rings[i] and rings[i+1], or None for a direct bond.
     """
     atoms = [int(a) for a in atoms]
     # See the matching comment in has_fullerene: ligand adjmats can be
@@ -887,12 +665,8 @@ def _find_porphyrin_rings_and_bridges(
 
     n_nitrogen = sum(1 for z in atoms if z == 7)
     n_carbon = sum(1 for z in atoms if z == 6)
-    # 16 core carbons (4 pyrrole rings * 4 C) is the hard minimum for any
-    # porphyrin-family macrocycle. Carbon meso bridges push this higher (20 for
-    # a full porphyrin, 19 for a ring-contracted corrole/corrin), but a
-    # porphyrazine / phthalocyanine has *nitrogen* meso bridges, so its core can
-    # bottom out at exactly 16 C when no carbon-adding fused rings are present
-    # (e.g. GAFMUW01, a tetrakis(thiadiazole)porphyrazine: C16-N16-S4).
+    # 16 core carbons (4 rings x 4 C) is the hard minimum: carbon meso bridges
+    # push it higher, but a phthalocyanine's meso bridges are nitrogen.
     if n_nitrogen < 4 or n_carbon < 16:
         return []
 
@@ -920,15 +694,9 @@ def _find_porphyrin_rings_and_bridges(
             rings_by_nitrogen[nitrogen] = ring
     remaining_rings = list(rings_by_nitrogen.values())
 
-    # Peel off one closed macrocycle at a time. A classic porphyrin has
-    # exactly 4 candidate rings; a bis-porphyrin has 8 forming two disjoint
-    # 4-macrocycles; an expanded porphyrin (penta-/hexaphyrin, ...) closes a
-    # single loop of 5, 6, or more pyrroles. Each iteration finds the
-    # smallest closed loop among the remaining rings -- smallest-first so a
-    # bis-porphyrin still resolves into two genuine 4-macrocycles rather than
-    # one spurious 8-membered loop threaded through both -- records it, and
-    # removes those rings before searching the rest, so a pyrrole is never
-    # reused across macrocycles.
+    # Peel off the smallest closed loop at a time, removing its rings before
+    # searching on -- smallest-first so a bis-porphyrin resolves into two real
+    # 4-macrocycles rather than one spurious 8-membered loop through both.
     macrocycles: list[tuple[list[frozenset[int]], list[int | None]]] = []
     while len(remaining_rings) >= 4:
         found_combo = None
@@ -961,13 +729,8 @@ def _find_porphyrin_rings_and_bridges(
 def find_all_porphyrin_macrocycles(
     atoms, AC
 ) -> list[tuple[list[int], bool, list[int]]]:
-    """
-    Detect every disjoint porphyrin/porphine-, phthalocyanine-, or
-    corrole/corrin-type N4 macrocycle in a structure purely from
-    connectivity (see _find_porphyrin_rings_and_bridges). Returns one
-    (nitrogens, is_contracted, core_atoms) tuple per macrocycle -- two for
-    a bis-porphyrin ligand, and so on -- or an empty list if none is found.
-    See find_porphyrin_macrocycle for what each field means.
+    """Every disjoint N4 macrocycle in a structure -- two for a bis-porphyrin, and so
+    on. See find_porphyrin_macrocycle for the fields.
     """
     atoms = [int(a) for a in atoms]
     macrocycles = []
@@ -983,26 +746,10 @@ def find_all_porphyrin_macrocycles(
 
 
 def find_porphyrin_macrocycle(atoms, AC) -> tuple[list[int], bool, list[int]] | None:
-    """
-    Detect a single porphyrin/porphine-, phthalocyanine-, or
-    corrole/corrin-type N4 macrocycle purely from connectivity (see
-    _find_porphyrin_rings_and_bridges). Returns the first macrocycle found,
-    or None if there is none; use find_all_porphyrin_macrocycles for
-    ligands that may hold more than one (e.g. bis-porphyrins).
-
-    Returns (nitrogens, is_contracted, core_atoms) if found, else None:
-    - `nitrogens`: the 4 macrocycle (pyrrole-type) nitrogen atom indices
-      in cyclic macrocycle order (not sorted by index) -- position i and
-      i+2 are the "opposite" (bridge-separated-by-two-rings) pair,
-      positions i and i+1 are "adjacent" (single bridge apart).
-    - `is_contracted`: True for a corrole/corrin-type macrocycle (one
-      ring-to-ring link is a direct bond rather than a meso bridge),
-      False for a classic porphyrin/phthalocyanine macrocycle (all 4
-      links are meso bridges).
-    - `core_atoms`: every atom in the 4 pyrrole/pyrroline rings plus the
-      meso bridge atoms (sorted) -- i.e. the whole macrocycle core,
-      excluding any exocyclic substituent (aryl/alkyl groups, fused benzo
-      rings, H, a coordinated metal, etc.).
+    """The first N4 macrocycle found, or None. Returns (nitrogens, is_contracted,
+    core_atoms): the 4 pyrrole-type N in cyclic order (i and i+2 are the trans
+    pair), whether one link is a direct bond (corrole/corrin), and the rings plus
+    meso bridges without substituents.
     """
     macrocycles = find_all_porphyrin_macrocycles(atoms, AC)
     return macrocycles[0] if macrocycles else None
@@ -1011,23 +758,9 @@ def find_porphyrin_macrocycle(atoms, AC) -> tuple[list[int], bool, list[int]] | 
 def porphyrin_reference_protonation_sites(
     macrocycle_nitrogens: list[int], is_contracted: bool
 ) -> list[int]:
-    """
-    The macrocycle nitrogens that carry the proton in the neutral
-    free-base tautomer -- the opposite (trans) pair for a classic
-    porphyrin/phthalocyanine macrocycle (all 4 links are meso bridges),
-    or 3 of the 4 nitrogens for a ring-contracted corrole/corrin
-    macrocycle (the 4th, structurally tied to the direct ring-to-ring
-    bond, stays an unprotonated imine-type nitrogen).
-
-    For an expanded porphyrin (penta-/hexaphyrin, ...) this returns the
-    N-H set of the aromatic free base: N-H on alternating ring nitrogens
-    around the macrocycle (e.g. 3 of the 6 for a [26]hexaphyrin). This is
-    the baseline count m0; the actual number of protons enumerated for such
-    a macrocycle is bracketed at m0 +/- 1 to cover the oxidation-level
-    variants ([26]/[28], ...) -- see _generate_porphyrin_protonation_states.
-
-    The classic N4 result is what generate_porphyrin_charge_state relies on
-    to stay consistent with the enumerator.
+    """Ring nitrogens carrying the proton in the neutral free base: the trans pair for
+    a classic N4, 3 of 4 for a corrole/corrin, or alternating N-H for an expanded
+    ring -- there only the baseline m0, which the enumerator brackets at m0 +/- 1.
     """
     if len(macrocycle_nitrogens) == 4:
         if is_contracted:
@@ -1040,32 +773,10 @@ def porphyrin_reference_protonation_sites(
 def _macrocycle_ring_order_and_bridges(
     rings, graph: "nx.Graph[int]", atoms: list[int]
 ) -> tuple[list[int], dict[frozenset[int], int | None]] | None:
-    """
-    Check whether the k given pyrrole-type rings are connected pairwise,
-    each to exactly two others, into one single macrocyclic loop rather
-    than, say, two separate pairs or an open chain -- via either a
-    single-atom meso bridge (carbon for a porphyrin, nitrogen for a
-    phthalocyanine; either is accepted here, so this one check covers both
-    macrocycle families) or a direct bond between an atom of each ring (the
-    ring-contraction found in corrole/corrin, and the bipyrrole links of
-    expanded porphyrins such as rubyrin, replacing a meso bridge). k is 4
-    for a classic porphyrin/corrole and 5, 6, ... for expanded porphyrins
-    (penta-/hexaphyrin, ...).
-
-    For the k == 4 families a further constraint applies: at most one of
-    the four links may be a direct ring-to-ring bond (the single
-    corrole/corrin contraction) -- two or more would be a spurious loop
-    (e.g. two rings from each of two different macrocycles in a
-    bis-porphyrin, stitched together by inter-macrocycle bonds), not a
-    genuine tetrapyrrole. Larger loops are only accepted once no smaller
-    one exists (see _find_porphyrin_rings_and_bridges), so this guard is
-    what keeps a bis-porphyrin resolving into two real 4-macrocycles.
-
-    Returns (order, bridge_by_edge) if so, else None: `order` is the
-    cyclic traversal order (indices into `rings`); `bridge_by_edge` maps
-    each frozenset({ring_idx_a, ring_idx_b}) to the meso atom index
-    bridging that pair, or to None if that pair is joined by a direct
-    bond instead.
+    """Whether k rings form one closed loop, each joined to exactly two others by a
+    meso atom or a direct bond. For k == 4 at most one direct bond is allowed, else
+    a bis-porphyrin would stitch into one spurious loop. Returns (order,
+    bridge_by_edge) mapping each ring pair to its meso atom, or None per direct bond.
     """
     k = len(rings)
     ring_atoms = [set(r) for r in rings]
@@ -1135,15 +846,7 @@ def _macrocycle_ring_order_and_bridges(
 
 
 def is_porphyrin_macrocycle(atoms, AC) -> tuple[bool, str]:
-    """
-    True if the connectivity contains a porphyrin/porphine-,
-    phthalocyanine-, or corrole/corrin-type N4 macrocycle -- four pyrrole
-    rings bridged into one closed ring via carbon meso bridges
-    (porphyrin), nitrogen aza-meso bridges (phthalocyanine), or 3 meso
-    bridges plus one direct ring-to-ring bond (the ring-contracted
-    corrole/corrin core) -- regardless of substituents or fused benzo
-    rings. See find_porphyrin_macrocycle for the detection logic.
-    """
+    """True if the connectivity contains an N4 macrocycle, regardless of substituents."""
     result = find_porphyrin_macrocycle(atoms, AC)
     if result is None:
         return False, "no_porphyrin_macrocycle"
@@ -1154,31 +857,10 @@ def is_porphyrin_macrocycle(atoms, AC) -> tuple[bool, str]:
 
 
 def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
-    """
-    Builds a charge state for a porphyrin/phthalocyanine/corrole/corrin
-    N4 macrocycle ligand by fixing the macrocycle core's formal charges
-    analytically instead of running the whole ligand through the general
-    combinatorial AC2mol bond-order/charge search, which can settle on a
-    chemically implausible charge-separated resonance structure for a
-    conjugated ring system this size. Substituents (meso-aryl groups,
-    beta-pyrrole substituents, axial groups, ...) are split off and
-    charged independently via the same fragment-capping search used for
-    fullerene/borane substituents (_collect_substituent_fragment /
-    _charge_capped_fragment), then summed with the core's charge.
-
-    Core charge: the neutral free base carries one N-H on each pyrrolic
-    nitrogen; the remaining ring nitrogens are imine-type (=N-, part of a
-    ring double bond). Both are formally neutral, so we take the pyrrolic
-    (reference) set to be exactly the nitrogens `prot` actually protonates
-    and leave every core atom neutral, letting RDKit's Kekulization pick a
-    closed-shell bond pattern consistent with that N-H arrangement. If none
-    exists (a wrong-parity expanded-porphyrin tautomer, say), sanitization
-    fails and the state is dropped. The core is therefore always neutral,
-    and the ligand's metal-bound charge (uncorrected total minus the added
-    protons) comes out as -(number of N-H) -- -2 for a porphyrin, -3 for a
-    corrole, and -(m0-1..m0+1) across the enumerated hexaphyrin states --
-    with no combinatorial search needed for the core, only for any
-    non-trivial substituent.
+    """Charge an N4 macrocycle analytically rather than searching a conjugated system
+    this size. Core atoms are all neutral and Kekulization picks a pattern matching
+    the N-H set ``prot`` protonates, so the ligand charge is -(number of N-H).
+    Substituents are split off and charged independently, then summed.
     """
     assert (
         prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
@@ -1260,12 +942,6 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
             return None
         else:
             pass
-            # logger.debug(
-            #     "Porphyrin-family specie %s has a substituent fragment with "
-            #     "bond(s) back to the macrocycle at core atom(s) %s",
-            #     prot.formula,
-            #     [c for c, _s in attach_bonds],
-            # )
         attach_atoms = [s for _c, s in attach_bonds]
 
         frag_charge, frag_atom_charges, frag_bond_orders = _charge_capped_fragment(
@@ -1283,12 +959,9 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
             atom_charges[global_i] = charge
         fragment_bond_orders.update(frag_bond_orders)
 
-    # Ring atoms that are saturated (four connections) cannot carry a pi system:
-    # a reduced macrocycle -- chlorin, bacteriochlorin, or a bridged/fused
-    # variant -- has sp3 carbons sitting inside the ring set. Four aromatic
-    # bonds on such a carbon means an explicit valence of 4 x 1.5 = 6, and
-    # sanitization rejects the whole molecule. Bond them as single instead and
-    # leave the rest of the macrocycle aromatic.
+    # Saturated ring atoms (a chlorin's sp3 carbons) cannot carry a pi system:
+    # four aromatic bonds would mean valence 6 and sanitization would reject the
+    # molecule. Bond them single, leaving the rest of the ring aromatic.
     saturated_core = {
         i
         for i in core_atoms
@@ -1319,15 +992,9 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
                 and i not in saturated_core
                 and j not in saturated_core
             ):
-                # A macrocycle's own bonds (ring + meso bridges) are left
-                # aromatic and Kekulized by RDKit below, rather than
-                # hand-assigned, since -- unlike a fullerene cage or a
-                # borane cluster -- a flat conjugated tetrapyrrole ring is
-                # exactly the kind of system RDKit's standard aromaticity
-                # model is built for. This only applies within a single
-                # ring: a bond directly linking two different macrocycles in
-                # a fused bis-porphyrin is an inter-ring single bond (handled
-                # by the `else` below), not part of either aromatic system.
+                # A flat conjugated tetrapyrrole is what RDKit's aromaticity
+                # model is built for, so leave these bonds aromatic and let it
+                # Kekulize. Inter-macrocycle bonds are single (the else below).
                 bond_type = Chem.BondType.AROMATIC
             else:
                 bond_type = Chem.BondType.SINGLE
@@ -1357,20 +1024,14 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
     mol.AddConformer(conf, assignId=True)
 
     try:
-        # Keep RDKit's own Hueckel-based SETAROMATICITY perception out of
-        # it -- our formal charges/NoImplicit flags above already encode
-        # which ring atoms have a lone pair vs. a double bond, so only
-        # SANITIZE_KEKULIZE needs to run, picking bond orders consistent
-        # with what we've already fixed rather than re-deriving them.
+        # Charges and NoImplicit above already encode lone pair vs. double bond,
+        # so only KEKULIZE runs -- no re-deriving aromaticity from Hueckel.
         Chem.SanitizeMol(
             mol, sanitizeOps=Chem.SANITIZE_ALL ^ Chem.SANITIZE_SETAROMATICITY
         )
     except Exception as e:
-        # Not fatal: the specie falls back to the general charge enumeration.
-        # Reaching here means the ring matched the macrocycle topology but is
-        # not an aromatic tetrapyrrole after all -- e.g. a cyclopropane-fused or
-        # otherwise reduced core, where the remaining ring bonds are localized
-        # imines rather than one delocalized system.
+        # Not fatal -- the specie falls back to general enumeration. The ring
+        # matched the topology but is not an aromatic tetrapyrrole after all.
         logger.warning(
             "Porphyrin fast path declined for %s (not a kekulizable aromatic "
             "macrocycle: %s); falling back to general charge enumeration",
@@ -1398,35 +1059,10 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
 
 
 def generate_fullerene_charge_state(prot: Protonation) -> ChargeState | None:
-    """
-    Builds a closed-shell Kekule structure for a fullerene cage, including
-    substituted derivatives (methanofullerenes like PCBM, fullerenols,
-    halofullerenes, fulleranes, ...).
-
-    A bare fullerene skeleton is a bridgeless 3-regular graph, which by
-    Petersen's theorem always has a perfect matching. Promoting each
-    matched edge to a double bond gives every carbon its 4th bond
-    directly, with no charge separation and no combinatorial bond-order
-    search -- the kind of search that AC2mol/rdDetermineBonds cannot
-    afford to run over 60+ atoms.
-
-    A cage carbon bearing an exocyclic substituent already has 4 sigma
-    bonds (3 cage + 1 exocyclic) and so is already valence-satisfied
-    without a double bond at all -- it's excluded from the matching graph
-    entirely, and all 3 of its cage-neighbor bonds are forced single. The
-    perfect matching is instead computed over just the *unsubstituted*
-    cage atoms (see find_fullerene_cage_indices for how the cage itself
-    is identified within a larger substituted structure).
-
-    The cage's own charge is always 0 here: unlike a borane cage, a
-    fullerene's bonding is ordinary 2c-2e covalent bonding once the
-    Kekule structure is fixed, so every cage atom (substituted or not)
-    ends up with a complete, neutral valence by construction. Any actual
-    charge comes only from a substituent that isn't itself neutral (e.g.
-    a carboxylate tail) -- exactly as with borane cages, anything beyond
-    a simple terminal H/halogen is split off and charged independently
-    via the general AC2mol search (_collect_substituent_fragment /
-    _charge_capped_fragment).
+    """Kekule structure for a fullerene: a bridgeless 3-regular graph always has a
+    perfect matching (Petersen), so promoting matched edges completes every valence
+    with no charge separation and no search. Substituted carbons are excluded from
+    the matching. The cage charge is always 0; only substituents contribute.
     """
     assert (
         prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
@@ -1473,12 +1109,9 @@ def generate_fullerene_charge_state(prot: Protonation) -> ChargeState | None:
         for a, b in matching
     }
 
-    # Substituents beyond a simple terminal H/halogen are split off and
-    # charged independently, exactly as for borane cages. Their own
-    # internal bond orders (e.g. a pyridyl ring's aromatic Kekule
-    # pattern) are kept, not just their formal charges -- otherwise every
-    # such ring would get rebuilt as all-single bonds below and come out
-    # wrong (see _charge_capped_fragment's docstring).
+    # Substituents past a terminal H/halogen are split off and charged
+    # independently, keeping their internal bond orders as well as their
+    # charges -- rebuilt all-single, an aromatic ring comes out saturated.
     allowed_simple_labels = {"H"} | HALOGENS
     simple_exo = {
         i
@@ -1584,38 +1217,10 @@ def generate_fullerene_charge_state(prot: Protonation) -> ChargeState | None:
 def generate_fullerene_dimer_charge_states(
     prot: Protonation,
 ) -> list[ChargeState] | None:
-    """
-    Builds a two-fullerene-cage dimer joined by a single direct C-C bond
-    -- e.g. 1,1'-bi-C60fulleride, [C60-C60]^2- -- from connectivity (see
-    find_fullerene_dimer_split for how the two cages and the bridge bond
-    are identified).
-
-    Each cage's own bridge atom goes from degree 3 (bare fullerene, needs
-    1 double bond to complete its valence) to degree 4 once the
-    inter-cage bond forms (3 cage sigma bonds + 1 more to the other cage
-    = valence 4 already, no double bond needed or possible) -- exactly
-    like a substituted position in generate_fullerene_charge_state, so
-    it's excluded from its own cage's perfect-matching computation.
-
-    That leaves an *odd* number of atoms per cage needing pairing (a
-    fullerene always has an even vertex count, so vertex count minus the
-    1 excluded bridge atom is always odd) -- there is no way to pair all
-    of them, so each cage is left with exactly one genuine unpaired
-    position. This mirrors real (C60)2-type dimers, which are known to
-    have real radical/weak-bond character at the link rather than a
-    simple, fully-paired closed shell.
-
-    Unlike a borane cage's charge (fixed by Wade's rules) or a bare/
-    substituted fullerene's charge (always neutral by construction),
-    there's no way to derive from connectivity alone whether each
-    leftover position resolves as a closed-shell carbanion (formal charge
-    -1, gaining an electron) or carbocation (+1, losing one) -- that
-    depends on the actual electron count of the crystal, not the
-    topology. So this returns multiple candidate ChargeStates (both
-    anionic, both cationic, and one of each) for the resolver's ordinary
-    charge-reconciliation logic to pick from downstream, the same way it
-    already does for ordinary ligands via get_candidate_charges --
-    instead of committing to a single guessed answer.
+    """Two cages joined by one C-C bond. Each bridge atom reaches degree 4 and leaves
+    the matching, so an odd count remains per cage and each keeps one unpaired
+    position -- the real radical character of such dimers. Carbanion or carbocation
+    is not derivable from topology, so all four combinations are returned.
     """
     assert (
         prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
@@ -1757,30 +1362,10 @@ def _charge_capped_fragment(
     atnums,
     formula: str,
 ) -> tuple[int | None, dict[int, int], dict[frozenset, "Chem.BondType"]]:
-    """
-    Charges a substituent fragment on its own: every bond that used to go
-    to the cage is capped with its own plain H instead (usually one, but
-    a fragment attached to the cage at multiple points -- e.g. a
-    methanofullerene's cyclopropane bridgehead, bonded to 2 cage carbons
-    at once -- gets one capping H per broken bond, so `attach_atoms` may
-    repeat the same fragment atom). The general AC2mol bond-order search
-    is then tried at increasing |charge| until one succeeds -- this is
-    the same search the resolver runs for ordinary ligands, just applied
-    to the cut-off fragment rather than a whole specie.
-
-    Returns (charge, {global_atom_idx: formal_charge}, {frozenset({i, j}):
-    bond_type}) for every atom/internal bond in `fragment` (the capping
-    H's and the bonds to them are discarded -- those get replaced by the
-    real cage bond in the caller's merged molecule). The bond orders
-    matter, not just the charges: a fragment like a pyridyl ring needs
-    its own alternating single/double Kekule pattern to be a valid
-    aromatic ring at all -- rebuilding it as all-single bonds in the
-    merged molecule (using only the formal charges from here) leaves
-    every ring atom a bond short, which RDKit then silently "fixes" by
-    padding in extra implicit hydrogens instead of raising a valence
-    error, producing a saturated ring where an aromatic one belongs.
-
-    Returns (None, {}, {}) if no charge produced a sanitizable structure.
+    """Charge a substituent alone: each bond back to the cage is capped with a plain
+    H, then the general search runs at increasing |charge|. Internal bond orders
+    are returned too, not just charges -- rebuilt as all-single bonds, an aromatic
+    ring would be silently padded with implicit hydrogens and come out saturated.
     """
     local_index = {g: local for local, g in enumerate(fragment)}
     k = len(fragment)
@@ -1829,49 +1414,10 @@ def _charge_capped_fragment(
 
 
 def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
-    """
-    Builds a closo- or nido-type borane/carborane deltahedral cage
-    directly from connectivity, using Wade's rules skeletal-electron
-    counting to fix the cage's own charge in closed form instead of
-    running the general bond-order search over it -- the cage's
-    3-center-2-electron bonding isn't expressible as ordinary 2c-2e
-    bonds/localized formal charges in the first place, so there is no
-    "correct" Lewis structure for AC2mol to search for.
-
-    Each cage vertex atom (B or C) contributes (v - 2 + x) skeletal
-    electrons, where v is its main-group valence electron count (B: 3,
-    C: 4) and x is its number of exocyclic (non-cage) substituents. This
-    count only depends on *how many* terminal substituents a vertex has,
-    not on what they are: whether a vertex's terminal position is H, a
-    halogen, or the attachment point of a larger substituent group, it's
-    still one ordinary 2c-2e exocyclic bond and so still contributes the
-    same +1. The required skeletal electron count is 2*(n+1) for a closo
-    cage (n vertices, a full deltahedron) or 2*(n+2) for a nido cage (n
-    vertices, one vertex short of a closo deltahedron). The cage's own
-    charge is whatever is left over: contributed - required.
-
-    A lone terminal H or halogen substituent needs nothing further -- its
-    single exocyclic bond is already accounted for above. Anything else
-    (e.g. the -NH2 in 1-amino-closo-dodecaborate, [1-NH2-B12H11]^2-) is
-    the root of a larger substituent fragment, which is split off, capped
-    with a plain H where the cage bond was cut, and charged independently
-    via the general AC2mol search (see _charge_capped_fragment) -- since
-    the cage's Wade's-rule contribution above already doesn't care what's
-    on the far end of that bond, the cage charge and every substituent's
-    charge are independent and simply add.
-
-    This reproduces the standard reference points exactly: closo-B12H12
-    and closo-B12X12 (X = F/Cl/Br/I) both at -2, closo-C2B10H12
-    (o-carborane) at 0, nido-[C2B9H11] ("dicarbollide") at -2, and
-    [1-NH2-B12H11] at -2 (neutral -NH2 substituent, so unchanged from
-    plain B12H12^2-).
-
-    The cage's own charge has no single real localized site -- it's
-    delocalized across the cluster -- so it is placed entirely on one
-    arbitrarily chosen boron atom (the lowest-index cage B) purely to
-    give RDKit a valid formal-charge assignment to sanitize against.
-    Substituent fragment charges, in contrast, are real localized Lewis
-    charges and are placed wherever their own AC2mol search puts them.
+    """Charge a closo/nido cage by Wade's rules, since 3c-2e bonding has no ordinary
+    Lewis structure to search for. Each vertex gives ``v - 2 + x`` skeletal
+    electrons against 2*(n+1) closo or 2*(n+2) nido; the difference is the cage
+    charge, placed on the lowest-index boron since it is really delocalised.
     """
     assert (
         prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
@@ -1879,11 +1425,8 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
 
     adjmat = np.asarray(prot.adjmat)
 
-    # Isolate the true cage atoms from any B/C substituents (e.g. a
-    # phosphine-tethered dicarbollide's alkyl/aryl carbons) -- see
-    # find_borane_cage_indices. Everything else lands in exo_indices and
-    # is split further below into simple terminal substituents vs. larger
-    # fragments that need their own independent charge.
+    # Separate true cage atoms from B/C substituents; the rest lands in
+    # exo_indices, split below into terminal atoms vs. fragments needing charge.
     cage_indices = find_borane_cage_indices(prot.atnums, adjmat) or []
     boron_indices = [i for i in cage_indices if prot.atnums[i] == 5]
     exo_indices = [i for i in range(prot.natoms) if i not in cage_indices]
@@ -1976,14 +1519,9 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
                 )
                 rwmol.AddBond(i, j, bond_type)
 
-    # Cage atoms sit at degree 4-6 here, far past RDKit's default valence
-    # tables (B: 3, C: 4) -- the 3c-2e cage bonding a classical valence
-    # model can't represent. NoImplicit + skipping SANITIZE_PROPERTIES
-    # below both exist to let that stand rather than have RDKit "correct"
-    # it by adding implicit Hs or rejecting the structure outright.
-    # Substituent atoms keep implicit-H handling on: reinstating the real
-    # cage bond in place of the fragment's capping H leaves their degree
-    # and valence exactly as they were when charged as a fragment.
+    # Cage atoms sit at degree 4-6, far past RDKit's valence tables -- 3c-2e
+    # bonding a classical model cannot represent. NoImplicit and skipping
+    # SANITIZE_PROPERTIES let that stand. Substituents keep implicit-H on.
     for i in cage_indices:
         rwmol.GetAtomWithIdx(i).SetNoImplicit(True)
 
@@ -2030,56 +1568,10 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
 
 
 def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | None:
-    """
-    Builds a conjuncto (fused multi-cage) borane/carborane cluster -- e.g.
-    the docosaborate [B22H22]^2- anion, a closo-B12 icosahedron fused to a
-    nido-B10 cluster sharing a common edge -- directly from connectivity,
-    using Jemmis' mno-rule extension of Wade's rules:
-
-        required skeletal electron pairs = m + n + o + p - q
-
-    where m = number of fused sub-polyhedra, n = total unique cage
-    vertices, o = number of single-*vertex*-sharing condensations (0 for
-    a shared edge/2-atom share, which is what find_conjuncto_borane_split
-    currently detects), p = total vertices missing across all
-    sub-polyhedra relative to their own closo parents (e.g. 1 for a
-    closo+nido pair), and q = number of capped vertices (assumed 0 here --
-    capped/hypercloso conjuncto systems aren't handled).
-
-    m, n, and o are determined generically from connectivity by
-    find_conjuncto_borane_split: m is fixed at 2 (the only fusion pattern
-    currently detected), n is the total B/C cage atom count, and o follows
-    directly from whether the detected cut is a single shared vertex
-    (o=1) or a shared edge (o=0).
-
-    p is NOT derived from graph structure. Classifying each fused
-    sub-polyhedron's own openness (closo/nido/arachno) independently of
-    the fusion seam is unreliable from a naive graph slice -- see
-    find_conjuncto_borane_split's docstring, which documents this exact
-    failure on the docosaborate case. So p is looked up from
-    MANUAL_CONJUNCTO_BORANE_P, keyed by cage composition (e.g. "B22"),
-    the same way MANUAL_CHARGE_ASSIGN_SPECIES handles other cases this
-    resolver can't derive generically -- each entry there has been
-    checked against a literature-reported charge, not guessed.
-
-    Once required_SE is fixed, contributed skeletal electrons are counted
-    the same way as generate_borane_charge_state, extended for two
-    wrinkles specific to fused multi-cage topology (both verified
-    directly against the docosaborate reference structure):
-      - A cage vertex belonging to *both* sub-polyhedra typically has no
-        exocyclic substituent at all (every one of its bonds goes to
-        other cage atoms). Such a vertex contributes its full valence
-        electron count rather than the usual (v - 2 + x), since it has
-        no exocyclic bond to "spend" 2 electrons on.
-      - A bridging (mu-) hydrogen shared between two cage atoms
-        contributes its own 1 electron directly to the pool. It is not
-        counted as an exocyclic substituent on either neighbor (that
-        would double-count its single electron across both vertices).
-
-    As with generate_borane_charge_state, any other non-H/halogen
-    exocyclic substituent (e.g. -OH) is split off and charged
-    independently via _charge_capped_fragment, and the cage's own
-    (delocalized) charge is placed on one arbitrarily chosen boron atom.
+    """Charge a fused multi-cage cluster by Jemmis' mno rule, ``m + n + o + p - q``.
+    m, n and o come from the graph cut and q is assumed 0; p is looked up from
+    MANUAL_CONJUNCTO_BORANE_P, being unreliable from a naive slice. A shared vertex
+    contributes its full valence, and a bridging H its own single electron.
     """
     assert (
         prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
@@ -2257,21 +1749,10 @@ def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | N
 def _find_negative_moiety(
     spec: Specie,
 ) -> list[tuple[int, list[int], str]]:
-    """
-    Finds COO- and SO3- moieties based on ligand connectivity.
+    """COO- and SO3- moieties from ligand connectivity: a C with two, or an S with
+    three, oxygens whose only non-metal neighbour is that centre.
 
-    COO-:
-        C connected to two O atoms.
-        Each O has only that C as its non-metal neighbor.
-
-    SO3-:
-        S connected to three O atoms.
-        Each O has only that S as its non-metal neighbor.
-
-    Returns
-    -------
-    list[tuple[int, list[int], str]]
-        center_idx, oxygen_idxs, kind
+    Returns a list of (center_idx, oxygen_idxs, kind).
     """
 
     atoms = spec.atoms or []
@@ -2309,14 +1790,10 @@ def _find_negative_moiety(
 def _classify_charged_moiety(
     label: str, k: int, n_nonmetal: int, n_oxygen: int
 ) -> tuple[str | None, int]:
-    """Classify a candidate centre by element ``label``, its number of terminal
-    (=O / -O(-)) oxygens ``k``, its total non-metal neighbour count
-    ``n_nonmetal`` and its total non-metal oxygen count ``n_oxygen``. Returns
-    ``(kind, net_charge)`` or ``(None, 0)`` if the centre is a net-neutral group.
-
-    Net-neutral look-alikes are deliberately excluded: ``C`` + 2 terminal O
-    with no third substituent is CO2 (O=C=O, neutral) rather than a carboxylate,
-    and ``S`` + 2 O + 2 C is a sulfone.
+    """Classify a centre by element, terminal-oxygen count and neighbour counts,
+    returning (kind, net_charge) or (None, 0). Net-neutral look-alikes are
+    excluded: C + 2 terminal O with no third substituent is CO2, S + 2 O + 2 C is
+    a sulfone.
     """
     # --- Anionic oxo-anions: centre + k terminal O ---
     if label == "C":
@@ -2339,28 +1816,83 @@ def _classify_charged_moiety(
     #     if label == "S" and n_nonmetal == 3:
     #         return "sulfonium", 1
 
+    # Cationic N needs ring size, which this signature lacks: _find_cationic_nitrogen.
     return None, 0
+
+
+def _ring_sizes_by_atom(atoms, neighbor_source, local_idx_by_id) -> dict[int, set[int]]:
+    """Sizes of the smallest rings each atom belongs to (minimum cycle basis)."""
+    graph = nx.Graph()
+    graph.add_nodes_from(range(len(atoms)))
+    for i, atom in enumerate(atoms):
+        for j in atom.adjacency:
+            if j in atom.metal_adjacency:
+                continue
+            local_j = local_idx_by_id.get(id(neighbor_source[j]))
+            if local_j is None or local_j == i:
+                continue
+            graph.add_edge(i, local_j)
+
+    sizes: dict[int, set[int]] = {}
+    for cycle in nx.minimum_cycle_basis(graph):
+        for idx in cycle:
+            sizes.setdefault(idx, set()).add(len(cycle))
+    return sizes
+
+
+def _find_cationic_nitrogen(
+    atoms, neighbor_source, local_idx_by_id
+) -> list[tuple[int, list[int], str, int]]:
+    """Nitrogen whose +1 is pinned by connectivity: quaternary (4 sigma bonds), or
+    pyridinium (smallest ring exactly 6, with two three-connected ring neighbours).
+    Keyed on bond count and ring shape, not an N-H, since N-alkylated cations carry
+    none. Five-ring cations and guanidinium are out of scope.
+    """
+    ring_sizes = _ring_sizes_by_atom(atoms, neighbor_source, local_idx_by_id)
+
+    cations: list[tuple[int, list[int], str, int]] = []
+    for i, atom in enumerate(atoms):
+        # A cation has no lone pair to donate, so it is never a metal donor.
+        if atom.label != "N" or atom.metal_adjacency:
+            continue
+
+        neighbors = [
+            neighbor_source[j] for j in atom.adjacency if j not in atom.metal_adjacency
+        ]
+        # Terminal O -> N-oxide / nitro / azide: obligate pair, counted elsewhere.
+        if any(
+            n.label == "O"
+            and len([k for k in n.adjacency if k not in n.metal_adjacency]) == 1
+            for n in neighbors
+        ):
+            continue
+
+        if len(neighbors) == 4:
+            cations.append((i, [i], "quaternary-N", 1))
+            continue
+
+        sizes = ring_sizes.get(i)
+        if len(neighbors) != 3 or not sizes or min(sizes) != 6:
+            continue
+
+        sp2_neighbors = sum(
+            1
+            for n in neighbors
+            if len([k for k in n.adjacency if k not in n.metal_adjacency]) == 3
+        )
+        if sp2_neighbors >= 2:
+            cations.append((i, [i], "pyridinium-N", 1))
+
+    return cations
 
 
 def _find_charged_moiety(
     spec: Specie,
 ) -> list[tuple[int, list[int], str, int]]:
-    """Detect functional groups carrying a nonzero *net* formal charge purely
-    from connectivity.
-
-    Anionic groups are ``centre + k terminal O`` patterns, where a terminal O
-    has the centre as its only non-metal neighbour: carboxylate/carbonate and
-    sulfinate/sulfonate/sulfate. Net-neutral look-alikes (CO2, sulfone) are
-    excluded -- see ``_classify_charged_moiety``.
-
-    This is a pure substructure match: metal coordination is ignored, so a
-    group is detected whether or not its centre or terminal oxygen binds a
-    metal.
-
-    Returns ``(centre_local_idx, atom_local_idxs, kind, net_charge)`` with
-    indices into ``spec.atoms`` (the ordering used to build the RDKit mol),
-    ``atom_local_idxs`` being the terminal oxygens (anionic) or the centre
-    (cationic).
+    """Groups carrying a nonzero NET formal charge, from connectivity alone; metal
+    coordination is ignored. Anionic ``centre + k terminal O``, plus cationic N, so
+    the sum is the net rather than the anionic half. Returns (centre_local_idx,
+    atom_local_idxs, kind, net_charge) indexed into ``spec.atoms``.
     """
     atoms = spec.atoms or []
     parent_molecule = spec.get_parent("molecule")
@@ -2409,4 +1941,5 @@ def _find_charged_moiety(
         atom_locals = terminal_oxygen_locals if terminal_oxygen_locals else [i]
         moieties.append((i, atom_locals, kind, net_charge))
 
+    moieties.extend(_find_cationic_nitrogen(atoms, neighbor_source, local_idx_by_id))
     return moieties
