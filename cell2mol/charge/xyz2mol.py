@@ -45,7 +45,7 @@ global atomic_valence_electrons
 atomic_valence_electrons = dict(zip(elemdatabase.elementsym, valence_electrons))
 
 valence_combinations_limit = 1_000_000_000
-num_try_limit = 50
+num_try_limit = 100
 
 
 def get_atomic_valences(k):

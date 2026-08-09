@@ -506,7 +506,7 @@ class Molecule(Specie):
                         group.parent_ligand = parent_ligand
 
                         logger.info(
-                            "Mapped %s (%s) from Metal %s to Ligand %s",
+                            "Mapped %s (haptic_type: %s) from Metal %s to Ligand %s",
                             group.formula,
                             group.haptic_type,
                             met.label,
