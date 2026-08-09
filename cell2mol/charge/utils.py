@@ -44,6 +44,8 @@ MANUAL_CHARGE_ASSIGN_SPECIES = {
     "C",
     "H8-B3",
     "F6-Si",
+    "O2",
+    "Br3",
 }
 
 # Manual species whose structure cannot be written as a plain SMILES because it
