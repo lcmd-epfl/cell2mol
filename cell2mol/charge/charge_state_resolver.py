@@ -26,7 +26,11 @@ from cell2mol.charge.special_cases import (
     _find_charged_moiety,
     generate_special_charge_states,
 )
-from cell2mol.charge.smiles_handler import obligate_charge_separation_atoms
+from cell2mol.charge.smiles_handler import (
+    collapse_hypervalent_ylides,
+    fix_zwitterions,
+    obligate_charge_separation_atoms,
+)
 
 from cell2mol.elementdata import ElementData
 from rdkit import Chem
@@ -42,15 +46,9 @@ elemdatabase = ElementData()
 
 
 def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
-    """
-    Generates valid charge states (Lewis structures) for a given specie.
-    Charge states are only generated for:
-    - ligands
-    - non-complex molecules
-    Args:
-        spec: The Specie object.
-    Returns:
-        A list of selected ChargeState objects, or None if no valid states found.
+    """Valid charge states (Lewis structures) for a ligand or non-complex molecule.
+
+    Returns the best state per plausible charge, or None if none were found.
     """
 
     # 1. Check for protonation states
@@ -134,29 +132,19 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
 
 
 def get_candidate_charges(spec: Specie, prot: Protonation) -> list[int]:
-    """Formal charges to try for ONE protonation state of a specie.
-
-    These are charges of the PROTONATED structure, deliberately NOT re-based
-    per protonation state: holding them fixed while ``n_protons_added`` grows
-    is what walks the specie charge down (``ChargeState`` recovers it as about
-    ``q - n_protons_added``). That sweep is the only route to strongly anionic
-    answers, where deprotonated donors take the moiety sum further down.
-
-    Sources, most specific first: fixed-charge small formulas, the summed
-    charge of any charged substituents, else a sweep (see
-    ``_anchored_specie_charges`` / ``_sweep_charges``). The parity screen then
-    halves whatever comes back.
+    """Formal charges to try for ONE protonation state, in the PROTONATED frame and
+    deliberately not re-based per state -- holding them fixed while nH grows is
+    what walks the specie charge down. Sources: fixed formulas, moiety anchor,
+    else a sweep; a parity screen then halves the result.
     """
     anchor = _anchored_specie_charges(spec)
     candidates = list(anchor) if anchor is not None else _sweep_charges(spec)
 
     kept = _filter_by_electron_parity(candidates, prot)
     if not kept:
-        # Wrong parity everywhere proves the anchor wrong: some anionic centre
-        # the moiety scan can't see (a metal-bound carbanion, say). Widen
-        # DOWNWARD only -- every kind _classify_charged_moiety reports is
-        # anionic, so an anchor is a lower bound. One step down also flips the
-        # parity, so the widened set always survives.
+        # Wrong parity everywhere proves the anchor wrong: an anionic centre the
+        # scan cannot see. Widen DOWNWARD only (an anchor is a lower bound); one
+        # step down flips the parity, so the widened set always survives.
         widened = [c - 1 for c in candidates]
         kept = _filter_by_electron_parity(widened, prot)
         logger.debug(
@@ -171,11 +159,9 @@ def get_candidate_charges(spec: Specie, prot: Protonation) -> list[int]:
 
 
 def _filter_by_electron_parity(charges: list[int], prot: Protonation) -> list[int]:
-    """Drop charges that cannot give a closed-shell Lewis structure.
-
-    Bond perception pairs every electron, so ``sum(outer electrons) - q`` must
-    be even; other charges are provably unsolvable. May return an empty list --
-    the caller reads that as the anchor being wrong.
+    """Drop charges that cannot close a shell: bond perception pairs every electron,
+    so ``sum(outer electrons) - q`` must be even. May return empty, which the
+    caller reads as the anchor being wrong.
     """
     atnums = prot.atnums
     if not atnums:
@@ -210,14 +196,15 @@ def _anchored_specie_charges(spec: Specie) -> list[int] | None:
     # Anchor on the summed charge of any charged substituents rather than
     # sweeping -- the sweep is what makes a polycarboxylate intractable.
     charged_moieties = _find_charged_moiety(spec)
-    if not charged_moieties:
+
+    # Cations never anchor alone, only OFFSET detected anions: the scan has no
+    # vocabulary for delocalised anions, so a cation-only specie is one whose
+    # negative charge it cannot see. Falling through to the sweep finds it.
+    if not any(net_charge < 0 for *_, net_charge in charged_moieties):
         return None
 
-    # The summed moiety charge ALONE -- don't try to guess what the scan
-    # misses. Subtracting outside protonation sites over-counts, since some of
-    # those sites are neutral, and sweeping down to that bound lets
-    # min |charge| in identify_best_charge_states settle too positive. The
-    # protonation sweep reaches the missing charge instead.
+    # The summed moiety charge ALONE -- guessing at what the scan misses
+    # over-counts, and the protonation sweep reaches it anyway.
     anchor = sum(net_charge for *_, net_charge in charged_moieties)
     logger.debug(
         "Charged moieties in %s: %s -> candidate charge %d",
@@ -256,18 +243,9 @@ def _dedupe(values: list[int]) -> list[int]:
 
 
 def _manual_charge_state_from_adjacency(spec, charge: int):
-    """ChargeState for a bridged cluster, built from the specie's own adjacency.
-
-    Species like arachno-[B3H8]- are held together by 3-centre-2-electron B-H-B
-    bridges, which no SMILES string and no bond-perception search can express --
-    a bridging H is bonded to two borons at once, and the borons exceed the
-    valence RDKit will accept. Their total charge is nevertheless known from the
-    formula, so the graph is taken straight from the specie (every contact a
-    single bond) and the known charge asserted on it.
-
-    The charge is delocalized over the cluster framework; it is recorded on the
-    lowest-indexed heavy atom purely as a convention, so that the per-atom
-    charges sum to the right total.
+    """ChargeState for a bridged cluster (arachno-[B3H8]-), whose 3c-2e B-H-B bridges
+    no SMILES can express. The graph is taken from the specie and the known charge
+    asserted on the lowest-indexed heavy atom, by convention.
     """
     adjmat = np.asarray(spec.adjmat, dtype=int)
 
@@ -315,11 +293,9 @@ def _manual_charge_state_from_adjacency(spec, charge: int):
 
 
 def _manual_anchor_index(mol, target_atom: str) -> int | None:
-    """Index of a registry SMILES' anchor atom -- the one aligned against the
-    matching atom of the specie so the rest of the order follows.
-
-    Read off the SMILES rather than assumed, so adding a registry entry cannot
-    silently mis-order its atoms.
+    """Index of ``target_atom`` in a registry SMILES. Hard-coding 1 breaks "N-O3",
+    written [N+](=O)([O-])[O-] with nitrogen first, which permuted the mol against
+    spec.atoms and left create_bonds_specie with no bonds.
     """
     if target_atom == "central":
         # The middle of a symmetric chain: azide's inner N, triiodide's inner I.
@@ -352,6 +328,8 @@ def generate_manual_charge_state(spec):
         "N": (None, "[N-3]", -3),
         "C": (None, "[C-4]", -4),
         "F6-Si": ("Si", "F[Si-2](F)(F)(F)(F)F", -2),
+        "O2": (None, "[O-][O-]", -2),
+        "Br3": ("central", "Br[Br-]Br", -1),
     }
 
     formula = spec.formula
@@ -377,12 +355,9 @@ def generate_manual_charge_state(spec):
     new_order = order
 
     if target_atom:
-        # Where the anchor sits in the registry SMILES. This used to be
-        # hard-coded as 1, which is right for every entry except "N-O3":
-        # nitrate is written [N+](=O)([O-])[O-] with its nitrogen first, so the
-        # wrong atom was moved and the mol came back permuted against
-        # spec.atoms. create_bonds_specie then skipped every bond as an
-        # element mismatch and failed with "NO BONDS for N" (ABAMUO).
+        # Where the anchor sits in the registry SMILES. Hard-coding 1 breaks
+        # "N-O3", written nitrogen-first, which permutes the mol against
+        # spec.atoms and leaves create_bonds_specie with no bonds.
         smiles_idx = _manual_anchor_index(mol, target_atom)
         if smiles_idx is None:
             logger.warning(
@@ -417,11 +392,9 @@ def generate_manual_charge_state(spec):
         "Manual Charge: %s | SMILES: %s | Order: %s", formula, smiles, new_order
     )
 
-    # Supply the specie fields directly instead of letting ChargeState rebuild
-    # them. A manual specie has no protons to strip (nH is always 0 here -- see
-    # get_asis_protonation_state), so the specie IS the protonated structure.
-    # _build_specie_mol would sanitize on the way through and undo the registry
-    # Lewis structure the comment above protects.
+    # Supply specie fields directly: nH is always 0 here, so the specie IS the
+    # protonated structure, and _build_specie_mol would sanitize away the
+    # registry Lewis structure the comment above protects.
     return ChargeState(
         status=True,
         protonated_total_charge=total_charge,
@@ -452,14 +425,9 @@ def _specie_supported_by_rddeterminebonds(
     atomic_valence: dict[int, list[int]] = rdkit_atomic_valence,
     atom_site_labels: list[str] | None = None,
 ) -> bool:
-    """
-    Charge-independent pre-check for a specie.
-    Returns False if ANY atom either:
-        (a) has no possible valences defined, or
-        (b) has a bonded degree exceeding its maximum possible valence
-            — meaning no bond-order assignment can satisfy it, at any charge.
-        (c) has a bonded degree not in its possible valences and
-        is one of P, As, Sb, Te
+    """Charge-independent pre-check. False if any atom has no possible valences, has
+    a bonded degree past its maximum valence (unsatisfiable at any charge), or is
+    P/As/Sb/Te with a degree outside its possible valences.
     """
     ac = np.asarray(ac)
     n_atoms = len(atoms)
@@ -538,31 +506,26 @@ def generate_valid_charge_states(
         allow_charged_fragments,
         diagnostics=diagnostics,
     )
-    if any(valid_charge_states_dict.values()):
+    unsolved = [q for q in candidate_charges if not valid_charge_states_dict[q]]
+    if not unsolved:
         logger.debug(
             "rdDetermineBonds found valid charge states for %s: %s",
             prot.formula,
             valid_charge_states_dict,
         )
         return valid_charge_states_dict
+
+    # Tier 2, per charge rather than all-or-nothing: the two perceivers disagree
+    # about what is reachable. Safe only because identify_best_charge_states
+    # reports one state per charge, so a recovery is additive.
     logger.debug(
-        "rdDetermineBonds failed to find valid charge states for %s, "
-        "falling back to modified AC2mol",
+        "rdDetermineBonds left charges %s unsolved for %s; trying modified AC2mol",
+        unsolved,
         prot.formula,
     )
-    # --- Tier 2: every candidate charge failed rdDetermineBonds ---
-    #
-    # Deliberately all-or-nothing, not per charge. Retrying only the charges
-    # rdDetermineBonds abandoned looks strictly additive but is not:
-    # enumerate_possible_charge_states returns only the BEST-ranked states, so a
-    # recovered candidate that wins the ranking *displaces* the charge that was
-    # being reported before, narrowing the ballot the balancer sees. Measured
-    # over the manuscript corpus a per-charge retry fixed nothing and cost
-    # GEKDIJ (no valid charge distribution). Revisit only alongside a change
-    # that lets a specie report every valid charge, not just the best one.
     return determine_bond_using_modified_AC2mol(
         prot,
-        candidate_charges,
+        unsolved,
         valid_charge_states_dict,
         allow_charged_fragments=allow_charged_fragments,
         diagnostics=diagnostics,
@@ -585,6 +548,10 @@ def determine_bond_using_modified_AC2mol(
             diagnostics=diagnostics,
         )
         if rdkit_obj is not None:
+            obj, fixed = fix_zwitterions(rdkit_obj)
+            obj, collapsed = collapse_hypervalent_ylides(obj)
+            if fixed or collapsed:
+                rdkit_obj = obj
             charge_state = prepare_ChargeState_from_rdkit_obj(
                 rdkit_obj, prot, charge, allow_charged_fragments=allow_charged_fragments
             )
@@ -612,6 +579,10 @@ def determine_bond_using_rdDetermineBonds(
                 allow_charged_fragments=allow_charged_fragments,
             )
             if rdkit_obj is not None:
+                obj, fixed = fix_zwitterions(rdkit_obj)
+                obj, collapsed = collapse_hypervalent_ylides(obj)
+                if fixed or collapsed:
+                    rdkit_obj = obj
                 charge_state = prepare_ChargeState_from_rdkit_obj(
                     rdkit_obj,
                     prot,
@@ -656,25 +627,19 @@ def prepare_ChargeState_from_rdkit_obj(
     prot,
     charge,
     allow_charged_fragments=True,
-    ref_uncorr_atom_charges: list[int] | None = None,
 ):
-    atom_charges = []
-    total_charge = 0
-    for i, atom in enumerate(rdkit_obj.GetAtoms()):
-        if ref_uncorr_atom_charges is not None:
-            ref_q = ref_uncorr_atom_charges[i]
-            if atom.GetFormalCharge() != ref_q:
-                logger.debug(
-                    "Correcting atom %d (%s) %d -> %d",
-                    i,
-                    atom.GetSymbol(),
-                    atom.GetFormalCharge(),
-                    ref_q,
-                )
-                atom.SetFormalCharge(ref_q)
-        q = atom.GetFormalCharge()
-        atom_charges.append(q)
-        total_charge += q
+    smiles = Chem.MolToSmiles(rdkit_obj)
+    logger.debug(
+        "Generated RDKit object for %s | Protonation: %s | Charge: %d | SMILES: %s | n_protons_added: %d",
+        prot.parent.formula,
+        prot.formula,
+        charge,
+        smiles,
+        prot.n_protons_added,
+    )
+
+    atom_charges = [atom.GetFormalCharge() for atom in rdkit_obj.GetAtoms()]
+    total_charge = int(sum(atom_charges))
 
     # Final Validation and Resonance Search
     smiles = Chem.MolToSmiles(rdkit_obj)
@@ -695,8 +660,9 @@ def prepare_ChargeState_from_rdkit_obj(
 
 
 def get_best_resonance_state(charge_state: ChargeState) -> ChargeState:
-    """
-    Checks for resonance alternatives and returns the best state found.
+    """The best resonance alternative, or the state unchanged. Ranked forms are walked
+    in order and the first that round-trips through SMILES wins -- index 0 can be
+    over-delocalised and unkekulizable, which per-atom checks do not catch.
     """
     prot = charge_state.protonation
     rdkit_obj = charge_state.rdkit_obj
@@ -721,14 +687,7 @@ def get_best_resonance_state(charge_state: ChargeState) -> ChargeState:
     logger.debug("   Resonance check for %s: found %d forms", parent.formula, num_res)
     logger.debug("   Original: %s", original_smiles)
 
-    # The ResonanceMolSupplier ranks structures with index 0 as the most 'stable',
-    # but it can still emit over-delocalized structures that are not actually
-    # kekulizable/valid (e.g. an exocyclic double bond combined with a ring
-    # charge that leaves no valid alternating bond pattern). Walk the ranked
-    # candidates and accept the first one that round-trips through SMILES
-    # parsing; per-atom valence bookkeeping (check_rdkit_obj_connectivity)
-    # doesn't catch this since the inconsistency is a whole-ring kekulization
-    # issue, not a per-atom one.
+    # Walk the ranked forms, accept the first that round-trips through SMILES.
     best_res_mol = None
     best_smiles = None
     for candidate in suppl:
@@ -775,15 +734,9 @@ def get_best_resonance_state(charge_state: ChargeState) -> ChargeState:
 
 
 def get_plausible_metal_os(metal: Metal) -> list[int]:
-    """
-    Retrieve common oxidation states for a given metal atom.
+    """Common oxidation states for a metal atom.
 
-    Oxidation state data primarily from:
-    Venkataraman et al., J. Chem. Educ. 1997, 74, 915.
-    Args:
-        metal (Metal): Metal atom object.
-    Returns:
-        metal_os (list): List of common oxidation states for the metal.
+    Source: Venkataraman et al., J. Chem. Educ. 1997, 74, 915.
     """
 
     mol = cast("Molecule", metal.get_parent("molecule"))
@@ -805,21 +758,10 @@ def get_plausible_metal_os(metal: Metal) -> list[int]:
 def _cleaned_of_resonance_artifacts(
     charge_states: list[ChargeState],
 ) -> list[ChargeState]:
-    """Let charge-separated candidates resonate into a cleaner form before they
-    are judged.
-
-    A candidate can carry the right total charge on a poor Lewis structure --
-    AC2mol in particular tends to strand a spurious ``[N-]``/``[N+]`` pair
-    across a conjugated chain. Ranked as-is such a candidate loses on
-    ``specie_abs_atcharge`` to a structure that is cleaner but has the wrong
-    charge, so the right answer is discarded for the wrong reason.
-
-    Resonance is exactly the right test for "is this separation real or just a
-    bad way of drawing it". Only artifact-zwitterionic candidates are tried
-    (obligate separation has nothing to gain), and a resonance form is adopted
-    only when it strictly reduces charge separation at the same total charge --
-    ``get_best_resonance_state`` returns the first *valid* form, not
-    necessarily the least charged, so its output has to be earned.
+    """Let artifact-zwitterionic candidates resonate into a cleaner form before
+    judging: ranked as-is, a right-charge/poor-drawing candidate loses to a clean
+    one at the wrong charge. A form is adopted only if it strictly reduces
+    separation at the same total charge.
     """
     cleaned: list[ChargeState] = []
     for state in charge_states:
@@ -854,8 +796,9 @@ def _cleaned_of_resonance_artifacts(
 
 
 def identify_best_charge_states(charge_states: list[ChargeState]) -> list[ChargeState]:
-    """
-    Selects the best charge distributions.
+    """Best Lewis structure for each charge the specie can validly carry -- one state
+    per charge, not one winner. Choosing between charges needs cell neutrality and
+    metal oxidation states, so it belongs to the balancer.
     """
     # Filter out None values initially
     valid_charge_states = [ch for ch in charge_states if ch is not None and ch.status]
@@ -864,23 +807,19 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
 
     valid_charge_states = _cleaned_of_resonance_artifacts(valid_charge_states)
 
-    # 1. Get initial best candidates indices using the core logic
-    best_indices = _get_best_candidate_indices(valid_charge_states)
-
-    # Map indices back to objects
-    initial_candidates = [valid_charge_states[i] for i in best_indices]
-
-    # 2. Group candidates by their 'corrected total charge'
+    # Group by specie charge FIRST, so ranking only ever compares like with
+    # like. Sorted so the reported order does not depend on enumeration order.
     grouped_by_charge = defaultdict(list)
-    for state in initial_candidates:
+    for state in valid_charge_states:
         grouped_by_charge[state.specie_total_charge].append(state)
 
-    logger.debug("Found target charges: %s", list(grouped_by_charge.keys()))
+    logger.debug("Found target charges: %s", sorted(grouped_by_charge))
 
     final_states = []
 
-    # 3. Process each charge group
-    for tgt_charge, candidates in grouped_by_charge.items():
+    # Pick the best structure within each charge
+    for tgt_charge in sorted(grouped_by_charge):
+        candidates = grouped_by_charge[tgt_charge]
         logger.debug(
             "Processing target charge %s with %d candidates",
             tgt_charge,
@@ -897,43 +836,91 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
         else:
             best_subset_indices = _get_best_candidate_indices(candidates)
             if not best_subset_indices:
-                # Fallback: take the first if filtering somehow fails
                 logger.debug("Tie-break failed, taking first.")
                 final_states.append(candidates[0])
             else:
-                # Take the best one from the filtered result (index 0)
                 logger.debug("Tie-break successful, taking best structure.")
-                best_idx = best_subset_indices[
-                    0
-                ]  # Generate resonance forms for all candidates in this group first
-                final_states.append(candidates[best_idx])
+                final_states.append(candidates[best_subset_indices[0]])
 
-            # resonance_candidates = [get_best_resonance_state(temp) for temp in candidates]
+    return _drop_dominated_charges(final_states)
 
-            # # We apply the same filtering criteria to the subset of resonance structures
-            # best_subset_indices = _get_best_candidate_indices(resonance_candidates)
 
-            # if not best_subset_indices:
-            #     # Fallback: take the first if filtering somehow fails
-            #     logger.debug("Tie-break failed, taking first.")
-            #     final_states.append(candidates[0])
-            # else:
-            #     # Take the best one from the filtered result (index 0)
-            #     logger.debug("Tie-break successful, taking best resonance structure.")
-            #     best_idx = best_subset_indices[0]
-            #     final_states.append(resonance_candidates[best_idx])
+def _artifact_separation(state: ChargeState) -> int:
+    """How much formal charge merely CANCELS, discounting obligate pairs:
+    ``min(positive total, negative total)``. A bipyridinium dication scores 0
+    (nothing cancels); a stray [C+]..[c-] scores 1, the actual defect.
+    """
+    charges = state.protonated_atom_charges or []
+    mol = state.rdkit_obj
+    obligate: set[int] = set()
+    if mol is not None and mol.GetNumAtoms() == len(charges):
+        obligate = obligate_charge_separation_atoms(mol)
 
-    return final_states
+    free = [q for idx, q in enumerate(charges) if idx not in obligate]
+    return min(sum(q for q in free if q > 0), -sum(q for q in free if q < 0))
+
+
+def _structural_quality(state: ChargeState) -> tuple[int, int]:
+    """``(aromatic_atoms, artifact_separation)`` -- maximise the first, minimise the
+    second. Both read in the protonated frame: they judge the drawing, and the
+    specie's charge is the hypothesis under test, not evidence against it.
+    """
+    added_indices = [
+        idx for idx, n in enumerate(state.protonation.site_proton_counts or []) if n > 0
+    ]
+    aromatic = aromatic_info(state.rdkit_obj, added_indices=added_indices)
+    return int(aromatic["Aromatic atoms"]), _artifact_separation(state)
+
+
+def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
+    """Drop charges beaten on every structural axis. A charge falls only to one at
+    least as aromatic and then strictly better on cancelling charge, or on |net
+    charge|; aromaticity can only veto a drop, never cause one. Charges that
+    genuinely trade the axes both survive, and the balancer settles them.
+    """
+    if len(states) < 2:
+        return states
+
+    quality = [_structural_quality(s) for s in states]
+    kept = []
+    for i, (arom_i, sep_i) in enumerate(quality):
+        dominated_by = next(
+            (
+                states[j].specie_total_charge
+                for j, (arom_j, sep_j) in enumerate(quality)
+                if j != i
+                and arom_j >= arom_i
+                and (
+                    sep_j < sep_i
+                    or (
+                        sep_j == sep_i
+                        and abs(states[j].specie_total_charge)
+                        < abs(states[i].specie_total_charge)
+                    )
+                )
+            ),
+            None,
+        )
+        if dominated_by is None:
+            kept.append(states[i])
+        else:
+            logger.debug(
+                "   Dropping charge %+d (aromatic %d, separation %d): dominated "
+                "by charge %+d",
+                states[i].specie_total_charge,
+                arom_i,
+                sep_i,
+                dominated_by,
+            )
+
+    # Mutual domination is impossible (it needs strictly less separation in
+    # both directions), so `kept` is never empty -- but never hand back nothing.
+    return kept or states
 
 
 def _is_artifact_zwitterion(charge_state: ChargeState) -> bool:
-    """``specie_zwitt`` with obligate charge separation discounted.
-
-    A nitro group or an N-oxide makes a specie "zwitterionic" by the plain
-    any-positive-and-any-negative test, but those charges are forced -- no
-    neutral Lewis structure exists for them. Only the *remaining* separation
-    says anything about whether bond perception went astray, and that is what
-    the ranking below should react to.
+    """``specie_zwitt`` with obligate separation discounted -- nitro and N-oxide
+    charges are forced, so only the remainder says bond perception went astray.
     """
     mol = charge_state.specie_rdkit_obj
     charges = charge_state.specie_atom_charges or []
@@ -958,9 +945,11 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
         return []
 
     # --- 1. Extract Metrics ---
-    # Using lists to store metrics for all candidates
+    # The two keys are read in DIFFERENT frames on purpose: |net charge| on the
+    # specie (a claim about chemistry), separation on the protonated structure
+    # (a claim about the drawing).
     specie_abs_totals = []
-    specie_abs_atcharges = []
+    prot_abs_atcharges = []
     specie_zwitt = []
     artifact_zwitt = []
     coincide = []
@@ -989,7 +978,7 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
 
     for chs in valid_charge_states:
         specie_abs_totals.append(chs.specie_abstotal)
-        specie_abs_atcharges.append(chs.specie_abs_atcharge)
+        prot_abs_atcharges.append(chs.protonated_abs_atcharge)
         specie_zwitt.append(chs.specie_zwitt)
         artifact_zwitt.append(_is_artifact_zwitterion(chs))
         coincide.append(chs.coincide)
@@ -1020,26 +1009,12 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
         )
 
     # --- 2. Determine Minima/Maxima ---
-    min_abs = int(np.min(specie_abs_atcharges))
+    min_abs = int(np.min(prot_abs_atcharges))
 
-    # A zwitterionic candidate can post a smaller |net charge| than a
-    # non-zwitterionic one purely by pairing a spurious +1 against a spurious
-    # -1, and rdDetermineBonds' search is not atom-order invariant, so one
-    # symmetry copy of a ligand can find such a solution while its twin does
-    # not (ABOFAY: copy A -> -2, copy B -> 0, same graph, permuted indices).
-    # Whenever a candidate free of *artifact* charge separation already reaches
-    # the best per-atom charge separation, it describes the same amount of
-    # charge with none of it cancelled, so let it set the |net charge| target
-    # instead. Obligate separation (nitro, N-oxide) does not count as artifact,
-    # so those candidates still compete on their own terms.
-    #
-    # Aromaticity vetoes the swap. Remote charges are not by themselves a sign
-    # of a bad structure -- BEJFON's ligand is a methylpyridinium tethered to a
-    # cyclopentadienide, permanently zwitterionic with the charges rings apart
-    # -- and there the charge-free alternative is the one that is wrong,
-    # dearomatising both rings to avoid the charges. Aromaticity separates the
-    # two cases where the charge bookkeeping cannot: never buy a lower |net
-    # charge| at the cost of aromatic rings.
+    # A zwitterion can post a smaller |net charge| purely by pairing a spurious
+    # +1 against a spurious -1, so let an artifact-free candidate set the target
+    # instead. Aromaticity vetoes the swap: never buy a lower |net charge| at the
+    # cost of aromatic rings.
     naive_min_tot = int(np.min(specie_abs_totals))
     best_aromatic_at_naive_min = max(
         aromatic_atoms[idx]
@@ -1049,7 +1024,7 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
     clean_at_min_abs = [
         idx
         for idx in range(nlists)
-        if specie_abs_atcharges[idx] == min_abs
+        if prot_abs_atcharges[idx] == min_abs
         and not artifact_zwitt[idx]
         and aromatic_atoms[idx] >= best_aromatic_at_naive_min
     ]
@@ -1069,7 +1044,7 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
     max_aromatic = np.max(aromatic_atoms)
 
     indices_min_tot = {i for i, x in enumerate(specie_abs_totals) if x == min_tot}
-    indices_min_abs = {i for i, x in enumerate(specie_abs_atcharges) if x == min_abs}
+    indices_min_abs = {i for i, x in enumerate(prot_abs_atcharges) if x == min_abs}
     indices_max_aromatic = [
         i for i, x in enumerate(aromatic_atoms) if x == max_aromatic
     ]
@@ -1094,7 +1069,11 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
         if (coordinating_atoms_indices == blocked_indices) and (
             "C" in coordinating_atoms_labels
         ):
-            if (specie_abs_atcharges[idx] == coord_abs_atcharge[idx]) and coincide[idx]:
+            # coord_abs_atcharge is summed from protonated_atom_charges, so the
+            # comparison is like-for-like only now that the left side is also
+            # the protonated total: "all the charge separation sits on the
+            # coordinating atoms".
+            if (prot_abs_atcharges[idx] == coord_abs_atcharge[idx]) and coincide[idx]:
                 if all(c < 0 for c in coord_raw_atcharge[idx]):
                     is_coord_valid = True
 
@@ -1148,12 +1127,9 @@ def _get_best_candidate_indices(valid_charge_states: list[ChargeState]) -> list[
             tmplist = new_tmplist
 
     elif len(indices_max_aromatic) > 1:
-        # Several candidates share max aromaticity: keep those and drop the
-        # rest, which is what the `== 1` branch above already does for the
-        # singleton case. This body used to copy tmplist and never modify it,
-        # so aromaticity was silently ignored here and selection fell through
-        # to "take the first" -- letting a non-aromatic tautomer beat an
-        # equally charged aromatic one.
+        # Several share max aromaticity: keep those, drop the rest. Copying
+        # tmplist unmodified here silently ignored aromaticity, letting a
+        # non-aromatic tautomer beat an equally charged aromatic one.
         if len(tmplist) > 1:
             preferred = [
                 idx for idx in tmplist if idx in indices_max_aromatic and coincide[idx]
