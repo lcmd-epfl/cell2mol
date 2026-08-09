@@ -365,12 +365,12 @@ def BO2mol(
 
     """
 
-    l = len(BO_matrix)
-    l2 = len(atoms)
+    n_bo = len(BO_matrix)
+    n_atoms = len(atoms)
     BO_valences = list(BO_matrix.sum(axis=1))
-    if l != l2:
+    if n_bo != n_atoms:
         raise RuntimeError(
-            "sizes of adjMat ({0:d}) and Atoms {1:d} differ".format(l, l2)
+            "sizes of adjMat ({0:d}) and Atoms {1:d} differ".format(n_bo, n_atoms)
         )
 
     rwMol = Chem.RWMol(mol)
@@ -381,8 +381,8 @@ def BO2mol(
         3: Chem.BondType.TRIPLE,
     }
 
-    for i in range(l):
-        for j in range(i + 1, l):
+    for i in range(n_bo):
+        for j in range(i + 1, n_bo):
             bo = int(round(BO_matrix[i, j]))
             if bo == 0:
                 continue
@@ -602,14 +602,6 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
 
         current_group_count = math.prod(len(v) for v in other_valences)
         group_counts.append(current_group_count)
-
-        other_nums = [atoms[i] for i in others]
-        other_syms = [elemdatabase.elementsym[n] for n in other_nums]
-        # logger.debug(
-        #     f"Element Others ({other_syms}): {len(others)} atoms | "
-        #     f"Group Combinations: {current_group_count:,}"
-        #     # f" | Valences: {other_valences}"
-        # )
 
         nested_inputs.append(itertools.product(*other_valences))
 
@@ -971,14 +963,12 @@ def read_xyz_file(filename, look_for_charge=True):
     atomic_symbols = []
     xyz_coordinates = []
     charge = 0
-    title = ""
 
     with open(filename, "r") as file:
         for line_number, line in enumerate(file):
             if line_number == 0:
-                num_atoms = int(line)
+                continue  # atom count, recovered from the coordinate lines
             elif line_number == 1:
-                title = line
                 if "charge=" in line:
                     charge = int(line.split("=")[1])
             else:
@@ -1005,7 +995,7 @@ def chiral_stereo_check(mol):
         Chem.AssignStereochemistry(mol, flagPossibleStereoCenters=True, force=True)
         Chem.AssignAtomChiralTagsFromStructure(mol, -1)
         return True
-    except:
+    except Exception:
         try:
             Chem.SanitizeMol(
                 mol,
@@ -1037,7 +1027,7 @@ def xyz2mol(
     allow_carbenes=False,
 ):
     """
-    Generate a rdkit molobj from atoms, coordinates and a total_charge.
+    Generate a rdkit mol object from atoms, coordinates and a charge.
 
     Args:
         atoms: list of atom types (int)
@@ -1046,11 +1036,12 @@ def xyz2mol(
         charge: total charge of the system (default: 0)
 
     Optional:
-        allow_charged_fragments: alternatively radicals are made
+        allow_charged_fragments: allow charged fragments in the molecule
         use_graph: use graph (networkx)
         use_huckel: Use Huckel method for atom connectivity prediction
         embed_chiral: embed chiral information to the molecule
-
+        exportBO: export bond order matrix along with the molecule (default: False)
+        allow_carbenes: allow carbene structures in the molecule (default: False)
     Returns:
         mols - list of rdkit molobjects
 
