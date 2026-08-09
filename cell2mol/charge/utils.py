@@ -10,17 +10,7 @@ from rdkit.Chem import rdDetermineBonds
 
 logger = logging.getLogger(__name__)
 
-# Backtracking steps rdDetermineBonds may take per call before giving up.
-#
-# Its cost is bimodal, not gradual: every ordinary specie measured -- benzene,
-# terpyridine, porphine, coronene, phthalocyanine -- resolves within four
-# steps, while a pathological one runs unbounded (ADIZAO and AYUPOB both hang
-# indefinitely at the default of 0, "no limit"). Nothing sits in between, so
-# the exact value hardly matters; 1000 is ~250x the worst legitimate case
-# measured. Raising it cannot rescue a hang, only postpone it.
-#
-# This is a cap on the search, NOT a wall-clock timeout: it is deterministic
-# and reproducible across machines, and needs no threads or signals.
+# Backtracking steps rdDetermineBonds may take before giving up.
 rddeterminebonds_max_iterations = 1000
 
 # Monatomic noble gases
@@ -48,11 +38,9 @@ MANUAL_CHARGE_ASSIGN_SPECIES = {
     "Br3",
 }
 
-# Manual species whose structure cannot be written as a plain SMILES because it
-# relies on 3-centre-2-electron bridge bonds. Their mol is built from the
-# specie's own adjacency instead of a registry SMILES (see
-# generate_manual_charge_state), which also keeps them independent of the
-# per-CIF atom ordering a fixed SMILES string could not track.
+# Species relying on 3c-2e bridge bonds, which no plain SMILES can express. Built
+# from the specie's own adjacency instead, which also keeps them independent of
+# per-CIF atom ordering.
 BRIDGED_CLUSTER_CHARGES = {
     # arachno-[B3H8]-, octahydrotriborate: 6 terminal H + 2 bridging H over a
     # B3 framework. Not deltahedral, so is_borane_cage does not claim it.
@@ -154,11 +142,9 @@ METAL_OXIDATION_STATES = {
 }
 
 
-# AC2mol's combinatorial bond-order search can converge on a technically
-# valence-consistent but chemically absurd resonance structure: e.g. an
-# entire ring system drawn with alternating +1/-1 formal charges and no
-# double bonds at all, just to represent a small net charge; anything
-# far beyond that is a search artifact, not real chemistry.
+# The search can converge on a valence-consistent but absurd structure -- a ring
+# drawn with alternating +1/-1 charges and no double bonds, to represent a small
+# net charge. Anything far past this is an artifact, not real chemistry.
 MAX_EXCESS_CHARGE_SEPARATION = 4
 
 rdkit_atomic_valence: dict[int, list[int]] = {
@@ -204,12 +190,9 @@ def aromatic_info(mol: RDKitObject, added_indices=None):
 
 
 def _nitro_charge_atom_indices(mol: Chem.Mol, natoms: int) -> set[int]:
-    """Indices of atoms whose formal charge belongs to a nitro group,
-    ``[N+](=O)[O-]`` -- the N(+1) and the single-bonded terminal O(-1).
-
-    Detected locally (no sanitisation/aromaticity needed): an N with formal
-    charge +1 bearing both a single-bonded O(-1) and a double-bonded O(0).
-    Used to exempt this obligate charge separation from the excess-charge check.
+    """Atoms whose formal charge belongs to a nitro group -- the N(+1) and its
+    single-bonded terminal O(-1). Detected locally, no sanitisation needed. Used to
+    exempt this obligate separation from the excess-charge check.
     """
     nitro_atoms: set[int] = set()
     for i in range(natoms):
@@ -238,14 +221,10 @@ def _nitro_charge_atom_indices(mol: Chem.Mol, natoms: int) -> set[int]:
 
 
 def _malformed_nitro_atom(mol: Chem.Mol, natoms: int) -> int | None:
-    """Index of a nitrogen drawn as ``N([O-])[O-]`` rather than ``[N+](=O)[O-]``.
-
-    Nitrogen cannot expand its octet, so one of its terminal oxygens is always
-    doubly bonded. The all-single form still passes every valence check, so
-    bond perception accepts it, but it is two charge units too negative
-    (AXAXUS: a -2 ligand, hence Pt(VI)). Rejected rather than repaired --
-    promoting the bond would change the requested total charge; failing here
-    sends the specie to the AC2mol tier, which draws the nitro correctly.
+    """Index of a nitrogen drawn N([O-])[O-] rather than [N+](=O)[O-]. N cannot expand
+    its octet, so one terminal O is always doubly bonded; the all-single form
+    passes every valence check but is two charge units too negative. Rejected, not
+    repaired -- promoting the bond would change the requested total charge.
     """
     for i in range(natoms):
         atom = mol.GetAtomWithIdx(i)
@@ -294,20 +273,10 @@ def check_rdkit_obj_connectivity(mol: Chem.Mol, natoms: int, charge: int) -> boo
         )
         is_correct = False
 
-    # 0b. Charge Separation Sanity Check
-    # A valid Lewis structure can concentrate the net charge on a small
-    # number of atoms (a real zwitterion/ylide), but a structure requiring
-    # far more formal charge than the net charge demands is a bond-order
-    # search artifact (see MAX_EXCESS_CHARGE_SEPARATION above), not a
-    # legitimate resonance form.
-    #
-    # Exception: a nitro group [N+](=O)[O-] is an *obligate* charge-separated
-    # group -- there is no neutral Lewis structure for it -- so its +1/-1 pair
-    # is real chemistry, not a search artifact. A polynitro compound may
-    # legitimately carry many (e.g. an octanitro-porphyrin: 8 * (|+1|+|-1|) =
-    # 16). Exclude nitro N+/O- charges before measuring separation; a genuine
-    # artifact (alternating +/- around a ring/chain) is untouched.
-    # 0c. Nitro groups must be drawn [N+](=O)[O-], never N([O-])[O-].
+    # 0b/0c. A structure needing far more formal charge than the net demands is a
+    # search artifact, not a resonance form. Nitro is obligate -- a polynitro
+    # compound legitimately carries many -- so its charges are excluded before
+    # measuring, and it must be drawn [N+](=O)[O-], never N([O-])[O-].
     bad_nitro = _malformed_nitro_atom(mol, natoms)
     if bad_nitro is not None:
         logger.debug(
@@ -384,40 +353,10 @@ def check_rdkit_obj_connectivity(mol: Chem.Mol, natoms: int, charge: int) -> boo
                 )
                 is_correct = False
 
-        # logger.debug(
-        #     "Charge: %d | Atom: %2d %2s | Q: %2d | V: %2d | LP: %2d | Correct: %s",
-        #     charge,
-        #     i,
-        #     symbol,
-        #     formal_charge,
-        #     valence,
-        #     lone_pairs,
-        #     is_correct,
-        # )
-
-    # 4. Reducible charged-carbon pair check
-    # rdDetermineBonds sometimes "pays" for a C=C double bond it fails to
-    # place by splitting it into an adjacent charged-carbon pair, so a bond
-    # that should be C=C comes back as either:
-    #   - [C+]-[C-] (opposite charges): the carbanion lone pair would fill
-    #     the carbocation's empty orbital to give a neutral C=C -- an
-    #     electron-conserving stand-in for the missing double bond; or
-    #   - [C-]-[C-] (both carbanions): the two lone pairs would pair into the
-    #     missing double bond, neutralising both.
-    # Either way a lower-|charge| structure exists at a nearby charge, so the
-    # separated form is a bond-order-search artifact, not a ground-state
-    # Lewis form -- it is what leaves a toluene ring looking like a valid
-    # -2/-4 state or a cyclopentadiene ring like a valid -4 tetra-anion, even
-    # though every per-atom valence check above passes.
-    #
-    # Only C/C pairs are tested, so genuine heteroatom ylides (P+=C-, diazo
-    # C-=N+) are untouched. Opposite-sign pairs are always rejected
-    # (including the aromatic [c+]-[c-] form). Same-sign carbanion pairs are
-    # rejected only when non-aromatic and not already multiply bonded, so a
-    # delocalised aromatic poly-anion (Cp-, cyclooctatetraene dianion, ...)
-    # and an acetylide/carbide triple bond ([C-]#[C-], no room for a further
-    # bond) are both left intact. Two carbocations are never flagged -- with
-    # no lone pair on either, they cannot pair into a double bond.
+    # 4. A C=C the search failed to place comes back split as [C+]-[C-] or
+    # [C-]-[C-], whose lone pairs would pair into the missing bond -- which is
+    # what makes a toluene ring look like a valid -2/-4 state. Only C/C pairs are
+    # tested, and aromatic or already-multiply-bonded ones are left intact.
     for bond in mol.GetBonds():
         begin_atom, end_atom = bond.GetBeginAtom(), bond.GetEndAtom()
         if begin_atom.GetAtomicNum() != 6 or end_atom.GetAtomicNum() != 6:
@@ -461,30 +400,8 @@ def generate_rdkit_mol_from_rdDetermineBonds(
     allow_charged_fragments=True,
     embed_chiral=True,
 ):
-    """
-    Build an RDKit Mol object from atomic numbers, coordinates, and
-    adjacency matrix from a protonation state, and
-    then assign bond orders using rdDetermineBonds.DetermineBondOrders.
-    Parameters
-    ----------
-    atoms : list[int]
-        Atomic numbers, e.g. [6, 1, 1, 1, 1]
-    coords : array-like, shape (n_atoms, 3)
-        Cartesian coordinates.
-    AC : array-like, shape (n_atoms, n_atoms)
-        Connectivity matrix. Nonzero means bonded.
-    charge : int
-        Total molecular charge.
-    sanitize : bool
-        Whether to sanitize after bond-order assignment.
-    allow_charged_fragments : bool
-        Whether to allow charged fragments.
-    embed_chiral : bool
-        Whether to embed chiral information.
-
-    Returns
-    -------
-    mol : rdkit.Chem.Mol
+    """Build an RDKit Mol from atomic numbers, coordinates and an adjacency matrix,
+    assigning bond orders with rdDetermineBonds.DetermineBondOrders.
     """
 
     atoms = list(map(int, atoms))
@@ -546,35 +463,10 @@ def generate_rdkit_mol_from_AC2mol(
     embed_chiral=True,
     diagnostics=None,
 ):
-    """
-    Build an RDKit Mol object from atomic numbers, coordinates, and
-    adjacency matrix from a protonation state, and
-    then assign bond orders
-    - using rdDetermineBonds.DetermineBondOrders.
-    - modified AC2mol from xyz2mol
-    Parameters
-    ----------
-    atoms : list[int]
-        Atomic numbers, e.g. [6, 1, 1, 1, 1]
-    coords : array-like, shape (n_atoms, 3)
-        Cartesian coordinates.
-    AC : array-like, shape (n_atoms, n_atoms)
-        Connectivity matrix. Nonzero means bonded.
-    charge : int
-        Total molecular charge.
-    sanitize : bool
-        Whether to sanitize after bond-order assignment.
-    allow_charged_fragments : bool
-        Whether to allow charged fragments.
-    embed_chiral : bool
-        Whether to embed chiral information.
-    diagnostics : dict, optional
-        Filled in with why bond assignment gave up, when it gives up for a
-        reason worth telling the user about.
-
-    Returns
-    -------
-    mol : rdkit.Chem.Mol
+    """Build an RDKit Mol from atomic numbers, coordinates and an adjacency matrix,
+    assigning bond orders with the modified AC2mol from xyz2mol. ``diagnostics``,
+    if given, is filled in with why bond assignment gave up when the reason is
+    worth telling the user about.
     """
     new_mols, BO = AC2mol(
         mol=get_proto_mol(atoms),
