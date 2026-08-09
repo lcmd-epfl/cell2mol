@@ -37,12 +37,8 @@ class ProtonationGroupResult:
 
 
 def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
-    """Enumerate possible protonation states for the specie.
-
-    Protonation states are only generated for:
-    - ligands
-    - non-complex molecules
-    For all other species, returns None.
+    """Protonation states for a ligand or non-complex molecule; None for anything
+    else.
     """
     # ============================================================
     # Applicability guards
@@ -91,20 +87,9 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
         if specie.has_porphyrin is not None
         else specie.evaluate_has_porphyrin()
     )
-    # A detected porphyrin-family macrocycle is dispatched by difficulty:
-    #
-    #   * Clean closed-form porphyrin (k = 4 with every metal donor inside a
-    #     core) -- a classic porphyrin / corrole / phthalocyanine, or a fully
-    #     covered fused bis-porphyrin -- is the ONLY family handled
-    #     automatically, via the closed-form free-base builder.
-    #
-    #   * Everything harder is deliberately declined here: an expanded
-    #     macrocycle (k >= 5: penta-/hexa-/octaphyrin, whose free-base N-H count
-    #     is oxidation-level dependent) or a k = 4 core that also binds a metal
-    #     through donors outside it (e.g. EFISEV, furan-fused). These emit only the
-    #     as-is protonation state and set specie.protonation_warning, flagging
-    #     the charge result for manual review. The automatic generators for
-    #     these cases are parked in _experimental_macrocycle_protonation.
+    # Only a clean k = 4 macrocycle with every metal donor inside a core is built
+    # automatically. Anything harder -- expanded (k >= 5), or outside donors --
+    # emits the as-is state and sets protonation_warning for manual review.
     if has_porphyrin:
         macrocycles = find_all_porphyrin_macrocycles(
             specie.get_atomic_numbers(), specie.adjmat
@@ -209,15 +194,6 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
 
         if result.needs_combinatorial:
             combinatorial_site_indices.extend(result.combinatorial_indices)
-            # Remember which metal each combinatorial site coordinates, so a
-            # tetrapyrrolic ligand whose macrocycle the strict detector missed
-            # (a fused / ring-modified bis-porphyrin such as EHOMUL) can still
-            # be grouped into per-metal N4 pockets below.
-            # group_metals = list(g.metals or [])
-            # for idx in result.combinatorial_indices:
-            #     if len(group_metals) == 1:
-            #         nonlocal_site_metal[idx] = group_metals[0]
-
     # ============================================================
     # Check combinatorial_site_indices for decision
     # ============================================================
@@ -372,12 +348,8 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     local_ligand_donor_electrons = ligand_donor_electrons.copy()
     local_n_protons_added = n_protons_added
 
-    # Per environment class, ``count_choices`` (built above) says HOW MANY of
-    # its equivalent atoms may get a proton. Because the atoms in a class are
-    # symmetry-equivalent, protonating any c of them yields the same structure,
-    # so a single representative subset (the first c) is emitted per count --
-    # e.g. two equivalent sites [0, 1] give exactly three states: none, one (of
-    # the pair), both.
+    # Atoms in a class are symmetry-equivalent, so protonating any c of them gives
+    # the same structure: one representative subset (the first c) per count.
     combinations = list(itertools.product(*count_choices))
     combinations.sort(key=sum)  # order by total protons added
 
@@ -418,18 +390,9 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
 
 
 def get_asis_protonation_state(specie: Specie) -> list[Protonation]:
-    """Return the specie's structure as-is, wrapped in a single Protonation.
-
-    No hydrogens are added (``mode="none"``, ``n_protons_added=0``, zero
-    ``site_proton_counts`` / ``ligand_donor_electrons``): the labels, coords and
-    adjacency are exactly the specie's own. It is not a chemical protonation --
-    it exists only so charge-state enumeration always has a Protonation to read
-    (adjacency, per-site counts, donor electrons) even when nothing is added.
-
-    Used for species that must not be protonated but still need a charge state:
-    non-complex molecules, manual-charge formulas, fullerenes, ligands
-    coordinating to alkali/alkaline-earth metals, and macrocycles declined by
-    the porphyrin engine.
+    """The specie's own structure wrapped in a single Protonation, nothing added. Not
+    a chemical protonation -- it exists so enumeration always has a Protonation to
+    read. Used for species that must not be protonated but still need a charge.
     """
     logger.debug(
         "Creating as-is (no-proton) protonation for %s (%s)",
@@ -476,16 +439,10 @@ ALL_OR_NOTHING_CLASS_SIZE = 3
 
 
 def _class_count_choices(cls: list[int]):
-    """How many of an environment class's equivalent sites may be protonated.
-
-    A class of one or two sites enumerates every count (0..k). Mono-protonation
-    of a two-site class is real chemistry: acetylacetonate's two equivalent
-    oxygens share ONE proton, so dropping its nH=1 state would lose the enol.
-
-    From three equivalent sites up the partial counts are refused, and only
-    "none" or "all" are offered. The class exists precisely because the atoms
-    are indistinguishable, so protonating some-but-not-all of them invents an
-    asymmetry the structure does not show.
+    """How many of a class's equivalent sites may be protonated. One or two sites
+    enumerate every count (acetylacetonate's two oxygens share ONE proton, the
+    enol); three or more are all-or-nothing, since protonating some-but-not-all
+    would invent an asymmetry the structure does not show.
     """
     if len(cls) >= ALL_OR_NOTHING_CLASS_SIZE:
         return (0, len(cls))
@@ -493,15 +450,9 @@ def _class_count_choices(cls: list[int]):
 
 
 def _environment_classes(ligand: "Ligand", indices: list[int]) -> list[list[int]]:
-    """Partition ``indices`` (ligand atom indices) into topological-equivalence
-    classes by Weisfeiler-Lehman colour refinement on the element-labelled
-    ligand graph. Two atoms share a class if they stay indistinguishable under
-    iterated hashing of their neighbour labels, letting the combinatorial
-    protonation treat a class as one all-or-nothing site rather than enumerating
-    every per-atom combination (2**#classes states instead of 2**#atoms).
-
-    Classes are returned sorted by their smallest atom index; each lists its
-    atom indices sorted. ``indices`` need not be unique.
+    """Partition ``indices`` into topological-equivalence classes by Weisfeiler-Lehman
+    colour refinement, so protonation treats a class as one all-or-nothing site
+    (2**#classes states instead of 2**#atoms). Sorted by smallest atom index.
     """
     unique = sorted(set(indices))
     if not unique:
@@ -538,16 +489,9 @@ def _metal_donors_outside_tetrapyrrole_core(
     specie: Specie,
     macrocycles: list[tuple[list[int], bool, list[int]]],
 ) -> list[int]:
-    """Metal-bound donors of ``specie`` (any element) that the ring-nitrogen
-    free-base model can't represent -- i.e. every metal donor that is not a
-    ring nitrogen of a detected tetrapyrrole core (indices into ``specie.atoms``).
-
-    This covers both a donor lying entirely outside the cores (a pendant or
-    second-pocket donor) and an in-core donor that isn't a ring nitrogen (a
-    metal-bound meso or N-confused carbon). A non-empty result means the
-    porphyrin fast-path misses a binding mode, forcing fall-through to the
-    general engine. Ring nitrogens are pooled over ALL macrocycles, so a
-    bis-corrole's two sets of metal-bound nitrogens are both covered.
+    """Metal donors the ring-nitrogen free-base model cannot represent: any donor that
+    is not a ring nitrogen of a detected core, pooled over all macrocycles. A
+    non-empty result forces fall-through to the general engine.
     """
     core: set[int] = set()
     core_nitrogens: set[int] = set()
@@ -555,11 +499,8 @@ def _metal_donors_outside_tetrapyrrole_core(
         core.update(core_atoms)
         core_nitrogens.update(nitrogens)
 
-    # A metal donor is "uncovered" if it lies outside every core, OR is an
-    # in-core atom that is not a ring nitrogen (a metal-bound non-N core atom
-    # the ring-nitrogen free-base model can't represent). core_nitrogens is the
-    # union over ALL macrocycles -- so, e.g., a bis-corrole's two sets of ring
-    # nitrogens are both covered.
+    # Uncovered = outside every core, or in-core but not a ring nitrogen.
+    # core_nitrogens unions ALL macrocycles, so a bis-corrole is fully covered.
     outside_donors = [
         idx
         for idx, atom in enumerate(specie.atoms or [])
@@ -572,24 +513,10 @@ def _generate_porphyrin_protonation_states(
     specie: Specie,
     macrocycles: list[tuple[list[int], bool, list[int]]],
 ) -> list[Protonation]:
-    """Candidate protonation states for a specie with one or more pyrrolic
-    macrocycles, protonating each ring to its neutral free-base tautomer
-    (alternating ring N-H). Protons added = sum over rings:
-
-    - Classic N4 porphyrin/phthalocyanine (meso-bridged): 2 N-H (trans pair;
-      the 4-H dication is disabled).
-    - Ring-contracted k=4 (one direct link): two states -- a corrole
-      (aromatic, 3 N-H, trianionic free base) and a corrin (saturated,
-      1 N-H, monoanionic free base). The two are ambiguous from connectivity.
-    - Expanded porphyrin (k>=5): m0 = alternating N-H (3 for a hexaphyrin).
-
-    Classic N4 families emit exactly this one free-base count (bis-porphyrin ->
-    4). A ring-contracted k=4 emits both the corrole and corrin counts, and an
-    expanded porphyrin has an oxidation-level-dependent count ([26]hexaphyrin=3,
-    [28]=4, ...) so three states m0-1/m0/m0+1 are emitted -- in each case the
-    charge/metal-balance step picks, with invalid parities dropped downstream.
-    Replaces the general combinatorial search (too slow on large macrocycles).
-    Falls back to the as-is state if no macrocycle nitrogens are found.
+    """Free-base protonation states for pyrrolic macrocycles: 2 N-H for a classic N4
+    (trans pair), both corrole (3) and corrin (1) for a ring-contracted k=4 since
+    connectivity cannot tell them apart, and m0-1/m0/m0+1 for an expanded ring
+    whose count is oxidation-level dependent. Falls back to the as-is state.
     """
     asis_state = get_asis_protonation_state(specie)[0]
 
@@ -630,11 +557,8 @@ def _generate_porphyrin_protonation_states(
         n for n in all_nitrogens if n not in base_sites and not _already_has_h(n)
     ]
 
-    # Classic N4: just m0. Expanded: also bracket m0 +/- 1. Ring-contracted
-    # k=4: base_add already holds the corrole 3 N-H (trianionic free base);
-    # also emit the corrin 1 N-H (monoanionic free base). The two are hard to
-    # tell apart from connectivity alone, so both counts are offered and the
-    # charge/metal-balance step keeps whichever is valid.
+    # Classic N4: m0 only. Expanded: bracket m0 +/- 1. Ring-contracted k=4: emit
+    # both corrole (3 N-H) and corrin (1 N-H); connectivity cannot tell them apart.
     site_sets: list[list[int]] = [base_add]
     if is_expanded:
         if extra_bare:
@@ -977,23 +901,10 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
 
 def _charged_moiety_atoms(specie) -> set[int]:
-    """Atom indices whose formal charge ``_find_charged_moiety`` already fixes.
-
-    These are the terminal oxygens of a carboxylate / carbonate / sulfinate /
-    sulfonate / sulfate. Such an oxygen is NOT a protonation site: the group is
-    already a valid closed-shell anion, so bond perception needs no hydrogen on
-    it, and its charge is supplied directly by the moiety scan.
-
-    Excluding them is what keeps a polycarboxylate tractable -- a ligand with n
-    carboxylates would otherwise open 2n combinatorial sites and blow up the
-    protonation enumeration, which is the very cost the moiety shortcut in
-    ``get_candidate_charges`` exists to avoid. It also keeps the two mechanisms
-    from double-counting: no proton ever lands on a moiety atom, so every
-    protonation site is an anionic centre the moiety sum did NOT account for.
-
-    A genuine ``-C(=O)OH`` is unaffected -- its hydroxyl oxygen has two
-    non-metal neighbours (C and H), so it is not terminal and the scan never
-    reports it.
+    """Atoms whose charge ``_find_charged_moiety`` already fixes -- a carboxylate or
+    sulfonate's terminal oxygens. Not protonation sites: the group is already a
+    valid closed-shell anion, and excluding them keeps a polycarboxylate tractable
+    and stops the two mechanisms double-counting.
     """
     try:
         return {
@@ -1012,15 +923,8 @@ def _handle_non_haptic_group(
     parent_indices,
     moiety_atoms: set[int] | None = None,
 ) -> ProtonationGroupResult:
-    """
-    Handle protonation rules for non-haptic ligand groups.
-
-    ``moiety_atoms`` are atoms whose charge is already fixed by
-    ``_find_charged_moiety`` (carboxylate/sulfonate oxygens); they are skipped
-    as protonation sites.
-
-    No global state is mutated.
-    All intended changes are returned via ProtonationGroupResult.
+    """Protonation rules for a non-haptic group. ``moiety_atoms`` are skipped as
+    sites. Mutates no global state; all changes come back in the result.
     """
     moiety_atoms = moiety_atoms or set()
 
@@ -1106,15 +1010,9 @@ def _handle_non_haptic_group(
                     site_proton_counts[idx] = 1
 
                 else:
-                    # A coordinating N that lies on a 6-membered ring is a
-                    # neutral pyridine-type donor (no proton, no combinatorial
-                    # site). Accept membership in ANY minimal 6-ring, so the N
-                    # of a fused / bridged / substituted pyridine system
-                    # (quinoline, phenanthroline, bipyridine, naphthyridine,
-                    # ...) qualifies too -- not just a bare pyridine ligand.
-                    # The size-6 test is kept to exclude an N on a 5-membered
-                    # ring (pyrrolide-type), which is an anionic donor handled
-                    # combinatorially instead.
+                    # A coordinating N on ANY minimal 6-ring is a neutral
+                    # pyridine-type donor -- no proton, no combinatorial site.
+                    # Size 6 excludes 5-ring (pyrrolide) N, which is anionic.
                     graph = nx.from_numpy_array(ligand.adjmat.astype(float))
                     rings = nx.minimum_cycle_basis(graph)
                     in_six_ring = any(idx in ring and len(ring) == 6 for ring in rings)
