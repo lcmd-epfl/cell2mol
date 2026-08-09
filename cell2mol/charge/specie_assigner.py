@@ -17,12 +17,9 @@ logger = logging.getLogger(__name__)
 
 
 def assemble_complex_charge_state(mol):
-    """Roll the per-specie charges of a metal complex up to the molecule level.
-
-    Gathers the already-assigned atomic charges from the complex's ligands and
-    metals, builds the whole metal complex rdkit_obj/SMILES via
-    ``generate_tmc_rdkit_obj_smiles``, and stores the molecule's total charge,
-    atomic charges, SMILES and rdkit_obj. Metal-complex only.
+    """Roll a metal complex's per-specie charges up to the molecule level: gathers the
+    ligand and metal atomic charges, builds the whole rdkit_obj/SMILES, and stores
+    the molecule's total charge, atomic charges, SMILES and rdkit_obj.
     """
     tmp_atcharge = np.zeros((mol.natoms), dtype=int)
 
@@ -46,12 +43,8 @@ def assemble_complex_charge_state(mol):
 
 
 def assign_charge_to_specie(specie: "Specie | Metal", final_charge: int):
-    """
-    Assigns the final charge to a specie object.
-
-    Args:
-        specie: The specie object to update.
-        final_charge: The integer charge to assign.
+    """Apply an already-selected total charge to one specie or metal,
+    rebuilding its per-atom charges and rdkit_obj.
     """
     specie_unique_index = getattr(specie, "unique_index", None)
     logger.debug(
@@ -113,47 +106,29 @@ def assign_charge_to_specie(specie: "Specie | Metal", final_charge: int):
 
 
 def set_charge_state(reference, target, mode: int):
-    """
-    Dispatcher function to apply charge states to a target species.
+    """Transfer a solved charge state onto a target specie, reordering atoms.
 
-    Args:
-        reference: The source object (holds the total charge or reference state).
-        target: The object to receive the charge/state.
-        mode:
-            1 = Select pre-calculated state (Reference Cell).
-            2 = Transfer and reorder state (Unit Cell - Direct Mapping).
+    Both modes do the same thing with different keys: mode 1 (Reference Cell)
+    reorders by graph isomorphism, mode 2 (Unit Cell) by atom site label.
     """
     final_charge = reference.totcharge
 
-    # logger.debug(
-    #     "SET_CHARGE_STATE: Mode=%d | Target=%s | RefCharge=%s",
-    #     mode,
-    #     target.formula,
-    #     final_charge,
-    # )
-
     if mode == 1:
-        _apply_precalculated_state(target, final_charge, reference=reference)
+        _transfer_state_to_reference_copy(reference, target, final_charge)
     elif mode == 2:
         _transfer_state_to_unit_cell(reference, target, final_charge)
     else:
         logger.error("Invalid Mode %d passed to set_charge_state", mode)
 
 
-# --- Mode 1: Reference Cell (Selection) ---
-def _apply_precalculated_state(target: "Specie", final_charge, reference=None):
-    """Mode 1: Gives the target the unique specie's already-solved structure.
-
-    Entries sharing a ``unique_index`` are the same specie, so the copy should
-    *inherit* the solved Lewis structure rather than re-derive one and hope the
-    two agree. They frequently do not: ``rdDetermineBonds`` explores in atom
-    index order with a bounded budget, so symmetry-related copies -- identical
-    graphs, permuted numbering -- come back with different candidate sets, and
-    the copy is then asked for a charge it never found ("Charge Mismatch").
-
-    This is Mode 2's operation keyed on connectivity instead of atom site
-    labels, which do not correspond between two crystallographically distinct
-    copies. Falls back to the old lookup when no isomorphism is available.
+# --- Mode 1: Reference Cell ---
+def _transfer_state_to_reference_copy(
+    reference: "Specie", target: "Specie", final_charge
+):
+    """Mode 1: reorder the unique specie's solved state onto ``target`` by graph
+    isomorphism -- site labels do not correspond between distinct copies. Manual
+    formulas are rebuilt instead, and a declined transfer falls back on selecting
+    from the target's own charge states, which is where "Charge Mismatch" comes from.
     """
 
     # 1. Determine the Charge State (cs) object
@@ -212,7 +187,7 @@ def _apply_precalculated_state(target: "Specie", final_charge, reference=None):
     )
 
 
-# --- Mode 2: Unit Cell (Direct Transfer) ---
+# --- Mode 2: Unit Cell ---
 def _transfer_state_to_unit_cell(reference, target, final_charge):
     """Mode 2: Transfers RDKit object from reference to target, reordering atoms."""
 
@@ -289,19 +264,10 @@ _MAX_ISOMORPHISM_MATCHES = 5000
 
 
 def _connectivity_new_order(ref_spec, target_spec) -> list[int] | None:
-    """Atom order mapping ``ref_spec``'s indices onto ``target_spec``'s, from
-    graph isomorphism alone. Returns a ``new_order`` for ``Chem.RenumberAtoms``,
-    or None when the two graphs do not match.
-
-    ``compare_species`` assigns a shared ``unique_index`` on a fingerprint
-    (atom/electron counts and element-pair adjacency counts), not a true
-    isomorphism test, so two species can share an index without matching. That
-    is why None is a normal outcome and the caller must have a fallback.
-
-    Where several automorphisms exist, one that also aligns metal coordination
-    is preferred: two graph-equivalent donors (a carboxylate's oxygens, say)
-    may carry different formal charges, and the charge must not land on the
-    oxygen that is not bound to the metal.
+    """Atom order mapping ``ref_spec`` onto ``target_spec`` by graph isomorphism, for
+    ``Chem.RenumberAtoms``; None is normal, since ``unique_index`` comes from a
+    fingerprint rather than a real isomorphism test. An automorphism aligning metal
+    coordination is preferred, so charge lands on the donor actually bound.
     """
     # Declining must never raise: the caller treats None as "fall back to the
     # target's own charge states", whereas an exception would surface as a bare
@@ -398,11 +364,8 @@ def _transfer_state_by_connectivity(reference, target, final_charge) -> bool:
 
 
 def _reorder_rdkit_atoms(ref_mol, ref_labels, target_labels):
-    # Reorder atoms so position i holds the ref atom whose label == target_labels[i].
-    # Use RenumberAtoms (not a manual rebuild) so ALL atom properties are kept --
-    # formal charge, NoImplicit / explicit-H, aromaticity, chirality. A manual
-    # rebuild that copies only atomic number + charge drops NoImplicit, letting
-    # RDKit add implicit H to fill open valences (e.g. [Al-] -> [AlH2-]).
+    # RenumberAtoms, never a manual rebuild: a rebuild copying only atomic number
+    # and charge drops NoImplicit, letting RDKit fill valences ([Al-] -> [AlH2-]).
     label_to_index = {label: idx for idx, label in enumerate(ref_labels)}
     new_order = [label_to_index[label] for label in target_labels]
     return Chem.RenumberAtoms(ref_mol, new_order)
