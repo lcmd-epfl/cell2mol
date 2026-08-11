@@ -75,9 +75,6 @@ def get_atomic_valences(k):
     if k == 33:  # As
         return [5, 3]  # [5,4,3]
     if k == 34:  # Se
-        # Same expandable set as its congeners S and Te; without this Se falls
-        # through to the generic `8 - ave` branch below and gets [2] only, so
-        # selenoxides/selenones have no neutral solution here either.
         return [2, 4, 6]
     if k == 51:  # Sb
         return [6, 5, 4, 3]  # [5,4,3]
@@ -312,16 +309,22 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
     elif atom == 16 and BO_valence == 5 and not found:
         charge = 1
         found = True
+    elif atom == 32 and BO_valence == 6 and not found:
+        # Hexacoordinate germanate GeX6(2-): 4 - 6 = -2. Without this Ge hits the
+        # generic branch and comes back +2, valid at no charge at all.
+        charge = -2
+        found = True
     elif atom == 33 and BO_valence == 6 and not found:  # AsX6
         charge = -1
         found = True
     elif atom == 50 and BO_valence == 4 and not found:  # SnX4
         charge = 0
         found = True
-    elif atom == 51 and BO_valence in (3, 4, 5) and not found:
+    elif atom == 51 and BO_valence in (3, 5) and not found:  # SbR3, SbX5
         charge = 0
         found = True
-    elif atom == 51 and BO_valence == 6 and not found:  # SbX6
+    elif atom == 51 and BO_valence in (4, 6) and not found:
+        # [R2SbX2]- (4 bonds + lone pair) and SbX6-: 5 - 4 - 2 = 5 - 6 = -1.
         charge = -1
         found = True
     elif atom == 52 and BO_valence in (2, 4, 6) and not found:  # TeX2, TeX4, TeX6
@@ -660,6 +663,31 @@ def score_BO(BO, atoms, atomic_valence_electrons, allow_charged_fragments=True):
     return (total_abs_charge, num_charged_atoms)
 
 
+def _nitro_forced_valences(AC, atoms) -> dict[int, list[int]]:
+    """Pin every nitro/nitrate group to its only correct Lewis form, [N+](=O)[O-].
+
+    Nitrogen cannot expand its octet, so exactly one terminal oxygen is doubly
+    bonded. The other terminal oxygens are singly bonded.
+    Returns {atom index: [valence]} for the atoms of every group found.
+    """
+    forced = {}
+    for i, atomicNum in enumerate(atoms):
+        if atomicNum != 7:
+            continue
+        terminal_oxygens = [
+            j
+            for j, bonded in enumerate(AC[i])
+            if bonded and j != i and atoms[j] == 8 and int(sum(AC[j])) == 1
+        ]
+        if len(terminal_oxygens) < 2:
+            continue
+        forced[i] = [4]
+        forced[terminal_oxygens[0]] = [2]
+        for j in terminal_oxygens[1:]:
+            forced[j] = [1]
+    return forced
+
+
 def AC2BO(
     AC,
     atoms,
@@ -682,6 +710,8 @@ def AC2BO(
 
     formula = labels2formula([elemdatabase.elementsym[atom] for atom in atoms])
     wrong = 0
+
+    nitro_forced = _nitro_forced_valences(AC, atoms)
 
     for i, (atomicNum, valence) in enumerate(zip(atoms, AC_valence)):
         # valence can't be smaller than number of neighbours
@@ -712,6 +742,8 @@ def AC2BO(
             # P: [3,5]for PPh4+, missing 4).
             if valence not in possible_valence:
                 possible_valence.append(valence)
+        if i in nitro_forced:
+            possible_valence = list(nitro_forced[i])
         if atomicNum == 16 and valence == 1 and formula == "C-S":
             possible_valence = [3]
         if atomicNum == 34 and valence == 1 and formula == "C-Se":
