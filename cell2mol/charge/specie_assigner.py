@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, cast
 
+import networkx as nx
 import numpy as np
 from rdkit import Chem
 from cell2mol.charge.utils import MANUAL_CHARGE_ASSIGN_SPECIES
@@ -236,37 +237,37 @@ def _transfer_state_to_unit_cell(reference, target, final_charge):
     logger.debug("Mode 2 Applied: %s (Q=%d)", target.formula, target.totcharge)
 
 
-def _single_bond_graph(spec):
-    """The specie's bare connectivity as an RDKit mol: right elements, every
-    contact a single bond, no implicit H. Bond orders are deliberately absent
-    -- the point is to match the graph, not a particular Lewis structure."""
-    rwmol = Chem.RWMol()
-    for atomic_num in spec.get_atomic_numbers():
-        rwmol.AddAtom(Chem.Atom(int(atomic_num)))
+# Node labels VF2++ matches on. ELEMENT is the element alone; DONOR adds how
+# many metals the atom is bound to, so a mapping that respects it puts charge on
+# the donor actually coordinated rather than on a symmetry-equivalent twin.
+_ELEMENT = "element"
+_DONOR = "donor"
+
+
+def _connectivity_graph(spec) -> nx.Graph[int]:
+    """The specie's bare connectivity as a graph: right elements, every contact
+    an edge. Bond orders are deliberately absent -- the point is to match the
+    graph, not a particular Lewis structure."""
+    graph = nx.Graph()
+    atomic_numbers = [int(z) for z in spec.get_atomic_numbers()]
+
+    mconnec = [a.mconnec or 0 for a in spec.atoms or []]
+    if len(mconnec) != len(atomic_numbers):
+        mconnec = [0] * len(atomic_numbers)
+
+    for i, atomic_num in enumerate(atomic_numbers):
+        graph.add_node(i, **{_ELEMENT: atomic_num, _DONOR: (atomic_num, mconnec[i])})
 
     adjmat = np.asarray(spec.adjmat)
-    for i in range(spec.natoms):
-        for j in range(i + 1, spec.natoms):
-            if adjmat[i, j]:
-                rwmol.AddBond(i, j, Chem.BondType.SINGLE)
-
-    mol = rwmol.GetMol()
-    for atom in mol.GetAtoms():
-        atom.SetNoImplicit(True)
-    Chem.FastFindRings(mol)
-    return mol
-
-
-# Flexible ligands have many graph automorphisms (mostly methyl-hydrogen
-# permutations), and enumerating all of them is combinatorial. We only need
-# enough to find one that also aligns metal coordination.
-_MAX_ISOMORPHISM_MATCHES = 5000
+    rows, cols = np.nonzero(np.triu(adjmat, k=1))
+    graph.add_edges_from(zip(rows.tolist(), cols.tolist()))
+    return graph
 
 
 def _connectivity_new_order(ref_spec, target_spec) -> list[int] | None:
     """Atom order mapping ``ref_spec`` onto ``target_spec`` by graph isomorphism, for
     ``Chem.RenumberAtoms``; None is normal, since ``unique_index`` comes from a
-    fingerprint rather than a real isomorphism test. An automorphism aligning metal
+    fingerprint rather than a real isomorphism test. An isomorphism aligning metal
     coordination is preferred, so charge lands on the donor actually bound.
     """
     # Declining must never raise: the caller treats None as "fall back to the
@@ -276,8 +277,8 @@ def _connectivity_new_order(ref_spec, target_spec) -> list[int] | None:
     if getattr(ref_spec, "natoms", None) != getattr(target_spec, "natoms", None):
         return None
     try:
-        ref_graph = _single_bond_graph(ref_spec)
-        target_graph = _single_bond_graph(target_spec)
+        ref_graph = _connectivity_graph(ref_spec)
+        target_graph = _connectivity_graph(target_spec)
     except (AttributeError, TypeError, ValueError) as exc:
         logger.debug(
             "Cannot build a connectivity graph for %s: %s",
@@ -286,38 +287,21 @@ def _connectivity_new_order(ref_spec, target_spec) -> list[int] | None:
         )
         return None
 
-    matches = target_graph.GetSubstructMatches(
-        ref_graph,
-        uniquify=False,
-        maxMatches=_MAX_ISOMORPHISM_MATCHES,
-        useChirality=False,
-    )
-    # A same-size substructure match is an isomorphism; anything shorter is not.
-    matches = [m for m in matches if len(m) == target_spec.natoms]
-    if not matches:
-        return None
+    # Coordination is a label, not a post-filter: VF2++ prunes on it while searching,
+    # so the first isomorphism already aligns the donors. Enumerating them all and
+    # filtering afterwards is what made flexible ligands run for minutes.
+    mapping = nx.vf2pp_isomorphism(ref_graph, target_graph, node_label=_DONOR)
+    if mapping is None:
+        mapping = nx.vf2pp_isomorphism(ref_graph, target_graph, node_label=_ELEMENT)
+        if mapping is None:
+            return None
+        logger.debug(
+            "No isomorphism of %s aligns metal coordination; matching elements only",
+            target_spec.formula,
+        )
 
-    ref_mconnec = [a.mconnec or 0 for a in ref_spec.atoms or []]
-    target_mconnec = [a.mconnec or 0 for a in target_spec.atoms or []]
-    if len(ref_mconnec) == len(target_mconnec) == target_spec.natoms:
-        aligned = [
-            m
-            for m in matches
-            if all(ref_mconnec[i] == target_mconnec[j] for i, j in enumerate(m))
-        ]
-        if aligned:
-            matches = aligned
-        else:
-            logger.debug(
-                "No isomorphism of %s aligns metal coordination; using the first "
-                "of %d matches",
-                target_spec.formula,
-                len(matches),
-            )
-
-    chosen = matches[0]
-    new_order = [0] * len(chosen)
-    for ref_idx, target_idx in enumerate(chosen):
+    new_order = [0] * target_spec.natoms
+    for ref_idx, target_idx in mapping.items():
         new_order[target_idx] = ref_idx
     return new_order
 

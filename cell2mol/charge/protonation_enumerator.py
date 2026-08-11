@@ -103,24 +103,15 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
             is_expanded,
             [is_contracted for _n, is_contracted, _c in macrocycles],
         )
-        uncovered = _metal_donors_outside_tetrapyrrole_core(specie, macrocycles)
-        # Clean closed-form k=4 (incl. fully-covered bis-porphyrin): auto-handle.
-        if not is_expanded and not uncovered:
+        # Closed-form k=4: build it. The generator's site filter drops core nitrogens
+        # that cannot take a proton, and a donor that is not a ring nitrogen at all
+        # (an axial phosphine, say) is never a candidate site -- so it says nothing
+        # about the free base and must not divert the ligand to the general engine.
+        if not is_expanded:
             return _generate_porphyrin_protonation_states(specie, macrocycles)
-        # Expanded k>=5, or fused/ring-modified k=4: as-is state + warning flag.
-        if is_expanded:
-            reason = "expanded porphyrin (k>=5, oxidation-level-dependent free base)"
-            specie.protonation_warning = reason
-        else:
-            uncovered_labels = [
-                (specie.atoms or [])[i].atom_site_label or (specie.atoms or [])[i].label
-                for i in uncovered
-            ]
-            reason = (
-                f"fused/ring-modified k=4 core with {len(uncovered)} metal "
-                f"donor(s) beyond the tetrapyrrole core {uncovered_labels}"
-            )
-            specie.protonation_warning = reason
+        # Expanded k>=5: as-is state + warning flag.
+        reason = "expanded porphyrin (k>=5, oxidation-level-dependent free base)"
+        specie.protonation_warning = reason
         # return _warn_and_return(specie, reason)
 
     if specie.subtype == "ligand":
@@ -485,30 +476,6 @@ def _environment_classes(ligand: "Ligand", indices: list[int]) -> list[list[int]
     return sorted((sorted(cls) for cls in grouped.values()), key=lambda cls: cls[0])
 
 
-def _metal_donors_outside_tetrapyrrole_core(
-    specie: Specie,
-    macrocycles: list[tuple[list[int], bool, list[int]]],
-) -> list[int]:
-    """Metal donors the ring-nitrogen free-base model cannot represent: any donor that
-    is not a ring nitrogen of a detected core, pooled over all macrocycles. A
-    non-empty result forces fall-through to the general engine.
-    """
-    core: set[int] = set()
-    core_nitrogens: set[int] = set()
-    for nitrogens, _is_contracted, core_atoms in macrocycles:
-        core.update(core_atoms)
-        core_nitrogens.update(nitrogens)
-
-    # Uncovered = outside every core, or in-core but not a ring nitrogen.
-    # core_nitrogens unions ALL macrocycles, so a bis-corrole is fully covered.
-    outside_donors = [
-        idx
-        for idx, atom in enumerate(specie.atoms or [])
-        if (atom.mconnec or 0) > 0 and (idx not in core or idx not in core_nitrogens)
-    ]
-    return outside_donors
-
-
 def _generate_porphyrin_protonation_states(
     specie: Specie,
     macrocycles: list[tuple[list[int], bool, list[int]]],
@@ -545,16 +512,27 @@ def _generate_porphyrin_protonation_states(
     if not base_sites:
         return [asis_state]
 
-    # Skip ring nitrogens that already carry an H (e.g. an N-confused pyrrole
-    # N-H); adding another would build a spurious [NH2+].
+    # A free-base site must be a ring nitrogen that binds the metal and still has its
+    # lone pair: one already carrying an H (N-confused pyrrole) or a substituent
+    # (N-alkylated porphyrin) would give a spurious [NH2+] or a four-bonded N that
+    # will not kekulize. This also sets the count -- an N-alkyl occupies one of the
+    # two trans positions, so that macrocycle takes a single proton, not two.
     adjmat = np.asarray(specie.adjmat)
+    atoms = specie.atoms or []
 
-    def _already_has_h(idx: int) -> bool:
-        return any(specie.labels[j] == "H" for j in np.nonzero(adjmat[idx])[0])
+    def _can_be_protonated(idx: int) -> bool:
+        neighbours = np.nonzero(adjmat[idx])[0]
+        if (atoms[idx].mconnec or 0) == 0:
+            return False
+        if any(specie.labels[j] == "H" for j in neighbours):
+            return False
+        # A pyrrole-type N has exactly two ring carbons; a third heavy
+        # neighbour is an exocyclic substituent.
+        return sum(1 for j in neighbours if specie.labels[j] != "H") <= 2
 
-    base_add = [n for n in base_sites if not _already_has_h(n)]
+    base_add = [n for n in base_sites if _can_be_protonated(n)]
     extra_bare = [
-        n for n in all_nitrogens if n not in base_sites and not _already_has_h(n)
+        n for n in all_nitrogens if n not in base_sites and _can_be_protonated(n)
     ]
 
     # Classic N4: m0 only. Expanded: bracket m0 +/- 1. Ring-contracted k=4: emit
@@ -1010,12 +988,26 @@ def _handle_non_haptic_group(
                     site_proton_counts[idx] = 1
 
                 else:
-                    # A coordinating N on ANY minimal 6-ring is a neutral
-                    # pyridine-type donor -- no proton, no combinatorial site.
-                    # Size 6 excludes 5-ring (pyrrolide) N, which is anionic.
+                    # A coordinating N on a pyridine ring is a neutral donor -- no
+                    # proton, no combinatorial site. Ring size 6 alone is not enough:
+                    # pyridine is one N and five carbons, so a diazine or an O/S-
+                    # containing 6-ring is a different donor and has to fall through
+                    # to the combinatorial engine rather than be silently skipped.
+                    # Size 6 also excludes 5-ring (pyrrolide) N, which is anionic.
                     graph = nx.from_numpy_array(ligand.adjmat.astype(float))
                     rings = nx.minimum_cycle_basis(graph)
-                    in_six_ring = any(idx in ring and len(ring) == 6 for ring in rings)
+
+                    def _is_pyridine_ring(ring) -> bool:
+                        if len(ring) != 6:
+                            return False
+                        ring_labels = [ligand.labels[j] for j in ring]
+                        return (
+                            ring_labels.count("N") == 1 and ring_labels.count("C") == 5
+                        )
+
+                    in_six_ring = any(
+                        idx in ring and _is_pyridine_ring(ring) for ring in rings
+                    )
                     in_five_ring = any(idx in ring and len(ring) == 5 for ring in rings)
                     if in_six_ring:
                         pass  # pyridine-like

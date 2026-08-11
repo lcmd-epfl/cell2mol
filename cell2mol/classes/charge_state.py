@@ -127,13 +127,35 @@ class ChargeState(BaseModel):
         self.ligand_donor_electrons = self.protonation.ligand_donor_electrons
         self.n_protons_added = self.protonation.n_protons_added
 
+        parent = getattr(self.protonation, "parent", None)
+        parent_atoms = getattr(parent, "atoms", None) or []
+        donor_electrons = self.ligand_donor_electrons or []
+        protonated_sites = []
+        for idx, n_added in enumerate(self.site_proton_counts or []):
+            if not n_added:
+                continue
+            # A site can also donate a lone pair; that is what separates the specie
+            # charge from the protonated one, so show it where it is non-zero.
+            donated = donor_electrons[idx] if idx < len(donor_electrons) else 0
+            donated_note = f"+{donated}e-" if donated else ""
+            if idx < len(parent_atoms):
+                atom = parent_atoms[idx]
+                label = getattr(atom, "label", "?")
+                site_label = getattr(atom, "atom_site_label", None) or label
+                protonated_sites.append(
+                    f"{label}({site_label})+{n_added}H{donated_note}"
+                )
+            else:
+                protonated_sites.append(f"?+{n_added}H{donated_note}")
+
         logger.debug(
-            "Initializing ChargeState | Status: %s | SMILES: %s | Protonated Charge: %d | Charge Tried: %d | N Protons Added: %d",
+            "Initializing ChargeState | Status: %s | SMILES: %s | Protonated Charge: %d | Charge Tried: %d | N Protons Added: %d | Protonated sites: %s",
             self.status,
             self.smiles,
             self.protonated_total_charge,
             self.charge_tried,
             self.n_protons_added,
+            ", ".join(protonated_sites) if protonated_sites else "none",
         )
 
         # Specie (deprotonated) charges: build a fresh list and ASSIGN (never

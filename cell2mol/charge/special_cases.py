@@ -445,6 +445,59 @@ def find_borane_cage_indices(atoms, AC) -> list[int] | None:
     return sorted(bc_indices[i] for i in core.nodes())
 
 
+def _classify_cage(graph) -> str | None:
+    """ "closo", "nido" or None for one cage subgraph, read off its planar faces:
+    closo is all triangles, nido has exactly one open pentagonal face.
+    """
+    if graph.number_of_nodes() < 5:
+        return None
+    if not nx.is_connected(graph):
+        return None
+    if any(d < 3 for _, d in graph.degree()):
+        return None
+
+    face_sizes = _cage_face_sizes(graph)
+    if face_sizes is None:
+        return None
+    if all(size == 3 for size in face_sizes):
+        return "closo"
+    if (
+        graph.number_of_nodes() >= 6
+        and sum(1 for size in face_sizes if size == 5) == 1
+        and all(size == 3 for size in face_sizes if size != 5)
+    ):
+        return "nido"
+    return None
+
+
+def find_borane_cages(atoms, AC) -> list[tuple[list[int], str]]:
+    """Every closo/nido cage in the specie, as (cage atom indices, "closo"/"nido").
+
+    A specie can carry more than one cage -- two dicarbollides sandwiching a metal,
+    or a pendant carborane bonded to another cage -- so the 3-core is split before
+    classifying. Disjoint cages fall out as separate components; linked ones are
+    cut at their bridges, which is safe because a deltahedron is 3-connected and
+    therefore has none of its own. Returns [] when nothing classifies.
+    """
+    atoms = [int(a) for a in atoms]
+    ac = np.asarray(AC, dtype=int)
+    core = find_borane_cage_indices(atoms, ac)
+    if not core:
+        return []
+
+    graph = nx.from_numpy_array(ac[np.ix_(core, core)])
+    graph.remove_edges_from(list(nx.bridges(graph)))
+
+    cages: list[tuple[list[int], str]] = []
+    for component in nx.connected_components(graph):
+        indices = sorted(core[i] for i in component)
+        kind = _classify_cage(graph.subgraph(component))
+        if kind is None or not any(atoms[i] == 5 for i in indices):
+            continue
+        cages.append((indices, kind))
+    return cages
+
+
 def is_borane_cage(atoms, AC) -> tuple[bool, str]:
     """Detect a closo- or nido-type deltahedron from connectivity, exocyclic atoms
     dropped first. Read off the cage's planar faces: closo (n >= 5) is all
@@ -483,33 +536,21 @@ def is_borane_cage(atoms, AC) -> tuple[bool, str]:
     sub_ac = ac[np.ix_(cage_indices, cage_indices)]
     graph = nx.from_numpy_array(sub_ac)
 
-    # 4. Must be one connected cage, not fragments/disorder artifacts
-    if not nx.is_connected(graph):
-        return False, "disconnected_cage"
+    # 4. Classify every cage the specie carries, not just one. A bis(dicarbollide)
+    #    sandwich has two disjoint cages and a pendant carborane is bonded to its
+    #    neighbour, so requiring a single connected deltahedron rejected both.
+    cages = find_borane_cages(atoms, ac)
+    if not cages:
+        # Distinguish the two ways this fails, since the reasons read very
+        # differently in a log.
+        if not nx.is_connected(graph):
+            return False, "disconnected_cage"
+        return False, "not_deltahedral"
 
-    # 5. Every deltahedron vertex has degree >= 3 (the two apices of the
-    #    trigonal bipyramid); rules out spurious low-connectivity AC
-    #    artifacts cheaply, before the planarity/face check.
-    if any(d < 3 for _, d in graph.degree()):
-        return False, "degree_too_low"
-
-    # 6. Planarity + face-size distribution - required for, and fully
-    #    characterizes, a genuine closo/nido deltahedral cage.
-    face_sizes = _cage_face_sizes(graph)
-    if face_sizes is None:
-        return False, "not_planar"
-
-    if all(size == 3 for size in face_sizes):
-        return True, "closo_cage_confirmed"
-
-    if (
-        n >= 6
-        and sum(1 for size in face_sizes if size == 5) == 1
-        and all(size == 3 for size in face_sizes if size != 5)
-    ):
-        return True, "nido_cage_confirmed"
-
-    return False, "not_deltahedral"
+    kinds = {kind for _indices, kind in cages}
+    if len(cages) == 1:
+        return True, f"{kinds.pop()}_cage_confirmed"
+    return True, f"multi_cage_confirmed({'+'.join(sorted(kinds))}, n={len(cages)})"
 
 
 def find_conjuncto_borane_split(atoms, AC) -> dict | None:
@@ -1439,28 +1480,42 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
         )
         return None
 
-    n = len(cage_indices)
-
-    is_cage, reason = is_borane_cage(prot.atnums, adjmat)
-    if reason == "closo_cage_confirmed":
-        required_se = 2 * (n + 1)
-    elif reason == "nido_cage_confirmed":
-        required_se = 2 * (n + 2)
-    else:
+    # Wade's rules apply per cage, so a two-cage specie is counted twice over and
+    # each cage carries its own charge, on its own lowest-index boron.
+    cages = find_borane_cages(prot.atnums, adjmat)
+    if not cages:
         logger.warning(
-            "Borane/carborane specie %s failed cage topology re-check (%s)",
-            prot.formula,
-            reason,
+            "Borane/carborane specie %s failed cage topology re-check", prot.formula
         )
         return None
 
-    contributed_se = 0
-    for i in cage_indices:
-        valence_electrons = 3 if prot.atnums[i] == 5 else 4
-        exo_count = int(np.count_nonzero(adjmat[i][exo_indices])) if exo_indices else 0
-        contributed_se += valence_electrons - 2 + exo_count
-
-    core_charge = contributed_se - required_se
+    cage_charges: list[tuple[int, int]] = []
+    for indices, kind in cages:
+        n = len(indices)
+        required_se = 2 * (n + 1) if kind == "closo" else 2 * (n + 2)
+        # Exo is relative to THIS cage: a bond to the neighbouring cage is an
+        # exo substituent for each of them, exactly like any other.
+        own = set(indices)
+        outside = [i for i in range(prot.natoms) if i not in own]
+        contributed_se = 0
+        for i in indices:
+            valence_electrons = 3 if prot.atnums[i] == 5 else 4
+            exo_count = int(np.count_nonzero(adjmat[i][outside])) if outside else 0
+            contributed_se += valence_electrons - 2 + exo_count
+        cage_boron = [i for i in indices if prot.atnums[i] == 5]
+        if not cage_boron:
+            logger.warning(
+                "Borane/carborane specie %s has a cage with no boron", prot.formula
+            )
+            return None
+        cage_charges.append((cage_boron[0], contributed_se - required_se))
+        logger.debug(
+            "   %s cage of %d vertices in %s: charge %+d",
+            kind,
+            n,
+            prot.formula,
+            contributed_se - required_se,
+        )
 
     allowed_simple_labels = {"H"} | HALOGENS
     simple_exo = {
@@ -1472,7 +1527,8 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
     complex_roots = [i for i in exo_indices if i not in simple_exo]
 
     atom_charges = [0] * prot.natoms
-    atom_charges[boron_indices[0]] = core_charge
+    for boron_idx, cage_charge in cage_charges:
+        atom_charges[boron_idx] = cage_charge
 
     # Substituent fragments' own internal bond orders (e.g. an aromatic
     # ring's Kekule pattern) are kept, not just their formal charges --
@@ -1820,8 +1876,10 @@ def _classify_charged_moiety(
     return None, 0
 
 
-def _ring_sizes_by_atom(atoms, neighbor_source, local_idx_by_id) -> dict[int, set[int]]:
-    """Sizes of the smallest rings each atom belongs to (minimum cycle basis)."""
+def _rings_by_atom(
+    atoms, neighbor_source, local_idx_by_id
+) -> dict[int, list[list[int]]]:
+    """The smallest rings each atom belongs to (minimum cycle basis)."""
     graph = nx.Graph()
     graph.add_nodes_from(range(len(atoms)))
     for i, atom in enumerate(atoms):
@@ -1833,22 +1891,30 @@ def _ring_sizes_by_atom(atoms, neighbor_source, local_idx_by_id) -> dict[int, se
                 continue
             graph.add_edge(i, local_j)
 
-    sizes: dict[int, set[int]] = {}
+    rings: dict[int, list[list[int]]] = {}
     for cycle in nx.minimum_cycle_basis(graph):
         for idx in cycle:
-            sizes.setdefault(idx, set()).add(len(cycle))
-    return sizes
+            rings.setdefault(idx, []).append(list(cycle))
+    return rings
 
 
 def _find_cationic_nitrogen(
     atoms, neighbor_source, local_idx_by_id
 ) -> list[tuple[int, list[int], str, int]]:
     """Nitrogen whose +1 is pinned by connectivity: quaternary (4 sigma bonds), or
-    pyridinium (smallest ring exactly 6, with two three-connected ring neighbours).
-    Keyed on bond count and ring shape, not an N-H, since N-alkylated cations carry
-    none. Five-ring cations and guanidinium are out of scope.
+    pyridinium (a pyridine ring -- one N, five C -- with two three-connected ring
+    neighbours). Keyed on bond count and ring shape, not an N-H, since N-alkylated
+    cations carry none. Ring size alone is not enough: a diazine or an O/S-containing
+    6-ring is a different species whose charge is not pinned this way. Five-ring
+    cations and guanidinium are out of scope.
     """
-    ring_sizes = _ring_sizes_by_atom(atoms, neighbor_source, local_idx_by_id)
+    rings_by_atom = _rings_by_atom(atoms, neighbor_source, local_idx_by_id)
+
+    def _is_pyridine_ring(ring: list[int]) -> bool:
+        if len(ring) != 6:
+            return False
+        ring_labels = [atoms[j].label for j in ring]
+        return ring_labels.count("N") == 1 and ring_labels.count("C") == 5
 
     cations: list[tuple[int, list[int], str, int]] = []
     for i, atom in enumerate(atoms):
@@ -1871,8 +1937,14 @@ def _find_cationic_nitrogen(
             cations.append((i, [i], "quaternary-N", 1))
             continue
 
-        sizes = ring_sizes.get(i)
-        if len(neighbors) != 3 or not sizes or min(sizes) != 6:
+        rings = rings_by_atom.get(i)
+        if len(neighbors) != 3 or not rings:
+            continue
+        # Smallest ring must be the pyridine itself: a 6-ring fused to a smaller
+        # one is a different environment, as before.
+        if min(len(ring) for ring in rings) != 6:
+            continue
+        if not any(_is_pyridine_ring(ring) for ring in rings):
             continue
 
         sp2_neighbors = sum(

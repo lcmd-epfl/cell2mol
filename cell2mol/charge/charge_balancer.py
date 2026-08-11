@@ -1,11 +1,38 @@
 import logging
 import itertools
 from typing import List
-from cell2mol.charge.utils import aromatic_info
+from cell2mol.charge.utils import (
+    aromatic_info,
+    METAL_OS_OBSERVED,
+    METAL_OXIDATION_STATES,
+)
 from cell2mol.write_results import log_charge_state_details
 from cell2mol.charge.specie_assigner import assign_charge_to_specie
 
 logger = logging.getLogger(__name__)
+
+# Ceiling on the ligand charge combinations the metal-OS inference will enumerate.
+_MAX_INFERENCE_COMBINATIONS = 100_000
+
+# How much likelier one metal oxidation state must be than its rival before the
+# observed frequencies are allowed to settle an otherwise ambiguous cell.
+_PRIOR_DECISIVE_RATIO = 10
+
+
+def _observed_os_histogram(label: str) -> dict[int, int]:
+    """Observed {oxidation state: count} for an element, empty if unknown.
+
+    Elements outside the CSD tabulation -- main group, lanthanides, actinides --
+    are given the old rule instead, every state up to one past the curated table,
+    weighted equally so that the frequency comparisons below never fire on them.
+    """
+    observed = METAL_OS_OBSERVED.get(label)
+    if observed is not None:
+        return observed
+    known_os = METAL_OXIDATION_STATES.get(label)
+    if not known_os:
+        return {}
+    return {os: 1 for os in range(0, max(known_os) + 2)}
 
 
 def balance_unitcell_charge(refcell, unitcell):
@@ -27,16 +54,19 @@ def balance_unitcell_charge(refcell, unitcell):
     log_charge_state_details(unitcell, refcell)
 
     # Charge Balancing
-    expanded_species_charges, unique_species_charges = resolve_charge_distributions(
+    _, unique_species_charges = resolve_charge_distributions(
         unitcell.unique_indices, refcell.unique_species
     )
 
-    dist_count = len(expanded_species_charges)
+    # _preferred_distributions() would narrow several balancing distributions to
+    # one here. Left off: a data-driven model is to take over that decision.
+
+    dist_count = len(unique_species_charges)
     unitcell.error_multiple_distrib = dist_count > 1
     unitcell.error_empty_distrib = dist_count == 0
 
     # Nothing balanced: usually the metal's true oxidation state is missing from
-    # METAL_OXIDATION_STATES. Only safe when every other specie is unambiguous.
+    # its plausible_os set.
     if unitcell.error_empty_distrib:
         inferred_charges = _infer_metal_charge_from_fixed_ligands(
             unitcell.unique_indices, refcell.unique_species
@@ -45,7 +75,7 @@ def balance_unitcell_charge(refcell, unitcell):
             logger.warning(
                 "No standard charge distribution summed to neutrality; "
                 "inferred a non-standard metal oxidation state from the "
-                "unambiguous ligand charges instead: %s",
+                "ligand charges instead: %s",
                 inferred_charges,
             )
             unique_species_charges = [inferred_charges]
@@ -69,13 +99,86 @@ def balance_unitcell_charge(refcell, unitcell):
     return refcell, unitcell
 
 
+def _preferred_distributions(
+    unique_indices, unique_species, distributions: List[List[int]]
+) -> List[List[int]]:
+    """Narrow several neutral distributions, on two criteria in order: drop any
+    whose metal oxidation states are far rarer than the best on offer, then keep
+    those separating the least charge -- summed |ligand charge| per occurrence.
+    """
+    occurrences: dict[int, int] = {}
+    for u_idx in unique_indices:
+        occurrences[u_idx] = occurrences.get(u_idx, 0) + 1
+
+    metal_indices = [
+        idx for idx, spec in enumerate(unique_species) if spec.subtype == "metal"
+    ]
+
+    def separated_charge(distribution: List[int]) -> int:
+        return sum(
+            abs(charge) * occurrences.get(idx, 0)
+            for idx, (charge, spec) in enumerate(zip(distribution, unique_species))
+            if spec.subtype != "metal"
+        )
+
+    histograms = {
+        idx: _observed_os_histogram(unique_species[idx].label) for idx in metal_indices
+    }
+
+    def metal_likelihood(distribution: List[int]) -> float:
+        """P(oxidation state) across the cell's metals; 1.0 when none is tabulated."""
+        likelihood = 1.0
+        for idx in metal_indices:
+            histogram = histograms[idx]
+            if histogram:
+                likelihood *= histogram.get(distribution[idx], 0) / sum(
+                    histogram.values()
+                )
+        return likelihood
+
+    likelihoods = [metal_likelihood(dist) for dist in distributions]
+    likeliest = max(likelihoods)
+    if likeliest > 0:
+        alive = [
+            dist
+            for dist, likelihood in zip(distributions, likelihoods)
+            if likelihood * _PRIOR_DECISIVE_RATIO >= likeliest
+        ]
+        if len(alive) < len(distributions):
+            logger.info(
+                "Discarded %d of %d distribution(s) whose metal oxidation states "
+                "are over %dx rarer than the likeliest reading.",
+                len(distributions) - len(alive),
+                len(distributions),
+                _PRIOR_DECISIVE_RATIO,
+            )
+            distributions = alive
+
+    burdens = [separated_charge(dist) for dist in distributions]
+    lowest = min(burdens)
+    best = [dist for dist, burden in zip(distributions, burdens) if burden == lowest]
+
+    if len(best) < len(distributions):
+        logger.info(
+            "%d distributions balanced the cell; kept the %d separating the "
+            "least ligand charge (%d, down from %d).",
+            len(distributions),
+            len(best),
+            lowest,
+            max(burdens),
+        )
+    return best
+
+
 def _infer_metal_charge_from_fixed_ligands(
     unique_indices, unique_species, input_charge: int = 0
 ) -> List[int] | None:
-    """Fallback when nothing balanced: if every non-metal specie has exactly one
-    feasible charge, solve the metal's oxidation state as the value that balances,
-    even one outside its candidate list. Declines when several metals are distinct.
-    Returns one charge per ``unique_species`` entry, or None.
+    """Last resort when nothing balanced: try every combination of the ligands'
+    candidate charges, keeping those that leave the metal at a whole-number
+    oxidation state attested for that element. A lone survivor is taken; among
+    several the observed frequencies decide, and only by _PRIOR_DECISIVE_RATIO
+    or more. Declines otherwise, and when the cell holds more than one distinct
+    metal. Returns one charge per ``unique_species`` entry, or None.
     """
     metal_unique_indices: set[int] = set()
     non_metal_options: List[tuple[int, List[int]]] = []
@@ -83,14 +186,13 @@ def _infer_metal_charge_from_fixed_ligands(
         if spec.subtype == "metal":
             metal_unique_indices.add(idx)
         else:
-            options = _get_ligand_options(spec, aromatic=False)
-            if len(set(options)) != 1:
+            options = sorted(set(_get_ligand_options(spec, aromatic=False)))
+            if not options:
                 logger.debug(
                     "Cannot infer metal charge: non-metal specie %s (index %d) "
-                    "is still ambiguous (%s).",
+                    "has no charge options.",
                     spec.formula,
                     idx,
-                    options,
                 )
                 return None
             non_metal_options.append((idx, options))
@@ -103,36 +205,99 @@ def _infer_metal_charge_from_fixed_ligands(
         )
         return None
 
-    fixed_charge_by_index = {idx: options[0] for idx, options in non_metal_options}
-
-    non_metal_sum = 0
-    unique_metal_count = 0
-    for u_idx in unique_indices:
-        if u_idx in fixed_charge_by_index:
-            non_metal_sum += fixed_charge_by_index[u_idx]
-        else:
-            unique_metal_count += 1
-
-    if unique_metal_count == 0:
-        return None
-
-    remainder = input_charge - non_metal_sum
-    if remainder % unique_metal_count != 0:
+    (metal_idx,) = metal_unique_indices
+    metal_label = unique_species[metal_idx].label
+    observed_os = _observed_os_histogram(metal_label)
+    if not observed_os:
         logger.debug(
-            "Cannot infer metal charge: needed total charge %d does not "
-            "split evenly across %d metal occurrence(s).",
-            remainder,
-            unique_metal_count,
+            "Cannot infer metal charge: no observed oxidation states for %s.",
+            metal_label,
         )
         return None
 
-    inferred_metal_charge = remainder // unique_metal_count
-    (metal_idx,) = metal_unique_indices
+    # How many times each unique specie occurs in the cell.
+    occurrences = {idx: 0 for idx, _ in non_metal_options}
+    metal_occurrences = 0
+    for u_idx in unique_indices:
+        if u_idx in occurrences:
+            occurrences[u_idx] += 1
+        else:
+            metal_occurrences += 1
 
-    return [
-        inferred_metal_charge if idx == metal_idx else fixed_charge_by_index[idx]
-        for idx in range(len(unique_species))
-    ]
+    if metal_occurrences == 0:
+        return None
+
+    combination_count = 1
+    for _, options in non_metal_options:
+        combination_count *= len(options)
+    if combination_count > _MAX_INFERENCE_COMBINATIONS:
+        logger.debug(
+            "Cannot infer metal charge: %d ligand charge combinations exceed "
+            "the search limit of %d.",
+            combination_count,
+            _MAX_INFERENCE_COMBINATIONS,
+        )
+        return None
+
+    solutions: List[List[int]] = []
+    for combo in itertools.product(*[options for _, options in non_metal_options]):
+        charge_by_index = {
+            idx: charge for (idx, _), charge in zip(non_metal_options, combo)
+        }
+        non_metal_sum = sum(
+            charge_by_index[idx] * count for idx, count in occurrences.items()
+        )
+        remainder = input_charge - non_metal_sum
+        if remainder % metal_occurrences != 0:
+            continue
+        metal_charge = remainder // metal_occurrences
+        if metal_charge not in observed_os:
+            continue
+        solutions.append(
+            [
+                metal_charge if idx == metal_idx else charge_by_index[idx]
+                for idx in range(len(unique_species))
+            ]
+        )
+
+    if not solutions:
+        logger.debug(
+            "Cannot infer metal charge: no ligand charge combination leaves %s "
+            "with a whole-number oxidation state among the observed %s.",
+            metal_label,
+            sorted(observed_os),
+        )
+        return None
+
+    if len(solutions) == 1:
+        return solutions[0]
+
+    # Several balance. Let the prior decide, but only when it is emphatic: two
+    # solutions sharing a metal oxidation state tie at ratio 1 and are declined,
+    # as are near-neighbours like V(V) over V(IV).
+    solutions.sort(key=lambda sol: observed_os.get(sol[metal_idx], 0), reverse=True)
+    best, runner_up = (observed_os.get(sol[metal_idx], 0) for sol in solutions[:2])
+    if best < _PRIOR_DECISIVE_RATIO * runner_up:
+        logger.debug(
+            "Cannot infer metal charge: %d combinations balance the cell with "
+            "%s oxidation states %s; the prior does not separate them.",
+            len(solutions),
+            metal_label,
+            sorted({sol[metal_idx] for sol in solutions}),
+        )
+        return None
+
+    logger.info(
+        "%d combinations balanced the cell; took %s(%d), seen in %d of %d "
+        "surveyed structures, over the next best at %d.",
+        len(solutions),
+        metal_label,
+        solutions[0][metal_idx],
+        best,
+        sum(observed_os.values()),
+        runner_up,
+    )
+    return solutions[0]
 
 
 def balance_molecule_charge(molecule, input_charge: int = 0, second_try: bool = True):

@@ -217,21 +217,6 @@ def _anchored_specie_charges(spec: Specie) -> list[int] | None:
 
 def _sweep_charges(spec: Specie) -> list[int]:
     """Fallback SPECIE-charge sweep for a specie with no chemical anchor."""
-    # Trim the sweep for heteroatom-rich species: bond perception + resonance
-    # cost scales with the charge-flexible heteroatom count.
-    n_heteroatoms = sum(
-        1 for lab in spec.labels if lab not in ("C", "H") and lab not in HALOGENS
-    )
-    n_oxygens = sum(1 for lab in spec.labels if lab == "O")
-    if n_oxygens > 8:
-        logger.debug(
-            "Limiting candidate charges for %s (%d atoms, %d heteroatoms, %d oxygens) to [0]",
-            spec.formula,
-            spec.natoms,
-            n_heteroatoms,
-            n_oxygens,
-        )
-        return [0]
     if spec.is_non_complex_molecule:
         return [0, -1, 1, -2, 2, -3, 3, -4, 4]
     return [0, -1, 1, -2, 2]
@@ -310,6 +295,35 @@ def _manual_anchor_index(mol, target_atom: str) -> int | None:
     return None
 
 
+def _manual_label_order(mol, spec) -> list[int] | None:
+    """Permutation putting a registry SMILES into ``spec.atoms`` order by element.
+
+    Only valid when every element in the SMILES appears once, which makes the
+    mapping unique; returns None otherwise so the caller falls back to its anchor.
+    """
+    symbols = [atom.GetSymbol() for atom in mol.GetAtoms()]
+    if len(set(symbols)) != len(symbols):
+        return None
+
+    atoms = getattr(spec, "atoms", None) or []
+    if len(atoms) != len(symbols):
+        return None
+
+    position = {symbol: idx for idx, symbol in enumerate(symbols)}
+    try:
+        # RenumberAtoms reads this as "atom i of the result is old atom order[i]".
+        return [position[atom.label] for atom in atoms]
+    except KeyError:
+        logger.warning(
+            "Manual Charge: %s has labels %s that the registry SMILES %s does "
+            "not cover; keeping the SMILES atom order",
+            spec.formula,
+            [a.label for a in atoms],
+            Chem.MolToSmiles(mol),
+        )
+        return None
+
+
 def generate_manual_charge_state(spec):
     """Generates a ChargeState for special species using formula-based lookups."""
     # 1. Configuration Registry
@@ -330,6 +344,7 @@ def generate_manual_charge_state(spec):
         "F6-Si": ("Si", "F[Si-2](F)(F)(F)(F)F", -2),
         "O2": (None, "[O-][O-]", -2),
         "Br3": ("central", "Br[Br-]Br", -1),
+        "C-N-S": (None, "[N-]=C=S", -1),
     }
 
     formula = spec.formula
@@ -353,6 +368,11 @@ def generate_manual_charge_state(spec):
     mol = Chem.MolFromSmiles(smiles, sanitize=False)
     order = list(range(spec.natoms))
     new_order = order
+
+    if not target_atom:
+        label_order = _manual_label_order(mol, spec)
+        if label_order is not None:
+            new_order = label_order
 
     if target_atom:
         # Where the anchor sits in the registry SMILES. Hard-coding 1 breaks
@@ -842,7 +862,97 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
                 logger.debug("Tie-break successful, taking best structure.")
                 final_states.append(candidates[best_subset_indices[0]])
 
-    return _drop_dominated_charges(final_states)
+    return _drop_dominated_charges(
+        _drop_charged_uncoordinated_carbons(_drop_cationic_donors(final_states))
+    )
+
+
+def _has_cationic_donor(state: ChargeState) -> bool:
+    """True when an atom coordinating a metal carries a positive formal charge."""
+    parent = getattr(state.protonation, "parent", None)
+    atoms = getattr(parent, "atoms", None) or []
+    charges = state.specie_atom_charges or []
+    if not atoms or len(atoms) != len(charges):
+        return False
+    return any((a.mconnec or 0) > 0 and q > 0 for a, q in zip(atoms, charges))
+
+
+def _drop_cationic_donors(states: list[ChargeState]) -> list[ChargeState]:
+    """Drop charges that put a positive formal charge on a metal donor, as long as
+    something is left. A donor gives electron density to the metal, so a cationic
+    one says bond perception drew the ligand wrong rather than that the specie is a
+    cation -- CF3 read as F[C+](F)F instead of the carbanion. Kept as a filter of
+    last resort: where every state is like this (a linear nitrosyl, say) the drop is
+    declined, so a genuinely cationic donor still gets a charge.
+    """
+    if len(states) < 2:
+        return states
+
+    clean = [s for s in states if not _has_cationic_donor(s)]
+    if not clean or len(clean) == len(states):
+        return states
+
+    for state in states:
+        if _has_cationic_donor(state):
+            logger.debug(
+                "   Dropping charge %+d: positive formal charge on a metal donor (%s)",
+                state.specie_total_charge,
+                state.specie_smiles,
+            )
+    return clean
+
+
+def _has_charged_uncoordinated_carbon(state: ChargeState) -> bool:
+    """True when a carbon that coordinates nothing carries a formal charge."""
+    parent = getattr(state.protonation, "parent", None)
+    atoms = getattr(parent, "atoms", None) or []
+    charges = state.specie_atom_charges or []
+    if not atoms or len(atoms) != len(charges):
+        return False
+    return any(
+        a.label == "C" and (a.mconnec or 0) == 0 and q != 0
+        for a, q in zip(atoms, charges)
+    )
+
+
+def _drop_charged_uncoordinated_carbons(
+    states: list[ChargeState],
+) -> list[ChargeState]:
+    """Drop charges that park formal charge on a carbon bonded to no metal, as long
+    as something is left.
+
+    The charge sweep walks outward (-1, +1, -3, +3 ...), and for each value bond
+    perception must put the charge somewhere. When the value is wrong the usual
+    landing site is a carbon: diphenyldiazomethane comes back as a carbanion at -2
+    and a carbocation at +2 either side of the real neutral diazo zwitterion, and a
+    beta-ketoester grows a spurious [C-] for every step down. Carbon is the tell
+    because it has no lone pair to donate and no electronegativity to hold the
+    charge -- if it is neither bonded to a metal nor stabilised, the charge is an
+    artifact of the value being tried, not chemistry.
+
+    Restricted to carbon on purpose: a free anionic heteroatom is ordinary (the
+    borate of a tris(pyrazolyl)borate is a -1 on boron that coordinates nothing),
+    and a carbon that IS a donor is the whole point of a carbanion ligand like
+    CF3-. Kept as a filter of last resort, so a genuine free carbanion -- cyanide
+    sitting in the lattice N-down -- still gets its charge when every state is
+    like this.
+    """
+    if len(states) < 2:
+        return states
+
+    clean = [s for s in states if not _has_charged_uncoordinated_carbon(s)]
+    if not clean or len(clean) == len(states):
+        return states
+
+    for state in states:
+        if _has_charged_uncoordinated_carbon(state):
+            logger.debug(
+                "   Dropping charge %+d: formal charge on a carbon that "
+                "coordinates no metal (%s)",
+                state.specie_total_charge,
+                state.specie_smiles,
+            )
+    return clean
 
 
 def _artifact_separation(state: ChargeState) -> int:
@@ -873,10 +983,29 @@ def _structural_quality(state: ChargeState) -> tuple[int, int]:
 
 
 def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
-    """Drop charges beaten on every structural axis. A charge falls only to one at
-    least as aromatic and then strictly better on cancelling charge, or on |net
-    charge|; aromaticity can only veto a drop, never cause one. Charges that
-    genuinely trade the axes both survive, and the balancer settles them.
+    """Drop charges beaten on a structural axis without paying for it on the other.
+    A charge falls to one strictly better on cancelling charge and no less
+    aromatic, or strictly more aromatic and no worse on cancelling charge.
+
+    Both directions matter. Aromaticity has to be able to win outright, or a state
+    that dearomatises a ring to park a carbanion on it survives next to the intact
+    aromatic one -- an N-benzylpyridinium is then equally happy at -1 and +1.
+
+    Aromaticity may not be BOUGHT with formal charge, though, hence the |net
+    charge| guard on that clause. Stripping electrons off a sulfur-rich donor
+    turns its dithiole rings formally aromatic: BEDT-TTF picks up five aromatic
+    atoms at +4 that it does not have at 0, and without the guard the real neutral
+    donor loses to a quadruply-oxidised drawing of itself. Comparing aromaticity
+    only at equal-or-lower |charge| keeps the axis honest -- it settles which of
+    two equally charged drawings is better, and never argues for more charge.
+
+    What is deliberately NOT an axis is |net charge|. Two states with the same
+    aromaticity and the same charge separation are equally good drawings; the
+    smaller one is not the better one. Preferring it would erase the anionic form
+    of every redox-non-innocent ligand that can also be drawn neutral -- an
+    ene-dithiolate reduced to its dithione, a catecholate to its quinone. Those
+    charges genuinely trade nothing, so both survive and the balancer settles them
+    on cell neutrality.
     """
     if len(states) < 2:
         return states
@@ -889,13 +1018,13 @@ def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
                 states[j].specie_total_charge
                 for j, (arom_j, sep_j) in enumerate(quality)
                 if j != i
-                and arom_j >= arom_i
                 and (
-                    sep_j < sep_i
+                    (arom_j >= arom_i and sep_j < sep_i)
                     or (
-                        sep_j == sep_i
+                        arom_j > arom_i
+                        and sep_j <= sep_i
                         and abs(states[j].specie_total_charge)
-                        < abs(states[i].specie_total_charge)
+                        <= abs(states[i].specie_total_charge)
                     )
                 )
             ),
@@ -913,8 +1042,8 @@ def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
                 dominated_by,
             )
 
-    # Mutual domination is impossible (it needs strictly less separation in
-    # both directions), so `kept` is never empty -- but never hand back nothing.
+    # Mutual domination is impossible (it needs one axis strictly better in both
+    # directions), so `kept` is never empty -- but never hand back nothing.
     return kept or states
 
 
