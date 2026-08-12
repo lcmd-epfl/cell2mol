@@ -5,13 +5,23 @@ from ase import Atoms
 from cell2mol.classes import Molecule
 from cell2mol.compare import compare_reference_indices
 from cell2mol.connectivity import split_species
-from cell2mol.operations import translate, tmatgenerator, extract_from_list
+from cell2mol.element_utils import get_radii
+from cell2mol.operations import translate, extract_from_list
 from itertools import combinations
 from cell2mol.elementdata import ElementData
 from cell2mol.utils import config
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
+
+# Atoms touch within the sum of their radii plus this. Only shortlists shifts.
+_CONTACT_MARGIN = 1.0
+
+# A symmetry-generated atom this close to a unit-cell atom is that atom.
+_SITE_MATCH_TOLERANCE = 0.05
+
+# Closer than this is one site written twice, usually CIF disorder.
+_MIN_SITE_SEPARATION = 0.3
 
 
 def construct_unitcell(refcell, unitcell, sym_ops):
@@ -100,7 +110,9 @@ def construct_unitcell(refcell, unitcell, sym_ops):
         assign_unitcell_species(unitcell, refcell.species_list)
         return unitcell
 
-    # Reconstruction failed, unitcell already has error flags
+    # Reconstruction failed, unitcell already has error flags. Say why when the
+    # cell itself, rather than the merging, is the reason.
+    diagnose_failed_reconstruction(unitcell, refcell, sym_atoms_list)
     return unitcell
 
 
@@ -360,7 +372,6 @@ def reconstruct_fragments_by_reference(
             fragments_for_ref,
             target_ref_indices,
             refcell,
-            full=False,
         )
 
         if reconstructed:
@@ -373,7 +384,6 @@ def reconstruct_fragments(
     fragments,
     target_ref,
     refcell,
-    full: bool = False,
 ):
     reconstructed_molecules = []
     remaining_fragments = []
@@ -382,7 +392,6 @@ def reconstruct_fragments(
         fragments.copy(),
         target_ref,
         refcell,
-        full=full,
     )
 
     for merged in merged_candidates:
@@ -411,8 +420,9 @@ def final_reconstruct(
     Perform a final reconstruction pass over remaining fragments.
 
     This function attempts a last reconstruction step for fragments that could
-    not be merged during symmetry-based reconstruction. Reconstruction is
-    performed per reference molecule using `full=True`.
+    not be merged during symmetry-based reconstruction. Fragments are pooled per
+    reference molecule, so leftovers from different symmetry operations can meet
+    here, unlike the per-operation pass that precedes it.
 
     Successfully reconstructed molecules are appended to
     `reconstructed_molecules`. Fragments that still cannot be reconstructed
@@ -451,7 +461,6 @@ def final_reconstruct(
             ref_fragments,
             target_ref_indices,
             refcell,
-            full=True,
         )
 
         if reconstructed:
@@ -466,6 +475,88 @@ def final_reconstruct(
         )
 
     return final_remaining_fragments
+
+
+def diagnose_failed_reconstruction(unitcell, refcell, sym_atoms_list):
+    """Log why an input could never have been reconstructed.
+
+    The cell must be a whole number of copies of each reference molecule.
+    Duplicate sites and partial occupancy break that before any merging starts.
+    Neither gets its own error code: the reconstruction error already reports the
+    failure, this only says why, so it goes to the log alone.
+
+    Copies are counted within a molecule only: two moieties of one structure may
+    legitimately differ, an anion on a general position next to a complex on a
+    two-fold axis being the ordinary case.
+    """
+    overlapping = _overlapping_sites(unitcell)
+    if overlapping:
+        first, second, distance = overlapping[0]
+        logger.error(
+            "%d atom pair(s) closer than %.2f A, the closest %s%d and %s%d at "
+            "%.3f A. The cell lists the same site more than once.",
+            len(overlapping),
+            _MIN_SITE_SEPARATION,
+            unitcell.labels[first],
+            first,
+            unitcell.labels[second],
+            second,
+            distance,
+        )
+
+    for ref_idx, counts in _uneven_copy_counts(unitcell, refcell, sym_atoms_list):
+        logger.error(
+            "Reference molecule %d (%s) is not a whole number of copies: its "
+            "atoms appear %s times. Partial occupancy or a disordered site.",
+            ref_idx,
+            refcell.refmoleclist[ref_idx].formula,
+            " and ".join(str(count) for count in sorted(counts)),
+        )
+
+
+def _overlapping_sites(unitcell):
+    """Unit-cell atom pairs closer than ``_MIN_SITE_SEPARATION``, closest first."""
+    cell_vector = np.asarray(unitcell.cell_vector)
+    fracs = np.asarray(unitcell.frac_coord)
+
+    overlapping = []
+    for idx in range(len(fracs) - 1):
+        separation = fracs[idx + 1 :] - fracs[idx]
+        separation -= np.round(separation)
+        distances = np.linalg.norm(separation @ cell_vector, axis=1)
+        for offset in np.flatnonzero(distances < _MIN_SITE_SEPARATION):
+            overlapping.append((idx, idx + 1 + int(offset), float(distances[offset])))
+
+    return sorted(overlapping, key=lambda pair: pair[2])
+
+
+def _uneven_copy_counts(unitcell, refcell, sym_atoms_list):
+    """Reference molecules whose atoms are not all present the same number of times.
+
+    Returns ``(reference index, {counts seen})`` for each offending molecule.
+    """
+    # Which reference atom each unit-cell atom is a copy of. The first symmetry
+    # operation to claim an atom owns it, as in the reconstruction itself.
+    owner: dict[int, int] = {}
+    for symop_idx, sym_atoms in enumerate(sym_atoms_list):
+        for ref_idx, cell_idx in _get_updated_indices(
+            symop_idx, refcell, unitcell, sym_atoms
+        ):
+            owner.setdefault(cell_idx, ref_idx)
+
+    copies_per_ref_atom: dict[int, int] = {}
+    for ref_idx in owner.values():
+        copies_per_ref_atom[ref_idx] = copies_per_ref_atom.get(ref_idx, 0) + 1
+
+    uneven = []
+    for idx, ref in enumerate(refcell.refmoleclist):
+        counts = {
+            copies_per_ref_atom.get(ref_atom, 0)
+            for ref_atom in ref.get_parent_indices("reference")
+        }
+        if len(counts) > 1:
+            uneven.append((idx, counts))
+    return uneven
 
 
 def is_reconstruction_complete(
@@ -636,20 +727,32 @@ def _get_updated_indices(symop_idx, refcell, unitcell, sym_atoms):
     logger.debug("Applying symmetry operations #%2d", symop_idx)
     indices_lists = []
 
-    ref_labels = refcell.labels
-    cell_labels = unitcell.labels
-    cell_pos = unitcell.coord
-    cell_fracs = unitcell.frac_coord
+    cell_vector = np.asarray(unitcell.cell_vector)
+    cell_fracs = np.asarray(unitcell.frac_coord)
+    new_fracs = np.asarray(sym_atoms.get_scaled_positions())
 
-    new_pos = sym_atoms.get_positions()
-    new_fracs = sym_atoms.get_scaled_positions()
+    # Candidates grouped by element, so each generated atom is only measured
+    # against the atoms it could possibly be.
+    cell_atoms_by_label: dict[str, list[int]] = {}
+    for kdx, label in enumerate(unitcell.labels):
+        cell_atoms_by_label.setdefault(label, []).append(kdx)
 
-    for jdx, (n_l, n_p, n_f) in enumerate(zip(ref_labels, new_pos, new_fracs)):
-        for kdx, (label, p, f) in enumerate(zip(cell_labels, cell_pos, cell_fracs)):
-            if n_l == label and np.allclose(n_p, p, atol=1e-4, rtol=1e-2):
-                # jdx is the index of the atom in the new structure
-                # kdx is the index of the atom in the unit cell
-                indices_lists.append((jdx, kdx))
+    for jdx, (n_l, n_f) in enumerate(zip(refcell.labels, new_fracs)):
+        candidates = cell_atoms_by_label.get(n_l)
+        if not candidates:
+            continue
+
+        # Minimum image: both sets are wrapped into the cell, so an atom sitting
+        # on a face can come out at 0.0 on one side and 1.0 on the other.
+        separation = cell_fracs[candidates] - n_f
+        separation -= np.round(separation)
+        distances = np.linalg.norm(separation @ cell_vector, axis=1)
+
+        nearest = int(np.argmin(distances))
+        if distances[nearest] <= _SITE_MATCH_TOLERANCE:
+            # jdx is the index of the atom in the new structure
+            # kdx is the index of the atom in the unit cell
+            indices_lists.append((jdx, candidates[nearest]))
     return indices_lists
 
 
@@ -800,11 +903,44 @@ def _build_fragments_from_blocklist(
     return fragments
 
 
+def _candidate_translations(keep_frag, move_frag, cell_vector):
+    """Pick the whole-cell shifts to try when joining ``move_frag`` to ``keep_frag``.
+
+    A fragment cut off at the cell edge has to be moved by one whole cell, or
+    two, or three, before it sits next to the rest of its molecule. This decides
+    which of those shifts are worth testing.
+
+    Take one atom from each fragment. Exactly one shift brings that pair as close
+    together as the cell allows. If they would then be close enough to bond, that
+    shift is a candidate. Repeat for all pairs; only a few shifts come out.
+
+    Smallest shift first, because most fragments need no shift at all.
+    """
+    cell = np.asarray(cell_vector)
+    inv_cell = np.linalg.inv(cell)
+    # From the Cartesian coordinates, since frac_coord may still say where the
+    # fragment was before an earlier merge moved it.
+    keep_fracs = np.asarray(keep_frag.coord) @ inv_cell
+    move_fracs = np.asarray(move_frag.coord) @ inv_cell
+
+    reach = (
+        max(get_radii(keep_frag.labels))
+        + max(get_radii(move_frag.labels))
+        + _CONTACT_MARGIN
+    )
+
+    separation = keep_fracs[:, None, :] - move_fracs[None, :, :]
+    shift = np.round(separation)
+    distance = np.linalg.norm((separation - shift) @ cell, axis=-1)
+    candidates = set(map(tuple, shift[distance <= reach].astype(int).tolist()))
+
+    return sorted(candidates, key=lambda t: (max(map(abs, t)), sum(map(abs, t))))
+
+
 def _merge_fragments_iterative(
     fragments,
     target_ref,
     refcell,
-    full: bool = False,
 ):
     """
     Iteratively merge fragment pairs in-place until no further merges are possible.
@@ -833,7 +969,6 @@ def _merge_fragments_iterative(
             merged = _merge_fragment_pair(
                 (frag_i, frag_j),
                 refcell,
-                full=full,
             )
             if merged is None:
                 continue
@@ -853,7 +988,6 @@ def _merge_fragment_pair(
     frag_pair: "tuple[Any, Any]",
     refcell: Any,
     use_bond_info: bool | None = None,
-    full: bool = False,
 ):
     """
     Attempt to merge two fragments by translating one fragment across the unit cell.
@@ -879,13 +1013,9 @@ def _merge_fragment_pair(
 
     # Keep the larger fragment fixed, move the smaller one
     keep_frag, move_frag = sorted(frag_pair, key=lambda f: f.natoms, reverse=True)
-    move_frag.get_centroid()
 
-    # Single H/D: allow full translations
-    if move_frag.natoms == 1 and move_frag.labels[0] in ("H", "D"):
-        full = True
-
-    translations = tmatgenerator(move_frag.frac_centroid, full=full)
+    inv_cell = np.linalg.inv(np.asarray(cell_vector))
+    translations = _candidate_translations(keep_frag, move_frag, cell_vector)
     if not translations:
         return None
 
@@ -899,7 +1029,10 @@ def _merge_fragment_pair(
             moved_coord = translate(t, move_frag.coord, cell_vector)
 
         merged_coord = [*keep_frag.coord, *moved_coord]
-        merged_fracs = [*keep_frag.frac_coord, *move_frag.frac_coord]
+        # Fractions follow the merged Cartesian coordinates. Carrying over the
+        # mover's own fractions would describe the fragment where it used to
+        # sit, not where this merge put it, and the next merge reads them back.
+        merged_fracs = (np.asarray(merged_coord) @ inv_cell).tolist()
 
         merged_ref_indices = [*keep_frag.ref_indices, *move_frag.ref_indices]
         merged_cell_indices = [*keep_frag.cell_indices, *move_frag.cell_indices]
