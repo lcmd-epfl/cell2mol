@@ -193,7 +193,12 @@ def charge_is_OK(
     if allow_charged_fragments:
         BO_valences = list(BO.sum(axis=1))
         for i, atom in enumerate(atoms):
-            q = get_atomic_charge(atom, atomic_valence_electrons[atom], BO_valences[i])
+            q = get_atomic_charge(
+                atom,
+                atomic_valence_electrons[atom],
+                BO_valences[i],
+                neighbor_atoms=_neighbor_atomic_numbers(AC, i, atoms),
+            )
             total_q += q
             if atom == 6:
                 number_of_single_bonds_to_C = list(BO[i, :]).count(1)
@@ -265,8 +270,22 @@ def BO_is_OK(
     return False
 
 
-def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
-    """ """
+# An electronegative substituent leaves four-coordinate Sb its lone pair, which
+# is what makes [R2SbX2]- an anion where a tetraorganostibonium is a cation.
+_SB_III_SUBSTITUENTS = frozenset({7, 8, 9, 16, 17, 34, 35, 53})  # N O F S Cl Se Br I
+
+
+def _neighbor_atomic_numbers(matrix, index, atoms) -> list[int]:
+    """Atomic numbers bonded to ``index``, read off a BO or adjacency matrix."""
+    if matrix is None:
+        return []
+    return [j_atom for j, j_atom in enumerate(atoms) if j != index and matrix[index][j]]
+
+
+def get_atomic_charge(atom, atomic_valence_electrons, BO_valence, neighbor_atoms=None):
+    """Formal charge of one atom from its bond order sum. ``neighbor_atoms`` (the
+    bonded atomic numbers) matters only where the bond count alone is ambiguous.
+    """
     label = elemdatabase.elementsym[atom]
     group = elemdatabase.elementgroup[label]
 
@@ -323,9 +342,15 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence):
     elif atom == 51 and BO_valence in (3, 5) and not found:  # SbR3, SbX5
         charge = 0
         found = True
-    elif atom == 51 and BO_valence in (4, 6) and not found:
-        # [R2SbX2]- (4 bonds + lone pair) and SbX6-: 5 - 4 - 2 = 5 - 6 = -1.
+    elif atom == 51 and BO_valence == 6 and not found:  # SbX6-: 5 - 6 = -1
         charge = -1
+        found = True
+    elif atom == 51 and BO_valence == 4 and not found:
+        # [SbR4]+ (Sb(V), no lone pair) vs [R2SbX2]- (Sb(III), lone pair kept).
+        # Only the substituents tell them apart; default to the anion.
+        neighbors = neighbor_atoms or []
+        sb_iii = any(z in _SB_III_SUBSTITUENTS for z in neighbors)
+        charge = -1 if (sb_iii or not neighbors) else 1
         found = True
     elif atom == 52 and BO_valence in (2, 4, 6) and not found:  # TeX2, TeX4, TeX6
         charge = 0
@@ -411,7 +436,12 @@ def set_atomic_charges(
     q = 0
     for i, atom in enumerate(atoms):
         a = mol.GetAtomWithIdx(i)
-        charge = get_atomic_charge(atom, atomic_valence_electrons[atom], BO_valences[i])
+        charge = get_atomic_charge(
+            atom,
+            atomic_valence_electrons[atom],
+            BO_valences[i],
+            neighbor_atoms=_neighbor_atomic_numbers(BO_matrix, i, atoms),
+        )
         q += charge
         if atom == 6:
             number_of_single_bonds_to_C = list(BO_matrix[i, :]).count(1)
@@ -654,8 +684,13 @@ def score_BO(BO, atoms, atomic_valence_electrons, allow_charged_fragments=True):
     BO_valences = list(BO.sum(axis=1))
     total_abs_charge = 0
     num_charged_atoms = 0
-    for atom, BO_valence in zip(atoms, BO_valences):
-        q = get_atomic_charge(atom, atomic_valence_electrons[atom], BO_valence)
+    for i, (atom, BO_valence) in enumerate(zip(atoms, BO_valences)):
+        q = get_atomic_charge(
+            atom,
+            atomic_valence_electrons[atom],
+            BO_valence,
+            neighbor_atoms=_neighbor_atomic_numbers(BO, i, atoms),
+        )
         if q != 0:
             total_abs_charge += abs(q)
             num_charged_atoms += 1
@@ -686,6 +721,16 @@ def _nitro_forced_valences(AC, atoms) -> dict[int, list[int]]:
         for j in terminal_oxygens[1:]:
             forced[j] = [1]
     return forced
+
+
+def _narrowed_oxygen_valences(valences_list_of_lists, atoms):
+    """Drop valence 3 from every oxygen that has another option."""
+    narrowed = []
+    for atomic_num, options in zip(atoms, valences_list_of_lists):
+        if atomic_num == 8 and 3 in options and len(options) > 1:
+            options = [valence for valence in options if valence != 3]
+        narrowed.append(options)
+    return narrowed
 
 
 def AC2BO(
@@ -785,6 +830,22 @@ def AC2BO(
         valences_list_of_lists.append(possible_valence)
     if wrong > 0:
         return None, atomic_valence_electrons
+
+    # Oxygen is usually what blows up the search, narrowing beats terminating
+    projected = math.prod(len(options) for options in valences_list_of_lists)
+    if projected > valence_combinations_limit and 8 in atoms:
+        narrowed = _narrowed_oxygen_valences(valences_list_of_lists, atoms)
+        narrowed_total = math.prod(len(options) for options in narrowed)
+        if narrowed_total < projected:
+            logger.warning(
+                "Valence search space for %s is %d, over the %d limit; "
+                "restricting oxygen to [2, 1] brings it to %d.",
+                formula,
+                projected,
+                valence_combinations_limit,
+                narrowed_total,
+            )
+            valences_list_of_lists = narrowed
 
     best_BO = AC.copy()
     best_status_BO = None
