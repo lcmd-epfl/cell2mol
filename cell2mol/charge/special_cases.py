@@ -943,16 +943,21 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
         else:
             atom_charges[n] = 1 if protonated else 0
 
-    core_charge = sum(atom_charges[n] for n in nitrogens)
-    expected_core_charge = prot.n_protons_added - len(reference_sites)
-    if core_charge != expected_core_charge:
+    # The core is neutral by construction, so check the protons instead: the charge
+    # is -(number added) only if every one landed on a nitrogen. Counting N-H would
+    # misread a free base that brought its own, or a pocket N outside the ring.
+    misplaced = [
+        idx
+        for idx, n_added in enumerate(prot.site_proton_counts or [])
+        if n_added and prot.atnums[idx] != 7
+    ]
+    if misplaced:
         logger.warning(
-            "Porphyrin-family core charge mismatch for %s: %d from nitrogen "
-            "protonation vs %d expected from proton count; using the "
-            "proton-count value",
+            "Porphyrin-family specie %s protonates %d non-nitrogen site(s) %s; "
+            "its charge is not -(protons added)",
             prot.formula,
-            core_charge,
-            expected_core_charge,
+            len(misplaced),
+            misplaced,
         )
 
     # Substituents beyond a simple terminal H are split off and charged

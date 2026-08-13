@@ -109,7 +109,18 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
         # about the free base and must not divert the ligand to the general engine.
         if not is_expanded:
             return _generate_porphyrin_protonation_states(specie, macrocycles)
-        # Expanded k>=5: as-is state + warning flag.
+        # Expanded k>=5, but its metals may cut it into ordinary N4 pockets.
+        pockets = _metal_pocket_macrocycles(specie)
+        if pockets:
+            logger.info(
+                "%s: expanded macrocycle resolves into %d metal-bound N4 "
+                "pocket(s) %s; protonating a trans pair in each.",
+                specie.formula,
+                len(pockets),
+                [pocket for _n, _c, pocket in pockets],
+            )
+            return _generate_porphyrin_protonation_states(specie, pockets)
+        # Expanded k>=5 with no pockets: as-is state + warning flag.
         reason = "expanded porphyrin (k>=5, oxidation-level-dependent free base)"
         specie.protonation_warning = reason
         # return _warn_and_return(specie, reason)
@@ -226,11 +237,25 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
             n_all_or_nothing,
         )
         if n_all_or_nothing > max_combinations:
-            reason = (
-                f"too many combinatorial protonation states even all-or-nothing "
-                f"per class ({n_all_or_nothing} > {max_combinations})"
+            merged = _merge_by_donor_signature(ligand, site_classes)
+            count_choices = [range(len(cls) + 1) for cls in merged]
+            n_count_only = 1
+            for choices in count_choices:
+                n_count_only *= len(choices)
+            logger.info(
+                "  falling back to count-only protonation over %d donor "
+                "signature(s) %s (%d state(s)).",
+                len(merged),
+                merged,
+                n_count_only,
             )
-            return _warn_and_return(specie, reason, return_asis=True)
+            if n_count_only > max_combinations:
+                reason = (
+                    f"too many combinatorial protonation states even count-only "
+                    f"per donor signature ({n_count_only} > {max_combinations})"
+                )
+                return _warn_and_return(specie, reason, return_asis=True)
+            site_classes = merged
 
     # ============================================================
     # DETERMINISTIC ATOM ADDITION
@@ -340,7 +365,8 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     local_n_protons_added = n_protons_added
 
     # Atoms in a class are symmetry-equivalent, so protonating any c of them gives
-    # the same structure: one representative subset (the first c) per count.
+    # the same structure: one representative subset (the first c) per count. After
+    # a count-only merge they are only alike, so the subset is one of several.
     combinations = list(itertools.product(*count_choices))
     combinations.sort(key=sum)  # order by total protons added
 
@@ -440,6 +466,25 @@ def _class_count_choices(cls: list[int]):
     return range(len(cls) + 1)
 
 
+def _donor_signature(ligand: "Ligand", idx: int) -> tuple:
+    """Element, metals bridged and substituents -- what makes two donors alike."""
+    a = ligand.atoms[idx]
+    mol_labels = ligand.get_parent("molecule").labels
+    metal_adj = set(a.metal_adjacency)
+    non_metal = sorted(mol_labels[j] for j in a.adjacency if j not in metal_adj)
+    return (a.label, a.mconnec, tuple(non_metal))
+
+
+def _merge_by_donor_signature(
+    ligand: "Ligand", site_classes: list[list[int]]
+) -> list[list[int]]:
+    """Collapse classes sharing a donor signature, keeping only their endpoints exact."""
+    merged: dict[tuple, list[int]] = {}
+    for cls in site_classes:
+        merged.setdefault(_donor_signature(ligand, cls[0]), []).extend(cls)
+    return sorted((sorted(cls) for cls in merged.values()), key=lambda cls: cls[0])
+
+
 def _environment_classes(ligand: "Ligand", indices: list[int]) -> list[list[int]]:
     """Partition ``indices`` into topological-equivalence classes by Weisfeiler-Lehman
     colour refinement, so protonation treats a class as one all-or-nothing site
@@ -474,6 +519,63 @@ def _environment_classes(ligand: "Ligand", indices: list[int]) -> list[list[int]
     for idx in unique:
         grouped.setdefault(colours[idx], []).append(idx)
     return sorted((sorted(cls) for cls in grouped.values()), key=lambda cls: cls[0])
+
+
+def _order_pocket_trans(metal_coord, nitrogens: list[int], coords) -> list[int]:
+    """Order four donors so 0/2 and 1/3 are the trans pairs: of the three pairings,
+    the one minimising the intra-pair dot products of the metal->N vectors.
+    """
+    units = {}
+    for idx in nitrogens:
+        vec = np.asarray(coords[idx], float) - np.asarray(metal_coord, float)
+        norm = np.linalg.norm(vec)
+        units[idx] = vec / norm if norm > 0 else vec
+
+    a, b, c, d = nitrogens
+    pairings = [((a, b), (c, d)), ((a, c), (b, d)), ((a, d), (b, c))]
+    (p0, p1), (p2, p3) = min(
+        pairings,
+        key=lambda pairing: sum(float(np.dot(units[p], units[q])) for p, q in pairing),
+    )
+    return [p0, p2, p1, p3]
+
+
+def _metal_pocket_macrocycles(
+    specie: Specie,
+) -> list[tuple[list[int], bool, list[int]]]:
+    """One N4 pocket per metal, as pseudo-macrocycles for the k=4 builder: an expanded
+    ring has one free base per pocket, not one overall. Declines unless every metal
+    takes exactly four unsubstituted nitrogens.
+    """
+    molecule = specie.get_parent("molecule")
+    atoms = specie.atoms or []
+    if molecule is None or not atoms:
+        return []
+
+    adjmat = np.asarray(specie.adjmat)
+    pockets: dict[int, list[int]] = {}
+    for idx, atom in enumerate(atoms):
+        for metal_idx in atom.metal_adjacency or []:
+            heavy = sum(
+                1 for j in np.nonzero(adjmat[idx])[0] if specie.labels[j] != "H"
+            )
+            if atom.label != "N" or heavy > 2:
+                return []
+            pockets.setdefault(metal_idx, []).append(idx)
+
+    if not pockets or any(len(nitrogens) != 4 for nitrogens in pockets.values()):
+        return []
+
+    return [
+        (
+            _order_pocket_trans(
+                molecule.atoms[metal_idx].coord, nitrogens, specie.coord
+            ),
+            False,
+            sorted(nitrogens),
+        )
+        for metal_idx, nitrogens in pockets.items()
+    ]
 
 
 def _generate_porphyrin_protonation_states(
