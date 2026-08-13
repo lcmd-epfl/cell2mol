@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import itertools
 import numpy as np
 import networkx as nx
+from collections import deque
 from cell2mol.charge.utils import (
     check_rdkit_obj_connectivity,
     generate_rdkit_mol_from_AC2mol,
@@ -1802,6 +1803,162 @@ def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | N
     )
 
 
+# S and Se: the selenium analogues (TMTSF, BEDT-TSF) oxidise like their parents.
+_TTF_CHALCOGENS = {16, 34}
+
+
+def find_dithiolylidene_units(mol: Chem.Mol) -> list[int]:
+    """The 2-position carbons of every 1,3-dithiol-2-ylidene unit.
+
+    A unit is a five-ring with two chalcogens whose carbon between them is doubly
+    bonded outside the ring. Oxidation moves that bond, leaving a dithiolium.
+    """
+    units = []
+    for ring in mol.GetRingInfo().AtomRings():
+        if len(ring) != 5:
+            continue
+        chalcogens = {
+            idx
+            for idx in ring
+            if mol.GetAtomWithIdx(idx).GetAtomicNum() in _TTF_CHALCOGENS
+        }
+        if len(chalcogens) != 2:
+            continue
+
+        for idx in ring:
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetAtomicNum() != 6:
+                continue
+            if {n.GetIdx() for n in atom.GetNeighbors()} & set(ring) != chalcogens:
+                continue
+            exocyclic = [n for n in atom.GetNeighbors() if n.GetIdx() not in ring]
+            if len(exocyclic) != 1 or exocyclic[0].GetAtomicNum() != 6:
+                continue
+            bond = mol.GetBondBetweenAtoms(idx, exocyclic[0].GetIdx())
+            if bond.GetBondType() == Chem.BondType.DOUBLE and idx not in units:
+                units.append(idx)
+    return units
+
+
+def _alternating_bond_path(mol: Chem.Mol, start: int, end: int) -> list[int] | None:
+    """Atom path from ``start`` to ``end`` reading DOUBLE, SINGLE, ..., DOUBLE.
+
+    The conjugated bridge between two units -- one bond in a plain TTF, `C=C-C=C`
+    in a vinylogue. Flipping it oxidises both units at once. None if there is no
+    such path.
+    """
+    double, single = Chem.BondType.DOUBLE, Chem.BondType.SINGLE
+    queue = deque([(start, double, [start])])
+    seen: set[tuple[int, Chem.BondType]] = set()
+
+    while queue:
+        atom_idx, expected, path = queue.popleft()
+        if (atom_idx, expected) in seen:
+            continue
+        seen.add((atom_idx, expected))
+
+        for neighbour in mol.GetAtomWithIdx(atom_idx).GetNeighbors():
+            next_idx = neighbour.GetIdx()
+            bond = mol.GetBondBetweenAtoms(atom_idx, next_idx)
+            if bond.GetBondType() != expected or next_idx in path:
+                continue
+            if next_idx == end:
+                # Arrive on a double bond: the far unit's exocyclic one.
+                if expected is double:
+                    return path + [next_idx]
+                continue
+            queue.append(
+                (next_idx, single if expected is double else double, path + [next_idx])
+            )
+    return None
+
+
+def _oxidised_donor_mol(mol: Chem.Mol, n_electrons_removed: int) -> Chem.Mol | None:
+    """``mol`` with one or two electrons taken off its dithiolylidene units.
+
+    Flipping the bridge turns both units into dithiolium cations. At one electron
+    the second charge becomes an unpaired electron instead, since a radical cation
+    has no closed-shell drawing.
+    """
+    units = find_dithiolylidene_units(mol)
+    if len(units) != 2:
+        return None
+
+    first, second = units
+    path = _alternating_bond_path(mol, first, second)
+    if path is None:
+        return None
+
+    oxidised = Chem.RWMol(mol)
+    for begin, end in zip(path, path[1:]):
+        bond = oxidised.GetBondBetweenAtoms(begin, end)
+        bond.SetBondType(
+            Chem.BondType.SINGLE
+            if bond.GetBondType() == Chem.BondType.DOUBLE
+            else Chem.BondType.DOUBLE
+        )
+
+    oxidised.GetAtomWithIdx(first).SetFormalCharge(1)
+    far_atom = oxidised.GetAtomWithIdx(second)
+    if n_electrons_removed == 2:
+        far_atom.SetFormalCharge(1)
+    else:
+        far_atom.SetNumRadicalElectrons(1)
+        far_atom.SetNoImplicit(True)
+
+    result = oxidised.GetMol()
+    try:
+        Chem.SanitizeMol(result)
+    except Exception as exc:
+        logger.debug("Oxidised donor failed to sanitize: %s", exc)
+        return None
+    return result
+
+
+def generate_oxidised_donor_charge_states(
+    neutral: ChargeState,
+) -> list[ChargeState]:
+    """Radical-cation and dication states for a tetrathiafulvalene-type donor.
+
+    The general search reaches neither, so the 0/+1/+2 ladder is built here and
+    the balancer picks the rung. Fractional oxidation is not attempted.
+    """
+    if neutral.specie_total_charge != 0 or neutral.rdkit_obj is None:
+        return []
+
+    states = []
+    for removed in (1, 2):
+        mol = _oxidised_donor_mol(neutral.rdkit_obj, removed)
+        if mol is None:
+            continue
+
+        atom_charges = [atom.GetFormalCharge() for atom in mol.GetAtoms()]
+        total_charge = neutral.protonated_total_charge + removed
+        if sum(atom_charges) != total_charge:
+            continue
+
+        smiles = Chem.MolToSmiles(mol)
+        logger.debug(
+            "Oxidised donor state for %s: +%d | SMILES: %s",
+            neutral.protonation.formula,
+            removed,
+            smiles,
+        )
+        states.append(
+            ChargeState.from_positional(
+                True,
+                total_charge,
+                atom_charges,
+                mol,
+                smiles,
+                total_charge,
+                True,
+                neutral.protonation,
+            )
+        )
+    return states
+
+
 def _find_negative_moiety(
     spec: Specie,
 ) -> list[tuple[int, list[int], str]]:
@@ -1898,15 +2055,58 @@ def _rings_by_atom(
     return rings
 
 
+def _nonmetal_connectivity(atom) -> int:
+    """Sigma bonds to non-metals, the count every rule here is keyed on."""
+    return len([j for j in atom.adjacency if j not in atom.metal_adjacency])
+
+
+def _amidinium_rings(
+    atoms, neighbor_source, rings_by_atom
+) -> list[tuple[int, list[int], str, int]]:
+    """Five-ring amidinium cations -- imidazolium, pyrazolium, benzimidazolium --
+    pinned by connectivity: two ring nitrogens, every ring atom three-connected.
+    That excludes imidazole, imidazolidine, NHCs and cyclic ureas. Reported once
+    per ring, since the charge is delocalised over N-C-N; missing it left AZEMEY's
+    histidine zwitterion anchored only by its carboxylates, at -2 instead of 0.
+    """
+    seen: set[frozenset[int]] = set()
+    cations: list[tuple[int, list[int], str, int]] = []
+    for rings in rings_by_atom.values():
+        for ring in rings:
+            key = frozenset(ring)
+            if len(ring) != 5 or key in seen:
+                continue
+            seen.add(key)
+
+            if any(_nonmetal_connectivity(atoms[j]) != 3 for j in ring):
+                continue
+            nitrogens = [j for j in ring if atoms[j].label == "N"]
+            # A cation has no lone pair to donate, so it is never a metal donor.
+            if len(nitrogens) != 2 or any(atoms[j].metal_adjacency for j in nitrogens):
+                continue
+            # Terminal O/S on the ring -> cyclic urea or thiourea, neutral.
+            if any(
+                neighbor_source[k].label in ("O", "S")
+                and _nonmetal_connectivity(neighbor_source[k]) == 1
+                for j in ring
+                for k in atoms[j].adjacency
+                if k not in atoms[j].metal_adjacency
+            ):
+                continue
+            cations.append((nitrogens[0], nitrogens, "amidinium-N", 1))
+    return cations
+
+
 def _find_cationic_nitrogen(
     atoms, neighbor_source, local_idx_by_id
 ) -> list[tuple[int, list[int], str, int]]:
-    """Nitrogen whose +1 is pinned by connectivity: quaternary (4 sigma bonds), or
+    """Nitrogen whose +1 is pinned by connectivity: quaternary (4 sigma bonds),
     pyridinium (a pyridine ring -- one N, five C -- with two three-connected ring
-    neighbours). Keyed on bond count and ring shape, not an N-H, since N-alkylated
-    cations carry none. Ring size alone is not enough: a diazine or an O/S-containing
-    6-ring is a different species whose charge is not pinned this way. Five-ring
-    cations and guanidinium are out of scope.
+    neighbours), or the five-ring amidinium of :func:`_amidinium_rings`. Keyed on
+    bond count and ring shape, not an N-H, since N-alkylated cations carry none.
+    Ring size alone is not enough: a diazine or an O/S-containing 6-ring is a
+    different species whose charge is not pinned this way. Guanidinium is out of
+    scope.
     """
     rings_by_atom = _rings_by_atom(atoms, neighbor_source, local_idx_by_id)
 
@@ -1926,11 +2126,7 @@ def _find_cationic_nitrogen(
             neighbor_source[j] for j in atom.adjacency if j not in atom.metal_adjacency
         ]
         # Terminal O -> N-oxide / nitro / azide: obligate pair, counted elsewhere.
-        if any(
-            n.label == "O"
-            and len([k for k in n.adjacency if k not in n.metal_adjacency]) == 1
-            for n in neighbors
-        ):
+        if any(n.label == "O" and _nonmetal_connectivity(n) == 1 for n in neighbors):
             continue
 
         if len(neighbors) == 4:
@@ -1947,14 +2143,11 @@ def _find_cationic_nitrogen(
         if not any(_is_pyridine_ring(ring) for ring in rings):
             continue
 
-        sp2_neighbors = sum(
-            1
-            for n in neighbors
-            if len([k for k in n.adjacency if k not in n.metal_adjacency]) == 3
-        )
+        sp2_neighbors = sum(1 for n in neighbors if _nonmetal_connectivity(n) == 3)
         if sp2_neighbors >= 2:
             cations.append((i, [i], "pyridinium-N", 1))
 
+    cations.extend(_amidinium_rings(atoms, neighbor_source, rings_by_atom))
     return cations
 
 
