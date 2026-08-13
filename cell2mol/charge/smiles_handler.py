@@ -109,6 +109,76 @@ def collapse_hypervalent_ylides(mol):
     return out, fixed
 
 
+def shift_13_ylides(mol):
+    """Shift X(+)=A-Y(-) -> X-A=Y to neutralize both ends; nothing else collapses a
+    pair separated BY an atom, so [S+]=C([O-]) reaches ranking charged. Neutral
+    middle and plain bonds spare nitro, N-oxides, nitrones, ozone, azide, diazo.
+    """
+    rw_mol = Chem.RWMol(mol)
+    fixed = False
+
+    for middle in rw_mol.GetAtoms():
+        if middle.GetFormalCharge() != 0 or middle.GetIsAromatic():
+            continue
+
+        to_cation = to_anion = None
+        for bond in middle.GetBonds():
+            if bond.GetIsAromatic():
+                continue
+            other = bond.GetOtherAtom(middle)
+            if (
+                bond.GetBondType() == Chem.BondType.DOUBLE
+                and other.GetFormalCharge() == 1
+            ):
+                to_cation = (bond, other)
+            elif (
+                bond.GetBondType() == Chem.BondType.SINGLE
+                and other.GetFormalCharge() == -1
+            ):
+                to_anion = (bond, other)
+
+        if to_cation is None or to_anion is None:
+            continue
+
+        double_bond, cation = to_cation
+        single_bond, anion = to_anion
+        if anion.GetSymbol() not in _YLIDE_ACCEPTORS:
+            continue
+
+        # The cation gives up a bond, the anion takes one on; both have to land
+        # somewhere a neutral atom of that element can sit.
+        cation_valence = _total_bond_order(cation) - 1
+        anion_valence = _total_bond_order(anion) + 1
+        if cation_valence not in _neutral_valences(cation.GetSymbol()):
+            continue
+        if anion_valence not in _neutral_valences(anion.GetSymbol()):
+            continue
+
+        double_bond.SetBondType(Chem.BondType.SINGLE)
+        single_bond.SetBondType(Chem.BondType.DOUBLE)
+        cation.SetFormalCharge(0)
+        anion.SetFormalCharge(0)
+        fixed = True
+
+        logger.debug(
+            "\tShifted 1,3 ylide %s(+)=%s-%s(-) to %s-%s=%s (valences %d / %d)",
+            cation.GetSymbol(),
+            middle.GetSymbol(),
+            anion.GetSymbol(),
+            cation.GetSymbol(),
+            middle.GetSymbol(),
+            anion.GetSymbol(),
+            cation_valence,
+            anion_valence,
+        )
+
+    out = rw_mol.GetMol()
+    if fixed:
+        # See fix_zwitterions: moving a bond invalidates the cached valences.
+        out.UpdatePropertyCache(strict=False)
+    return out, fixed
+
+
 def obligate_charge_separation_atoms(mol) -> set[int]:
     """Atoms whose charge is obligate, not optional: an X(+)-Y(-) pair whose cation
     cannot expand its octet has no neutral form to collapse to (nitro, N-oxide,
