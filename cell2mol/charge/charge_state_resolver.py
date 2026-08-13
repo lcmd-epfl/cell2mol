@@ -24,10 +24,12 @@ from cell2mol.charge.utils import (
 from cell2mol.charge.special_cases import (
     generate_porphyrin_charge_state,
     _find_charged_moiety,
+    generate_oxidised_donor_charge_states,
     generate_special_charge_states,
 )
 from cell2mol.charge.smiles_handler import (
     collapse_hypervalent_ylides,
+    shift_13_ylides,
     fix_zwitterions,
     obligate_charge_separation_atoms,
 )
@@ -79,7 +81,9 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
             if charge_state is not None and charge_state.status:
                 valid_charge_states.append(charge_state)
 
-    else:
+    # The porphyrin path is a fast path, not a commitment: it can decline a ring
+    # that matched the topology, so fall through on the RESULT, not the match.
+    if not valid_charge_states:
         for prot in spec.protonation_states:
             # Charges to attempt are per protonation state: an anchor derived
             # from the specie's chemistry has to be shifted into this state's
@@ -118,6 +122,10 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
     # 4. Final Selection / Filtering
     best_candidates = identify_best_charge_states(valid_charge_states)
 
+    # 5. Oxidised forms the search cannot reach. After selection, never through
+    # it: these are rungs on a redox ladder, not competing drawings of one charge.
+    best_candidates = _with_oxidised_donor_states(best_candidates)
+
     # Only meaningful when nothing was found: a specie that aborted on one
     # protonation state and succeeded on another is characterised, not skipped.
     found_nothing = not best_candidates
@@ -129,6 +137,29 @@ def enumerate_possible_charge_states(spec: Specie) -> list[ChargeState] | None:
     )
 
     return best_candidates if best_candidates else None
+
+
+def _with_oxidised_donor_states(states: list[ChargeState]) -> list[ChargeState]:
+    """Append the oxidised states of a tetrathiafulvalene-type donor. Only ever
+    adds, and only charges the search did not already reach.
+    """
+    neutral = next((s for s in states if s.specie_total_charge == 0), None)
+    if neutral is None:
+        return states
+
+    found = {s.specie_total_charge for s in states}
+    added = [
+        state
+        for state in generate_oxidised_donor_charge_states(neutral)
+        if state.specie_total_charge not in found
+    ]
+    if added:
+        logger.debug(
+            "Tetrathiafulvalene-type donor %s: adding oxidised states %s",
+            neutral.protonation.formula,
+            [s.specie_total_charge for s in added],
+        )
+    return states + added
 
 
 def get_candidate_charges(spec: Specie, prot: Protonation) -> list[int]:
@@ -495,7 +526,11 @@ def _specie_supported_by_rddeterminebonds(
 
 
 def generate_valid_charge_states(
-    prot, candidate_charges, allow_charged_fragments=True, diagnostics=None
+    prot,
+    candidate_charges,
+    allow_charged_fragments=True,
+    diagnostics=None,
+    always_use_modified_AC2mol=False,
 ):
     valid_charge_states_dict = {charge: [] for charge in candidate_charges}
 
@@ -526,8 +561,34 @@ def generate_valid_charge_states(
         allow_charged_fragments,
         diagnostics=diagnostics,
     )
+    # Every charge, not just the ones rdDetermineBonds missed. Still additive:
+    # the two drawings compete within their own charge.
+    if always_use_modified_AC2mol:
+        logger.debug(
+            "always_use_modified_AC2mol set for %s; running modified AC2mol on all "
+            "candidate charges %s",
+            prot.formula,
+            candidate_charges,
+        )
+        return determine_bond_using_modified_AC2mol(
+            prot,
+            candidate_charges,
+            valid_charge_states_dict,
+            allow_charged_fragments=allow_charged_fragments,
+            diagnostics=diagnostics,
+        )
+
     unsolved = [q for q in candidate_charges if not valid_charge_states_dict[q]]
-    if not unsolved:
+
+    # CONTESTED: a drawing exists at this charge but every one looks forced, so
+    # downstream has nothing better to prefer. Ask AC2mol for a second opinion.
+    contested = [
+        q
+        for q in candidate_charges
+        if valid_charge_states_dict[q]
+        and all(_drawing_looks_forced(state) for state in valid_charge_states_dict[q])
+    ]
+    if not unsolved and not contested:
         logger.debug(
             "rdDetermineBonds found valid charge states for %s: %s",
             prot.formula,
@@ -539,13 +600,15 @@ def generate_valid_charge_states(
     # about what is reachable. Safe only because identify_best_charge_states
     # reports one state per charge, so a recovery is additive.
     logger.debug(
-        "rdDetermineBonds left charges %s unsolved for %s; trying modified AC2mol",
+        "rdDetermineBonds left charges %s unsolved and %s poorly drawn "
+        "for %s; trying modified AC2mol",
         unsolved,
+        contested,
         prot.formula,
     )
     return determine_bond_using_modified_AC2mol(
         prot,
-        unsolved,
+        unsolved + contested,
         valid_charge_states_dict,
         allow_charged_fragments=allow_charged_fragments,
         diagnostics=diagnostics,
@@ -570,7 +633,8 @@ def determine_bond_using_modified_AC2mol(
         if rdkit_obj is not None:
             obj, fixed = fix_zwitterions(rdkit_obj)
             obj, collapsed = collapse_hypervalent_ylides(obj)
-            if fixed or collapsed:
+            obj, shifted = shift_13_ylides(obj)
+            if fixed or collapsed or shifted:
                 rdkit_obj = obj
             charge_state = prepare_ChargeState_from_rdkit_obj(
                 rdkit_obj, prot, charge, allow_charged_fragments=allow_charged_fragments
@@ -601,7 +665,8 @@ def determine_bond_using_rdDetermineBonds(
             if rdkit_obj is not None:
                 obj, fixed = fix_zwitterions(rdkit_obj)
                 obj, collapsed = collapse_hypervalent_ylides(obj)
-                if fixed or collapsed:
+                obj, shifted = shift_13_ylides(obj)
+                if fixed or collapsed or shifted:
                     rdkit_obj = obj
                 charge_state = prepare_ChargeState_from_rdkit_obj(
                     rdkit_obj,
@@ -845,6 +910,7 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
             tgt_charge,
             len(candidates),
         )
+        candidates = _preferring_uncharged_carbons(candidates, tgt_charge)
 
         # CASE 1: Only one candidate for this charge
         if len(candidates) == 1:
@@ -862,9 +928,81 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
                 logger.debug("Tie-break successful, taking best structure.")
                 final_states.append(candidates[best_subset_indices[0]])
 
-    return _drop_dominated_charges(
-        _drop_charged_uncoordinated_carbons(_drop_cationic_donors(final_states))
+    kept = _drop_lone_pair_stripped_charges(final_states)
+    kept = _drop_cationic_donors(kept)
+    kept = _drop_charged_uncoordinated_carbons(kept)
+    return _drop_dominated_charges(kept)
+
+
+def _protonation_pattern(state: ChargeState) -> tuple:
+    """Protons added per site -- which states are drawings of the same structure."""
+    return tuple(state.site_proton_counts or ())
+
+
+def _bond_order_signature(state: ChargeState):
+    """The state's bonding without its charge: proton pattern, atom count, bonds.
+    ``None`` when there is no mol, so the state compares equal to nothing.
+    """
+    mol = state.rdkit_obj
+    if mol is None:
+        return None
+    bonds = tuple(
+        sorted(
+            (
+                min(b.GetBeginAtomIdx(), b.GetEndAtomIdx()),
+                max(b.GetBeginAtomIdx(), b.GetEndAtomIdx()),
+                b.GetBondTypeAsDouble(),
+            )
+            for b in mol.GetBonds()
+        )
     )
+    return tuple(state.site_proton_counts or ()), mol.GetNumAtoms(), bonds
+
+
+def _drop_lone_pair_stripped_charges(states: list[ChargeState]) -> list[ChargeState]:
+    """Drop a charge whose drawing has the same bonds as a less charged one.
+
+    Same bonds and a different charge means nothing but deleted lone pairs: DMSO
+    comes back as both `CS(=O)C` and `C[S+2](=O)C`, and so does every solvent with
+    a lone pair. Ranking cannot catch it -- both score zero on either axis, and
+    `_drop_dominated_charges` refuses |net charge| as an axis to protect ligands
+    genuinely drawable at two charges (catecholate/quinone), which are safe here
+    because they change bonds to do it. Equal |charge| never drops: +2 and -2 on
+    one skeleton is a real ambiguity for the balancer.
+    """
+    if len(states) < 2:
+        return states
+
+    signatures = [_bond_order_signature(s) for s in states]
+    kept = []
+    for idx, signature in enumerate(signatures):
+        beaten_by = (
+            None
+            if signature is None
+            else next(
+                (
+                    other.specie_total_charge
+                    for jdx, other in enumerate(states)
+                    if jdx != idx
+                    and signatures[jdx] == signature
+                    and abs(other.specie_total_charge)
+                    < abs(states[idx].specie_total_charge)
+                ),
+                None,
+            )
+        )
+        if beaten_by is None:
+            kept.append(states[idx])
+        else:
+            logger.debug(
+                "   Dropping charge %+d: same bonds as charge %+d, the extra "
+                "charge is a stripped lone pair (%s)",
+                states[idx].specie_total_charge,
+                beaten_by,
+                states[idx].specie_smiles,
+            )
+
+    return kept or states
 
 
 def _has_cationic_donor(state: ChargeState) -> bool:
@@ -915,6 +1053,35 @@ def _has_charged_uncoordinated_carbon(state: ChargeState) -> bool:
     )
 
 
+def _drawing_looks_forced(state: ChargeState) -> bool:
+    """True when a charge sits somewhere only for want of anywhere better: on a
+    carbon bonded to no metal, or separated with nothing obliging it. Grounds for
+    a second opinion, not a verdict.
+    """
+    return _has_charged_uncoordinated_carbon(state) or _is_artifact_zwitterion(state)
+
+
+def _preferring_uncharged_carbons(
+    candidates: list[ChargeState], charge: int
+) -> list[ChargeState]:
+    """:func:`_drop_charged_uncoordinated_carbons` applied within one charge instead
+    of between charges: same claim, so the cleaner drawing wins and no hypothesis
+    is lost. Abstains when none is clean, sparing a genuine free carbanion.
+    """
+    clean = [c for c in candidates if not _has_charged_uncoordinated_carbon(c)]
+    if not clean or len(clean) == len(candidates):
+        return candidates
+
+    logger.debug(
+        "   Charge %+d: preferring %d of %d drawing(s) that leave uncoordinated "
+        "carbons neutral",
+        charge,
+        len(clean),
+        len(candidates),
+    )
+    return clean
+
+
 def _drop_charged_uncoordinated_carbons(
     states: list[ChargeState],
 ) -> list[ChargeState]:
@@ -959,9 +1126,13 @@ def _artifact_separation(state: ChargeState) -> int:
     """How much formal charge merely CANCELS, discounting obligate pairs:
     ``min(positive total, negative total)``. A bipyridinium dication scores 0
     (nothing cancels); a stray [C+]..[c-] scores 1, the actual defect.
+
+    Read in the SPECIE frame: in the protonated one an added proton neutralises
+    the anionic half of a pair and the min() reads 0 while the cation remains.
+    Net charge cannot leak in -- min(pos, neg) is blind to it.
     """
-    charges = state.protonated_atom_charges or []
-    mol = state.rdkit_obj
+    charges = state.specie_atom_charges or state.protonated_atom_charges or []
+    mol = state.specie_rdkit_obj if state.specie_atom_charges else state.rdkit_obj
     obligate: set[int] = set()
     if mol is not None and mol.GetNumAtoms() == len(charges):
         obligate = obligate_charge_separation_atoms(mol)
@@ -970,42 +1141,85 @@ def _artifact_separation(state: ChargeState) -> int:
     return min(sum(q for q in free if q > 0), -sum(q for q in free if q < 0))
 
 
+# Exocyclic partners whose charge-separated form keeps a ring aromatic: a
+# pyridone qualifies, an aza-fulvene does not.
+_YLIDIC_EXOCYCLIC_PARTNERS = frozenset({7, 8, 16, 34})  # N, O, S, Se
+
+
+def _unearned_aromatic_atoms(mol) -> set[int]:
+    """Atoms RDKit calls aromatic in a six-ring that has not earned it: one holding
+    a divalent chalcogen, or a neutral three-connected nitrogen with no exocyclic
+    double bond to O/N/S/Se.
+    """
+    if mol is None:
+        return set()
+    try:
+        kekulized = Chem.Mol(mol)
+        Chem.Kekulize(kekulized, clearAromaticFlags=True)
+    except Exception:  # unkekulizable: no bond orders to judge, so no discount
+        return set()
+
+    unearned: set[int] = set()
+    earned: set[int] = set()
+    for ring in mol.GetRingInfo().AtomRings():
+        if not all(mol.GetAtomWithIdx(idx).GetIsAromatic() for idx in ring):
+            continue
+        ring_atoms = set(ring)
+        neutral_trivalent_n = any(
+            mol.GetAtomWithIdx(idx).GetAtomicNum() == 7
+            and mol.GetAtomWithIdx(idx).GetFormalCharge() == 0
+            and mol.GetAtomWithIdx(idx).GetTotalDegree() == 3
+            for idx in ring
+        )
+        ylidic = any(
+            bond.GetBondType() == Chem.BondType.DOUBLE
+            and bond.GetOtherAtomIdx(idx) not in ring_atoms
+            and kekulized.GetAtomWithIdx(bond.GetOtherAtomIdx(idx)).GetAtomicNum()
+            in _YLIDIC_EXOCYCLIC_PARTNERS
+            for idx in ring
+            for bond in kekulized.GetAtomWithIdx(idx).GetBonds()
+        )
+        divalent_chalcogen = any(
+            mol.GetAtomWithIdx(idx).GetAtomicNum() in (16, 34)
+            and mol.GetAtomWithIdx(idx).GetFormalCharge() == 0
+            and mol.GetAtomWithIdx(idx).GetTotalDegree() == 2
+            for idx in ring
+        )
+        fails = len(ring) == 6 and (
+            divalent_chalcogen or (neutral_trivalent_n and not ylidic)
+        )
+        (unearned if fails else earned).update(ring_atoms)
+
+    return unearned - earned
+
+
 def _structural_quality(state: ChargeState) -> tuple[int, int]:
     """``(aromatic_atoms, artifact_separation)`` -- maximise the first, minimise the
-    second. Both read in the protonated frame: they judge the drawing, and the
-    specie's charge is the hypothesis under test, not evidence against it.
+    second. Aromaticity is read in the protonated frame: it judges the drawing, and
+    the specie's charge is the hypothesis under test, not evidence against it.
+    Separation is read on the specie; see :func:`_artifact_separation`.
     """
     added_indices = [
         idx for idx, n in enumerate(state.protonation.site_proton_counts or []) if n > 0
     ]
     aromatic = aromatic_info(state.rdkit_obj, added_indices=added_indices)
-    return int(aromatic["Aromatic atoms"]), _artifact_separation(state)
+    unearned = _unearned_aromatic_atoms(state.rdkit_obj)
+    if unearned:
+        logger.debug(
+            "   Discounting %d unearned aromatic atom(s) %s for charge %+d (%s)",
+            len(unearned),
+            sorted(unearned),
+            state.specie_total_charge,
+            state.specie_smiles,
+        )
+    return int(aromatic["Aromatic atoms"]) - len(unearned), _artifact_separation(state)
 
 
 def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
-    """Drop charges beaten on a structural axis without paying for it on the other.
-    A charge falls to one strictly better on cancelling charge and no less
-    aromatic, or strictly more aromatic and no worse on cancelling charge.
-
-    Both directions matter. Aromaticity has to be able to win outright, or a state
-    that dearomatises a ring to park a carbanion on it survives next to the intact
-    aromatic one -- an N-benzylpyridinium is then equally happy at -1 and +1.
-
-    Aromaticity may not be BOUGHT with formal charge, though, hence the |net
-    charge| guard on that clause. Stripping electrons off a sulfur-rich donor
-    turns its dithiole rings formally aromatic: BEDT-TTF picks up five aromatic
-    atoms at +4 that it does not have at 0, and without the guard the real neutral
-    donor loses to a quadruply-oxidised drawing of itself. Comparing aromaticity
-    only at equal-or-lower |charge| keeps the axis honest -- it settles which of
-    two equally charged drawings is better, and never argues for more charge.
-
-    What is deliberately NOT an axis is |net charge|. Two states with the same
-    aromaticity and the same charge separation are equally good drawings; the
-    smaller one is not the better one. Preferring it would erase the anionic form
-    of every redox-non-innocent ligand that can also be drawn neutral -- an
-    ene-dithiolate reduced to its dithione, a catecholate to its quinone. Those
-    charges genuinely trade nothing, so both survive and the balancer settles them
-    on cell neutrality.
+    """Drop a charge beaten on one structural axis without paying for it on the
+    other: less cancelling charge and no less aromatic, or more aromatic at no
+    more |charge|. An exact tie within one protonation falls to the lower
+    |charge|.
     """
     if len(states) < 2:
         return states
@@ -1015,7 +1229,7 @@ def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
     for i, (arom_i, sep_i) in enumerate(quality):
         dominated_by = next(
             (
-                states[j].specie_total_charge
+                (states[j].specie_total_charge, arom_j, sep_j)
                 for j, (arom_j, sep_j) in enumerate(quality)
                 if j != i
                 and (
@@ -1026,6 +1240,14 @@ def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
                         and abs(states[j].specie_total_charge)
                         <= abs(states[i].specie_total_charge)
                     )
+                    or (
+                        arom_j == arom_i
+                        and sep_j == sep_i
+                        and _protonation_pattern(states[j])
+                        == _protonation_pattern(states[i])
+                        and abs(states[j].specie_total_charge)
+                        < abs(states[i].specie_total_charge)
+                    )
                 )
             ),
             None,
@@ -1033,13 +1255,16 @@ def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
         if dominated_by is None:
             kept.append(states[i])
         else:
+            winner_charge, winner_arom, winner_sep = dominated_by
             logger.debug(
                 "   Dropping charge %+d (aromatic %d, separation %d): dominated "
-                "by charge %+d",
+                "by charge %+d (aromatic %d, separation %d)",
                 states[i].specie_total_charge,
                 arom_i,
                 sep_i,
-                dominated_by,
+                winner_charge,
+                winner_arom,
+                winner_sep,
             )
 
     # Mutual domination is impossible (it needs one axis strictly better in both
