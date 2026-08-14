@@ -1,5 +1,6 @@
 import logging
 import itertools
+import math
 from typing import List
 from cell2mol.charge.utils import (
     aromatic_info,
@@ -13,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 # Ceiling on the ligand charge combinations the metal-OS inference will enumerate.
 _MAX_INFERENCE_COMBINATIONS = 100_000
+
+# Ceiling on the full charge-distribution search.
+_MAX_DISTRIBUTION_COMBINATIONS = 10_000_000
 
 # How much likelier one metal oxidation state must be than its rival before the
 # observed frequencies are allowed to settle an otherwise ambiguous cell.
@@ -396,10 +400,20 @@ def resolve_charge_distributions(
     expanded_species_charges = []
     unique_species_charges = []
 
-    combinations = list(itertools.product(*species_charge_options))
-    logger.debug("Generated %d charge combinations.", len(combinations))
+    combination_count = math.prod(len(options) for options in species_charge_options)
+    logger.debug("Generating %d charge combinations.", combination_count)
 
-    for combo in combinations:
+    if combination_count > _MAX_DISTRIBUTION_COMBINATIONS:
+        logger.error(
+            "Charge distribution search space (%d combinations over %d unique "
+            "species) exceeds the limit of %d; cannot balance charges.",
+            combination_count,
+            len(species_charge_options),
+            _MAX_DISTRIBUTION_COMBINATIONS,
+        )
+        return [], []
+
+    for combo in itertools.product(*species_charge_options):
         expanded_dist = [combo[u_idx] for u_idx in unique_indices]
 
         # Check if total charge matches input

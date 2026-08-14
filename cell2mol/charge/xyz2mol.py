@@ -601,45 +601,21 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
         else:
             others.append(i)
 
+    # 2. Order the atoms: prioritized element groups first, others last.
+    # One flat product, never a product of per-group products: product() tuples
+    # up its arguments at once, so nesting expands a whole group eagerly
+    # Flat is lazy and yields the same order.
     reordered_indices = []
-    nested_inputs = []
-    group_counts = []  # Stores the total combinations for each element group
-
-    # logger.debug("--- Nested Valence Input Structure ---")
-
-    # 2. Process prioritized groups
     for num in priority_order:
-        indices = groups[num]
-        if indices:
-            reordered_indices.extend(indices)
-            group_valences = [valences_list_of_lists[i] for i in indices]
-
-            # Estimate complexity for this specific element group
-            # math.prod calculates the product of lengths of all sub-lists
-            current_group_count = math.prod(len(v) for v in group_valences)
-            group_counts.append(current_group_count)
-
-            # logger.debug(
-            #     f"Element {elemdatabase.elementsym[num]} : {len(indices)} atoms | "
-            #     f"Group Combinations: {current_group_count:,}"
-            #     # f" | Valences: {group_valences}"
-            # )
-
-            # Create a product iterator for this group
-            nested_inputs.append(itertools.product(*group_valences))
+        reordered_indices.extend(groups[num])
 
     # 3. Process remaining elements (Others)
-    if others:
-        reordered_indices.extend(others)
-        other_valences = [valences_list_of_lists[i] for i in others]
+    reordered_indices.extend(others)
 
-        current_group_count = math.prod(len(v) for v in other_valences)
-        group_counts.append(current_group_count)
-
-        nested_inputs.append(itertools.product(*other_valences))
+    ordered_valences = [valences_list_of_lists[i] for i in reordered_indices]
 
     # 4. Complexity Estimation
-    total_expected_combinations = math.prod(group_counts)
+    total_expected_combinations = math.prod(len(v) for v in ordered_valences)
     # logger.info(f"Total Expected Combinations: {total_expected_combinations:,}")
 
     # TERMINATION LOGIC:
@@ -658,13 +634,10 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
 
     # 6. Generator Function
     def valence_generator():
-        # itertools.product(*nested_inputs) creates a sorted stream lazily
-        for combined in itertools.product(*nested_inputs):
-            # 'combined' is a nested tuple like ((O1, O2), (N1,), (C1, C2...))
-            # Flatten to a single list
-            flat = [v for group in combined for v in group]
+        # Lazy -- callers take only the first num_try_limit combinations.
+        for combined in itertools.product(*ordered_valences):
             # Map back to original atom order and yield as tuple
-            yield tuple(flat[restore_map[i]] for i in range(len(atoms)))
+            yield tuple(combined[restore_map[i]] for i in range(len(atoms)))
 
     return valence_generator()
 

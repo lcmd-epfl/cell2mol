@@ -36,7 +36,6 @@ from cell2mol.charge.smiles_handler import (
 
 from cell2mol.elementdata import ElementData
 from rdkit import Chem
-from rdkit.Chem import rdchem
 
 if TYPE_CHECKING:
     from cell2mol.classes.specie import Specie
@@ -726,7 +725,6 @@ def prepare_ChargeState_from_rdkit_obj(
     atom_charges = [atom.GetFormalCharge() for atom in rdkit_obj.GetAtoms()]
     total_charge = int(sum(atom_charges))
 
-    # Final Validation and Resonance Search
     smiles = Chem.MolToSmiles(rdkit_obj)
     is_correct = check_rdkit_obj_connectivity(rdkit_obj, prot.natoms, charge)
 
@@ -742,80 +740,6 @@ def prepare_ChargeState_from_rdkit_obj(
     )
 
     return charge_state
-
-
-def get_best_resonance_state(charge_state: ChargeState) -> ChargeState:
-    """The best resonance alternative, or the state unchanged. Ranked forms are walked
-    in order and the first that round-trips through SMILES wins -- index 0 can be
-    over-delocalised and unkekulizable, which per-atom checks do not catch.
-    """
-    prot = charge_state.protonation
-    rdkit_obj = charge_state.rdkit_obj
-    charge_tried = charge_state.protonated_total_charge
-    assert prot.natoms is not None
-    natoms = prot.natoms
-    parent = cast("Specie", prot.parent)
-    try:
-        # Generate resonance structures
-        ## We use UNCONSTRAINED_ANIONS/CATIONS if the system is highly charged
-        ## suppl = rdchem.ResonanceMolSupplier(rdkit_obj, rdchem.ResonanceFlags.ALLOW_INCOMPLETE_OCTETS)
-        suppl = rdchem.ResonanceMolSupplier(rdkit_obj)
-        num_res = len(suppl)
-    except Exception as e:
-        logger.error("   ResonanceMolSupplier failed for %s: %s", parent.formula, e)
-        return charge_state
-
-    if num_res <= 1:
-        return charge_state
-
-    original_smiles = Chem.MolToSmiles(rdkit_obj, canonical=True)
-    logger.debug("   Resonance check for %s: found %d forms", parent.formula, num_res)
-    logger.debug("   Original: %s", original_smiles)
-
-    # Walk the ranked forms, accept the first that round-trips through SMILES.
-    best_res_mol = None
-    best_smiles = None
-    for candidate in suppl:
-        if candidate is None:
-            continue
-        candidate_smiles = Chem.MolToSmiles(candidate, canonical=True)
-        if candidate_smiles == original_smiles:
-            logger.debug("   Found original structure in resonance forms")
-            return charge_state
-        if Chem.MolFromSmiles(candidate_smiles) is not None:
-            best_res_mol = candidate
-            best_smiles = candidate_smiles
-            break
-        logger.debug("   Rejected (invalid SMILES): %s", candidate_smiles)
-
-    if best_res_mol is None or best_smiles is None:
-        logger.debug(
-            "   No valid resonance alternative found for %s; keeping original",
-            parent.formula,
-        )
-        return charge_state
-
-    logger.debug("   Best    : %s", best_smiles)
-    logger.info("   Resonance form updated for %s", parent.formula)
-
-    # Extract properties from the best resonance candidate
-    atom_charges = [a.GetFormalCharge() for a in best_res_mol.GetAtoms()]
-    total_charge = sum(atom_charges)
-
-    # Perform a sanity check on the new connectivity/valence
-    is_correct = check_rdkit_obj_connectivity(best_res_mol, natoms, charge_tried)
-
-    # Return the updated ChargeState object
-    return ChargeState.from_positional(
-        is_correct,
-        total_charge,
-        atom_charges,
-        best_res_mol,
-        best_smiles,
-        charge_tried,
-        True,  # allow
-        prot,
-    )
 
 
 def get_plausible_metal_os(metal: Metal) -> list[int]:
@@ -840,46 +764,6 @@ def get_plausible_metal_os(metal: Metal) -> list[int]:
     return metal_os
 
 
-def _cleaned_of_resonance_artifacts(
-    charge_states: list[ChargeState],
-) -> list[ChargeState]:
-    """Let artifact-zwitterionic candidates resonate into a cleaner form before
-    judging: ranked as-is, a right-charge/poor-drawing candidate loses to a clean
-    one at the wrong charge. A form is adopted only if it strictly reduces
-    separation at the same total charge.
-    """
-    cleaned: list[ChargeState] = []
-    for state in charge_states:
-        if not _is_artifact_zwitterion(state):
-            cleaned.append(state)
-            continue
-
-        try:
-            candidate = get_best_resonance_state(state)
-        except Exception as exc:  # resonance is best-effort, never fatal
-            logger.debug("   Resonance cleanup failed for a candidate: %s", exc)
-            cleaned.append(state)
-            continue
-
-        if (
-            candidate is not state
-            and candidate.status
-            and candidate.specie_total_charge == state.specie_total_charge
-            and candidate.specie_abs_atcharge < state.specie_abs_atcharge
-        ):
-            logger.debug(
-                "   Resonance cleanup: q=%+d charge separation %d -> %d",
-                state.specie_total_charge,
-                state.specie_abs_atcharge,
-                candidate.specie_abs_atcharge,
-            )
-            cleaned.append(candidate)
-        else:
-            cleaned.append(state)
-
-    return cleaned
-
-
 def identify_best_charge_states(charge_states: list[ChargeState]) -> list[ChargeState]:
     """Best Lewis structure for each charge the specie can validly carry -- one state
     per charge, not one winner. Choosing between charges needs cell neutrality and
@@ -889,8 +773,6 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
     valid_charge_states = [ch for ch in charge_states if ch is not None and ch.status]
     if not valid_charge_states:
         return []
-
-    valid_charge_states = _cleaned_of_resonance_artifacts(valid_charge_states)
 
     # Group by specie charge FIRST, so ranking only ever compares like with
     # like. Sorted so the reported order does not depend on enumeration order.
@@ -914,24 +796,51 @@ def identify_best_charge_states(charge_states: list[ChargeState]) -> list[Charge
 
         # CASE 1: Only one candidate for this charge
         if len(candidates) == 1:
-            # best_structure = get_best_resonance_state(candidates[0])
             best_structure = candidates[0]
-            final_states.append(best_structure)
 
         # CASE 2: Multiple candidates
         else:
             best_subset_indices = _get_best_candidate_indices(candidates)
             if not best_subset_indices:
                 logger.debug("Tie-break failed, taking first.")
-                final_states.append(candidates[0])
+                best_structure = candidates[0]
             else:
                 logger.debug("Tie-break successful, taking best structure.")
-                final_states.append(candidates[best_subset_indices[0]])
+                best_structure = candidates[best_subset_indices[0]]
+
+        final_states.append(_better_drawn_sibling(best_structure, candidates))
 
     kept = _drop_lone_pair_stripped_charges(final_states)
     kept = _drop_cationic_donors(kept)
     kept = _drop_charged_uncoordinated_carbons(kept)
     return _drop_dominated_charges(kept)
+
+
+def _better_drawn_sibling(winner: ChargeState, pool: list[ChargeState]) -> ChargeState:
+    """Trade a charge-separated winner for a sibling at the same charge that is
+    strictly better drawn: no worse on either ranking axis, better on one.
+    Selection, not enumeration -- the cleaner drawing is already in hand.
+    """
+    if len(pool) < 2 or not _is_artifact_zwitterion(winner):
+        return winner
+
+    best = winner
+    for candidate in pool:
+        if candidate is best:
+            continue
+        q_new, q_best = _structural_quality(candidate), _structural_quality(best)
+        if q_new[0] >= q_best[0] and q_new[1] <= q_best[1] and q_new != q_best:
+            best = candidate
+
+    if best is not winner:
+        logger.debug(
+            "   Better-drawn sibling at charge %+d: %s -> %s (%s)",
+            winner.specie_total_charge,
+            _structural_quality(winner),
+            _structural_quality(best),
+            best.specie_smiles,
+        )
+    return best
 
 
 def _protonation_pattern(state: ChargeState) -> tuple:
@@ -1087,22 +996,6 @@ def _drop_charged_uncoordinated_carbons(
 ) -> list[ChargeState]:
     """Drop charges that park formal charge on a carbon bonded to no metal, as long
     as something is left.
-
-    The charge sweep walks outward (-1, +1, -3, +3 ...), and for each value bond
-    perception must put the charge somewhere. When the value is wrong the usual
-    landing site is a carbon: diphenyldiazomethane comes back as a carbanion at -2
-    and a carbocation at +2 either side of the real neutral diazo zwitterion, and a
-    beta-ketoester grows a spurious [C-] for every step down. Carbon is the tell
-    because it has no lone pair to donate and no electronegativity to hold the
-    charge -- if it is neither bonded to a metal nor stabilised, the charge is an
-    artifact of the value being tried, not chemistry.
-
-    Restricted to carbon on purpose: a free anionic heteroatom is ordinary (the
-    borate of a tris(pyrazolyl)borate is a -1 on boron that coordinates nothing),
-    and a carbon that IS a donor is the whole point of a carbanion ligand like
-    CF3-. Kept as a filter of last resort, so a genuine free carbanion -- cyanide
-    sitting in the lattice N-down -- still gets its charge when every state is
-    like this.
     """
     if len(states) < 2:
         return states

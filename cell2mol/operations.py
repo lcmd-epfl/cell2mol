@@ -315,6 +315,7 @@ def get_angle(vec1, vec2) -> float:
     norm2 = np.linalg.norm(vec2)
     dotprod = np.dot(vec1, vec2)
     factor = dotprod / (norm1 * norm2)
+    factor = np.clip(factor, -1.0, 1.0)
     angle = np.arccos(factor)
     if np.isnan(angle):
         logger.error(
