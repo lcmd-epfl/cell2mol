@@ -6,11 +6,12 @@ import argparse
 from typing import cast
 from ase import Atoms
 from ase.io import read
-from cell2mol.classes import Molecule
+from cell2mol.classes import Molecule, MoleculeSet
 from cell2mol.element_utils import labels2formula
 from cell2mol.connectivity import split_species
+from cell2mol.operations import extract_from_list
 from cell2mol.write_results import (
-    get_molecule_error_message,
+    get_molecule_error_message_all,
     write_molecule_info,
     write_unique_species,
     write_plausible_charges,
@@ -26,16 +27,72 @@ METAL_FACTOR = config.METAL_FACTOR
 
 
 # -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+def build_molecule(labels, coords):
+    """Build one fully prepared Molecule from a block of the xyz file."""
+    newmolec = Molecule.from_positional(labels, coords)
+    newmolec.set_adjacency_parameters(cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR)
+    newmolec.set_atoms(create_adjacencies=True, use_bond_info=False)
+
+    # --- split complexes ---
+    if newmolec.iscomplex or newmolec.has_ia_iia:
+        logger.debug("Splitting complex: %s", newmolec.formula)
+        newmolec.split_complex()
+    elif newmolec.has_post_transition_metal:
+        logger.debug("Splitting post-transition metal complex: %s", newmolec.formula)
+        newmolec.split_complex(post_tms=True)
+    else:
+        newmolec.add_parent(newmolec, indices=list(range(newmolec.natoms)))
+
+    newmolec.analyze_coordination()
+    newmolec.detect_special_moieties()
+
+    return newmolec
+
+
+def _write_summary(target, name, path):
+    """Write the human-readable summary next to the saved object."""
+    with open(path, "w") as f:
+        print(name, file=f)
+        if isinstance(target, MoleculeSet):
+            print(
+                f"{len(target.moleclist)} molecules, totcharge={target.totcharge}",
+                file=f,
+            )
+            for idx, mol in enumerate(target.moleclist):
+                write_molecule_info(mol, file=f, index=idx)
+        else:
+            write_molecule_info(target, file=f)
+        write_unique_species(target, file=f)
+        write_plausible_charges(target, file=f)
+        print(
+            get_molecule_error_message_all(target.error_cases_all, target.error_case),
+            file=f,
+        )
+
+
+# -----------------------------------------------------------------------------
 # Core function
 # -----------------------------------------------------------------------------
 def interpret_molecule(input_path, name, input_charge, current_dir):
-    molec_fname = os.path.join(current_dir, f"Molecule_{name}.mol")
+    """Interpret the molecular content of an xyz file.
+
+    Returns a ``Molecule`` when the file holds a single molecule, and a
+    ``MoleculeSet`` when it holds several molecules.
+    """
     summary_molecule_fname = os.path.join(current_dir, "molecule_summary.txt")
 
     logger.info("cell2mol version %s", config.VERSION)
     logger.info("Input XYZ: %s", input_path)
-    logger.info("Input total charge: %d", input_charge)
-    newmolec = None
+
+    # An xyz file carries no CIF bond information, so connectivity can only come
+    # from interatomic distances.
+    config.USE_BOND_INFO = False
+
+    logger.info("Input total charge: %s", input_charge)
+    target = None
+    save_fname = None
 
     try:
         try:
@@ -50,7 +107,11 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
         blocklist = cast(
             "list[list[int]]",
             split_species(
-                labels, coords, cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR
+                labels,
+                coords,
+                cov_factor=COV_FACTOR,
+                metal_factor=METAL_FACTOR,
+                use_bond_info=False,
             ),
         )
         logger.info("Number of molecules in xyz: %d", len(blocklist))
@@ -60,89 +121,89 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
             logger.error("No molecule found in the input file.")
             return None
 
-        if len(blocklist) > 1:
-            logger.error("Input file includes more than one molecule. Stopping.")
-            if logger.isEnabledFor(logging.DEBUG):
-                for i, block in enumerate(blocklist):
-                    block_labels = [labels[j] for j in block]
-                    logger.debug(
-                        "Found block %d: %s (%d atoms)",
-                        i,
-                        labels2formula(block_labels),
-                        len(block_labels),
-                    )
-            return None
-
-        # --- build molecule ---
-        newmolec = Molecule.from_positional(labels, coords)
-        newmolec.set_adjacency_parameters(
-            cov_factor=COV_FACTOR, metal_factor=METAL_FACTOR
-        )
-        newmolec.set_atoms(create_adjacencies=True)
-
-        # --- split complexes ---
-        if newmolec.iscomplex or newmolec.has_ia_iia:
-            logger.debug("Splitting complex: %s", newmolec.formula)
-            newmolec.split_complex()
-        elif newmolec.has_post_transition_metal:
-            logger.debug(
-                "Splitting post-transition metal complex: %s", newmolec.formula
+        # --- build molecules ---
+        moleclist = []
+        for idx, block in enumerate(blocklist):
+            block_labels = extract_from_list(block, labels, dimension=1)
+            block_coords = extract_from_list(block, coords.tolist(), dimension=1)
+            logger.info(
+                "Block %d: %s (%d atoms)",
+                idx,
+                labels2formula(block_labels),
+                len(block_labels),
             )
-            newmolec.split_complex(post_tms=True)
-        else:
-            newmolec.add_parent(newmolec, indices=list(range(newmolec.natoms)))
+            moleclist.append(build_molecule(block_labels, block_coords))
 
-        newmolec.analyze_coordination()
-        newmolec.detect_special_moieties()
+        # A lone molecule stays a Molecule; only several of them need a set that
+        # shares one pool of unique species and one charge target.
+        if len(moleclist) == 1:
+            target = moleclist[0]
+            save_fname = os.path.join(current_dir, f"Molecule_{name}.mol")
+        else:
+            target = MoleculeSet(name=name, moleclist=moleclist)
+            save_fname = os.path.join(current_dir, f"MoleculeSet_{name}.mol")
+
         # --- charge assignment ---
-        newmolec.input_charge = input_charge
+        target.input_charge = input_charge
         if input_charge is None:
             logger.info("No input charge provided.")
-            return newmolec
+            return target
 
         logger.info("Assigning total charge: %d", input_charge)
-        newmolec.get_unique_species()
-        newmolec.get_plausible_charges()
-        newmolec = balance_molecule_charge(newmolec, input_charge=input_charge)
-        newmolec.assess_errors()
-        if newmolec.error_case != 0:
-            logger.error("Error while balancing charges in the molecule.")
-            return newmolec
+        target.get_unique_species()
 
-        newmolec.assign_charges()
-        newmolec.create_bonds()
-        newmolec.assess_errors()
-        if newmolec.error_case != 0:
-            logger.error("Error while assigning charges in the molecule.")
-            return newmolec
+        # Hydrogens first, as in the reference pipeline
+        target.check_hydrogens()
+        target.get_plausible_charges()
 
-        newmolec.get_spin()
-        newmolec.assess_errors()
+        target.assess_errors()
+        if target.error_case != 0:
+            logger.error(
+                "Fails checking hydrogens and plausible charges: %s",
+                get_molecule_error_message_all(
+                    target.error_cases_all, target.error_case
+                ),
+            )
+            return target
 
-        return newmolec
+        target = balance_molecule_charge(target, input_charge=input_charge)
+        target.assess_errors()
+        if target.error_case != 0:
+            logger.error(
+                "Fails balancing charges: %s",
+                get_molecule_error_message_all(
+                    target.error_cases_all, target.error_case
+                ),
+            )
+            return target
+
+        target.assign_charges()
+        target.assess_errors()
+        if target.error_case != 0:
+            logger.error(
+                "Fails assigning charges: %s",
+                get_molecule_error_message_all(
+                    target.error_cases_all, target.error_case
+                ),
+            )
+            return target
+
+        target.get_spin()
+        target.assess_errors()
+
+        return target
 
     except Exception as err:
         logger.error("interpret_molecule failed: %s", err)
         logger.debug("Exception details", exc_info=True)
-        return newmolec
+        return target
 
     finally:
-        # --- always save molecule ---
-        if newmolec is not None:
-            newmolec.save(molec_fname)
-            logger.info("Molecule saved to %s", molec_fname)
-
-            # --- summary ---
-            with open(summary_molecule_fname, "w") as f:
-                print(name, file=f)
-                write_molecule_info(newmolec, file=f)
-                write_unique_species(newmolec, file=f)
-                write_plausible_charges(newmolec, file=f)
-                print(
-                    get_molecule_error_message(newmolec.error_case),
-                    file=f,
-                )
-        return newmolec
+        # --- always save what was built ---
+        if target is not None and save_fname is not None:
+            target.save(save_fname)
+            logger.info("Saved to %s", save_fname)
+            _write_summary(target, name, summary_molecule_fname)
 
 
 # -----------------------------------------------------------------------------
@@ -166,7 +227,7 @@ def parse_args():
         "--charge",
         dest="charge",
         type=int,
-        help="Total charge of a molecule in .xyz file",
+        help="Total charge of all molecules in the .xyz file",
     )
 
     parser.add_argument(
