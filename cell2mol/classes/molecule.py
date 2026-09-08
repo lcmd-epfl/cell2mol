@@ -17,9 +17,12 @@ from cell2mol.element_utils import (
     POST_TRANSITION_METALS,
     METALLOIDS,
 )
-from cell2mol.compare import compare_species, compare_metals
+from cell2mol.species_collection import (
+    collect_plausible_charges,
+    collect_unique_species,
+    map_charges_to_molecules,
+)
 from cell2mol.charge.specie_assigner import (
-    set_charge_state,
     assemble_complex_charge_state,
 )
 from cell2mol.charge.smiles_handler import (
@@ -42,6 +45,38 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
+
+# Error rules, most severe first: the first hit is the primary ``error_case``
+# and every hit is kept in ``error_cases_all``, so a structure that is short of
+# hydrogens on both a coordinated donor and a carbon reports code 3 without
+# hiding code 4. Shared with MoleculeSet so the two cannot drift apart.
+MOLECULE_ERROR_RULES = [
+    ("has_isolated_H", 1),
+    ("missing_H_in_Water", 2),
+    ("missing_H_on_CoordDonor", 3),
+    ("missing_H_in_Carbon", 4),
+    ("error_plausible_charges", 5),
+    ("error_multiple_distrib", 6),
+    ("error_empty_distrib", 7),
+    ("error_assign_charge", 8),
+    ("error_create_bonds", 9),
+    ("error_get_spin", 10),
+]
+
+
+def assess_molecule_errors(obj):
+    """Reduce the error flags of a molecule or molecule set to error codes.
+
+    Sets ``error_cases_all`` to every code that fired and ``error_case`` to the
+    first (most severe) of them, 0 when nothing fired.
+    """
+    triggered = [
+        code for attr, code in MOLECULE_ERROR_RULES if getattr(obj, attr, False)
+    ]
+    obj.error_cases_all = triggered
+    obj.error_case = triggered[0] if triggered else 0
+
+    return obj.error_case
 
 
 class Molecule(Specie):
@@ -75,12 +110,21 @@ class Molecule(Specie):
     # two indices. None marks a specie whose charges could not be found.
     plausible_charges: list[list[int] | None] | None = None
     error_plausible_charges: bool | None = None
+    # True when this molecule is a single, dangling H/D atom.
+    has_isolated_H: bool | None = None
+    # Set when two entries sharing a unique_index -- i.e. copies of the SAME
+    # specie -- enumerated to different charges. See
+    # inconsistent_plausible_charges for the detail.
+    error_inconsistent_plausible_charges: bool | None = None
+    inconsistent_plausible_charges: dict[int, list[list[int] | None]] | None = None
     error_multiple_distrib: bool | None = None
     error_empty_distrib: bool | None = None
     error_assign_charge: bool | None = None
     error_create_bonds: bool | None = None
     error_get_spin: bool | None = None
+    # Primary (first-matching, most severe) code, and every code that fired.
     error_case: int | None = None
+    error_cases_all: list[int] | None = None
 
     @classmethod
     @deprecated("Use molecule() with the keyword arguments instead.")
@@ -705,205 +749,60 @@ class Molecule(Specie):
         with open(path, "rb") as fil:
             return pickle.load(fil)
 
+    def check_hydrogens(self):
+        """Screen this molecule for missing hydrogens.
+
+        Extends ``Specie.check_hydrogens`` (which already dispatches a complex
+        to its ligands) with the dangling-hydrogen case, so that a molecule and
+        a ``MoleculeSet`` report the same flags to ``assess_errors``.
+        """
+        self.has_isolated_H = self.natoms == 1 and self.labels[0] in {"H", "D"}
+        if self.has_isolated_H:
+            logger.warning("  Isolated hydrogen found %s", self.labels[0])
+
+        return Specie.check_hydrogens(self)
+
     def get_unique_species(self):
+        """Deduplicate this molecule's own species.
+
+        A single molecule is just a collection of one, so this delegates to the
+        shared routine. Use ``MoleculeSet`` when several molecules have to share
+        one set of unique species -- deduplicating them one at a time would give
+        each its own indices and its own charge decision.
+        """
         logger.info("Getting unique species in molecule: %s", self.formula)
 
-        self.unique_species = []
-        self.unique_indices = []
-        self.species_list = []
-
-        typelist_mols = []
-        typelist_ligs = []
-        typelist_mets = []
-
-        specs_found = -1
-
-        # Case 1: simple molecule (not complex, not IA/IIA)
-        if not self.contains_metal:
-            found = False
-            kdx = None
-            for ldx, typ in enumerate(typelist_mols):
-                issame = compare_species(self, typ[0])
-                if issame:
-                    found = True
-                    kdx = typ[1]
-                    logger.debug("molecule is the same as type %s", ldx)
-
-            if not found:
-                specs_found += 1
-                kdx = specs_found
-                typelist_mols.append([self, kdx])
-                self.unique_species.append(self)
-                logger.debug(
-                    "New molecule found: formula=%s, added at specie type %d",
-                    self.formula,
-                    kdx,
-                )
-
-            assert kdx is not None
-            self.unique_indices.append(kdx)
-            self.unique_index = kdx
-            self.species_list.append(self)
-
-        else:
-            # Ensure ligands and metals are available
-            if not self.ligands is not None:
-                if self.iscomplex or self.has_ia_iia:
-                    self.split_complex()
-                elif self.has_post_transition_metal:
-                    self.split_complex(post_tms=True)
-            # Case 2: ligands
-            for jdx, lig in enumerate(self.ligands or []):
-                found = False
-                kdx = None
-                for ldx, typ in enumerate(typelist_ligs):
-                    if lig.is_nitrosyl is None:
-                        lig.evaluate_as_nitrosyl()
-                    if typ[0].is_nitrosyl is None:
-                        typ[0].evaluate_as_nitrosyl()
-                    if lig.haptic_type is None:
-                        lig.get_hapticity()
-                    if typ[0].haptic_type is None:
-                        typ[0].get_hapticity()
-                    lig_groups_labels = [g.labels for g in lig.groups or []]
-                    typ_groups_labels = [g.labels for g in typ[0].groups or []]
-
-                    if lig.is_nitrosyl and typ[0].is_nitrosyl:
-                        issame = lig.NO_type == typ[0].NO_type
-                    else:
-                        if (
-                            len(lig_groups_labels) == len(typ_groups_labels)
-                            and sorted(lig_groups_labels) == sorted(typ_groups_labels)
-                            and lig.haptic_type == typ[0].haptic_type
-                        ):
-                            # if lig.haptic_type == typ[0].haptic_type:
-                            issame = compare_species(lig, typ[0])
-                        else:
-                            issame = False
-
-                    if issame:
-                        found = True
-                        kdx = typ[1]
-                        logger.debug(
-                            "ligand %s (%d) is the same with type %d in typelist",
-                            lig.formula,
-                            jdx,
-                            ldx,
-                        )
-                if not found:
-                    specs_found += 1
-                    kdx = specs_found
-                    typelist_ligs.append([lig, kdx])
-                    self.unique_species.append(lig)
-                    logger.debug(
-                        "New ligand found: %s, added at specie type %d",
-                        lig.formula,
-                        kdx,
-                    )
-
-                assert kdx is not None
-                self.unique_indices.append(kdx)
-                lig.unique_index = kdx
-                self.species_list.append(lig)
-
-            # Case 3: metals
-            for jdx, met in enumerate(self.metals or []):
-                found = False
-                kdx: int | None = None
-                for ldx, typ in enumerate(typelist_mets):
-                    issame = compare_metals(met, typ[0])
-                    if issame:
-                        found = True
-                        kdx = typ[1]
-                        logger.debug(
-                            "metal %s (%d) is the same with type %d in typelist",
-                            met.formula,
-                            jdx,
-                            ldx,
-                        )
-                if not found:
-                    specs_found += 1
-                    kdx = specs_found
-                    typelist_mets.append([met, kdx])
-                    self.unique_species.append(met)
-                    logger.debug(
-                        "New metal found: formula=%s, added at specie type %d",
-                        met.formula,
-                        kdx,
-                    )
-
-                assert kdx is not None
-                self.unique_indices.append(kdx)
-                met.unique_index = kdx
-                self.species_list.append(met)
+        (
+            self.unique_species,
+            self.unique_indices,
+            self.species_list,
+        ) = collect_unique_species([self])
 
         return self.unique_species
 
     def get_plausible_charges(self):
-        if not self.unique_species is not None:
+        if self.unique_species is None:
             self.get_unique_species()
 
-        self.plausible_charges = []
-        for unique_specie in self.unique_species or []:
-            logger.info(
-                "Get plausible charge states for unique specie %s",
-                unique_specie.formula,
-            )
-            if unique_specie.subtype == "metal":
-                tmp = unique_specie.get_plausible_os()
-                self.plausible_charges.append(tmp if tmp else None)
-            else:
-                tmp = unique_specie.get_plausible_charge_states()
-                self.plausible_charges.append(
-                    [cs.specie_total_charge for cs in tmp] if tmp else None
-                )
-
-        for specie in self.species_list or []:
-            logger.info(
-                "Get plausible charge states for species list %s", specie.formula
-            )
-            if specie.subtype == "metal":
-                tmp = specie.get_plausible_os()
-                self.plausible_charges.append(tmp if tmp else None)
-            else:
-                tmp = specie.get_plausible_charge_states()
-                self.plausible_charges.append(
-                    [cs.specie_total_charge for cs in tmp] if tmp else None
-                )
-
-        if None in self.plausible_charges:
-            self.error_plausible_charges = True
-        else:
-            self.error_plausible_charges = False
+        (
+            self.plausible_charges,
+            self.error_plausible_charges,
+            self.inconsistent_plausible_charges,
+        ) = collect_plausible_charges(
+            self.unique_species, self.species_list, skip_missing_h=True
+        )
+        self.error_inconsistent_plausible_charges = bool(
+            self.inconsistent_plausible_charges
+        )
 
     def assign_charges(self):
         logger.info("Assigning charges for molecule: %s", self.formula)
-        for specie in self.unique_species or []:
-            specie_unique_index = getattr(specie, "unique_index", None)
-            if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
-                for jdx, lig in enumerate(self.ligands or []):
-                    if lig.unique_index == specie_unique_index:
-                        set_charge_state(specie, lig, mode=1)
-                for kdx, met in enumerate(self.metals or []):
-                    if met.unique_index == specie_unique_index:
-                        specie_charge = getattr(specie, "charge", None)
-                        if specie_charge is not None:
-                            met.set_charge(specie_charge)
-            else:
-                if self.unique_index == specie_unique_index:
-                    set_charge_state(specie, self, mode=1)
-        temp = []
+
+        self.error_assign_charge = map_charges_to_molecules(self.unique_species, [self])
+
         self.create_bonds()
-        temp.append(self.error_create_bonds)
-        if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
-            assemble_complex_charge_state(self)
 
-        if any(temp):
-            self.error_create_bonds = True
-        else:
-            self.error_create_bonds = False
-
-        if self.iscomplex or self.has_ia_iia or self.has_post_transition_metal:
+        if self.contains_metal and not self.error_create_bonds:
             assemble_complex_charge_state(self)
             logger.info("Complex %s %s", self.formula, self.totcharge)
             for jdx, lig in enumerate(self.ligands or []):
@@ -916,7 +815,7 @@ class Molecule(Specie):
                 )
             for kdx, met in enumerate(self.metals or []):
                 logger.info("    Metal %d %s %s", kdx, met.formula, met.charge)
-        else:
+        elif not self.contains_metal:
             logger.info(
                 "Non-Complex %s %s %s", self.formula, self.totcharge, self.smiles
             )
@@ -963,19 +862,4 @@ class Molecule(Specie):
         self.error_create_bonds = False
 
     def assess_errors(self):
-        if self.error_plausible_charges:
-            case = 5
-        elif self.error_multiple_distrib:
-            case = 6
-        elif self.error_empty_distrib:
-            case = 7
-        elif self.error_assign_charge:
-            case = 8
-        elif self.error_create_bonds:
-            case = 9
-        elif self.error_get_spin:
-            case = 10
-        else:
-            case = 0
-
-        self.error_case = case
+        return assess_molecule_errors(self)

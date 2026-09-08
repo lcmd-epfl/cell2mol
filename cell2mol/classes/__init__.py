@@ -6,6 +6,7 @@ from .cell import Cell
 from .reference import Reference
 from .unitcell import UnitCell
 from .cells import Cells
+from .molecule_set import MoleculeSet
 from .bond import Bond
 from .specie import Specie
 from .group import Group
@@ -21,6 +22,7 @@ __all__ = [
     "Reference",
     "UnitCell",
     "Cells",
+    "MoleculeSet",
     "Bond",
     "Specie",
     "Group",
@@ -41,6 +43,7 @@ Cell.model_rebuild()
 Reference.model_rebuild()
 UnitCell.model_rebuild()
 Cells.model_rebuild()
+MoleculeSet.model_rebuild()
 Bond.model_rebuild()
 Protonation.model_rebuild()
 ChargeState.model_rebuild()

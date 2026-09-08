@@ -89,10 +89,20 @@ OptionalRefList = list[T] | None
 # =============================================================================
 
 Spin = int
-Type = Literal["cell", "cells", "specie", "protonation", "charge_state", "atom", "bond"]
+Type = Literal[
+    "cell",
+    "cells",
+    "molecule_set",
+    "specie",
+    "protonation",
+    "charge_state",
+    "atom",
+    "bond",
+]
 SubType = Literal[
     "reference",
     "unitcell",
+    "molecule_set",
     "molecule",
     "ligand",
     "metal",
