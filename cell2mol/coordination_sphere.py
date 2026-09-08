@@ -576,23 +576,25 @@ def move_to_front(atoms, target_atom):
     return [target_atom] + [a for a in atoms if a is not target_atom]
 
 
-def get_neighbors_in_group(atom, group_atom_site_labels):
+def get_neighbors_in_group(atom, group_indices):
+    """Non-metal neighbours of ``atom`` that belong to the same group.
+
+    Membership is tested on the atom index within the parent molecule, not on
+    the CIF site label: xyz input has no site labels at all, and in a unit cell
+    symmetry-related copies share one label, so a label test can match the
+    wrong atom.
+    """
     neighboring_nonmetal_atoms = []
     for adj in atom.adjacency:
         if adj not in atom.metal_adjacency:
             neighboring_nonmetal_atoms.append(atom.get_parent("molecule").atoms[adj])
 
-    n_neighbors_in_group = 0
-    n_h_neighbors_in_group = 0
+    group_indices = set(group_indices or [])
     neighbors_in_group = []
     for neighbor in neighboring_nonmetal_atoms:
-        if neighbor.atom_site_label in group_atom_site_labels:
+        if neighbor.get_parent_index("molecule") in group_indices:
             neighbors_in_group.append(neighbor)
-            n_neighbors_in_group += 1
-            if neighbor.label == "H":
-                n_h_neighbors_in_group += 1
 
-    # return neighboring_nonmetal_atoms, n_neighbors_in_group, n_h_neighbors_in_group
     return neighbors_in_group
 
 
@@ -633,6 +635,7 @@ def sort_gr_atoms_by_margin(group, metal):
     sorted_group = {
         "gr_atoms": [],
         "labels": [],
+        "indices": [],
         "atom_site_labels": [],
         "distances": [],
         "margins": [],
@@ -646,6 +649,7 @@ def sort_gr_atoms_by_margin(group, metal):
         margin = float(np.round(distance - metal.radii - atom.radii, 3))
         sorted_group["gr_atoms"].append(atom)
         sorted_group["labels"].append(atom.label)
+        sorted_group["indices"].append(atom.get_parent_index("molecule"))
         sorted_group["atom_site_labels"].append(atom.atom_site_label)
         sorted_group["distances"].append(distance)
         sorted_group["margins"].append(margin)
@@ -810,7 +814,7 @@ def validate_coordinated_atoms(
             "Only one coordinating atom found: %s (%s) "
             "(distance: %s / margin: %s). Skipping connectivity validation.",
             sorted_group["labels"][0],
-            sorted_group["atom_site_labels"][0],
+            (sorted_group["atom_site_labels"] or ["N/A"])[0],
             sorted_group["distances"][0],
             sorted_group["margins"][0],
         )
@@ -918,7 +922,7 @@ def validate_coordinated_atoms(
 
             neighbors_in_group = get_neighbors_in_group(
                 atom,
-                sorted_group["atom_site_labels"],
+                sorted_group["indices"],
             )
             n_neighbors_in_group = len(neighbors_in_group)
 
@@ -978,9 +982,7 @@ def validate_coordinated_atoms(
         sorted_group["distances"],
         sorted_group["margins"],
     ):
-        neighbors_in_group = get_neighbors_in_group(
-            atom, sorted_group["atom_site_labels"]
-        )
+        neighbors_in_group = get_neighbors_in_group(atom, sorted_group["indices"])
         n_neighbors_in_group = len(neighbors_in_group)
         n_gr_atoms = len(gr_atoms)
 
