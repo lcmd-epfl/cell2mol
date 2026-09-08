@@ -11,6 +11,8 @@ __pycache__/
 .ipynb_checkpoints/*
 .ipynb_checkpoints/
 playground/*
+tests/test_*.py
+tests/fixtures/*.cell.gz
 
 # Distribution/packaging
 build/
