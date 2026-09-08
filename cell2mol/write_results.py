@@ -139,45 +139,45 @@ def extract_refmoleclist_xyz(fdir, refmoleclist, name: str):
         name (str): Base name for the output files.
     """
     for i, ref in enumerate(refmoleclist):
-        if ref.iscomplex:
-            if ref.totcharge_cif is not None:
-                n_electrons = 0
-                for atom in ref.labels:
-                    n_electrons += elemdatabase.elementnr[atom]
-                n_electrons -= ref.totcharge_cif
-                if n_electrons % 2 == 0:
-                    spin = 1
-                else:
-                    spin = 2
-                writexyz(
-                    fdir,
-                    f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz",
-                    ref.labels,
-                    ref.coord,
-                    charge=ref.totcharge_cif,
-                    spin=spin,
-                )
-                logger.debug(
-                    "Ref molecule %s %s total charge %s lowest spin multiplicity %s",
-                    i,
-                    ref.formula,
-                    ref.totcharge_cif,
-                    spin,
-                )
+        # if ref.iscomplex:
+        if ref.totcharge_cif is not None:
+            n_electrons = 0
+            for atom in ref.labels:
+                n_electrons += elemdatabase.elementnr[atom]
+            n_electrons -= ref.totcharge_cif
+            if n_electrons % 2 == 0:
+                spin = 1
             else:
-                writexyz(
-                    fdir,
-                    f"{name}_Ref_{i}_{ref.formula}.xyz",
-                    ref.labels,
-                    ref.coord,
-                    charge="",
-                    spin="",
-                )
-                logger.debug(
-                    "Ref molecule %s %s without charge and spin information",
-                    i,
-                    ref.formula,
-                )
+                spin = 2
+            writexyz(
+                fdir,
+                f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz",
+                ref.labels,
+                ref.coord,
+                charge=ref.totcharge_cif,
+                spin=spin,
+            )
+            logger.debug(
+                "Ref molecule %s %s total charge %s lowest spin multiplicity %s",
+                i,
+                ref.formula,
+                ref.totcharge_cif,
+                spin,
+            )
+        else:
+            writexyz(
+                fdir,
+                f"{name}_Ref_{i}_{ref.formula}.xyz",
+                ref.labels,
+                ref.coord,
+                charge="",
+                spin="",
+            )
+            logger.debug(
+                "Ref molecule %s %s without charge and spin information",
+                i,
+                ref.formula,
+            )
 
 
 def get_reference_error_message(error_case):
@@ -362,6 +362,18 @@ def get_molecule_error_message(error_case):
     elif error_case == 0:
         return "No errors found"
 
+    elif error_case == 1:
+        return "Isolated hydrogens found"
+
+    elif error_case == 2:
+        return "Missing hydrogens in water molecules"
+
+    elif error_case == 3:
+        return "Missing hydrogens on a coordinated O (water/hydroxide) or N (ammonia)"
+
+    elif error_case == 4:
+        return "Missing hydrogens in carbon atoms"
+
     elif error_case == 5:
         return "Some unique species have no plausible charge states"
 
@@ -382,6 +394,13 @@ def get_molecule_error_message(error_case):
 
     else:
         return f"Unhandled error case: {error_case}"
+
+
+def get_molecule_error_message_all(codes, fallback_code=0):
+    """Join the messages for every error code a molecule or molecule set fired."""
+    if not codes:
+        return get_molecule_error_message(fallback_code)
+    return "; ".join(get_molecule_error_message(code) for code in codes)
 
 
 def write_cell_molecules_info(cell, file=None):
