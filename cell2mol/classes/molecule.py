@@ -688,11 +688,6 @@ class Molecule(Specie):
 
         return self.haptic_type
 
-    # def save(self, path):
-    #     logger.info(f"SAVING cell2mol MOLECULE object to {path}")
-    #     with open(path, "wb") as fil:
-    #         pickle.dump(self, fil)
-
     def save(self, path: str | Path, *, format: Format = "json"):
         if format == "json":
             self._save_as_json(path)

@@ -320,12 +320,6 @@ class Cell(BaseModel):
         # Check all modes
         return any(code != 0 for code in self.error_cases.values())
 
-    # def save(self, path):
-    #     """Save the Cell object to a file using pickle."""
-    #     logger.info(f"SAVING cell2mol CELL ({self.subtype}) object to {path}")
-    #     with open(path, "wb") as fil:
-    #         pickle.dump(self, fil)
-
     def save(self, path: str | Path, *, format: Format = "pickle"):
         if format == "json":
             self._save_as_json(path)

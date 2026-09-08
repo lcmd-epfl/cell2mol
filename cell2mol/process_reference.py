@@ -282,24 +282,28 @@ def _handle_reference_outputs(name, current_dir, refcell):
     """Manages saving files and writing summaries."""
     if refcell is None:
         return
+    """Handles all file writing and summary generation."""
+    paths = {
+        "refcell": os.path.join(current_dir, f"Ref_Cell_{name}"),
+        "ref_sum": os.path.join(current_dir, "reference_summary.txt"),
+    }
 
-    # 1. Write the .out summary file
-    summary_path = os.path.join(current_dir, "reference_summary.txt")
     _safe_run(
-        lambda: _write_ref_detailed_summary(name, refcell, summary_path),
+        lambda: refcell.save(paths["refcell"] + ".cell", format="pickle"),
+        "Failed to save reference as pickle",
+    )
+    _safe_run(
+        lambda: refcell.save(paths["refcell"] + ".json", format="json"),
+        "Failed to save reference as JSON",
+    )
+    _safe_run(
+        lambda: _write_ref_detailed_summary(name, refcell, paths["ref_sum"]),
         "Failed to write reference summary",
     )
 
-    # 2. Save the refcell object (.cell)
-    ref_cell_fname = os.path.join(current_dir, f"Ref_Cell_{name}.cell")
-
-    def save_ref():
-        refcell.save(ref_cell_fname)
-        # from cell2mol.write_results import extract_refmoleclist_xyz
-        # if logger.isEnabledFor(logging.DEBUG) and not refcell.error_cases.get("ref_molecules", 0) == -1:
-        #     extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
-
-    _safe_run(save_ref, "Failed to save reference cell")
+    # from cell2mol.write_results import extract_refmoleclist_xyz
+    # if logger.isEnabledFor(logging.DEBUG) and not refcell.error_cases.get("ref_molecules", 0) == -1:
+    #     extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
 
 
 def _write_ref_detailed_summary(name, refcell, summary_path):

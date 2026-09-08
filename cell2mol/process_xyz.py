@@ -138,10 +138,10 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
         # shares one pool of unique species and one charge target.
         if len(moleclist) == 1:
             target = moleclist[0]
-            save_fname = os.path.join(current_dir, f"Molecule_{name}.mol")
+            save_fname = os.path.join(current_dir, f"Molecule_{name}")
         else:
             target = MoleculeSet(name=name, moleclist=moleclist)
-            save_fname = os.path.join(current_dir, f"MoleculeSet_{name}.mol")
+            save_fname = os.path.join(current_dir, f"MoleculeSet_{name}")
 
         # --- charge assignment ---
         target.input_charge = input_charge
@@ -201,8 +201,10 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
     finally:
         # --- always save what was built ---
         if target is not None and save_fname is not None:
-            target.save(save_fname)
-            logger.info("Saved to %s", save_fname)
+            target.save(save_fname + ".mol", format="pickle")
+            logger.info("Saved to %s as pickle", save_fname + ".mol")
+            target.save(save_fname + ".json", format="json")
+            logger.info("Saved to %s as JSON", save_fname + ".json")
             _write_summary(target, name, summary_molecule_fname)
 
 
