@@ -9,48 +9,24 @@ import logging
 
 if TYPE_CHECKING:
     from cell2mol.classes.molecule import Molecule
+    from cell2mol.classes.specie import Specie
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
-# Anionic partners worth promoting at a hypervalent centre. Carbanions are
-# excluded: a sulfonium ylide is real, so collapsing it would be an opinion.
+# Exclude carbanions: sulfonium ylides are genuine charge-separated species.
 _YLIDE_ACCEPTORS = frozenset(("O", "S", "Se", "N"))
 
 
-def _can_expand_octet(symbol: str) -> bool:
-    """True for p-block elements from period 3 down, which can hold more than an
-    octet. This is what separates an artifact from real chemistry: an S(+)-O(-)
-    pair is an unrecognised S=O, whereas an amine N-oxide's N(+)-O(-) is obligate.
-    """
-    return (
-        elemdatabase.elementblock[symbol] == "p"
-        and elemdatabase.elementperiod[symbol] >= 3
-    )
+############################################################
+# Charge repair and obligate charge separation
+############################################################
 
 
-def _neutral_valences(symbol: str) -> tuple[int, ...]:
-    """Bond-order sums a neutral atom of this element can carry: ``8 - valence
-    electrons``, plus one or two more pairs if it can expand its octet. Derived
-    from the periodic table, so elements xyz2mol omits (Se) still work.
-    """
-    base = 8 - elemdatabase.valenceelectrons[symbol]
-    if base < 1:
-        return ()
-    if _can_expand_octet(symbol):
-        return tuple(base + 2 * k for k in range(3))
-    return (base,)
+def collapse_hypervalent_ylides(mol: RDKitObject):
+    """Convert X(+)-Y(-) to X=Y when both atoms can support the neutral valences.
 
-
-def _total_bond_order(atom) -> int:
-    return int(sum(bond.GetBondTypeAsDouble() for bond in atom.GetBonds()))
-
-
-def collapse_hypervalent_ylides(mol):
-    """Collapse charge-separated hypervalent centres, X(+)-Y(-) -> X=Y: rdDetermineBonds
-    has no 4-valent sulfur, so a sulfoxide returns as an ylide whose spurious
-    charges then bias ranking. Promoted only when both atoms land on a valence a
-    neutral atom can hold, which spares N-oxides, nitro groups and P ylides.
+    Preserve obligate pairs such as N-oxides, nitro groups and phosphorus ylides.
     """
     rw_mol = Chem.RWMol(mol)
     fixed = False
@@ -61,8 +37,7 @@ def collapse_hypervalent_ylides(mol):
 
         begin, end = bond.GetBeginAtom(), bond.GetEndAtom()
         for center, partner in ((begin, end), (end, begin)):
-            # Exactly one unit of charge separation each way: anything larger
-            # would still leave a charge behind after promotion.
+            # Only ±1 pairs can become neutral after one bond promotion.
             if center.GetFormalCharge() != 1 or partner.GetFormalCharge() != -1:
                 continue
 
@@ -109,10 +84,10 @@ def collapse_hypervalent_ylides(mol):
     return out, fixed
 
 
-def shift_13_ylides(mol):
-    """Shift X(+)=A-Y(-) -> X-A=Y to neutralize both ends; nothing else collapses a
-    pair separated BY an atom, so [S+]=C([O-]) reaches ranking charged. Neutral
-    middle and plain bonds spare nitro, N-oxides, nitrones, ozone, azide, diazo.
+def shift_13_ylides(mol: RDKitObject):
+    """Shift X(+)=A-Y(-) to X-A=Y when both ends can be neutralized.
+
+    Require a neutral middle atom and ordinary bonds to preserve obligate pairs.
     """
     rw_mol = Chem.RWMol(mol)
     fixed = False
@@ -145,8 +120,7 @@ def shift_13_ylides(mol):
         if anion.GetSymbol() not in _YLIDE_ACCEPTORS:
             continue
 
-        # The cation gives up a bond, the anion takes one on; both have to land
-        # somewhere a neutral atom of that element can sit.
+        # Both endpoints must support their resulting neutral valences.
         cation_valence = _total_bond_order(cation) - 1
         anion_valence = _total_bond_order(anion) + 1
         if cation_valence not in _neutral_valences(cation.GetSymbol()):
@@ -179,11 +153,9 @@ def shift_13_ylides(mol):
     return out, fixed
 
 
-def obligate_charge_separation_atoms(mol) -> set[int]:
-    """Atoms whose charge is obligate, not optional: an X(+)-Y(-) pair whose cation
-    cannot expand its octet has no neutral form to collapse to (nitro, N-oxide,
-    diazo, azide). Separation surviving this and collapse_hypervalent_ylides --
-    charges stranded on non-adjacent atoms -- is what an artifact looks like.
+def obligate_charge_separation_atoms(mol: RDKitObject) -> set[int]:
+    """Find adjacent opposite charges whose cation cannot expand its octet,
+    such as nitro, N-oxide, diazo and azide pairs.
     """
     obligate: set[int] = set()
 
@@ -193,8 +165,7 @@ def obligate_charge_separation_atoms(mol) -> set[int]:
             if center.GetFormalCharge() <= 0 or partner.GetFormalCharge() >= 0:
                 continue
             if _can_expand_octet(center.GetSymbol()):
-                # A neutral alternative exists (collapse_hypervalent_ylides
-                # would have taken it), so these charges are not obligate.
+                # Octet-expandable cations have a neutral alternative, so separation is optional.
                 continue
             obligate.add(center.GetIdx())
             obligate.add(partner.GetIdx())
@@ -202,11 +173,10 @@ def obligate_charge_separation_atoms(mol) -> set[int]:
     return obligate
 
 
-def fix_zwitterions(mol):
-    """Demote a charged DOUBLE bond between adjacent opposite charges to a neutral
-    single bond. The mirror of :func:`collapse_hypervalent_ylides`.
+def fix_zwitterions(mol: RDKitObject):
+    """Neutralize adjacent opposite charges by reducing a double bond to single.
 
-    Returns (Chem.Mol, whether anything changed).
+    Return (molecule, changed).
     """
     rw_mol = Chem.RWMol(mol)
     fixed = False
@@ -214,7 +184,6 @@ def fix_zwitterions(mol):
     for atom in rw_mol.GetAtoms():
         fcharge = atom.GetFormalCharge()
 
-        # Target positively charged atoms to find adjacent negative partners
         if fcharge > 0:
             atom_idx = atom.GetIdx()
             atom_label = atom.GetSymbol()
@@ -238,7 +207,7 @@ def fix_zwitterions(mol):
                 logger.debug("\tSkipping nitro or nitrate group.")
                 continue
 
-            # Skip Carbonyl oxygens (usually shouldn't have + charge, but safety check)
+            # Skip Carbonyl oxygens
             if (
                 atom_label == "O"
                 and len(neighbors) == 1
@@ -270,8 +239,6 @@ def fix_zwitterions(mol):
 
                     bond = rw_mol.GetBondBetweenAtoms(atom_idx, neighbor_idx)
 
-                    # Minimize zwitterion only if a bond exists and is currently a DOUBLE bond
-                    # (This logic implies converting a charged double bond to a neutral single bond)
                     if bond and bond.GetBondTypeAsDouble() == 2.0:
                         fixed = True
                         logger.debug(
@@ -280,7 +247,6 @@ def fix_zwitterions(mol):
                             n_label,
                         )
 
-                        # Determine the charge magnitude to neutralize
                         diff = min(fcharge, abs(n_fcharge))
                         atom.SetFormalCharge(fcharge - diff)
                         neighbor.SetFormalCharge(n_fcharge + diff)
@@ -295,8 +261,6 @@ def fix_zwitterions(mol):
                             neighbor.GetFormalCharge(),
                         )
 
-                        # Recalculate and estimate radical electrons for the neighbor
-                        # Formula: Valence - FormalCharge - Total Bonds
                         valence_electrons = elemdatabase.valenceelectrons[n_label]
                         num_radicals = (
                             valence_electrons
@@ -311,7 +275,6 @@ def fix_zwitterions(mol):
                             num_radicals,
                         )
 
-                        # Downgrade bond from DOUBLE to SINGLE
                         logger.debug(
                             "\tChanging bond between %d and %d from DOUBLE to SINGLE",
                             atom_idx,
@@ -330,22 +293,52 @@ def fix_zwitterions(mol):
 
     out = rw_mol.GetMol()
     if fixed:
-        # Cached valences still describe the OLD structure; without this, anything
-        # reading GetTotalValence() finds every touched atom an electron pair short.
+        # Refresh cached valences after changing bonds and charges.
         out.UpdatePropertyCache(strict=False)
     return out, fixed
 
 
-def finalize_specie_mol(mol):
-    """Sanitize and canonicalize a specie mol, dropping any conformer so the SMILES is
-    conformer-independent. Returns (mol, smiles, charges_rearranged); the last is
-    always False since charge repair moved upstream, and is kept only for callers.
+############################################################
+# Valence helpers for charge repair
+############################################################
+
+
+def _can_expand_octet(symbol: str) -> bool:
+    """Return whether a p-block element from period 3 onward can expand its octet."""
+    return (
+        elemdatabase.elementblock[symbol] == "p"
+        and elemdatabase.elementperiod[symbol] >= 3
+    )
+
+
+def _neutral_valences(symbol: str) -> tuple[int, ...]:
+    """Return neutral bond-order sums from valence electrons and octet-expansion rules."""
+    base = 8 - elemdatabase.valenceelectrons[symbol]
+    if base < 1:
+        return ()
+    if _can_expand_octet(symbol):
+        return tuple(base + 2 * k for k in range(3))
+    return (base,)
+
+
+def _total_bond_order(atom) -> int:
+    return int(sum(bond.GetBondTypeAsDouble() for bond in atom.GetBonds()))
+
+
+############################################################
+# Molecule finalization and SMILES generation
+############################################################
+
+
+def finalize_specie_mol(mol: RDKitObject):
+    """Sanitize the specie molecule and generate conformer-independent SMILES.
+
+    Return (molecule, SMILES, False); the final field is retained for compatibility.
     """
     obj = Chem.Mol(mol)
     fixed = False
     obj.RemoveAllConformers()
-    # Strip any chiral tags inherited from the 3D-perceived rdkit_obj so the
-    # SMILES is stereo-free and conformer-independent.
+    # Remove 3D-derived chirality to keep SMILES conformer-independent.
     Chem.RemoveStereochemistry(obj)
     Chem.SanitizeMol(
         obj,
@@ -386,8 +379,6 @@ def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
         )
 
     for lig in mol.ligands or []:
-        # lig_atom : atom object from cell2mol
-        # a : atom object from rdkit object
         assert lig.rdkit_obj is not None
         for lig_atom, a in zip(lig.atoms or [], lig.rdkit_obj.GetAtoms()):
             a.SetFormalCharge(int(lig_atom.charge or 0))
@@ -443,7 +434,6 @@ def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
 
         for idx in coordinating_atoms_indices:
             assert idx is not None
-            # print(idx, new_mol.GetBondBetweenAtoms(idx, met_idx))
             if new_mol.GetBondBetweenAtoms(idx, met_idx):
                 logger.debug(
                     "Already added %s %s",
@@ -454,7 +444,6 @@ def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
                 new_mol.AddBond(idx, met_idx, Chem.BondType.UNSPECIFIED)
             else:
                 new_mol.AddBond(idx, met_idx, Chem.BondType.DATIVE)
-            # print(idx, new_mol.GetBondBetweenAtoms(idx, met_idx).GetBondType())
 
     smiles = Chem.MolToSmiles(new_mol.GetMol())
     logger.info("TMC_SMILES: %s", smiles)
@@ -487,11 +476,13 @@ def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
     return new_mol, tmc_rdkit_obj
 
 
-def create_bonds_specie(specie, rdkit_obj: RDKitObject | None = None):
-    """Build cell2mol Bond objects on ``specie.atoms`` from the specie's own
-    (deprotonated) rdkit_obj, which already has exactly ``specie.natoms`` atoms in
-    the same order. One Bond per RDKit bond; nothing else is computed.
-    """
+############################################################
+# Specie and metal bond assembly
+############################################################
+
+
+def create_bonds_specie(specie: "Specie", rdkit_obj: RDKitObject | None = None):
+    """Populate specie.atoms with one Bond per bond in the deprotonated RDKit molecule."""
     from cell2mol.classes import Bond
 
     if rdkit_obj is None:
@@ -544,7 +535,11 @@ def create_metal_ligand_bonds(mol: "Molecule"):
     from cell2mol.classes import Bond
 
     assert mol.madjmat is not None
-    if mol.iscomplex or mol.has_ia_iia or mol.has_post_transition_metal:
+    if (
+        mol.is_metal_complex
+        or mol.has_s_block_metal
+        or mol.is_post_transition_metal_complex
+    ):
         for lig in mol.ligands or []:
             for at in lig.atoms or []:
                 count = 0
@@ -562,7 +557,6 @@ def create_metal_ligand_bonds(mol: "Molecule"):
                             bond_startatom = met
                             bond_endatom = at
                         newbond = Bond.from_positional(bond_startatom, bond_endatom, 1)
-                        # Chem.BondType.DATIVE
                         at.add_bond(newbond)
                         met.add_bond(newbond)
                         count += 1
@@ -579,7 +573,11 @@ def create_metal_metal_bonds(mol: "Molecule"):
 
     # Adds Metal-Metal Bonds, with a zero order:
     assert mol.madjmat is not None
-    if mol.iscomplex or mol.has_ia_iia or mol.has_post_transition_metal:
+    if (
+        mol.is_metal_complex
+        or mol.has_s_block_metal
+        or mol.is_post_transition_metal_complex
+    ):
         metals = mol.metals or []
         if len(metals) > 1:
             logger.debug("Creating Metal-Metal Bonds for molecule %s", mol.formula)

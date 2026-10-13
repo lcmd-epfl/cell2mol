@@ -132,7 +132,6 @@ def int_atom(atom):
 
 
 def get_UA(maxValence_list, valence_list):
-    """ """
     UA = []
     DU = []
     for i, (maxValence, valence) in enumerate(zip(maxValence_list, valence_list)):
@@ -144,7 +143,6 @@ def get_UA(maxValence_list, valence_list):
 
 
 def get_BO(AC, UA, DU, valences, UA_pairs, use_graph=True):
-    """ """
     BO = AC.copy()
     DU_save = []
 
@@ -157,14 +155,12 @@ def get_BO(AC, UA, DU, valences, UA_pairs, use_graph=True):
         BO_valence = list(BO.sum(axis=1))
         DU_save = copy.copy(du)
         ua, du = get_UA(valences, BO_valence)
-        # UA_pairs = get_UA_pairs(UA, AC, use_graph=use_graph)[0]
         UA_pairs = get_UA_pairs_new(ua, AC, du, use_graph=use_graph)[0]
 
     return BO
 
 
 def valences_not_too_large(BO, valences):
-    """ """
     number_of_bonds_list = BO.sum(axis=1)
     for valence, number_of_bonds in zip(valences, number_of_bonds_list):
         if number_of_bonds > valence:
@@ -184,10 +180,8 @@ def charge_is_OK(
     allow_charged_fragments=True,
     allow_carbenes=True,
 ):
-    # total charge
     total_q = 0
 
-    # charge fragment list
     q_list = []
 
     if allow_charged_fragments:
@@ -230,23 +224,7 @@ def BO_is_OK(
     allow_charged_fragments=True,
     allow_carbenes=True,
 ):
-    """
-    Sanity of bond-orders
-
-    Args:
-        BO -
-        AC -
-        charge -
-        DU -
-
-
-    optional
-        allow_charges_fragments -
-
-
-    Returns:
-        boolean - true of molecule is OK, false if not
-    """
+    """Check bond-order, unsaturation and charge consistency."""
 
     if not valences_not_too_large(BO, valences):
         return False
@@ -270,8 +248,7 @@ def BO_is_OK(
     return False
 
 
-# An electronegative substituent leaves four-coordinate Sb its lone pair, which
-# is what makes [R2SbX2]- an anion where a tetraorganostibonium is a cation.
+# Electronegative substituents preserve the lone pair in four-coordinate Sb anions.
 _SB_III_SUBSTITUENTS = frozenset({7, 8, 9, 16, 17, 34, 35, 53})  # N O F S Cl Se Br I
 
 
@@ -283,9 +260,7 @@ def _neighbor_atomic_numbers(matrix, index, atoms) -> list[int]:
 
 
 def get_atomic_charge(atom, atomic_valence_electrons, BO_valence, neighbor_atoms=None):
-    """Formal charge of one atom from its bond order sum. ``neighbor_atoms`` (the
-    bonded atomic numbers) matters only where the bond count alone is ambiguous.
-    """
+    """Calculate formal charge from bond-order sum and, when needed, neighbour elements."""
     label = elemdatabase.elementsym[atom]
     group = elemdatabase.elementgroup[label]
 
@@ -306,13 +281,7 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence, neighbor_atoms
     elif atom == 5 and not found:
         charge = 3 - BO_valence
         found = True
-    # elif atom == 6 and BO_valence == 2 and not found:
-    #     charge = 0
-    #     found = True
-    # elif atom == 13 and not found and not found:
-    #     charge = 3 - BO_valence
-    #     found = True
-    # Ionic Bonds are not correctly captured, exceptions are needed for atoms with tendency to form them
+    # Ionic bonding requires element-specific charge rules.
     elif atom == 15 and BO_valence == 5 and not found:  # PX5
         charge = 0
         found = True
@@ -329,8 +298,7 @@ def get_atomic_charge(atom, atomic_valence_electrons, BO_valence, neighbor_atoms
         charge = 1
         found = True
     elif atom == 32 and BO_valence == 6 and not found:
-        # Hexacoordinate germanate GeX6(2-): 4 - 6 = -2. Without this Ge hits the
-        # generic branch and comes back +2, valid at no charge at all.
+        # GeX6 has charge 4-6=-2.
         charge = -2
         found = True
     elif atom == 33 and BO_valence == 6 and not found:  # AsX6
@@ -372,25 +340,9 @@ def BO2mol(
     mol_charge,
     allow_charged_fragments=True,
 ):
-    """
-    based on code written by Paolo Toscani
+    """Build an RDKit molecule from bond orders and atomic charges.
 
-    From bond order, atoms, valence structure and total charge, generate an
-    rdkit molecule.
-
-    Args:
-        mol - rdkit molecule
-        BO_matrix - bond order matrix of molecule
-        atoms - list of integer atomic symbols
-        atomic_valence_electrons -
-        mol_charge - total charge of molecule
-
-    optional:
-        allow_charged_fragments - bool - allow charged fragments
-
-    Returns:
-        mol - updated rdkit molecule with bond connectivity
-
+    Based on code by Paolo Toscani.
     """
 
     n_bo = len(BO_matrix)
@@ -432,7 +384,6 @@ def BO2mol(
 def set_atomic_charges(
     mol, atoms, atomic_valence_electrons, BO_valences, BO_matrix, mol_charge
 ):
-    """ """
     q = 0
     for i, atom in enumerate(atoms):
         a = mol.GetAtomWithIdx(i)
@@ -476,7 +427,6 @@ def set_atomic_radicals(
 
 
 def get_bonds(UA, AC):
-    """ """
     bonds = []
 
     for k, i in enumerate(UA):
@@ -488,7 +438,6 @@ def get_bonds(UA, AC):
 
 
 def get_UA_pairs_new(UA, AC, DU, use_graph=True):
-    """"""
     n_ua = 10000
     matching_ids = dict()
     matching_ids2 = dict()
@@ -521,19 +470,13 @@ def get_UA_pairs_new(UA, AC, DU, use_graph=True):
             if i in matching_ids2 and j in matching_ids2:
                 remove_pairs.append(tuple([i, j]))
                 add_pairs.append(tuple([matching_ids2[i], matching_ids2[j]]))
-                # UA_pair.remove(tuple([i,j]))
-                # UA_pair.append(tuple([matching_ids2[i], matching_ids2[j]]))
             elif i in matching_ids2:
-                # UA_pair.remove(tuple([i,j]))
                 remove_pairs.append(tuple([i, j]))
                 add_pairs.append(tuple([matching_ids2[i], j]))
-                # UA_pair.append(tuple([matching_ids2[i],j]))
             elif j in matching_ids2:
                 remove_pairs.append(tuple([i, j]))
                 add_pairs.append(tuple([i, matching_ids2[j]]))
 
-                # UA_pair.remove(tuple([i,j]))
-                # UA_pair.append(tuple([i,matching_ids2[j]]))
         for p1, p2 in zip(remove_pairs, add_pairs):
             UA_pair.remove(p1)
             UA_pair.append(p2)
@@ -555,8 +498,6 @@ def get_UA_pairs_new(UA, AC, DU, use_graph=True):
 
 
 def get_UA_pairs(UA, AC, use_graph=True):
-    """ """
-
     bonds = get_bonds(UA, AC)
 
     if len(bonds) == 0:
@@ -584,41 +525,28 @@ def get_UA_pairs(UA, AC, use_graph=True):
 
 
 def get_sorted_valences_list(valences_list_of_lists, atoms):
-    """
-    Memory-efficient generator for valence combinations.
-    Groups atoms by element priority (O > N > C > P > S) to ensure
-    the resulting product follows the desired sorting order.
-    """
-    # 1. Define atomic priority (O, N, C, P, S)
+    """Generate valence combinations lazily in element order O, N, C, P, S, then others."""
     priority_order = [8, 7, 6, 15, 16]
     groups = {num: [] for num in priority_order}
     others = []
 
-    # Group atom indices based on their atomic number
     for i, atomicNum in enumerate(atoms):
         if atomicNum in groups:
             groups[atomicNum].append(i)
         else:
             others.append(i)
 
-    # 2. Order the atoms: prioritized element groups first, others last.
-    # One flat product, never a product of per-group products: product() tuples
-    # up its arguments at once, so nesting expands a whole group eagerly
-    # Flat is lazy and yields the same order.
+    # A flat product keeps valence combinations lazy; nested products expand groups eagerly.
     reordered_indices = []
     for num in priority_order:
         reordered_indices.extend(groups[num])
 
-    # 3. Process remaining elements (Others)
     reordered_indices.extend(others)
 
     ordered_valences = [valences_list_of_lists[i] for i in reordered_indices]
 
-    # 4. Complexity Estimation
     total_expected_combinations = math.prod(len(v) for v in ordered_valences)
-    # logger.info(f"Total Expected Combinations: {total_expected_combinations:,}")
 
-    # TERMINATION LOGIC:
     if total_expected_combinations > valence_combinations_limit:
         logger.error(
             f"Search space too large ({total_expected_combinations:,}). "
@@ -626,31 +554,20 @@ def get_sorted_valences_list(valences_list_of_lists, atoms):
         )
         return None  # Explicitly return None instead of the generator
 
-    # 5. Restore Map Calculation
-    # Maps the reordered indices back to the original atom sequence in the CIF
     restore_map = [0] * len(atoms)
     for sorted_pos, original_pos in enumerate(reordered_indices):
         restore_map[original_pos] = sorted_pos
 
-    # 6. Generator Function
     def valence_generator():
         # Lazy -- callers take only the first num_try_limit combinations.
         for combined in itertools.product(*ordered_valences):
-            # Map back to original atom order and yield as tuple
             yield tuple(combined[restore_map[i]] for i in range(len(atoms)))
 
     return valence_generator()
 
 
 def score_BO(BO, atoms, atomic_valence_electrons, allow_charged_fragments=True):
-    """
-    Score a candidate bond-order matrix that already passed BO_is_OK/charge_is_OK.
-    Lower is better. Prefers the resonance structure with the least total formal
-    charge, and among ties, the one with charge concentrated on fewer atoms.
-
-    Returns a tuple (total_abs_charge, num_charged_atoms) suitable for direct
-    comparison / sorting.
-    """
+    """Rank valid bond orders by (total absolute charge, number of charged atoms); lower is better."""
     if not allow_charged_fragments:
         return (0, 0)
 
@@ -672,12 +589,7 @@ def score_BO(BO, atoms, atomic_valence_electrons, allow_charged_fragments=True):
 
 
 def _nitro_forced_valences(AC, atoms) -> dict[int, list[int]]:
-    """Pin every nitro/nitrate group to its only correct Lewis form, [N+](=O)[O-].
-
-    Nitrogen cannot expand its octet, so exactly one terminal oxygen is doubly
-    bonded. The other terminal oxygens are singly bonded.
-    Returns {atom index: [valence]} for the atoms of every group found.
-    """
+    """Return forced atom valences for nitro/nitrate groups with exactly one N=O bond."""
     forced = {}
     for i, atomicNum in enumerate(atoms):
         if atomicNum != 7:
@@ -715,14 +627,8 @@ def AC2BO(
     allow_carbenes=True,
     diagnostics=None,
 ):
-    """
-    implemenation of algorithm shown in Figure 2
-    UA: unsaturated atoms
-    DU: degree of unsaturation (u matrix in Figure)
-    best_BO: Bcurr in Figure
-    """
+    """Infer bond orders from adjacency using unsaturated atoms and their valence deficits."""
 
-    # make a list of valences, e.g. for CO: [[4],[2,1]]
     valences_list_of_lists = []
     AC_valence = [int(x) for x in AC.sum(axis=1)]
 
@@ -754,10 +660,7 @@ def AC2BO(
             if valence not in possible_valence:
                 possible_valence.append(valence)
         if atomicNum != 6 and allow_charged_fragments:
-            # For any non-carbon atom, the hardcoded valence lists in
-            # get_atomic_valences() are often incomplete
-            # (e.g. I: [1,3,5] for cyclic iodonium, missing 2,
-            # P: [3,5]for PPh4+, missing 4).
+            # Hardcoded valences can omit charged states such as I(2) or P(4).
             if valence not in possible_valence:
                 possible_valence.append(valence)
         if i in nitro_forced:
@@ -786,7 +689,6 @@ def AC2BO(
                 possible_valence.append(valence)
 
             elif elemdatabase.elementperiod[element] < 3:
-                # e.g. F in  HOLMOK
                 logger.warning(
                     "  Atom %s (index %d) has valence %d, which exceeds the allowed maximum (%d) "
                     "for period %d elements.",
@@ -799,12 +701,11 @@ def AC2BO(
                 possible_valence.append(max_valence)
             else:
                 possible_valence.append(valence)
-            # sys.exit()
         valences_list_of_lists.append(possible_valence)
     if wrong > 0:
         return None, atomic_valence_electrons
 
-    # Oxygen is usually what blows up the search, narrowing beats terminating
+    # Prune oxygen valences before limiting the search.
     projected = math.prod(len(options) for options in valences_list_of_lists)
     if projected > valence_combinations_limit and 8 in atoms:
         narrowed = _narrowed_oxygen_valences(valences_list_of_lists, atoms)
@@ -824,20 +725,16 @@ def AC2BO(
     best_status_BO = None
     best_status_score = None  # holds (total_abs_charge, num_charged_atoms) tuples
 
-    # Get the generator (0 bytes consumed for combinations)
     sorted_gen = get_sorted_valences_list(valences_list_of_lists, atoms)
 
     if sorted_gen is None:
         logger.warning("AC2BO terminating: Valence search space exceeded limit.")
-        # Charge-independent -- the count depends only on atoms and adjacency --
-        # so this aborts every candidate charge alike. Recorded so callers can
-        # report the specie as skipped rather than as genuinely uncharacterised.
+        # Record charge-independent search limits so callers can report skipped species.
         if diagnostics is not None:
             diagnostics["valence_search_too_large"] = True
         return None, None
 
-    # Use islice to safely take only the first 50 entries
-    # This prevents calculating millions of combinations you don't need
+    # Limit enumeration without materializing all combinations.
     count = 0
     max_count = num_try_limit
     top_valences = list(itertools.islice(sorted_gen, max_count))
@@ -863,11 +760,8 @@ def AC2BO(
             check_bo = None
 
         if check_len and check_bo:
-            # logger.info("  return AC %s charge %d count %d", formula, charge, count)
-
             return AC, atomic_valence_electrons
 
-        # UA_pairs_list = get_UA_pairs(UA, AC, use_graph=use_graph)
         UA_pairs_list = get_UA_pairs_new(UA, AC, DU_from_AC, use_graph=use_graph)
 
         for UA_pairs in UA_pairs_list:
@@ -913,9 +807,7 @@ def AC2BO(
                         count,
                         score,
                     )
-                # Best possible case: all the (necessary) charge sits on a
-                # single atom -- no better resonance structure is possible,
-                # so stop searching further valence combinations.
+                # Stop when all necessary charge sits on one atom.
                 if best_status_score == (abs(charge), 1) or best_status_score == (0, 0):
                     logger.debug(
                         "  formula=%s charge=%s count=%s reached minimal charge "
@@ -974,11 +866,9 @@ def AC2mol(
     if not allow_charged_fragments:
         overrides = {8: [2, 1], 7: [3, 2], 6: [4, 2]}
 
-    # Take a fresh backup *now*, not at import time
     backup = copy.deepcopy(atomic_valence)
 
     try:
-        # Patch in place (no yield, no rebinding)
         if overrides is not None:
             for k, v in overrides.items():
                 atomic_valence[k] = list(v)  # copy to avoid sharing caller’s list
@@ -1006,13 +896,11 @@ def AC2mol(
         return [mol], BO
 
     finally:
-        # Always restore, even if exceptions occur
         atomic_valence.clear()
         atomic_valence.update(backup)
 
 
 def get_proto_mol(atoms):
-    """ """
     mol = Chem.MolFromSmarts("[#" + str(atoms[0]) + "]")
     rwMol = Chem.RWMol(mol)
     for i in range(1, len(atoms)):
@@ -1025,7 +913,6 @@ def get_proto_mol(atoms):
 
 
 def read_xyz_file(filename, look_for_charge=True):
-    """ """
     atomic_symbols = []
     xyz_coordinates = []
     charge = 0
@@ -1092,33 +979,12 @@ def xyz2mol(
     exportBO=False,
     allow_carbenes=False,
 ):
-    """
-    Generate a rdkit mol object from atoms, coordinates and a charge.
+    """Return RDKit molecules from atomic numbers, coordinates, adjacency and charge.
 
-    Args:
-        atoms: list of atom types (int)
-        coordinates: 3xN Cartesian coordinates
-        AC: atom connectivity matrix
-        charge: total charge of the system (default: 0)
-
-    Optional:
-        allow_charged_fragments: allow charged fragments in the molecule
-        use_graph: use graph (networkx)
-        use_huckel: Use Huckel method for atom connectivity prediction
-        embed_chiral: embed chiral information to the molecule
-        exportBO: export bond order matrix along with the molecule (default: False)
-        allow_carbenes: allow carbene structures in the molecule (default: False)
-    Returns:
-        mols - list of rdkit molobjects
-
+    Optionally export bond orders and allow charged fragments or carbenes.
     """
     ac = np.array(AC)
     mol = get_proto_mol(atoms)
-    # Get atom connectivity (AC) matrix, list of atomic numbers, molecular charge,
-    # and mol object with no connectivity information
-    # AC, mol = xyz2AC(atoms, coordinates, charge, covalent_factor, use_huckel=use_huckel)
-    # Convert AC to bond order matrix and add connectivity and charge info to
-    # mol object
     new_mols, BO = AC2mol(
         mol,
         ac,
@@ -1128,10 +994,6 @@ def xyz2mol(
         use_graph=use_graph,
         allow_carbenes=False,
     )
-
-    # Check for stereocenters and chiral centers -> Move to get_charge function
-    # if embed_chiral:
-    #     chiral_stereo_check(new_mol))
 
     if exportBO:
         return new_mols, BO
