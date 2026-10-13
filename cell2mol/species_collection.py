@@ -1,15 +1,4 @@
-"""Species bookkeeping shared by every collection of molecules.
-
-A *collection* is any group of molecules charge-balanced as one unit: a CIF
-reference cell, the blocks of a multi-molecule xyz, or a lone molecule.
-Deduplication must see them all at once -- one shared set of type lists is what
-gives the same ligand in two molecules a single ``unique_index``, hence one
-charge decision, and what makes the balancer's sum the charge of the whole
-collection rather than of one molecule.
-
-Nothing here touches the lattice: ``compare_species`` and ``compare_metals``
-work on composition and adjacency only.
-"""
+"""Collect species, hydrogen flags, and charge candidates across molecules."""
 
 from __future__ import annotations
 
@@ -20,17 +9,16 @@ from cell2mol.compare import compare_species, compare_metals
 logger = logging.getLogger(__name__)
 
 
-def _same_ligand(lig, other) -> bool:
-    """Whether two ligands are the same specie: cheap screens (nitrosyl kind,
-    group labels, hapticity) before the full ``compare_species``."""
+def _ligands_match(lig, other) -> bool:
+    """Compare nitrosyl geometry, donor groups, and hapticity before species matching."""
     if lig.is_nitrosyl is None:
-        lig.evaluate_as_nitrosyl()
+        lig.detect_nitrosyl()
     if other.is_nitrosyl is None:
-        other.evaluate_as_nitrosyl()
+        other.detect_nitrosyl()
     if lig.haptic_type is None:
-        lig.get_hapticity()
+        lig.update_hapticity()
     if other.haptic_type is None:
-        other.get_hapticity()
+        other.update_hapticity()
 
     if lig.is_nitrosyl and other.is_nitrosyl:
         return lig.NO_type == other.NO_type
@@ -48,31 +36,22 @@ def _same_ligand(lig, other) -> bool:
     return False
 
 
-def _ensure_split(mol) -> None:
-    """Make sure a metal-containing molecule has been split into ligands/metals."""
+def _ensure_complex_split(mol) -> None:
+    """Split metal-containing molecules into ligands and metals when needed."""
     if mol.ligands is not None:
         return
-    if mol.iscomplex or mol.has_ia_iia:
+    if mol.is_metal_complex or mol.has_s_block_metal:
         mol.split_complex()
-    elif mol.has_post_transition_metal:
+    elif mol.is_post_transition_metal_complex:
         mol.split_complex(post_tms=True)
 
 
 def collect_unique_species(moleclist):
-    """Deduplicate the species of ``moleclist``, between molecules as well as
-    within one.
+    """Collect representatives and assign each occurrence a unique_index.
 
-    Metal-containing molecules contribute their metals and ligands, metal-free
-    ones themselves. Stamps ``unique_index`` on each, which is how a
-    representative's charge later finds its copies.
-
-    Args:
-        moleclist: The molecules of the collection.
-
-    Returns:
-        unique_species: One representative per distinct specie.
-        unique_indices: Index into ``unique_species`` of each occurrence.
-        species_list: Every occurrence, aligned with ``unique_indices``.
+    Metal-containing molecules contribute metals and ligands; metal-free
+    molecules contribute themselves. Return (unique_species, unique_indices,
+    species_list), with the last two lists aligned.
     """
     unique_species = []
     unique_indices: list[int] = []
@@ -87,7 +66,7 @@ def collect_unique_species(moleclist):
     for idx, mol in enumerate(moleclist or []):
         logger.debug("Molecule (%d) formula=%s", idx, mol.formula)
 
-        if mol.is_non_complex_molecule:
+        if mol.is_metal_free_molecule:
             kdx = None
             for ldx, typ in enumerate(typelist_mols):
                 if compare_species(mol, typ[0]):
@@ -116,9 +95,8 @@ def collect_unique_species(moleclist):
             species_list.append(mol)
             continue
 
-        # Metal-containing molecule: metals first, then ligands. Both lists
-        # are produced by split_complex, so make sure it has run.
-        _ensure_split(mol)
+        # Collect metals before ligands to preserve occurrence order.
+        _ensure_complex_split(mol)
 
         for jdx, met in enumerate(mol.metals or []):
             kdx = None
@@ -151,7 +129,7 @@ def collect_unique_species(moleclist):
         for jdx, lig in enumerate(mol.ligands or []):
             kdx = None
             for ldx, typ in enumerate(typelist_ligs):
-                if _same_ligand(lig, typ[0]):
+                if _ligands_match(lig, typ[0]):
                     kdx = typ[1]
                     logger.debug(
                         "ligand %s (%d) is the same with type %d in type list",
@@ -183,23 +161,13 @@ def collect_unique_species(moleclist):
     return unique_species, unique_indices, species_list
 
 
-def collect_missing_hydrogens(moleclist, species_list):
-    """Screen a collection for missing hydrogens.
+def collect_hydrogen_flags(moleclist, species_list):
+    """Check isolated H/D atoms and missing hydrogens across molecules and species.
 
-    Scans the molecules for lone H/D atoms, then screens every non-metal specie
-    (metals carry no hydrogens) and OR-folds the per-specie flags into
-    collection-level ones. Call after the species have been collected.
-
-    Args:
-        moleclist: The molecules of the collection.
-        species_list: Every specie occurrence in the collection.
-
-    Returns:
-        A dict of the five flags: ``has_isolated_H``, ``missing_H_in_Carbon``,
-        ``missing_H_on_CoordDonor``, ``missing_H_in_Water`` and the
-        ``has_missing_H`` that ORs the last three.
+    Return flags for isolated H, missing H on carbon, coordinated donors,
+    and water. has_missing_H combines the three missing-H flags.
     """
-    # A lone H/D is a dangling hydrogen; any other lone atom is only reported.
+    # Only isolated H/D atoms set the hydrogen error flag.
     has_isolated_h = False
     for mol in moleclist or []:
         if mol.natoms != 1:
@@ -219,8 +187,7 @@ def collect_missing_hydrogens(moleclist, species_list):
     species = species_list or []
     missing = []
     for specie in species:
-        # Metals subclass Atom (not Specie) and carry no hydrogens, so they have
-        # no check_hydrogens() and are always clean -- skip them.
+        # Metals have no hydrogen-check method.
         if specie.subtype == "metal":
             continue
         if specie.check_hydrogens():
@@ -265,29 +232,18 @@ def collect_missing_hydrogens(moleclist, species_list):
 def collect_plausible_charges(
     unique_species, species_list, *, skip_missing_h: bool = False
 ):
-    """Collect the plausible charges of every specie; nothing is chosen here.
+    """Collect charge candidates for unique_species followed by species_list.
 
-    Args:
-        unique_species: One representative per distinct specie.
-        species_list: Every specie occurrence in the collection.
-        skip_missing_h: Record ``None`` for a specie short of hydrogens without
-            flagging an error -- the hydrogen check already reports that.
-
-    Returns:
-        plausible_charges: The charges of ``unique_species`` followed by those
-            of all ``species_list``, so a specie recurs at two positions.
-            ``None`` marks one whose charges were not found.
-        error_plausible_charges: True if any specie was left without charges.
-        inconsistent: ``{unique_index: differing charge sets}``, from
-            ``check_charge_consistency``.
+    Return (candidates, failed, inconsistencies). None marks missing candidates.
+    With skip_missing_h=True, skipped entries remain None but do not count
+    as charge-enumeration failures. No final charge is selected.
     """
     plausible_charges: list[list[int] | None] = []
 
     all_targets = [(specie, "unique specie") for specie in unique_species or []]
     all_targets.extend([(specie, "species list") for specie in species_list or []])
 
-    # Positions that are None because enumeration was never attempted, as
-    # opposed to attempted and failed.
+    # Separate hydrogen-related skips from enumeration failures.
     skipped_for_missing_h: set[int] = set()
 
     for idx, (specie, context_label) in enumerate(all_targets):
@@ -309,7 +265,7 @@ def collect_plausible_charges(
                 continue
 
         if specie.subtype == "metal":
-            plausible = specie.get_plausible_os()
+            plausible = specie.get_plausible_oxidation_states()
             plausible_charges.append(plausible if plausible else None)
         else:
             plausible = specie.get_plausible_charge_states()
@@ -337,31 +293,19 @@ def collect_plausible_charges(
             [all_targets[i][0].formula for i in unexplained],
         )
 
-    inconsistent = check_charge_consistency(
+    inconsistent = find_charge_inconsistencies(
         all_targets, plausible_charges, skipped_for_missing_h
     )
 
     return plausible_charges, error_plausible_charges, inconsistent
 
 
-def check_charge_consistency(all_targets, plausible_charges, skipped_for_missing_h):
-    """Find unique species whose copies did not enumerate to the same charges.
+def find_charge_inconsistencies(all_targets, plausible_charges, skipped_for_missing_h):
+    """Find differing charge candidates among copies sharing a unique_index.
 
-    Copies sharing a ``unique_index`` are the same specie, so they must yield
-    the same options; when they do not, the charge chosen depends on which copy
-    was stored first (the balancer reads ``unique_species`` only) rather than on
-    the chemistry. The usual cause is that bond perception is not atom-order
-    invariant. Recorded, not raised: order-dependent is not necessarily wrong.
-
-    Args:
-        all_targets: ``(specie, context_label)`` pairs, aligned with
-            ``plausible_charges``.
-        plausible_charges: The charges found for each of those entries.
-        skipped_for_missing_h: Positions never attempted, which are ignored.
-
-    Returns:
-        ``{unique_index: the distinct charge sets its copies produced}``, empty
-        when every copy agreed.
+    all_targets contains (specie, context_label) pairs aligned with candidates.
+    Ignore skipped positions and charge-list order. Return
+    {unique_index: distinct candidate lists}, logging differences without raising.
     """
     inconsistent: dict[int, list[list[int] | None]] = {}
 
@@ -378,7 +322,7 @@ def check_charge_consistency(all_targets, plausible_charges, skipped_for_missing
         by_unique_index.setdefault(unique_index, []).append(plausible_charges[idx])
 
     for unique_index, recorded in sorted(by_unique_index.items()):
-        # Order within a charge list carries no meaning, so compare as sets.
+        # Candidate order and duplicates do not affect equality.
         distinct = {
             None if charges is None else tuple(sorted(set(charges)))
             for charges in recorded
@@ -411,13 +355,12 @@ def check_charge_consistency(all_targets, plausible_charges, skipped_for_missing
 
 
 def map_charges_to_molecules(unique_species, moleclist) -> bool:
-    """Propagate the charges of the unique species onto every copy.
+    """Map representative charges to copies sharing a unique_index.
 
-    Returns True if any assignment failed, for ``error_assign_charge``.
+    Return True if any charge assignment fails.
     """
-    # Imported here: specie_assigner pulls in cell2mol.classes, which imports
-    # this module, so a module-level import would close the cycle.
-    from cell2mol.charge.specie_assigner import set_charge_state
+    # Defer the import to avoid a cycle through cell2mol.classes.
+    from cell2mol.charge.charge_assignment import set_charge_state
 
     error_assign_charge = False
 
@@ -425,7 +368,7 @@ def map_charges_to_molecules(unique_species, moleclist) -> bool:
         specie_unique_index = getattr(specie, "unique_index", None)
         for mol in moleclist or []:
             try:
-                if mol.is_non_complex_molecule:
+                if mol.is_metal_free_molecule:
                     if mol.unique_index == specie_unique_index:
                         set_charge_state(specie, mol, mode=1)
                     continue
@@ -456,10 +399,23 @@ def map_charges_to_molecules(unique_species, moleclist) -> bool:
                         error_assign_charge = True
 
             except Exception as e:
-                # Catch-all for unexpected logic errors in the outer loop
                 error_assign_charge = True
                 logger.error(
                     "Error mapping charge for Specie %s: %s", specie_unique_index, e
                 )
 
     return error_assign_charge
+
+
+def update_plausible_charges(collection) -> None:
+    """Refresh charge candidates and inconsistency flags on a molecule collection."""
+    (
+        collection.plausible_charges,
+        collection.error_plausible_charges,
+        collection.inconsistent_plausible_charges,
+    ) = collect_plausible_charges(
+        collection.unique_species, collection.species_list, skip_missing_h=True
+    )
+    collection.error_inconsistent_plausible_charges = bool(
+        collection.inconsistent_plausible_charges
+    )
