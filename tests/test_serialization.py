@@ -413,7 +413,7 @@ class TestEdgeCases:
                 if getattr(lig, "plausible_charge_states", None):
                     for cs in lig.plausible_charge_states:
                         # These should have values (computed originally, saved, restored)
-                        assert cs.protonated_abstotal is not None, (
+                        assert cs.protonated_abs_total_charge is not None, (
                             "protonated_abstotal should be set"
                         )
                         assert cs.specie_total_charge is not None, (
