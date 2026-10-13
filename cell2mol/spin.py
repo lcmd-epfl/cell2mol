@@ -1,166 +1,167 @@
-import numpy as np
-import pickle
-import joblib
+"""Determine metal and complex spin multiplicities from rules and model features."""
+
+from __future__ import annotations
+
+import logging
 import os
+from typing import TYPE_CHECKING, cast
+
+import joblib
+import numpy as np
+from numpy.typing import NDArray
+
 from cell2mol import __file__
 from cell2mol.coordination_sphere import shape_structure_references_simplified
 from cell2mol.elementdata import ElementData
-import logging
+from cell2mol.my_types import Spin
+
+if TYPE_CHECKING:
+    from cell2mol.classes.metal import Metal
+    from cell2mol.classes.molecule import Molecule
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 
-def predict_ox_state(metal: object) -> None:
-    model = ""
-    feature = generate_feature_vector(metal, target_prop="m_ox")
-    path_rf = os.path.join(os.path.abspath(os.path.dirname(__file__)), model)
-    ramdom_forest = pickle.load(open(path_rf, "rb"))
-    predictions = ramdom_forest.predict(feature)
-    m_ox_rf = predictions[0]
-    return m_ox_rf
+def predict_metal_spin(metal: Metal) -> Spin | None:
+    """Predict metal spin multiplicity (2S + 1) from its assigned charge.
 
+    Use electron-count rules for 3d d0/d1/d9/d10 and non-haptic d2/d3
+    cases; use the Random Forest model for the remaining 3d d2–d8 cases.
+    For heavier d-block metals, use 1 for even and 2 for odd valence
+    electron counts.
 
-def assign_spin_metal(metal: object) -> None:
-    """Assigns spin multiplicity of the transition metal."""
-    valence_elec = metal.get_valence_elec(metal.charge)
+    Return None if spin cannot be determined.
+    Raise ValueError if required data is missing.
+    Store the valence electron count and return the spin multiplicity.
+    """
+    charge = metal.charge
+    if charge is None:
+        raise ValueError(f"Metal {metal.label} has no assigned charge")
+    valence_elec = metal.compute_valence_electron_count(charge)
     period = elemdatabase.elementperiod[metal.label]
     block = elemdatabase.elementblock[metal.label]
-    if period == 4 and block == "d":  # 3d transition metals
+
+    if period == 4 and block == "d":
         if valence_elec in [0, 10]:
             return 1
-        elif valence_elec in [1, 9]:
+        if valence_elec in [1, 9]:
             return 2
-        elif valence_elec in [2, 3] and not metal.get_parent("molecule").is_haptic:
-            return valence_elec + 1
-        elif valence_elec in [4, 5, 6, 7, 8] or (
-            valence_elec in [2, 3] and metal.get_parent("molecule").is_haptic
-        ):
-            if metal.coord_geometry is not None and metal.coord_geometry != "Undefined":
-                # Predict spin multiplicity of metal based on Random Forest model
-                feature = generate_feature_vector(metal, target_prop="spin")
-                # path_rf = os.path.join(
-                #     os.path.dirname(os.path.abspath(__file__)),
-                #     "models",
-                #     "TM-GSspin_RandomForest.pkl",
-                # )
-                # ramdom_forest = pickle.load(open(path_rf, "rb"))
-                path_rf = os.path.join(
-                    os.path.dirname(os.path.abspath(__file__)),
-                    "models",
-                    "TM-GSspinPlus_RandomForest.joblib",
-                )
-                ramdom_forest = joblib.load(path_rf)
-                predictions = ramdom_forest.predict(feature)
-                spin_rf = predictions[0]
-                logger.info(
-                    "ASSIGN_SPIN_METAL: Spin multiplicity of the metal %s is predicted as %s using Random Forest model",
-                    metal.label,
-                    spin_rf,
-                )
-                return spin_rf
-            else:
+        if valence_elec in [2, 3]:
+            parent = cast("Molecule | None", metal.get_parent("molecule"))
+            if parent is None:
+                raise ValueError(f"Metal {metal.label} has no parent molecule")
+            if not parent.is_haptic:
+                return valence_elec + 1
+
+        if valence_elec in [2, 3, 4, 5, 6, 7, 8]:
+            if metal.coord_geometry is None or metal.coord_geometry == "Undefined":
                 logger.error(
-                    "Cannot assign spin multiplicity! Coordination geometry of the metal %s is not defined.",
-                    metal.label,
+                    "Cannot determine spin: geometry of %s is undefined", metal.label
                 )
                 return None
-        else:
-            logger.error(
-                "Cannot assign spin multiplicity! valence electrons of metal: %s",
-                valence_elec,
+
+            feature = build_spin_feature_vector(metal)
+            model_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "models",
+                "TM-GSspinPlus_RandomForest.joblib",
             )
-            return None
-    elif period > 4 and block == "d":  # 4d and 5d transition metals
-        if valence_elec % 2 == 0:
-            return 1
-        else:
-            return 2
-    else:  # other metals
-        return None
+            model = joblib.load(model_path)
+            spin = int(model.predict(feature)[0])
+            logger.info(
+                "Metal %s spin predicted as %s by the Random Forest model",
+                metal.label,
+                spin,
+            )
+            return spin
 
-
-def assign_spin_complexes(mol: object) -> None:
-    """Assigns spin multiplicity of the transition metal complexes."""
-    for metal in mol.metals:
-        if metal.spin is None and (elemdatabase.elementblock[metal.label] == "d"):
-            metal.get_spin()
-    for ligand in mol.ligands:
-        if ligand.is_nitrosyl is None:
-            ligand.evaluate_as_nitrosyl()
-
-    metals_spin = [metal.spin for metal in mol.metals if metal.spin is not None]
-    logger.info("Spin multiplicity of metals: %s", metals_spin)
-
-    if any([ligand.is_nitrosyl for ligand in mol.ligands]):
-        return None
-    else:
-        if None in metals_spin:
-            return None
-        elif len(metals_spin) == 1:
-            return metals_spin[0]  # Mononuclear complex
-        else:  # Polynuclear complex
-            metals_idx_not_singlet = [
-                idx for idx, spin in enumerate(metals_spin) if spin != 1
-            ]
-            if len(metals_idx_not_singlet) == 0:
-                return 1
-            elif len(metals_idx_not_singlet) == 1:
-                return metals_spin[metals_idx_not_singlet[0]]
-            else:
-                return None
-
-
-def generate_feature_vector(metal: object, target_prop: str) -> np.ndarray:
-    """Generate feature vector for a given transition metal coordination complex
-    Args:
-        metal (obj): metal atom object
-        target_prop (str): target property to predict, either "m_ox" for metal oxidation state or "spin" for spin multiplicity
-    Returns:
-        feature (np.ndarray): feature vector
-    """
-    elem_nr = elemdatabase.elementnr[metal.label]
-
-    coord_group = metal.get_connected_groups()
-    coord_nr = metal.coord_nr
-    geom_nr = make_geom_list()[metal.coord_geometry]
-    rel_metal_radius = metal.rel_metal_radius
-
-    coord_hapticty = [group.is_haptic for group in coord_group]
-    if any(coord_hapticty):
-        hapticity = 1
-    else:
-        hapticity = 0
-
-    if target_prop == "m_ox":
-        feature = np.array([[elem_nr, coord_nr, geom_nr, rel_metal_radius, hapticity]])
-        logger.info("feature_vector: %s", feature)
-    elif target_prop == "spin":
-        m_ox = metal.charge
-        valence_elec = metal.get_valence_elec(metal.charge)
-        feature = np.array(
-            [
-                [
-                    elem_nr,
-                    m_ox,
-                    valence_elec,
-                    coord_nr,
-                    geom_nr,
-                    rel_metal_radius,
-                    hapticity,
-                ]
-            ]
+        logger.error(
+            "Cannot determine spin: unsupported valence count %s", valence_elec
         )
-        logger.info("feature_vector: %s", feature)
+        return None
 
+    if period > 4 and block == "d":
+        return 1 if valence_elec % 2 == 0 else 2
+    return None
+
+
+def determine_complex_spin(mol: Molecule) -> Spin | None:
+    """Determine complex multiplicity from the constituent metal spins.
+
+    Assign missing d-block metal spins and check for nitrosyl ligands.
+    Return 1 if all metals are singlets, or the spin of the only non-singlet metal.
+    Return None for nitrosyls, missing spins, or more than one non-singlet metal.
+    """
+    metals = mol.metals or []
+    ligands = mol.ligands or []
+    for metal in metals:
+        if metal.spin is None and elemdatabase.elementblock[metal.label] == "d":
+            metal.assign_spin()
+    for ligand in ligands:
+        if ligand.is_nitrosyl is None:
+            ligand.detect_nitrosyl()
+
+    metal_spins = [metal.spin for metal in metals]
+    logger.info("Metal spin multiplicities: %s", metal_spins)
+    if any(ligand.is_nitrosyl for ligand in ligands) or any(
+        spin is None for spin in metal_spins
+    ):
+        return None
+
+    nonsinglet_spins = [spin for spin in metal_spins if spin is not None and spin != 1]
+    if not nonsinglet_spins:
+        return 1
+    if len(nonsinglet_spins) == 1:
+        return nonsinglet_spins[0]
+    return None
+
+
+def build_spin_feature_vector(metal: Metal) -> NDArray[np.float64]:
+    """Build a float array for the metal spin prediction model.
+
+    Features follow training order: atomic number, charge, valence electron
+    count, coordination number, coordination geometry index, relative metal
+    radius, and hapticity flag. Raise ValueError for missing charge or
+    coordination data; an unknown geometry name raises KeyError.
+    """
+    charge = metal.charge
+    geometry = metal.coord_geometry
+    if charge is None:
+        raise ValueError(f"Metal {metal.label} has no assigned charge")
+    if geometry is None or geometry == "Undefined":
+        raise ValueError(f"Metal {metal.label} has no defined coordination geometry")
+    if metal.coord_nr is None or metal.rel_metal_radius is None:
+        raise ValueError(f"Metal {metal.label} has incomplete coordination features")
+
+    groups = metal.get_connected_groups() or []
+    feature = np.array(
+        [
+            [
+                elemdatabase.elementnr[metal.label],
+                charge,
+                metal.compute_valence_electron_count(charge),
+                metal.coord_nr,
+                build_geometry_index()[geometry],
+                metal.rel_metal_radius,
+                int(any(group.is_haptic for group in groups)),
+            ]
+        ],
+        dtype=np.float64,
+    )
+    logger.info("Spin feature vector: %s", feature)
     return feature
 
 
-def make_geom_list():
-    geom_list = {}
+def build_geometry_index() -> dict[str, int]:
+    """Map geometry names to integer indices used by the spin prediction model.
+
+    Preserve this order to keep feature encoding consistent with training.
+    """
+    indices: dict[str, int] = {}
     count = 0
-    for i in shape_structure_references_simplified.values():
-        for geom in np.array(i)[:, 3]:
-            geom_list[geom] = count
+    for shapes in shape_structure_references_simplified.values():
+        for geometry in np.array(shapes)[:, 3]:
+            indices[str(geometry)] = count
             count += 1
-    return geom_list
+    return indices
