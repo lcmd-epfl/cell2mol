@@ -5,7 +5,7 @@ from .defaults import (
     DEFAULT_METAL_FACTOR,
 )
 
-# Error Codes
+# Application exit codes; detailed domain errors remain on result models.
 ERR_CELL2MOL = 50
 ERR_INPUT = 95
 ERR_ASE_PARSE = 96
