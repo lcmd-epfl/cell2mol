@@ -24,13 +24,21 @@
 #   - integrated into cell2mol
 ########################################################
 
+"""Refine metal contacts, build donor groups, and fit coordination geometries."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypedDict, cast
+from collections.abc import Sequence
+from cell2mol.my_types import NDArray
+
 import numpy as np
 import os
 from cell2mol import __file__
 import yaml
 from cell2mol.element_utils import labels2formula
 from cell2mol.operations import compute_centroid
-from cell2mol.connectivity import add_atom, identify_haptic_mode
+from cell2mol.connectivity import try_add_ligand_atom, identify_haptic_mode
 from cell2mol.elementdata import ElementData
 from scipy.optimize import linear_sum_assignment  # Hungarian algorithm
 from scipy.stats import special_ortho_group
@@ -39,10 +47,56 @@ from cell2mol.utils import config
 
 import logging
 
+if TYPE_CHECKING:
+    from cell2mol.classes.atom import Atom
+    from cell2mol.classes.group import Group
+    from cell2mol.classes.ligand import Ligand
+    from cell2mol.classes.metal import Metal
+    from cell2mol.classes.molecule import Molecule
+
+
+class CoordinationGroupData(TypedDict):
+    formula: str
+    is_haptic: bool
+    haptic_type: str | None
+    gr_atoms: list[Atom]
+
+
+class SortedCoordinationGroup(CoordinationGroupData):
+    labels: list[str]
+    indices: list[int]
+    atom_site_labels: list[str | None] | None
+    distances: list[float]
+    margins: list[float]
+
+
+class RefinedCoordinationGroup(TypedDict):
+    formula: str
+    is_haptic: bool
+    haptic_type: str | None
+    atoms: list[Atom]
+    count: int
+
+
+def _molecule_atom_index(atom: Atom) -> int:
+    """Return the atom's molecule index; require an assigned parent index."""
+    index = atom.get_parent_index("molecule")
+    if index is None:
+        raise ValueError("Coordination atom has no molecule index")
+    return index
+
+
+def _covalent_radius(atom: Atom) -> float:
+    """Return the covalent radius required for contact validation."""
+    if atom.radii is None:
+        raise ValueError(f"Missing covalent radius for {atom.label}")
+    return atom.radii
+
+
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
-# Load YAML filem
+# Load ideal coordinates for shape matching.
 path = os.path.join(
     os.path.abspath(os.path.dirname(__file__)), "ideal_structures_center.yaml"
 )
@@ -156,8 +210,13 @@ shape_structure_references_simplified = {
 }
 
 
-def define_coordination_geometry(metal: object, coord_group: list) -> object:
-    """Define the coordination geometry of a metal center based on its coordinating groups"""
+def determine_coordination_geometry(
+    metal: Metal, coord_group: list[Group | Metal]
+) -> tuple[int, str, float | str]:
+    """Determine the best-fit geometry and return (coordination number, name, deviation).
+
+    Represent haptic groups by centroids; count point donors and bonded metals
+    individually. Use Undefined when no reference shape is available."""
 
     symbols = []
     positions = []
@@ -169,16 +228,16 @@ def define_coordination_geometry(metal: object, coord_group: list) -> object:
     logger.debug(
         "coord_group hapticity %s",
         [
-            group.is_haptic if group.subtype != "metal" else False
+            cast("Group", group).is_haptic if group.subtype != "metal" else False
             for group in coord_group
         ],
     )
     logger.debug(
         "coord_group atoms %s",
         [
-            [a.label for a in group.atoms]
+            [a.label for a in (cast("Group", group).atoms or [])]
             if group.subtype != "metal"
-            else [group.label]
+            else [cast("Metal", group).label]
             for group in coord_group
         ],
     )
@@ -186,35 +245,34 @@ def define_coordination_geometry(metal: object, coord_group: list) -> object:
     count = 0
     for group in coord_group:
         if group.subtype == "metal":
-            symbols.append(group.label)
-            positions.append(group.coord)
+            symbols.append(cast("Metal", group).label)
+            positions.append(cast("Metal", group).coord)
             count += 1
-        elif not group.is_haptic:
-            for atom in group.atoms:
+        elif not cast("Group", group).is_haptic:
+            for atom in cast("Group", group).atoms or []:
                 symbols.append(atom.label)
                 positions.append(atom.coord)
                 count += 1
 
         else:
-            # haptic ligand
+            # A haptic group contributes one centroid.
             haptic_center_coord = compute_centroid(
-                np.array([atom.coord for atom in group.atoms])
+                np.array([atom.coord for atom in (cast("Group", group).atoms or [])])
             )
-            symbols.append(str(group.haptic_type))
+            symbols.append(str(cast("Group", group).haptic_type))
             positions.append(haptic_center_coord.tolist())
             count += 1
-            coord_haptic_type.append(group.haptic_type)
+            coord_haptic_type.append(cast("Group", group).haptic_type)
 
-    posgeom_dev = shape_measure(symbols, positions)
+    posgeom_dev = compute_shape_measures(symbols, positions)
     coord_nr = count
     if len(posgeom_dev) > 0:
-        coordination_geometry = min(posgeom_dev, key=posgeom_dev.get)
+        coordination_geometry = min(posgeom_dev, key=lambda name: posgeom_dev[name])
         geom_deviation = min(posgeom_dev.values())
     else:
         coordination_geometry = "Undefined"
         geom_deviation = "Undefined"
 
-    # for haptic ligands, it's the mid point of haptic ligands
     logger.info("The number of coordinating points: %s", coord_nr)
     logger.info("Possible coordination geometries: %s", posgeom_dev)
     logger.info("The type of hapticity : %s", coord_haptic_type)
@@ -224,24 +282,13 @@ def define_coordination_geometry(metal: object, coord_group: list) -> object:
         geom_deviation,
     )
 
-    # return coordination_geometry
     return coord_nr, coordination_geometry, geom_deviation
 
 
-def shape_measure(symbols: list, positions: list) -> dict:
-    """
-    Calculate shape measures for a coordination environment.
-
-    Args:
-        symbols (list):
-            Atomic symbols including the metal atom (used to determine CN).
-        positions (list):
-            Cartesian coordinates of atoms.
-
-    Returns:
-        dict:
-            Mapping of ideal geometry name to continuous shape measure (CSM).
-    """
+def compute_shape_measures(
+    symbols: list[str], positions: Sequence[Sequence[float] | NDArray]
+) -> dict[str, float]:
+    """Return rounded continuous shape measures for matching reference geometries."""
     # Coordination number (excluding metal atom)
     cn = len(symbols) - 1
 
@@ -267,25 +314,16 @@ def shape_measure(symbols: list, positions: list) -> dict:
         if ideal_shape is None:
             continue
 
-        cshm = calc_cshm_fast(positions, ideal_shape)
+        cshm = compute_continuous_shape_measure(positions, ideal_shape)
         posgeom_dev[geom] = round(float(cshm), 3)
     return posgeom_dev
 
 
-# def normalize_structure(coordinates):
-#     # center and normalize the structure for CShM calculations
-#     centered_coords = coordinates - np.mean(coordinates, axis=0)
-#     norm = np.sqrt(np.mean(np.sum(centered_coords**2, axis=1)))
-#     return centered_coords / norm
-
-
 def normalize_structure(coordinates):
-    """
-    Center and normalize the structure for CShM calculations
-    """
+    """Center coordinates and scale to unit root-mean-square distance from the centroid."""
     if len(coordinates) == 0:
         logger.warning("normalize_structure: empty coordinates")
-        return coordinates  # return as is
+        return coordinates
 
     centered_coords = coordinates - np.mean(coordinates, axis=0)
 
@@ -303,45 +341,40 @@ def normalize_structure(coordinates):
     return centered_coords / norm
 
 
-def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
-    # faster Hungarian algorithm optimization
-    # check number of trials, if it is too low, it calculates the
-    # local and not the global minimum
+def compute_continuous_shape_measure(coordinates, ideal_shape, num_trials=100):
+    """Estimate the minimum continuous shape measure using rotation trials.
+
+    Match points with Hungarian assignment, then fit rotation and scale.
+    More trials reduce the risk of selecting a local minimum."""
     input_structure = normalize_structure(coordinates)
     ideal_sq_norms = np.sum(ideal_shape**2)
-    # try different rotations first, then optimize assignment
     min_cshm = float("inf")
 
-    # generate some initial rotations to avoid local minima
+    # Start with identity, then sample rotations to reduce local minima.
     for trial in range(num_trials):
         if trial == 0:
-            # first trial with identity rotation
             R_init = np.eye(3)
         else:
-            # random rotation matrix for subsequent trials
-            # generate a random rotation matrix
-
             R_init = special_ortho_group.rvs(3)
 
             # Ensure it's a proper rotation (det=1)
             if np.linalg.det(R_init) < 0:
                 R_init[:, 0] *= -1
 
-        # apply initial rotation to ideal shape
+        # Rotate the reference shape before matching points.
         rotated_ideal_init = np.dot(ideal_shape, R_init)
 
-        # compute cost matrix based on squared Euclidean distances
+        # Match points by Euclidean distance.
         cost_matrix = np.linalg.norm(
             input_structure[:, None, :] - rotated_ideal_init[None, :, :], axis=2
         )
 
-        # solve assignment problem (Hungarian algorithm)
-        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+        # Solve point assignment with the Hungarian algorithm.
+        _, col_ind = linear_sum_assignment(cost_matrix)
 
-        # rearrange ideal_shape based on optimal assignment
         permuted_ideal = ideal_shape[col_ind]
 
-        # compute optimal rotation using SVD
+        # Fit rotation and scale for the assigned points.
         H = np.dot(input_structure.T, permuted_ideal)
         U, _, Vt = svd(H)
         R = np.dot(Vt.T, U.T)
@@ -349,7 +382,7 @@ def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
         rotated_ideal = np.dot(permuted_ideal, R)
         scale = np.sum(input_structure * rotated_ideal) / ideal_sq_norms
         if input_structure.size == 0:
-            logger.warning("calc_cshm_fast: empty input_structure")
+            logger.warning("compute_continuous_shape_measure: empty input_structure")
             cshm = float("inf")
         else:
             cshm = np.mean(
@@ -361,57 +394,45 @@ def calc_cshm_fast(coordinates, ideal_shape, num_trials=100):
     return min_cshm * 100
 
 
-def handle_metal_coordination(metal: object) -> list:
-    """
-    Determines the coordination environment of a metal center.
-
-    Process:
-    1. Identify which non-metal atoms are coordinating to the metal.
-    2. Map these atoms back to their parent ligands.
-    3. Refine the coordination sphere (validate connectivity and resolve hapticity).
-    4. Instantiate and return Group objects representing the coordination blocks.
-
-    Returns:
-        List[Group]: A list of validated coordination Group objects.
-    """
+def build_coordination_groups(metal: Metal) -> list[Group]:
+    """Build donor groups after validating metal contacts and refining hapticity."""
     from cell2mol.classes.group import Group
 
-    # Format metal info for consistent logging
     metal_info = (
         f"{metal.label}{f' ({metal.atom_site_label})' if metal.atom_site_label else ''}"
     )
 
-    # Ensure the metal has its connected atoms list initialized.
-    # The getter is memoized, so calling it unconditionally is idempotent.
     metal.get_connected_nonmetal_atoms()
 
     if not metal.connected_nonmetal_atoms:
         logger.info(f"No coordinating non-metal atoms found for metal {metal_info}")
         return []
 
-    mol = metal.get_parent("molecule")
+    mol = cast("Molecule | None", metal.get_parent("molecule"))
+    if mol is None:
+        raise ValueError("Metal has no parent molecule")
     ligands = mol.ligands
 
     if not ligands:
         logger.info(f"No ligands found for molecule {mol.formula}")
         return []
 
-    # Initialize a mapping of ligand indices to their coordinating atom indices
-    conn_idx_by_ligands = {lig_idx: [] for lig_idx, _ in enumerate(ligands)}
+    conn_idx_by_ligands: dict[int, list[int]] = {
+        lig_idx: [] for lig_idx, _ in enumerate(ligands)
+    }
 
-    # Map the molecule-wide index of each atom in each ligand for fast lookup
+    # Map ligand atoms into molecule index space.
     lig_mol_indices = {
-        lig_idx: [atom.get_parent_index("molecule") for atom in lig.atoms]
+        lig_idx: [_molecule_atom_index(atom) for atom in (lig.atoms or [])]
         for lig_idx, lig in enumerate(ligands)
     }
 
     # Group the metal's connected atoms by the ligand they belong to
     for atom in metal.connected_nonmetal_atoms:
-        atom_mol_idx = atom.get_parent_index("molecule")
+        atom_mol_idx = _molecule_atom_index(atom)
         for lig_idx, indices in lig_mol_indices.items():
             if atom_mol_idx in indices:
                 conn_idx_by_ligands[lig_idx].append(atom_mol_idx)
-                # detailed logging
                 atom_info = f"{atom.label}{f' ({atom.atom_site_label})' if atom.atom_site_label else ''}"
                 logger.debug(
                     "Atom %s (mol_idx %d) is part of ligand %s (lig_idx %d) coordinating metal %s",
@@ -425,9 +446,7 @@ def handle_metal_coordination(metal: object) -> list:
 
     logger.debug(f"Initial indices mapped by ligands: {conn_idx_by_ligands}")
 
-    # Refine the coordination sphere:
-    # This validates geometry and re-evaluates hapticity if atoms are pruned.
-    final_refined_data = correct_coordination_sphere(
+    final_refined_data = refine_coordination_sphere(
         metal=metal,
         ligands=ligands,
         conn_idx_by_ligands=conn_idx_by_ligands,
@@ -436,49 +455,42 @@ def handle_metal_coordination(metal: object) -> list:
 
     coordination_groups = []
 
-    # Iterate through refined results to create Group objects
     for lig_idx, groups_list in final_refined_data.items():
-        # Every ligand of the molecule has an entry here, including ones with no
-        # validated contact to this metal. Only the coordinating ones may record it.
+        # Link this metal only to ligands with surviving contacts.
         if not groups_list:
             continue
 
         current_lig_m_indices = lig_mol_indices[lig_idx]
         current_lig = ligands[lig_idx]
-        if getattr(current_lig, "metals", None) is None:
-            object.__setattr__(current_lig, "metals", [])
+        if current_lig.metals is None:
+            current_lig.metals = []
         if metal not in current_lig.metals:
             current_lig.metals.append(metal)
         for group_info in groups_list:
             atoms = group_info["atoms"]
 
-            # 1. Create the Group instance from atom list
             group_obj = Group.from_atom_list(atoms)
-            # 2. Set origin for traceability
-            group_obj.origin = "handle_metal_coordination"
 
-            # 3. Analyze coordination mode
-            group_obj.get_hapticity()
-            group_obj.get_denticity()
+            group_obj.origin = "build_coordination_groups"
 
-            # 4. Map indices
-            group_mol_indices = [a.get_parent_index("molecule") for a in atoms]
+            group_obj.update_hapticity()
+            group_obj.update_denticity()
+
+            group_mol_indices = [_molecule_atom_index(a) for a in atoms]
             group_ligand_indices = [
                 current_lig_m_indices.index(m_idx) for m_idx in group_mol_indices
             ]
-            # 5. Establish Parents
+
             group_obj.add_parent(mol, indices=group_mol_indices)
-            group_obj.set_inherit_adjmatrix("molecule")
+            group_obj.inherit_adjacency("molecule")
             group_obj.add_parent(ligands[lig_idx], indices=group_ligand_indices)
 
-            # 6. Link Metal (ensure list exists)
-            if getattr(group_obj, "metals", None) is None:
-                object.__setattr__(group_obj, "metals", [])
+            if group_obj.metals is None:
+                group_obj.metals = []
             group_obj.metals.append(metal)
 
             coordination_groups.append(group_obj)
 
-            # Detailed log of the final stabilized coordination mode
             logger.info(
                 "Final Coordinated Group [%s]: Formula=%s, Haptic=%s, Type=%s",
                 metal_info,
@@ -490,22 +502,16 @@ def handle_metal_coordination(metal: object) -> list:
     return coordination_groups
 
 
-def correct_coordination_sphere(
-    metal: object, ligands: list, conn_idx_by_ligands: dict, mol: object
-) -> dict:
-    """
-    Refine the coordination sphere and return the final coordinated groups.
-    Args:
-        metal: Metal Atom object.
-        ligands: List of ligand Molecule objects.
-        conn_idx_by_ligands: Dictionary mapping each ligand index to the atom indices
-            connected to the metal within that ligand.
-        mol: TMC complex Molecule object.
-    Returns:
-        dict[int, list]: Dictionary mapping each ligand index to a list of validated
-            haptic or non-haptic coordination groups.
-    """
-    final_coordination_results = {}
+def refine_coordination_sphere(
+    metal: Metal,
+    ligands: list[Ligand],
+    conn_idx_by_ligands: dict[int, list[int]],
+    mol: Molecule,
+) -> dict[int, list[RefinedCoordinationGroup]]:
+    """Refine donor groups until no coordinating atoms are removed.
+
+    Return validated group data by ligand index. CIF bond mode skips pruning."""
+    final_coordination_results: dict[int, list[RefinedCoordinationGroup]] = {}
 
     for jdx, connected_idx in conn_idx_by_ligands.items():
         current_pool = connected_idx
@@ -518,7 +524,7 @@ def correct_coordination_sphere(
             current_pool,
         )
         while True:
-            partitioned_groups_dict = partition_connected_indices(
+            partitioned_groups_dict = partition_coordination_groups(
                 current_pool, mol, use_bond_info=config.USE_BOND_INFO
             )
             if not partitioned_groups_dict:
@@ -526,7 +532,7 @@ def correct_coordination_sphere(
 
             any_change_in_iteration = False
             surviving_pool = []
-            temp_stable_groups = []
+            temp_stable_groups: list[RefinedCoordinationGroup] = []
 
             for group in partitioned_groups_dict.values():
                 if config.USE_BOND_INFO:
@@ -541,13 +547,12 @@ def correct_coordination_sphere(
                     )
 
                 surviving_pool.extend(
-                    [a.get_parent_index("molecule") for a in validated_gr_atoms]
+                    [_molecule_atom_index(a) for a in validated_gr_atoms]
                 )
 
                 if was_changed:
                     any_change_in_iteration = True
 
-                # Store the data of the group as it stands in this iteration
                 temp_stable_groups.append(
                     {
                         "formula": group["formula"],
@@ -562,7 +567,6 @@ def correct_coordination_sphere(
                 current_pool = surviving_pool
                 continue
             else:
-                # No changes means temp_stable_groups is now the final state
                 stable_groups = temp_stable_groups
                 break
 
@@ -571,72 +575,59 @@ def correct_coordination_sphere(
     return final_coordination_results
 
 
-def move_to_front(atoms, target_atom):
-    """Move target_atom to the front while keeping the rest order unchanged."""
-    return [target_atom] + [a for a in atoms if a is not target_atom]
+def get_neighbors_in_group(atom: Atom, group_indices: list[int]) -> list[Atom]:
+    """Return nonmetal neighbors that belong to the supplied group.
 
-
-def get_neighbors_in_group(atom, group_indices):
-    """Non-metal neighbours of ``atom`` that belong to the same group.
-
-    Membership is tested on the atom index within the parent molecule, not on
-    the CIF site label: xyz input has no site labels at all, and in a unit cell
-    symmetry-related copies share one label, so a label test can match the
-    wrong atom.
-    """
+    Match by molecule index; CIF labels may be missing or shared by symmetry copies."""
+    molecule = cast("Molecule | None", atom.get_parent("molecule"))
+    if molecule is None or molecule.atoms is None:
+        raise ValueError("Coordination atom has no parent molecule atoms")
     neighboring_nonmetal_atoms = []
     for adj in atom.adjacency:
         if adj not in atom.metal_adjacency:
-            neighboring_nonmetal_atoms.append(atom.get_parent("molecule").atoms[adj])
+            neighboring_nonmetal_atoms.append(molecule.atoms[adj])
 
-    group_indices = set(group_indices or [])
+    group_index_set = set(group_indices or [])
     neighbors_in_group = []
     for neighbor in neighboring_nonmetal_atoms:
-        if neighbor.get_parent_index("molecule") in group_indices:
+        if neighbor.get_parent_index("molecule") in group_index_set:
             neighbors_in_group.append(neighbor)
 
     return neighbors_in_group
 
 
-def unique_atoms(atoms):
-    seen = set()
-    unique = []
-
-    for atom in atoms:
-        atom_id = atom.get_parent_index("molecule")
-
-        if atom_id not in seen:
-            unique.append(atom)
-            seen.add(atom_id)
-
-    return unique
-
-
-def get_atom_distance_margin(atom, metal) -> float:
-    """Return rounded margin for an atom-site label."""
+def compute_distance_and_margin(atom: Atom, metal: Metal) -> tuple[float, float]:
+    """Return rounded metal–atom distance and distance minus both covalent radii."""
     distance = np.linalg.norm(np.array(atom.coord) - np.array(metal.coord))
-    margin = float(np.round(distance - metal.radii - atom.radii, 3))
+    margin = float(
+        np.round(distance - _covalent_radius(metal) - _covalent_radius(atom), 3)
+    )
     distance = float(np.round(distance, 3))
     return distance, margin
 
 
-def sort_gr_atoms_by_margin(group, metal):
-    """Sort group atoms by margin to prioritize validation."""
+def sort_group_atoms_by_margin(
+    group: CoordinationGroupData, metal: Metal
+) -> SortedCoordinationGroup:
+    """Sort donor atoms with H first, then decreasing distance margin; return group data."""
 
     sorted_gr_atoms = sorted(
         group["gr_atoms"],
         key=lambda a: (
             a.label == "H",
-            np.linalg.norm(metal.coord - a.coord) - metal.radii - a.radii,
+            np.linalg.norm(metal.coord - a.coord)
+            - _covalent_radius(metal)
+            - _covalent_radius(a),
         ),
         reverse=True,
     )
 
-    sorted_group = {
+    site_labels: list[str | None] = []
+    sorted_group: SortedCoordinationGroup = {
         "gr_atoms": [],
         "labels": [],
         "indices": [],
-        "atom_site_labels": [],
+        "atom_site_labels": site_labels,
         "distances": [],
         "margins": [],
         "formula": labels2formula([a.label for a in sorted_gr_atoms]),
@@ -646,11 +637,13 @@ def sort_gr_atoms_by_margin(group, metal):
 
     for atom in sorted_gr_atoms:
         distance = float(np.round(np.linalg.norm(metal.coord - atom.coord), 3))
-        margin = float(np.round(distance - metal.radii - atom.radii, 3))
+        margin = float(
+            np.round(distance - _covalent_radius(metal) - _covalent_radius(atom), 3)
+        )
         sorted_group["gr_atoms"].append(atom)
         sorted_group["labels"].append(atom.label)
-        sorted_group["indices"].append(atom.get_parent_index("molecule"))
-        sorted_group["atom_site_labels"].append(atom.atom_site_label)
+        sorted_group["indices"].append(_molecule_atom_index(atom))
+        site_labels.append(atom.atom_site_label)
         sorted_group["distances"].append(distance)
         sorted_group["margins"].append(margin)
 
@@ -671,12 +664,20 @@ def sort_gr_atoms_by_margin(group, metal):
 
 
 def remove_atom_from_coordination(
-    atom, metal, ligand, removed_ligand_indices, remove_anyway=False
-):
+    atom: Atom,
+    metal: Metal,
+    ligand: Ligand,
+    removed_ligand_indices: list[int],
+    remove_anyway: bool = False,
+) -> tuple[list[int], bool]:
+    """Remove an atom–metal contact and return (removed ligand indices, was_removed).
+
+    Unless remove_anyway is True, retain contacts that support adding a proton.
+    Update molecule connectivity and record the removed atom on the metal."""
     is_removed = False
-    atom_mol_idx = atom.get_parent_index("molecule")
+    atom_mol_idx = _molecule_atom_index(atom)
     lig_mol_indices = {
-        a.get_parent_index("molecule"): i for i, a in enumerate(ligand.atoms)
+        _molecule_atom_index(a): i for i, a in enumerate(ligand.atoms or [])
     }
 
     ligand_idx = lig_mol_indices.get(atom_mol_idx)
@@ -684,12 +685,13 @@ def remove_atom_from_coordination(
         return removed_ligand_indices, is_removed
 
     def marked_as_removed():
-        atom.reset_mconnec(metal)
+        """Update connectivity and record the removed ligand site and atom."""
+        atom.update_metal_connectivity(metal)
         if ligand_idx not in removed_ligand_indices:
             removed_ligand_indices.append(ligand_idx)
 
-        if getattr(metal, "removed_from_coordination", None) is None:
-            object.__setattr__(metal, "removed_from_coordination", [])
+        if metal.removed_from_coordination is None:
+            metal.removed_from_coordination = []
 
         metal.removed_from_coordination.append(atom)
 
@@ -704,9 +706,9 @@ def remove_atom_from_coordination(
         marked_as_removed()
         is_removed = True
     else:
-        is_added, _, _ = add_atom(
+        is_added, _, _ = try_add_ligand_atom(
             labels=ligand.labels,
-            coords=ligand.coord,
+            coords=ligand.coord.tolist(),
             site=ligand_idx,
             ligand=ligand,
             element="H",
@@ -727,45 +729,29 @@ def remove_atom_from_coordination(
 
 
 def validate_coordinated_atoms(
-    group,
-    metal,
-    ligand,
-    removed_ligand_indices,
+    group: CoordinationGroupData,
+    metal: Metal,
+    ligand: Ligand,
+    removed_ligand_indices: list[int],
     PRIORITY_DISTANCE_DIFF=0.4,
     EXCLUDED_C_NEIGHBOR_PAIRS={("C", "C"), ("B", "C")},
     EXCLUDED_B_NEIGHBOR_PAIRS={("B", "B"), ("B", "C"), ("B", "H"), ("C", "C")},
 ):
-    """
-    Checks if atoms in gr_atoms are truly connected to the metal.
+    """Prune questionable metal contacts and return (surviving atoms, changed).
 
-    Algorithm order:
-    1. BH4-like case:
-       remove B first and return.
-    2. Si-specific case:
-       remove suspicious Si atoms and return if any Si was handled.
-    2. H-containing group:
-       validate/remove H atoms and return.
-    4. General validation.
-
-    Args:
-        group: A dictionary containing the group information.
-        metal: The metal Atom object.
-        ligand: The ligand Molecule object to which these atoms belong.
-        removed_ligand_indices: List of removed atom indices in ligands.
-
-    Returns:
-        tuple: (list of surviving atoms, boolean changed_flag)
-    """
+    Check Si contacts first, preserve haptic groups, then handle borohydrides,
+    hydrogens, and general neighbor-distance rules."""
 
     removed_molecule_indices = set()
-    sorted_group = sort_gr_atoms_by_margin(group, metal)
+    sorted_group = sort_group_atoms_by_margin(group, metal)
     gr_atoms = sorted_group["gr_atoms"]
 
     def filter_and_return():
+        """Return surviving atoms and whether any contact was removed."""
         updated = [
             a
             for a in gr_atoms
-            if a.get_parent_index("molecule") not in removed_molecule_indices
+            if _molecule_atom_index(a) not in removed_molecule_indices
         ]
         changed = len(updated) < len(gr_atoms)
 
@@ -787,9 +773,7 @@ def validate_coordinated_atoms(
         return updated, changed
 
     def remove_and_mark(atom, remove_anyway=False):
-        """
-        Remove atom from coordination and update removed_molecule_indices.
-        """
+        """Remove a contact and record its molecule index when removal succeeds."""
         nonlocal removed_ligand_indices
 
         removed_ligand_indices, is_removed = remove_atom_from_coordination(
@@ -801,7 +785,7 @@ def validate_coordinated_atoms(
         )
 
         if is_removed:
-            removed_molecule_indices.add(atom.get_parent_index("molecule"))
+            removed_molecule_indices.add(_molecule_atom_index(atom))
 
         return is_removed
 
@@ -824,9 +808,7 @@ def validate_coordinated_atoms(
         logger.debug("H2 ligand detected. Skipping connectivity validation.")
         return gr_atoms, False
 
-    # -------------------------------------------------------------------------
-    # Si-mononuclear TM case: adjust Si atom margin, then return if handled.
-    # -------------------------------------------------------------------------
+    # Remove distant Si contacts to a single metal.
     for atom, atom_distance, atom_margin in zip(
         gr_atoms,
         sorted_group["distances"],
@@ -874,9 +856,7 @@ def validate_coordinated_atoms(
 
     labels = sorted_group["labels"]
 
-    # -------------------------------------------------------------------------
-    # 1. BH4-like case: remove B first, then return immediately.
-    # -------------------------------------------------------------------------
+    # Remove B contacts in BH4/B2H6-like groups before further validation.
     is_bh4_like = "B" in labels and (
         ligand.formula == "H4-B" or (labels.count("B") == 1 and labels.count("H") >= 2)
     )
@@ -902,9 +882,7 @@ def validate_coordinated_atoms(
 
         return filter_and_return()
 
-    # -------------------------------------------------------------------------
-    # 2. H-containing case: validate H atoms, then return immediately.
-    # -------------------------------------------------------------------------
+    # Validate H contacts before applying general neighbor rules.
     if "H" in labels:
         logger.debug(
             "H-containing coordination group detected "
@@ -928,7 +906,7 @@ def validate_coordinated_atoms(
 
             if n_neighbors_in_group == 1:
                 neighbor = neighbors_in_group[0]
-                nb_distance, nb_margin = get_atom_distance_margin(neighbor, metal)
+                nb_distance, nb_margin = compute_distance_and_margin(neighbor, metal)
                 distance_diff = round(atom_distance - nb_distance, 3)
                 is_close_to_neighbor = distance_diff < -(PRIORITY_DISTANCE_DIFF)
 
@@ -969,9 +947,7 @@ def validate_coordinated_atoms(
                         )
                         return filter_and_return()
 
-    # -------------------------------------------------------------------------
-    # 4. General validation.
-    # -------------------------------------------------------------------------
+    # Apply general neighbor-distance rules.
     logger.debug(
         "Applying general connectivity validation for group formula: %s",
         sorted_group["formula"],
@@ -997,7 +973,7 @@ def validate_coordinated_atoms(
         if atom.label == "H":
             continue  # H atoms already validated in the H-specific case above
 
-        nb_info = [get_atom_distance_margin(nb, metal) for nb in neighbors_in_group]
+        nb_info = [compute_distance_and_margin(nb, metal) for nb in neighbors_in_group]
         nb_distances, nb_margins = zip(*nb_info) if nb_info else ([], [])
 
         logger.debug(
@@ -1013,15 +989,6 @@ def validate_coordinated_atoms(
             list(nb_margins),
         )
 
-        # Skip removal if any neighbor is H (which already has its own validation logic above)
-        # if any(nb.label == "H" for nb in neighbors_in_group):
-        #     logger.debug(
-        #         "  Atom %s (%s) is kept because a neighbor is H.",
-        #         atom.label,
-        #         atom.atom_site_label,
-        #     )
-        #     continue
-
         if n_gr_atoms == 2:
             neighbor = neighbors_in_group[0]
             nb_distance = nb_distances[0]
@@ -1034,13 +1001,6 @@ def validate_coordinated_atoms(
                 if distance_diff < PRIORITY_DISTANCE_DIFF or (
                     atom_period > neighbor_period
                 ):
-                    # logger.debug(
-                    #     "  Atom %s (%s) is kept (neighbor %s, distance_diff=%s).",
-                    #     atom.label,
-                    #     atom.atom_site_label,
-                    #     neighbor.label,
-                    #     distance_diff,
-                    # )
                     logger.debug(
                         "  Atom %s (%s) kept over non-H neighbor %s"
                         " [distance_diff=%.4f, reason=%s].",
@@ -1054,13 +1014,6 @@ def validate_coordinated_atoms(
                     )
 
                 else:
-                    # logger.debug(
-                    #     "  Atom %s (%s) is removed (neighbor %s, distance_diff=%s).",
-                    #     atom.label,
-                    #     atom.atom_site_label,
-                    #     neighbor.label,
-                    #     distance_diff,
-                    # )
                     logger.debug(
                         "  Atom %s (%s) removed: non-H neighbor %s has priority"
                         " [distance_diff=%.4f, atom_period=%s, neighbor_period=%s].",
@@ -1076,13 +1029,6 @@ def validate_coordinated_atoms(
             else:
                 is_removed = remove_and_mark(atom, remove_anyway=False)
                 if is_removed:
-                    # logger.debug(
-                    #     "  Atom %s (%s) is removed based on connectivity (neighbor %s, distance_diff=%s).",
-                    #     atom.atom_site_label,
-                    #     atom.label,
-                    #     neighbor.label,
-                    #     distance_diff,
-                    # )
                     logger.debug(
                         "  Atom %s (%s) removed by connectivity check against H neighbor %s"
                         " [distance_diff=%.4f].",
@@ -1160,10 +1106,10 @@ def validate_coordinated_atoms(
     return filter_and_return()
 
 
-def partition_connected_indices(
-    connected_idx, molecule, use_bond_info: bool | None = None
-) -> list:
-    from cell2mol.operations import extract_from_list
+def partition_coordination_groups(
+    connected_idx: list[int], molecule: Molecule, use_bond_info: bool | None = None
+) -> dict[int, CoordinationGroupData]:
+    """Partition molecule atom indices into connected donor groups and classify hapticity."""
     from cell2mol.connectivity import split_species
 
     refcell = molecule.get_parent("reference")
@@ -1178,35 +1124,41 @@ def partition_connected_indices(
         logger.debug("  No connected indices provided.")
         return {}
 
-    conn_labels = extract_from_list(connected_idx, molecule.labels, dimension=1)
-    conn_coord = extract_from_list(connected_idx, molecule.coord, dimension=1)
-    conn_radii = extract_from_list(connected_idx, molecule.radii, dimension=1)
-    conn_atoms = extract_from_list(connected_idx, molecule.atoms, dimension=1)
-    if molecule.atom_site_labels is not None:
-        conn_atom_site_labels = extract_from_list(
-            connected_idx, molecule.atom_site_labels, dimension=1
+    if molecule.atoms is None or molecule.radii is None:
+        raise ValueError(
+            "Molecule atoms and radii are required for coordination groups"
         )
-    else:
-        conn_atom_site_labels = None
+    conn_labels = [molecule.labels[i] for i in connected_idx]
+    conn_coord = np.asarray([molecule.coord[i] for i in connected_idx])
+    conn_radii = [float(molecule.radii[i]) for i in connected_idx]
+    conn_atoms = [molecule.atoms[i] for i in connected_idx]
+    conn_atom_site_labels = (
+        [molecule.atom_site_labels[i] for i in connected_idx]
+        if molecule.atom_site_labels is not None
+        else None
+    )
 
-    blocklist = split_species(
-        labels=conn_labels,
-        positions=conn_coord,
-        radii=conn_radii,
-        indices=None,
-        atom_site_labels=conn_atom_site_labels,
-        bond_data=bond_data,
-        use_bond_info=use_bond_info,
-        cov_factor=cov_factor,
-        apply_graph=True,
+    blocklist = cast(
+        "list[list[int]]",
+        split_species(
+            labels=conn_labels,
+            positions=conn_coord,
+            radii=conn_radii,
+            indices=None,
+            atom_site_labels=conn_atom_site_labels,
+            bond_data=bond_data,
+            use_bond_info=use_bond_info,
+            cov_factor=cov_factor,
+            apply_graph=True,
+        ),
     )
     logger.debug("  Identified %s blocks from connected atoms", len(blocklist))
     logger.debug("    Blocks: %s", [block for block in blocklist])
-    partitioned_group_dict = {}
+    partitioned_group_dict: dict[int, CoordinationGroupData] = {}
     for idx, block in enumerate(blocklist):
-        gr_atoms = extract_from_list(block, conn_atoms, dimension=1)
+        gr_atoms = [conn_atoms[i] for i in block]
 
-        is_haptic, haptic_type, topology = identify_haptic_mode(
+        is_haptic, haptic_type, _ = identify_haptic_mode(
             gr_atoms, use_bond_info=use_bond_info
         )
         if is_haptic:
@@ -1226,240 +1178,4 @@ def partition_connected_indices(
             "haptic_type": haptic_type,
             "gr_atoms": gr_atoms,
         }
-        # logger.debug("Results for block %s: %s", idx, partitioned_group_dict[idx])
     return partitioned_group_dict
-
-
-def find_atom_outlier(atoms, metal, haptic, threshold_percent=50.0):
-    """
-    Takes the list of atoms, calculates distances to metal,
-    and returns atoms identified as outliers.
-    """
-    n = len(atoms)
-    if n < 2:
-        return []
-
-    # 1. Calculate margins (maintaining the order from your sorted list)
-    sorted_margins = np.array(
-        [np.linalg.norm(metal.coord - a.coord) - metal.radii - a.radii for a in atoms]
-    )
-    sorted_indices = np.arange(n)  # indices corresponding to the sorted_margins order
-    outlier_indices = []
-
-    if 3 <= n <= 8:
-        # 90% confidence
-        q_crit_table = {3: 0.941, 4: 0.765, 5: 0.642, 6: 0.560, 7: 0.507, 8: 0.468}
-        # 95% confidence level (alpha = 0.05)
-        # q_crit_table = {3: 0.970, 4: 0.829, 5: 0.710, 6: 0.625, 7: 0.568, 8: 0.526}
-        n3_harsh_factor = 0.98
-
-        largest = sorted_margins[0]
-        second_largest = sorted_margins[1]
-        second_smallest = sorted_margins[-2]
-        smallest = sorted_margins[-1]
-
-        margin_range = largest - smallest
-
-        if margin_range <= 0:
-            logger.debug("Result: Margins are identical. Data retained.")
-            return []
-
-        high_gap = largest - second_largest
-        low_gap = second_smallest - smallest
-
-        q_high = high_gap / margin_range
-        q_low = low_gap / margin_range
-        q_crit = q_crit_table[n]
-        if n == 3:
-            q_crit *= n3_harsh_factor
-
-        logger.debug(
-            f"n={n} | "
-            f"largest={largest:.3f}, second_largest={second_largest:.3f}, "
-            f"second_smallest={second_smallest:.3f}, smallest={smallest:.3f}"
-        )
-        logger.debug(
-            f"high_gap={high_gap:.3f}, low_gap={low_gap:.3f}, range={margin_range:.3f}"
-        )
-        logger.debug(f"Q_high={q_high:.4f}, Q_low={q_low:.4f}, Q_crit={q_crit:.4f}")
-
-        high_is_outlier = q_high > q_crit
-        low_is_outlier = q_low > q_crit
-
-        # ------------------------------------------------------------
-        # Case 1: largest margin is isolated
-        # Example: [0.642, -0.276, -0.310]
-        # The largest-margin atom is likely non-bonded.
-        # ------------------------------------------------------------
-        if high_is_outlier and not low_is_outlier:
-            outlier_indices = [int(sorted_indices[0])]
-            logger.debug(
-                "Result: Largest margin is an outlier. "
-                "Rejecting the furthest atom as non-bonded."
-            )
-        # ------------------------------------------------------------
-        # Case 2: smallest margin is isolated
-        # Example: [0.65, 0.58, 0.52, -0.20]
-        # The smallest-margin atom may be the only true bonded atom.
-        # The larger-margin atoms may be distance-based non-bonded.
-        # ------------------------------------------------------------
-        elif low_is_outlier and not high_is_outlier:
-            outlier_indices = [int(idx) for idx in sorted_indices[:-1]]
-            logger.debug(
-                "Result: Smallest margin is an outlier. "
-                "Keeping the smallest-margin atom and rejecting the rest."
-            )
-            logger.debug(
-                f"Kept atom index: {int(sorted_indices[-1])}; "
-                f"Rejected atom indices: {outlier_indices}"
-            )
-        # ------------------------------------------------------------
-        # Case 3: both sides appear outlying
-        # This is ambiguous. Usually safer to reject only the largest margin.
-        # ------------------------------------------------------------
-        elif high_is_outlier and low_is_outlier:
-            if q_high >= q_low:
-                outlier_indices = [int(sorted_indices[0])]
-                logger.debug(
-                    "Result: Both high and low margins look outlying. "
-                    "High-side outlier is stronger, rejecting largest-margin atom."
-                )
-            else:
-                outlier_indices = [int(idx) for idx in sorted_indices[:-1]]
-                logger.debug(
-                    "Result: Both high and low margins look outlying. "
-                    "Low-side outlier is stronger, keeping smallest-margin atom only."
-                )
-
-        # ------------------------------------------------------------
-        # Case 4: no statistical outlier
-        # Margins are regarded as uniform enough.
-        # ------------------------------------------------------------
-        else:
-            logger.debug("Result: Margins are uniform enough. Data retained.")
-
-    # --- Case: n=2 (Percent Difference) ---
-    elif n == 2:
-        high = sorted_margins[0]
-        low = sorted_margins[1]
-
-        # Robust to negative values and near-zero mean.
-        denom = max(abs(high), abs(low), 1e-8)
-        relative_gap = abs(high - low) / denom * 100.0
-
-        logger.debug(
-            f"n: {n} | margins: [{high:.3f}, {low:.3f}] | "
-            f"relative_gap: {relative_gap:.4f} | "
-            f"threshold_percent: {threshold_percent}"
-        )
-
-        if relative_gap > threshold_percent:
-            outlier_indices = [0]
-            logger.debug(
-                "Result: n=2 signed-margin relative gap is large. "
-                "Rejecting larger-margin atom."
-            )
-        else:
-            logger.debug("Result: n=2 margins are similar enough. Data retained.")
-
-    else:
-        pass
-
-    logger.debug(
-        f"Analysis results: {{'n': {n}, 'outlier_indices': {outlier_indices}}}"
-    )
-
-    adj_matrix, atom_labels, atom_types, is_single_simple_ring = (
-        build_adjacency_matrix_within_atoms(atoms, {metal.get_parent_index("molecule")})
-    )
-    logger.debug(f"atom_labels: {atom_labels}")
-    logger.debug(f"atom_types: {atom_types}")
-    logger.debug(f"is_single_simple_ring: {is_single_simple_ring}")
-    if haptic:
-        logger.debug("Coordination is haptic. No outlier removal applied.")
-        return []
-
-    if n == 3 and atom_types[0] == "internal" and not is_single_simple_ring:
-        if 0 in outlier_indices:
-            pass
-            logger.debug(
-                f"{atom_labels[0]} is already marked as an outlier and is internal"
-            )
-        else:
-            logger.debug(f"Check for outlier {atom_labels[0]}")
-            outlier_indices.insert(0, 0)
-
-    # Return the actual atom object that is an outlier
-    return [atoms[i] for i in outlier_indices] if outlier_indices else []
-    # return [atoms[outlier_index]] if outlier_index is not None else []
-
-
-def build_adjacency_matrix_within_atoms(atoms, metal_indices={}):
-    import networkx as nx
-
-    raw = [(a.label, a.get_parent_index("molecule"), a.adjacency) for a in atoms]
-    non_metal_atoms = [
-        (label, idx, neighbors)
-        for label, idx, neighbors in raw
-        if idx not in metal_indices
-    ]
-
-    non_metal_idx_set = {idx for _, idx, _ in non_metal_atoms}
-    matrix_position = {idx: pos for pos, (_, idx, _) in enumerate(non_metal_atoms)}
-
-    n = len(non_metal_atoms)
-    adj_matrix = [[0] * n for _ in range(n)]
-    for _, atom_idx, neighbors in non_metal_atoms:
-        for neighbor_idx in neighbors:
-            if neighbor_idx in non_metal_idx_set:
-                i, j = matrix_position[atom_idx], matrix_position[neighbor_idx]
-                adj_matrix[i][j] = adj_matrix[j][i] = 1
-
-    atom_labels = [f"{label}(mol idx:{idx})" for label, idx, _ in non_metal_atoms]
-    bond_counts = [sum(adj_matrix[i]) for i in range(n)]
-    atom_types = [
-        "terminal" if count == 1 else "internal" if count > 1 else "isolated"
-        for count in bond_counts
-    ]
-
-    G = nx.from_numpy_array(np.array(adj_matrix))
-
-    # --- Ring detection ---
-    cycle_basis = nx.cycle_basis(G)
-    ring_sets = [set(cycle) for cycle in cycle_basis]
-    n_rings = len(ring_sets)
-    ring_atoms = set().union(*ring_sets) if ring_sets else set()
-    ring_atoms = list(ring_atoms)
-    all_atoms_in_rings = len(ring_atoms) == G.number_of_nodes()
-    is_single_simple_ring = (n_rings == 1) and all_atoms_in_rings
-
-    return adj_matrix, atom_labels, atom_types, is_single_simple_ring
-
-
-def discriminate_coord_atoms(atoms, metal, gap_cutoff=0.25):
-    sorted_margins = np.array(
-        [np.linalg.norm(metal.coord - a.coord) - metal.radii - a.radii for a in atoms]
-    )
-
-    min_margin = min(margin for margin in sorted_margins)
-
-    coordinating = []
-    rejected = []
-    delta_from_best_margin = []
-    for a, margin in zip(atoms, sorted_margins):
-        delta = margin - min_margin
-
-        delta_from_best_margin.append(delta)
-
-        if delta <= gap_cutoff:
-            coordinating.append(a)
-        else:
-            rejected.append(a)
-    logger.debug(
-        f"Discriminating coordinating atoms based on margin gap cutoff {gap_cutoff}: "
-        f"min_margin={min_margin:.3f}, "
-        f"delta_from_best_margin={delta_from_best_margin}, "
-        f"coordinating={[a.label for a in coordinating]} {[a.atom_site_label for a in coordinating]}, "
-        f"rejected={[a.label for a in rejected]} {[a.atom_site_label for a in rejected]}"
-    )
-    return coordinating, rejected

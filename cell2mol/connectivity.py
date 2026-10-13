@@ -1,4 +1,8 @@
-from typing import Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypedDict
+from collections.abc import Collection, Sequence
+from cell2mol.my_types import NDArray
 import numpy as np
 import warnings
 import logging
@@ -6,7 +10,7 @@ import networkx as nx
 from cell2mol.utils import config
 from cell2mol.element_utils import (
     get_radii,
-    get_metal_idxs,
+    get_df_block_metal_idxs,
     get_post_transition_metal_idxs,
     get_alkali_alkaline_earth_metal_idxs,
     labels2formula,
@@ -16,25 +20,43 @@ from scipy.sparse.csgraph import reverse_cuthill_mckee
 from cell2mol.operations import inv, extract_from_list, point_along_vector
 from cell2mol.elementdata import ElementData
 
+if TYPE_CHECKING:
+    from cell2mol.classes.atom import Atom
+    from cell2mol.classes.metal import Metal
+    from cell2mol.classes.ligand import Ligand
+
+
+class TopologyResult(TypedDict):
+    is_connected: bool
+    n_rings: int
+    ring_sizes: list[int]
+    ring_atoms: list[int]
+    ring_sets: list[list[int]]
+    all_atoms_in_rings: bool
+    is_single_simple_ring: bool
+    is_fused_5_5: bool
+    is_fused_5_6: bool
+    is_fused_5_7: bool
+
+
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 
-def get_scaled_radii(radii, metal_idxs, alkali_idxs, metal_factor, cov_factor):
+def scale_covalent_radii(
+    radii, df_block_metal_idxs, s_block_metal_idxs, metal_factor, cov_factor
+):
     """Scale radii based on whether atom is metal, alkali/alkaline earth metal, or non-metal"""
     scaled_radii = np.zeros_like(radii, dtype=float)
-    alkali_alkaline_factor = 1.0  # additional factor for alkali/alkaline earth metals
     for k in range(len(radii)):
-        if k in metal_idxs:
+        if k in df_block_metal_idxs or k in s_block_metal_idxs:
             scaled_radii[k] = radii[k] * metal_factor
-        elif k in alkali_idxs:
-            scaled_radii[k] = radii[k] * metal_factor * alkali_alkaline_factor
         else:
             scaled_radii[k] = radii[k] * cov_factor
     return scaled_radii
 
 
-def is_mismatch_adjacency(
+def has_adjacency_mismatch(
     labels: list[str],
     positions: np.ndarray,
     atom_site_labels: list[str] | None = None,
@@ -58,7 +80,7 @@ def is_mismatch_adjacency(
     metal_factor = metal_factor if metal_factor is not None else config.METAL_FACTOR
 
     # 1. Build distance-based matrix (Geometric Baseline)
-    _, adj_dist, _ = get_adjmatrix(
+    _, adj_dist, _ = build_distance_adjacency(
         labels,
         positions,
         atom_site_labels=atom_site_labels,
@@ -71,7 +93,7 @@ def is_mismatch_adjacency(
     # 2. Build CIF-based matrix (Metadata Reference)
     adj_conn = None
     if bond_data and atom_site_labels:
-        adj_conn = get_adjmatrix_from_cif_bonds(
+        adj_conn = build_cif_bond_adjacency(
             labels,
             positions,
             atom_site_labels=atom_site_labels,
@@ -122,10 +144,12 @@ def build_adjacency(
 
     canonical = "bond_info" if use_bond_info else "distance"
 
+    isgood = True
+    warning = False
     adj_dist = None
     # --- distance-based adjacency (default) ---
     if canonical == "distance" or warn_on_mismatch:
-        isgood, adj_dist, warning = get_adjmatrix(
+        isgood, adj_dist, warning = build_distance_adjacency(
             labels,
             positions,
             atom_site_labels=atom_site_labels,
@@ -141,7 +165,7 @@ def build_adjacency(
         if atom_site_labels is None:
             raise ValueError("atom_site_labels must be provided with bond_data")
 
-        adj_conn = get_adjmatrix_from_cif_bonds(
+        adj_conn = build_cif_bond_adjacency(
             labels,
             positions,
             atom_site_labels=atom_site_labels,
@@ -178,7 +202,7 @@ def build_adjacency(
         return None
 
     # --- validate distance vs bond_info ---
-    if warn_on_mismatch and adj_conn is not None:
+    if warn_on_mismatch and adj_conn is not None and adj_dist is not None:
         compare_adjacency_and_warn(
             adj_dist=adj_dist,
             adj_conn=adj_conn,
@@ -192,7 +216,7 @@ def build_adjacency(
     return adj
 
 
-def bonds_from_adj(adj: np.ndarray) -> set[tuple[int, int]]:
+def extract_bond_pairs(adj: np.ndarray) -> set[tuple[int, int]]:
     """
     Convert adjacency matrix to bond set.
     """
@@ -225,8 +249,8 @@ def compare_adjacency_and_warn(
     if adj_conn is None:
         return
 
-    bonds_dist = bonds_from_adj(adj_dist)
-    bonds_conn = bonds_from_adj(adj_conn)
+    bonds_dist = extract_bond_pairs(adj_dist)
+    bonds_conn = extract_bond_pairs(adj_conn)
 
     extra = bonds_dist - bonds_conn
     missing = bonds_conn - bonds_dist
@@ -283,13 +307,13 @@ def format_bond_info(
     if metal_factor is None:
         metal_factor = config.METAL_FACTOR
 
-    metal_idxs = get_metal_idxs(labels)
-    alkali_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
+    df_block_metal_idxs = get_df_block_metal_idxs(labels)
+    s_block_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
 
-    radii = get_scaled_radii(
+    radii = scale_covalent_radii(
         np.asarray(get_radii(labels)),
-        metal_idxs,
-        alkali_idxs,
+        df_block_metal_idxs,
+        s_block_metal_idxs,
         metal_factor,
         cov_factor,
     )
@@ -321,12 +345,12 @@ def format_bond_info(
     return formatted
 
 
-def includes_metal(
+def pair_contains_metal(
     i: int,
     j: int,
     labels: list[str],
-    metal_idxs: list[int],
-    alkali_alkaline_earth_metal_idxs: list[int],
+    df_block_metal_idxs: Collection[int],
+    s_block_metal_idxs: Collection[int],
 ) -> bool:
     """
     Return True if the atom pair includes at least one metal element.
@@ -339,11 +363,11 @@ def includes_metal(
         return True
 
     # alkali / alkaline earth metals
-    if i in alkali_alkaline_earth_metal_idxs or j in alkali_alkaline_earth_metal_idxs:
+    if i in s_block_metal_idxs or j in s_block_metal_idxs:
         return True
 
     # fallback: post-transition metals if no other metals present
-    if not metal_idxs and not alkali_alkaline_earth_metal_idxs:
+    if not df_block_metal_idxs and not s_block_metal_idxs:
         if get_post_transition_metal_idxs([labels[i], labels[j]]):
             return True
 
@@ -382,11 +406,11 @@ def get_pair_cutoff(
     return default_cutoff
 
 
-def get_adjmatrix(
+def build_distance_adjacency(
     labels: list[str],
     pos: np.ndarray,
     atom_site_labels: list[str] | None = None,
-    radii: np.ndarray | list | None = None,
+    radii: NDArray | list[float] | None = None,
     cutoff: float | None = None,
     cov_factor: float | None = None,
     metal_factor: float | None = None,
@@ -426,16 +450,16 @@ def get_adjmatrix(
     adjmat = np.zeros((natoms, natoms), dtype=int)
     madjmat = np.zeros((natoms, natoms), dtype=int)
 
-    metal_idxs = get_metal_idxs(labels)
-    alkali_alkaline_earth_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
+    df_block_metal_idxs = get_df_block_metal_idxs(labels)
+    s_block_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
 
     # --- radii normalization ---
     if radii is None:
         radii = get_radii(labels)
-    radii = get_scaled_radii(
+    radii = scale_covalent_radii(
         np.asarray(radii),
-        metal_idxs,
-        alkali_alkaline_earth_metal_idxs,
+        df_block_metal_idxs,
+        s_block_metal_idxs,
         metal_factor,
         cov_factor,
     )
@@ -470,8 +494,8 @@ def get_adjmatrix(
 
             adjmat[i, j] = adjmat[j, i] = 1
 
-            if metal_only and includes_metal(
-                i, j, labels, metal_idxs, alkali_alkaline_earth_metal_idxs
+            if metal_only and pair_contains_metal(
+                i, j, labels, df_block_metal_idxs, s_block_metal_idxs
             ):
                 madjmat[i, j] = madjmat[j, i] = 1
 
@@ -481,13 +505,13 @@ def get_adjmatrix(
     # --- valence correction ---
     warning = False
     if not add_atom:
-        adjmat, madjmat, warning = correct_valence_violation(
+        adjmat, madjmat, warning = correct_valence_violations(
             adjmat, madjmat, labels, pos, radii, atom_site_labels=atom_site_labels
         )
     return True, (madjmat if metal_only else adjmat), warning
 
 
-def correct_valence_violation(
+def correct_valence_violations(
     adjmat, madjmat, labels, pos, radii, atom_site_labels=None
 ):
     """Detect and correct valence violations in an adjacency matrix.
@@ -508,10 +532,12 @@ def correct_valence_violation(
     natoms = len(labels)
     warning = False
 
-    metal_idxs = set(get_metal_idxs(labels))
-    post_metal_idxs = set(get_post_transition_metal_idxs(labels))
-    alkali_idxs = set(get_alkali_alkaline_earth_metal_idxs(labels))
-    metal_indices = metal_idxs | post_metal_idxs | alkali_idxs
+    df_block_metal_idxs = set(get_df_block_metal_idxs(labels))
+    post_transition_metal_idxs = set(get_post_transition_metal_idxs(labels))
+    s_block_metal_idxs = set(get_alkali_alkaline_earth_metal_idxs(labels))
+    metal_indices = (
+        df_block_metal_idxs | post_transition_metal_idxs | s_block_metal_idxs
+    )
 
     for i in range(natoms):
         indices = np.where(adjmat[i])[0]
@@ -548,9 +574,15 @@ def correct_valence_violation(
             logger.info("Skipping correction for element %s", labels[i])
             continue
 
+        # Only bonds to non-metals are candidates: the valence that is violated
+        # counts non-metal neighbors only, and metal coordination is validated
+        # separately during coordination analysis. Metal bonds are usually the
+        # most elongated, so leaving them in would cut them first.
         connections = []
         a = np.asarray(pos[i])
         for j in indices:
+            if j in metal_indices:
+                continue
             b = np.asarray(pos[j])
             dist = np.linalg.norm(a - b)
             margin = dist - (radii[i] + radii[j])
@@ -576,7 +608,6 @@ def correct_valence_violation(
         for j, margin in connections[:to_remove]:
             if margin > 0.2:
                 adjmat[i, j] = adjmat[j, i] = 0
-                madjmat[i, j] = madjmat[j, i] = 0
                 logger.info(
                     "Removed bond %d-%d %s%s:%s-%s%s:%s, dist=%.3f, margin=%.3f",
                     i,
@@ -594,7 +625,7 @@ def correct_valence_violation(
     return adjmat, madjmat, warning
 
 
-def get_adjmatrix_from_cif_bonds(
+def build_cif_bond_adjacency(
     labels: list[str],
     pos: np.ndarray,
     atom_site_labels: list[str],
@@ -617,8 +648,8 @@ def get_adjmatrix_from_cif_bonds(
 
     adjmat = np.zeros((natoms, natoms), dtype=int)
 
-    metal_idxs = set(get_metal_idxs(labels))
-    alkali_alkaline_earth_metal_idxs = set(get_alkali_alkaline_earth_metal_idxs(labels))
+    df_block_metal_idxs = set(get_df_block_metal_idxs(labels))
+    s_block_metal_idxs = set(get_alkali_alkaline_earth_metal_idxs(labels))
 
     for atom1, atom2, bond_dist in bond_data:
         if atom1 not in indices or atom2 not in indices:
@@ -633,8 +664,8 @@ def get_adjmatrix_from_cif_bonds(
         if abs(dist - bond_dist) > tol:
             continue
 
-        if metal_only and not includes_metal(
-            i, j, labels, metal_idxs, alkali_alkaline_earth_metal_idxs
+        if metal_only and not pair_contains_metal(
+            i, j, labels, df_block_metal_idxs, s_block_metal_idxs
         ):
             continue
 
@@ -643,7 +674,7 @@ def get_adjmatrix_from_cif_bonds(
     return adjmat
 
 
-def get_adjacency_types(label: list, conmat: np.ndarray) -> np.ndarray:
+def count_bonds_by_element_pair(label: list[str], conmat: np.ndarray) -> np.ndarray:
     elems = elemdatabase.elementnr.keys()
     natoms = len(label)
     bondtypes = np.zeros((len(elems), len(elems)), dtype=int)
@@ -667,7 +698,7 @@ def get_adjacency_types(label: list, conmat: np.ndarray) -> np.ndarray:
     return bondtypes
 
 
-def get_blocks(matrix: np.ndarray):
+def find_block_boundaries(matrix: np.ndarray):
     """Function that detects blocks in a block diagonal matrix."""
     # retrieves the blocks from a diagonal block matrix
     startlist = []  # List including the starting atom for all blocks
@@ -751,7 +782,7 @@ def split_species(
     dense = gp2.toarray()
 
     # detects blocks in the block diagonal matrix called "dense"
-    startlist, endlist = get_blocks(dense)
+    startlist, endlist = find_block_boundaries(dense)
 
     nblocks = len(startlist)
 
@@ -779,7 +810,7 @@ def split_species(
         return blocklist
 
     if apply_graph:
-        new_blocklist = apply_graph_to_blocklist(
+        new_blocklist = split_blocks_by_rings(
             blocklist,
             labels,
             positions,
@@ -789,12 +820,12 @@ def split_species(
             cov_factor=cov_factor,
             metal_factor=metal_factor,
         )
-        log_blocklist_diff(blocklist, new_blocklist)
+        log_block_changes(blocklist, new_blocklist)
         return new_blocklist
     return blocklist
 
 
-def apply_graph_to_blocklist(
+def split_blocks_by_rings(
     blocklist,
     conn_labels,
     conn_coord,
@@ -828,7 +859,7 @@ def apply_graph_to_blocklist(
 
         adjmat = build_adjacency(
             labels=gr_labels,
-            positions=gr_coord,
+            positions=np.asarray(gr_coord),
             atom_site_labels=gr_atom_site_labels,
             bond_data=bond_data,
             use_bond_info=use_bond_info,
@@ -890,12 +921,11 @@ def apply_graph_to_blocklist(
     return new_blocklist
 
 
-def log_blocklist_diff(blocklist, new_blocklist):
+def log_block_changes(blocklist, new_blocklist):
     old = {tuple(sorted(b)) for b in blocklist}
     new = {tuple(sorted(b)) for b in new_blocklist}
 
     if old == new:
-        # logger.debug("Blocklist unchanged.")
         return
 
     logger.debug("Blocklist differences detected.")
@@ -914,7 +944,19 @@ def log_blocklist_diff(blocklist, new_blocklist):
             logger.debug("  %s", list(b))
 
 
-def identify_haptic_mode(atoms: list, use_bond_info: bool | None = None):
+def _atom_site_labels(atoms: list[Atom]) -> list[str] | None:
+    """Return CIF site labels when present; require every atom to have one."""
+    if not atoms or not atoms[0].atom_site_label:
+        return None
+    labels: list[str] = []
+    for atom in atoms:
+        if atom.atom_site_label is None:
+            raise ValueError("Incomplete CIF atom site labels")
+        labels.append(atom.atom_site_label)
+    return labels
+
+
+def identify_haptic_mode(atoms: list[Atom], use_bond_info: bool | None = None):
     """
     Determine haptic coordination mode(s) for a given atoms list.
     Args:
@@ -1001,7 +1043,7 @@ def identify_haptic_mode(atoms: list, use_bond_info: bool | None = None):
     return is_haptic, haptic_type, results
 
 
-def is_single_ring(atoms: list, use_bond_info: bool | None = None) -> bool:
+def is_single_ring(atoms: list[Atom], use_bond_info: bool | None = None) -> bool:
     """Check if a given list of atoms is a ring
     Args:
         atoms: list of Atom objects
@@ -1011,22 +1053,15 @@ def is_single_ring(atoms: list, use_bond_info: bool | None = None) -> bool:
     """
     labels = [atom.label for atom in atoms]
     positions = [atom.coord for atom in atoms]
-    atom_site_labels = (
-        [atom.atom_site_label for atom in atoms] if atoms[0].atom_site_label else None
-    )
+    atom_site_labels = _atom_site_labels(atoms)
     refcell = atoms[0].get_parent("reference")
     bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
 
-    # logger.debug("Checking if group is a single ring...")
-    # logger.debug("Labels: %s", labels)
-    # logger.debug("Positions: %s", positions)
-    # logger.debug("Atom site labels: %s", atom_site_labels)
-
     adjmat = build_adjacency(
         labels=labels,
-        positions=positions,
+        positions=np.asarray(positions),
         atom_site_labels=atom_site_labels,
         bond_data=bond_data,
         use_bond_info=use_bond_info,
@@ -1045,14 +1080,13 @@ def is_single_ring(atoms: list, use_bond_info: bool | None = None) -> bool:
     # Check if there's exactly one cycle that includes all nodes (simple ring)
     if len(cycle_basis) == 1 and len(cycle_basis[0]) == len(G.nodes):
         return True
-    #     return True, None  # The graph represents a ring compound
-    # elif len(cycle_basis) == 1 and len(cycle_basis[0]) != len(G.nodes):
-    #     return False, cycle_basis[0]  # The graph has a cycle but not all nodes are included
 
     return False  # Otherwise, not a ring compound
 
 
-def analyze_topology(atoms: list, use_bond_info: bool | None = None):
+def analyze_topology(
+    atoms: list[Atom], use_bond_info: bool | None = None
+) -> TopologyResult:
     """
     Analyze graph topology for a group of atoms.
 
@@ -1065,7 +1099,7 @@ def analyze_topology(atoms: list, use_bond_info: bool | None = None):
     - fused ring systems (5–5, 5–6, 5–7)
     """
 
-    def _empty_result(is_connected=False):
+    def _empty_result(is_connected: bool = False) -> TopologyResult:
         return {
             "is_connected": is_connected,
             "n_rings": 0,
@@ -1084,9 +1118,7 @@ def analyze_topology(atoms: list, use_bond_info: bool | None = None):
 
     labels = [atom.label for atom in atoms]
     positions = [atom.coord for atom in atoms]
-    atom_site_labels = (
-        [atom.atom_site_label for atom in atoms] if atoms[0].atom_site_label else None
-    )
+    atom_site_labels = _atom_site_labels(atoms)
 
     refcell = atoms[0].get_parent("reference")
     bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
@@ -1096,7 +1128,7 @@ def analyze_topology(atoms: list, use_bond_info: bool | None = None):
 
     adjmat = build_adjacency(
         labels=labels,
-        positions=positions,
+        positions=np.asarray(positions),
         atom_site_labels=atom_site_labels,
         bond_data=bond_data,
         use_bond_info=use_bond_info,
@@ -1130,7 +1162,7 @@ def analyze_topology(atoms: list, use_bond_info: bool | None = None):
     if n_rings == 2:
         r1, r2 = ring_sets
         shared = r1 & r2
-        sizes = tuple(sorted([len(r1), len(r2)]))
+        sizes = (min(len(r1), len(r2)), max(len(r1), len(r2)))
         total_unique = len(r1 | r2)
 
         fused_rules = {
@@ -1144,20 +1176,22 @@ def analyze_topology(atoms: list, use_bond_info: bool | None = None):
             if total_unique == expected_total:
                 fused_flags[flag_name] = True
 
-    ring_sets = [list(r) for r in ring_sets]
+    ring_lists = [list(r) for r in ring_sets]
     return {
         "is_connected": True,
         "n_rings": n_rings,
-        "ring_sizes": [len(r) for r in ring_sets],
+        "ring_sizes": [len(r) for r in ring_lists],
         "ring_atoms": ring_atoms,
-        "ring_sets": ring_sets,
+        "ring_sets": ring_lists,
         "all_atoms_in_rings": all_atoms_in_rings,
         "is_single_simple_ring": is_single_simple_ring,
-        **fused_flags,
+        "is_fused_5_5": fused_flags["is_fused_5_5"],
+        "is_fused_5_6": fused_flags["is_fused_5_6"],
+        "is_fused_5_7": fused_flags["is_fused_5_7"],
     }
 
 
-def merge_multiple_groups(parent_molecule, groups, parent_ligand):
+def merge_coordination_groups(parent_molecule, groups, parent_ligand):
     from cell2mol.classes.group import Group
 
     """
@@ -1222,9 +1256,9 @@ def merge_multiple_groups(parent_molecule, groups, parent_ligand):
         if forced_haptic_type:
             new_grp.haptic_type = forced_haptic_type
             new_grp.is_haptic = True
-            new_grp.topology = results
+            new_grp.topology = dict(results)
         else:
-            new_grp.get_hapticity()
+            new_grp.update_hapticity()
 
         # Map Indices
         grp_mol_indices = [a.get_parent_index("molecule") for a in atom_subset]
@@ -1235,12 +1269,12 @@ def merge_multiple_groups(parent_molecule, groups, parent_ligand):
 
         # Establish Parents
         new_grp.add_parent(parent_molecule, indices=grp_mol_indices)
-        new_grp.set_inherit_adjmatrix("molecule")
+        new_grp.inherit_adjacency("molecule")
         new_grp.add_parent(parent_ligand, indices=grp_lig_indices)
 
         # Link Specific Metals
-        if getattr(new_grp, "metals", None) is None:
-            object.__setattr__(new_grp, "metals", [])
+        if new_grp.metals is None:
+            new_grp.metals = []
         new_grp.metals.extend(metals_subset)
 
         return new_grp
@@ -1309,7 +1343,7 @@ def merge_multiple_groups(parent_molecule, groups, parent_ligand):
                 elif results.get("is_fused_5_7"):
                     key = ("fused_5_7", formula)
 
-        group_name = ring_map.get(key, formula)
+        group_name = ring_map.get(key, formula) if key is not None else formula
         denticity_str = ",".join(haptic_denticities)
         new_haptic_type = f"{denticity_str}({group_name})" if denticity_str else None
 
@@ -1322,21 +1356,21 @@ def merge_multiple_groups(parent_molecule, groups, parent_ligand):
             "Merged group created: %s %s with metals %s",
             group_unified.formula,
             group_unified.haptic_type,
-            [m.label for m in group_unified.metals],
+            [m.label for m in (group_unified.metals or [])],
         )
         return [group_unified]
 
 
-def add_atom(
-    labels: list,
-    coords: list,
+def try_add_ligand_atom(
+    labels: list[str],
+    coords: Sequence[Sequence[float]] | NDArray,
     site: int,
-    ligand: object,
+    ligand: Ligand,
     element: str = "H",
-    metal: object | None = None,
-    removed_idx: list | None = None,
+    metal: Metal | None = None,
+    removed_idx: list[int] | None = None,
     unconditional: bool = False,
-) -> Tuple[bool, list, list]:
+) -> tuple[bool, list[str], list[Sequence[float]]]:
     """
     Add one atom of type `element` to a given ligand atom site.
 
@@ -1350,10 +1384,7 @@ def add_atom(
 
     newlab.append(element)  # one atom will be added
 
-    # logger.debug("number of ligand atoms=%d", len(ligand.atoms))
-    # logger.debug("target site=%d (%s)", site, ligand.atoms[site].label)
-
-    for idx, atom in enumerate(ligand.atoms):
+    for idx, atom in enumerate(ligand.atoms or []):
         if idx != site:
             continue
 
@@ -1362,27 +1393,25 @@ def add_atom(
             tgt = metal
 
         else:
-            tgt = atom.get_closest_metal()
+            tgt = atom.find_closest_metal()
 
-        # metal_idx = tgt.get_parent_index("molecule")
-
-        # logger.debug("Evaluating atom at %s with closest metal at %s", apos, tgt.coord)
-
+        if tgt is None:
+            raise ValueError("A metal is required to place the added ligand atom")
+        if atom.radii is None:
+            raise ValueError(f"Missing covalent radius for {atom.label}")
         idealdist = atom.radii + elemdatabase.CovalentRadius3[element]
         added_coords = point_along_vector(apos, tgt.coord, idealdist)
 
         newcoord.append([added_coords[0], added_coords[1], added_coords[2]])
 
-        isgood, tmpconmat, warning = get_adjmatrix(
+        isgood, tmpconmat, _ = build_distance_adjacency(
             newlab,
-            newcoord,
+            np.asarray(newcoord),
             cov_factor=ligand.cov_factor,
             add_atom=True,
         )
         tmpconnec = tmpconmat.sum(axis=1)
         logger.debug("tmpconnec at added position=%d", int(tmpconnec[posadded]))
-        # newlab_with_metal = newlab + [tgt.label]
-        # newcoord_with_metal = newcoord + [tgt.coord]
 
         # Case 1: unconditional addition
         if unconditional:
@@ -1433,12 +1462,6 @@ def add_atom(
         # Case 2: acceptable connectivity
         elif tmpconnec[posadded] <= 1:
             isadded = True
-            # logger.debug(
-            #     "Chosen metal index %d. %s added at site %d",
-            #     metal_idx,
-            #     element,
-            #     site,
-            # )
 
         # Case 3: excessive connectivity but some atoms were removed
         elif (
@@ -1456,10 +1479,14 @@ def add_atom(
                 atom.frac_coord,
                 connected,
                 [labels[i] for i in connected],
-                [ligand.atom_site_labels[i] for i in connected],
+                [ligand.atom_site_labels[i] for i in connected]
+                if ligand.atom_site_labels is not None
+                else None,
                 removed,
                 [labels[i] for i in removed],
-                [ligand.atom_site_labels[i] for i in removed],
+                [ligand.atom_site_labels[i] for i in removed]
+                if ligand.atom_site_labels is not None
+                else None,
             )
             logger.debug(f"connected: {connected} | removed: {removed}")
             remaining = list(connected - removed)
@@ -1483,14 +1510,6 @@ def add_atom(
                     element,
                     tmpconnec[posadded],
                 )
-                # import os
-                # from cell2mol.write_results import writexyz
-                # writexyz(
-                #     os.getcwd(),
-                #     f"target_atom_{atom.label}_{apos[0]}_newcoord_with_{element}.xyz",
-                #     newlab_with_metal,
-                #     newcoord_with_metal,
-                # )
 
                 isadded = False
                 newlab = list(labels)
