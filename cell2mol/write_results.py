@@ -1,24 +1,20 @@
 #!/usr/bin/env python
 
+"""Write result summaries, error logs, and coordination reports."""
+
 from cell2mol.utils import config
 import sys
-import re
 import os
 import traceback
-from collections import Counter
-from ase import Atoms
-from ase.io import read
-from cell2mol.elementdata import ElementData
 import logging
 import pandas as pd
 from pathlib import Path
 
-elemdatabase = ElementData()
 logger = logging.getLogger(__name__)
 
 
-def exit_with_error_input(message, details=None):
-    """Logs the error message to a file and exits the program."""
+def write_input_error_log(message, details=None):
+    """Write input-error details to error_InputFile.out without exiting."""
     error_log_path = os.path.join(os.getcwd(), "error_InputFile.out")
     with open(error_log_path, "w") as error_log:
         error_log.write(f"Error: {message}\n")
@@ -26,7 +22,8 @@ def exit_with_error_input(message, details=None):
             error_log.write(f"Details: {details}\n")
 
 
-def exit_with_error_exception(exc, error_log_path=None):
+def write_exception_error_log(exc, error_log_path=None):
+    """Write the active exception traceback, omitting it for MemoryError."""
     exc_type = type(exc).__name__
     if error_log_path is None:
         error_log_path = os.path.join(os.getcwd(), f"error_{exc_type}.out")
@@ -35,7 +32,7 @@ def exit_with_error_exception(exc, error_log_path=None):
         with open(error_log_path, "w") as error_log:
             error_log.write(f"Error Type: {exc_type}\n")
 
-            # Handle MemoryError specifically to avoid allocating traceback string
+            # Avoid allocating a traceback after memory exhaustion.
             if isinstance(exc, MemoryError):
                 error_log.write(
                     "Memory limit exceeded. Full traceback omitted to save RAM.\n"
@@ -44,149 +41,23 @@ def exit_with_error_exception(exc, error_log_path=None):
                 error_log.write(traceback.format_exc())
 
     except (MemoryError, OSError):
-        # Fallback to stderr if file writing fails
+        # Report log-write failures on stderr.
         sys.stderr.write(
             f"FATAL: Could not write to {error_log_path} due to {exc_type}\n"
         )
 
 
-def compare_formula_xyz_vs_cif(
-    xyzfile: str, formula_str_from_cif: str
-) -> dict[str, dict[str, int]]:
-    """
-    Compare the elements from CIF with the elements in the XYZ file.
-    """
-    element_pattern = r"([A-Z][a-z]*)(\d*)"
-    parsed_formula_cif = dict()
-    for element, count in re.findall(element_pattern, formula_str_from_cif):
-        parsed_formula_cif[element] = int(count) if count else 1
-    mol = read(xyzfile, format="xyz")
-    assert isinstance(mol, Atoms)
-    element_list = mol.get_chemical_symbols()
-    element_list_count = dict(Counter(element_list))
-    comparison_result = {
-        "in_formula_cif": parsed_formula_cif,
-        "in_list_xyz": element_list_count,
-        "missing_in_xyz": {
-            k: v - element_list_count.get(k, 0)
-            for k, v in parsed_formula_cif.items()
-            if element_list_count.get(k, 0) < v
-        },
-        "extra_in_xyz": {
-            k: v - parsed_formula_cif.get(k, 0)
-            for k, v in element_list_count.items()
-            if parsed_formula_cif.get(k, 0) < v
-        },
-    }
-    return comparison_result
-
-
-def readxyz(file):
-    labels = []
-    pos = []
-    xyz = open(file, "r")
-    n_atoms = xyz.readline()
-    title = xyz.readline()
-    for line in xyz:
-        line_data = line.split()
-        if len(line_data) == 4:
-            label, x, y, z = line.split()
-            pos.append([float(x), float(y), float(z)])
-            labels.append(label)
-        else:
-            print("I can't read the xyz. It has =/ than 4 columns")
-    xyz.close()
-
-    return labels, pos
-
-
-def printxyz(labels, pos):
-    print(len(labels))
-    print("")
-    for idx, l in enumerate(labels):
-        print("%s  %.6f  %.6f  %.6f" % (l, pos[idx][0], pos[idx][1], pos[idx][2]))
-
-
-def writexyz(
-    fdir,
-    fname,
-    labels,
-    pos,
-    charge: int | str = 0,
-    spin: int | str = 1,
-    info: str = "",
-):
-    """Writes an XYZ file with given labels and positions."""
-    os.makedirs(fdir, exist_ok=True)
-
-    fullname = os.path.join(fdir, fname)
-    natoms = len(labels)
-
-    with open(fullname, "w") as fil:
-        print(natoms, file=fil)
-        print(f"{charge} {spin}", file=fil)
-        # print(f"{charge=} {spin=} {info}", file=fil)
-        for label, (x, y, z) in zip(labels, pos):
-            fil.write(f"{label:<2}  {x:15.8f}  {y:15.8f}  {z:15.8f}\n")
-
-
-def extract_refmoleclist_xyz(fdir, refmoleclist, name: str):
-    """Extracts reference molecules to XYZ files.
-
-    Args:
-        fdir (str): Directory to save the XYZ files.
-        refmoleclist (list): List of reference molecule objects.
-        name (str): Base name for the output files.
-    """
-    for i, ref in enumerate(refmoleclist):
-        # if ref.iscomplex:
-        if ref.totcharge_cif is not None:
-            n_electrons = 0
-            for atom in ref.labels:
-                n_electrons += elemdatabase.elementnr[atom]
-            n_electrons -= ref.totcharge_cif
-            if n_electrons % 2 == 0:
-                spin = 1
-            else:
-                spin = 2
-            writexyz(
-                fdir,
-                f"{name}_Ref_{i}_{ref.formula}_charge_{ref.totcharge_cif}_lowspin_{spin}.xyz",
-                ref.labels,
-                ref.coord,
-                charge=ref.totcharge_cif,
-                spin=spin,
-            )
-            logger.debug(
-                "Ref molecule %s %s total charge %s lowest spin multiplicity %s",
-                i,
-                ref.formula,
-                ref.totcharge_cif,
-                spin,
-            )
-        else:
-            writexyz(
-                fdir,
-                f"{name}_Ref_{i}_{ref.formula}.xyz",
-                ref.labels,
-                ref.coord,
-                charge="",
-                spin="",
-            )
-            logger.debug(
-                "Ref molecule %s %s without charge and spin information",
-                i,
-                ref.formula,
-            )
-
-
 def get_reference_error_message(error_case):
-    """
-    Return an error message for a given error case.
-    """
+    """Return the message for a reference-processing error code."""
 
-    # --- Critical System Errors ---
-    if error_case == config.ERR_MEMORY:
+    # Input and runtime failures
+    if error_case == config.ERR_INPUT:
+        return "Processing failed: Invalid or inaccessible input"
+
+    elif error_case == config.ERR_ASE_PARSE:
+        return "Processing failed: ASE could not parse the input"
+
+    elif error_case == config.ERR_MEMORY:
         return "Process terminated: Memory limit exceeded"
 
     elif error_case == config.ERR_TIMEOUT:
@@ -195,7 +66,6 @@ def get_reference_error_message(error_case):
     elif error_case == config.ERR_GENERAL:
         return "Process terminated: General error occurred"
 
-    # --- Standard Processing Errors ---
     elif error_case == 0:
         return "No errors found"
 
@@ -230,26 +100,17 @@ def get_reference_error_message(error_case):
         return f"Unhandled error case: {error_case}"
 
 
-def get_reference_error_message_all(codes, fallback_code=0):
-    """Join the messages for every error code a mode triggered.
-
-    error_cases stores only the first match, so a structure missing hydrogens on
-    both a coordinated donor and a carbon would report code 3 and hide code 4.
-    `codes` is that mode's entry in error_cases_all; falls back to the stored
-    single code when it is absent (e.g. a cell serialized before the field).
-    """
+def get_reference_error_messages(codes, fallback_code=0):
+    """Join messages for all codes, using fallback_code when the list is empty."""
     if not codes:
         return get_reference_error_message(fallback_code)
     return "; ".join(get_reference_error_message(code) for code in codes)
 
 
 def get_reference_warning_messages(refcell):
-    """
-    Returns a list of messages based on potential_warnings.
-    Triggers 'Warning' for True and 'Skipped' for None.
-    """
+    """Return messages for active warnings (True) and skipped checks (None)."""
 
-    # Mapping for triggered warnings (status is True)
+    # Active warning messages
     warning_map = {
         "cif_mismatch": "CIF formula mismatch detected",
         "over_polynuclear_limit": f"Polynuclear complex exceeds metal center limit (> max_metals {config.MAX_METALS})",
@@ -259,7 +120,7 @@ def get_reference_warning_messages(refcell):
         "metal_coord_diff": "Final metal coordination differs from CIF bond connectivity.",
     }
 
-    # Mapping for skipped checks (status is None)
+    # Skipped-check messages
     skip_map = {
         "cif_mismatch": "CIF formula check skipped (No _chemical_formula_moiety in CIF)",
         "is_mismatch_adj": "Adjacency check skipped (No _geom_bond in CIF)",
@@ -273,13 +134,10 @@ def get_reference_warning_messages(refcell):
         return messages
 
     for key, status in refcell.potential_warnings.items():
-        # Case 1: The check failed (Warning)
         if status is True:
             messages.append(warning_map.get(key, f"Warning: {key}"))
 
-        # Case 2: The check was skipped (None)
         elif status is None:
-            # Only add a message if the key is in our skip_map
             if key in skip_map:
                 messages.append(f"Skipped: {skip_map[key]}")
             else:
@@ -291,12 +149,16 @@ def get_reference_warning_messages(refcell):
 
 
 def get_unitcell_error_message(error_case):
-    """
-    Return an error message for a given error case.
-    """
+    """Return the message for a unit-cell processing error code."""
 
-    # --- Critical System Errors ---
-    if error_case == config.ERR_MEMORY:
+    # Input and runtime failures
+    if error_case == config.ERR_INPUT:
+        return "Processing failed: Invalid or inaccessible input"
+
+    elif error_case == config.ERR_ASE_PARSE:
+        return "Processing failed: ASE could not parse the input"
+
+    elif error_case == config.ERR_MEMORY:
         return "Process terminated: Memory limit exceeded"
 
     elif error_case == config.ERR_TIMEOUT:
@@ -305,24 +167,14 @@ def get_unitcell_error_message(error_case):
     elif error_case == config.ERR_GENERAL:
         return "Process terminated: General error occurred"
 
-    # --- Standard Processing Errors ---
     elif error_case == 0:
         return "No errors found"
-
-    # elif error_case == 1:
-    #     return "Isolated hydrogens found"
-
-    # elif error_case == 2:
-    #     return "Missing hydrogens"
 
     elif error_case == 3:
         return "Error in reconstructing fragments"
 
     elif error_case == 4:
         return "Error in unit cell construction"
-
-    # elif error_case == 5:
-    #     return "Some unique species have no plausible charge states"
 
     elif error_case == 6:
         return "Multiple valid charge distributions detected"
@@ -344,12 +196,16 @@ def get_unitcell_error_message(error_case):
 
 
 def get_molecule_error_message(error_case):
-    """
-    Return an error message for a given error case.
-    """
+    """Return the message for a molecule-input processing error code."""
 
-    # --- Critical System Errors ---
-    if error_case == config.ERR_MEMORY:
+    # Input and runtime failures
+    if error_case == config.ERR_INPUT:
+        return "Processing failed: Invalid or inaccessible input"
+
+    elif error_case == config.ERR_ASE_PARSE:
+        return "Processing failed: ASE could not parse the input"
+
+    elif error_case == config.ERR_MEMORY:
         return "Process terminated: Memory limit exceeded"
 
     elif error_case == config.ERR_TIMEOUT:
@@ -358,7 +214,6 @@ def get_molecule_error_message(error_case):
     elif error_case == config.ERR_GENERAL:
         return "Process terminated: General error occurred"
 
-    # --- Standard Processing Errors ---
     elif error_case == 0:
         return "No errors found"
 
@@ -396,17 +251,15 @@ def get_molecule_error_message(error_case):
         return f"Unhandled error case: {error_case}"
 
 
-def get_molecule_error_message_all(codes, fallback_code=0):
-    """Join the messages for every error code a molecule or molecule set fired."""
+def get_molecule_error_messages(codes, fallback_code=0):
+    """Join molecule error messages, using fallback_code when the list is empty."""
     if not codes:
         return get_molecule_error_message(fallback_code)
     return "; ".join(get_molecule_error_message(code) for code in codes)
 
 
-def write_cell_molecules_info(cell, file=None):
-    """
-    Write molecule information within a cell to a file-like object.
-    """
+def write_cell_molecule_details(cell, file=None):
+    """Write numbered molecule details for a reference or unit cell."""
     if cell.subtype == "reference":
         cell_type = "Reference"
         molecule_list = getattr(cell, "refmoleclist", None)
@@ -423,33 +276,27 @@ def write_cell_molecules_info(cell, file=None):
     print(f"\nMolecules in {cell.subtype}:", file=file)
 
     for i, mol in enumerate(molecule_list):
-        # Pass the index to keep the output numbered
-        write_molecule_info(mol, file=file, index=i)
+        write_molecule_details(mol, file=file, index=i)
 
 
-def write_molecule_info(mol, file=None, index=None):
-    """
-    Writes detailed molecule information to a file-like object or the console.
-    """
+def write_molecule_details(mol, file=None, index=None):
+    """Write molecule, metal, ligand, and donor-group details to a stream or stdout."""
     if mol is None:
         print("\nNo molecule object.", file=file)
         return
 
-    # Start header
     prefix = f"Molecule {index}:" if index is not None else "Molecule:"
     mol_info_parts = [f"{prefix} {mol.formula}"]
 
-    # Append classification tags
-    if mol.iscomplex:
-        mol_info_parts.append("(TM Complex)")
-    if mol.has_ia_iia:
+    if mol.is_metal_complex:
+        mol_info_parts.append("(Metal Complex)")
+    if mol.has_s_block_metal:
         mol_info_parts.append("(Complex with Alkali or Alkaline metals)")
-    if mol.has_post_transition_metal:
+    if mol.is_post_transition_metal_complex:
         mol_info_parts.append("(Complex with Post-Transition metals)")
-    if mol.is_non_complex_molecule:
+    if mol.is_metal_free_molecule:
         mol_info_parts.append("(Non-complex)")
 
-    # Append properties
     if mol.totcharge is not None:
         mol_info_parts.append(f"totcharge={mol.totcharge}")
     if getattr(mol, "totcharge_cif", None) is not None:
@@ -463,10 +310,8 @@ def write_molecule_info(mol, file=None, index=None):
 
     print(" ".join(mol_info_parts), file=file)
 
-    # --------------------
-    # Metals (Coordination Centers)
-    # --------------------
-    if not mol.is_non_complex_molecule and hasattr(mol, "metals"):
+    # Metal coordination details
+    if not mol.is_metal_free_molecule and hasattr(mol, "metals"):
         for met in mol.metals:
             met_info = f"\t{met.formula} ({met.subtype})"
 
@@ -474,7 +319,6 @@ def write_molecule_info(mol, file=None, index=None):
             if labels:
                 met_info += f" atom_site_label={labels}"
 
-            # Oxidation state
             if met.charge is not None:
                 met_info += f" metal_OS={met.charge}"
             elif getattr(met, "plausible_os", None) is not None:
@@ -485,7 +329,6 @@ def write_molecule_info(mol, file=None, index=None):
 
             print(met_info, file=file)
 
-            # Coordination details
             if getattr(met, "coord_sphere_formula", None):
                 print(
                     f"\t|--coord_sphere_formula={met.coord_sphere_formula}", file=file
@@ -517,7 +360,7 @@ def write_molecule_info(mol, file=None, index=None):
 
                     print(group_info, file=file)
 
-            # Metal-Metal Bonds
+            # Metal–metal links
             if hasattr(met, "metals") and hasattr(met, "coord_nr_with_metal_bonds"):
                 bonded_metals = [m.label for m in met.metals]
                 if bonded_metals:
@@ -528,10 +371,8 @@ def write_molecule_info(mol, file=None, index=None):
                         file=file,
                     )
 
-    # --------------------
-    # Ligands
-    # --------------------
-    if not mol.is_non_complex_molecule and getattr(mol, "ligands", None):
+    # Ligand and donor-group details
+    if not mol.is_metal_free_molecule and getattr(mol, "ligands", None):
         for lig in mol.ligands:
             lig_info = f"\t{lig.formula} ({lig.subtype})"
             for attr in ("smiles", "denticity", "totcharge"):
@@ -572,13 +413,7 @@ def write_molecule_info(mol, file=None, index=None):
 
 
 def write_unique_species(object, file):
-    """
-    Write unique species information to a file-like object.
-
-    Args:
-        object: Object containing unique_species.
-        file: File-like object opened for writing.
-    """
+    """Write representative species, their indices, and available charge details."""
 
     unique_species = getattr(object, "unique_species", None)
     if not unique_species:
@@ -619,14 +454,8 @@ def write_unique_species(object, file):
         print("\t" + " ".join(parts), file=file)
 
 
-def _no_charge_state_reason(specie) -> str:
-    """Why a specie has no plausible charge states.
-
-    Reports SKIPPED (with the diagnosable cause) when enumeration was never
-    attempted, and NO PLAUSIBLE CHARGE STATES FOUND only when it ran and came up
-    empty -- so a structure that failed purely on charge perception can be told
-    apart from one whose CIF is short of hydrogens.
-    """
+def _get_charge_state_failure_reason(specie) -> str:
+    """Explain skipped charge enumeration or the absence of valid charge states."""
     if getattr(specie, "has_missing_H", False):
         kinds = [
             name
@@ -646,38 +475,26 @@ def _no_charge_state_reason(specie) -> str:
     if warning:
         return f"SKIPPED: protonation not auto-handled ({warning})"
 
-    # Both can be set: the iteration cap hands the specie to AC2mol, which may
-    # then decline for size as well. AC2mol is the last-resort tier, so when it
-    # is the one that gave up that is the binding constraint and the more
-    # actionable thing to report.
+    # Report the final valence-search limit before earlier perception limits.
     if getattr(specie, "valence_search_too_large", False):
         return "SKIPPED: valence search space too large, enumeration terminated"
 
     if getattr(specie, "bond_perception_capped", False):
-        return "SKIPPED: bond perception exceeded its iteration limit"
+        return "SKIPPED: bond order assignment exceeded its iteration limit"
 
     return "NO PLAUSIBLE CHARGE STATES FOUND"
 
 
 def write_plausible_charges(object, file=None):
-    """
-    Write the plausible charges for each species in the object.
-
-    Args:
-        object: Object containing species_list.
-        file: File-like object (e.g., opened file). Defaults to None (console).
-    """
+    """Write charge candidates, missing-state reasons, and inconsistencies between copies."""
     if object.species_list is not None:
         print(f"\nPossible charges of species in {object.subtype}:", file=file)
         for specie in object.species_list:
-            # Base species information
             info = f"\tunique_index={specie.unique_index} {specie.formula} ({specie.subtype})"
 
-            # Add coordination sphere for metals
             if specie.subtype == "metal":
                 info += f" coord_sphere_formula={getattr(specie, 'coord_sphere_formula', 'N/A')}"
 
-            # Add charge state information
             if specie.subtype == "metal":
                 plausible = getattr(specie, "plausible_os", None)
             else:
@@ -687,17 +504,15 @@ def write_plausible_charges(object, file=None):
                 if specie.subtype == "metal":
                     info += f" plausible_os={plausible}"
                 else:
-                    # Non-metals use a new line for charge states as per original logic
                     info += f"\n\tplausible_charge_states={plausible}"
             else:
-                info += f" {_no_charge_state_reason(specie)}"
+                info += f" {_get_charge_state_failure_reason(specie)}"
 
             print(info, file=file)
     else:
         print("\nNo species list found in the cell object.", file=file)
 
-    # Copies of one specie that enumerated differently: the final charge then
-    # depends on which copy was stored first, not on the chemistry.
+    # Different candidates for equivalent copies can affect charge selection.
     inconsistent = getattr(object, "inconsistent_plausible_charges", None)
     if inconsistent:
         print(
@@ -721,32 +536,26 @@ def write_plausible_charges(object, file=None):
     print("", file=file)
 
 
-def log_charge_state_details(newcell, refcell) -> None:
-    """
-    Logs the available charge candidates for unique species and validates
-    consistency between species objects and the unique_indices mapping.
-    """
+def log_charge_diagnostics(newcell, refcell) -> None:
+    """Log reference charge candidates and check reference/unit-cell index mappings."""
 
     logger.debug("#### Charge State & Index Validation ####")
 
-    # --- 1. Log Charge Options for Unique Species ---
     if hasattr(refcell, "plausible_charges") and refcell.plausible_charges:
         for specie, options in zip(refcell.unique_species, refcell.plausible_charges):
             logger.debug(
                 "Unique Specie %s (Formula: %s):", specie.unique_index, specie.formula
             )
             logger.debug("  > Plausible Charge Options: %s", options)
-            # logger.debug("  > Full Plausible States:    %s", plausible)
     else:
         logger.warning("RefCell has no 'plausible_charges' populated to display.")
 
-    # --- 2. Validate Indices in Reference and Unit Cells ---
     _validate_species_indices(refcell, "Reference Cell")
     _validate_species_indices(newcell, "Unit Cell")
 
 
 def _validate_species_indices(cell, label: str) -> None:
-    """Helper to check consistency between species objects and cell mapping lists."""
+    """Log mismatches between species unique_index values and their mapping list."""
     logger.debug("--- Validating %s Indices ---", label)
 
     if not hasattr(cell, "species_list") or not hasattr(cell, "unique_indices"):
@@ -758,7 +567,6 @@ def _validate_species_indices(cell, label: str) -> None:
     for i, (specie, mapped_idx) in enumerate(
         zip(cell.species_list, cell.unique_indices)
     ):
-        # Check consistency: The index stored in the list must match the specie's internal ID
         if mapped_idx != specie.unique_index:
             logger.warning(
                 "MISMATCH at list index %d: Species %s claims UniqueID %s, "
@@ -769,14 +577,13 @@ def _validate_species_indices(cell, label: str) -> None:
                 mapped_idx,
             )
         else:
-            # Verbose logging only if needed
             logger.debug(
                 "\t[OK] %s (UniqueID: %s)", specie.formula, specie.unique_index
             )
 
 
-def save_coordination_report(report, output_csv):
-    """Save metal coordination discrepancy report as a CSV file."""
+def write_coordination_report(report, output_csv):
+    """Write a coordination-discrepancy CSV with fixed columns; skip empty reports."""
     if not report:
         logger.info("No coordination discrepancy report to save.")
         return None
@@ -805,7 +612,7 @@ def save_coordination_report(report, output_csv):
 
     df = pd.DataFrame(report)
 
-    # Keep column order and avoid errors if some columns are missing
+    # Preserve column order and fill absent fields.
     df = df.reindex(columns=fieldnames)
 
     df.to_csv(output_csv, index=False)
