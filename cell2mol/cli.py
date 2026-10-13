@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import sys
 import logging
 import warnings
 from cell2mol.utils import config
@@ -8,7 +9,8 @@ from cell2mol.args import parsing_arguments
 from cell2mol.process_reference import interpret_reference
 from cell2mol.process_unitcell import interpret_unitcell
 from cell2mol.process_xyz import interpret_molecule
-from cell2mol.write_results import exit_with_error_input, exit_with_error_exception
+from cell2mol.write_results import write_input_error_log
+from cell2mol.utils.processing import run_cli
 from rdkit import RDLogger
 
 try:
@@ -56,12 +58,14 @@ def main():
     current_dir = os.getcwd()
     input_path = os.path.normpath(args.filepath)
     name, extension = os.path.splitext(os.path.basename(input_path))
+    extension = extension.lower()
 
     if not os.path.exists(input_path):
-        exit_with_error_input(f"Input file not found: {input_path}")
+        write_input_error_log(f"Input file not found: {input_path}")
+        sys.exit(config.ERR_INPUT)
 
     if extension == ".cif":
-        handle_cif_file(
+        code = handle_cif_file(
             input_path=input_path,
             system_type=args.system_type,
             name=name,
@@ -69,7 +73,7 @@ def main():
         )
 
     elif extension == ".xyz":
-        handle_xyz_file(
+        code = handle_xyz_file(
             input_path=input_path,
             system_type=args.system_type,
             name=name,
@@ -78,7 +82,10 @@ def main():
         )
 
     else:
-        exit_with_error_input(f"Invalid file extension: {input_path}")
+        write_input_error_log(f"Invalid file extension: {input_path}")
+        code = config.ERR_INPUT
+
+    sys.exit(code)
 
 
 def handle_cif_file(
@@ -88,31 +95,16 @@ def handle_cif_file(
     current_dir,
 ):
     logger.info("Processing CIF file: %s", input_path)
-    try:
-        if system_type == "reference":
-            logger.info("Processing reference (Wyckoff sites)")
-            interpret_reference(
-                input_path=input_path,
-                name=name,
-                current_dir=current_dir,
-            )
-
-        elif system_type == "unitcell":
-            logger.info("Processing unit cell")
-            interpret_unitcell(
-                input_path=input_path,
-                name=name,
-                current_dir=current_dir,
-            )
-
-        else:
-            exit_with_error_input(
-                "Invalid system type for .cif file",
-                {"system_type": system_type},
-            )
-
-    except Exception as exc:
-        exit_with_error_exception(exc)
+    if system_type == "reference":
+        process = interpret_reference
+    elif system_type == "unitcell":
+        process = interpret_unitcell
+    else:
+        write_input_error_log(
+            "Invalid system type for .cif file", {"system_type": system_type}
+        )
+        return config.ERR_INPUT
+    return run_cli(process, input_path=input_path, name=name, current_dir=current_dir)
 
 
 def handle_xyz_file(
@@ -123,22 +115,18 @@ def handle_xyz_file(
     current_dir,
 ):
     logger.info("Processing XYZ file: %s", input_path)
-    try:
-        if system_type == "molecule":
-            interpret_molecule(
-                input_path=input_path,
-                name=name,
-                input_charge=input_charge,
-                current_dir=current_dir,
-            )
-        else:
-            exit_with_error_input(
-                "Invalid system type for .xyz file",
-                {"system_type": system_type},
-            )
-
-    except Exception as exc:
-        exit_with_error_exception(exc)
+    if system_type != "molecule":
+        write_input_error_log(
+            "Invalid system type for .xyz file", {"system_type": system_type}
+        )
+        return config.ERR_INPUT
+    return run_cli(
+        interpret_molecule,
+        input_path=input_path,
+        name=name,
+        input_charge=input_charge,
+        current_dir=current_dir,
+    )
 
 
 if __name__ == "__main__":

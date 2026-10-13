@@ -8,64 +8,54 @@ from cell2mol.args import parsing_arguments
 from cell2mol.classes import Reference, UnitCell, Cells
 from cell2mol.process_reference import interpret_reference
 from cell2mol.construction import construct_unitcell
-from cell2mol.charge.charge_balancer import balance_unitcell_charge
-from cell2mol.read_cif import get_cell_atoms, get_cell_parameters
+from cell2mol.charge.balancing import balance_unitcell_charge
+from cell2mol.read_cif import extract_cell_atoms, extract_cell_parameters
 from cell2mol.write_results import (
-    write_cell_molecules_info,
+    write_cell_molecule_details,
     write_unique_species,
     write_plausible_charges,
     get_reference_error_message,
-    get_reference_error_message_all,
+    get_reference_error_messages,
     get_unitcell_error_message,
-    exit_with_error_exception,
+    write_exception_error_log,
     get_reference_warning_messages,
 )
-from cell2mol.utils.limits import ProcessingTimeoutError, set_time_limit
+from cell2mol.utils.limits import set_time_limit
 from cell2mol.compare import compare_metal_oxidation_states, compare_total_charge
 import sys
+from cell2mol.utils.processing import (
+    ProcessingError,
+    read_structure,
+    raise_processing_error,
+    save_partial_results,
+    run_cli,
+)
 import gc
 
 logger = logging.getLogger(__name__)
 
-# Error Codes
-ERR_CELL2MOL = config.ERR_CELL2MOL
-ERR_GENERAL = config.ERR_GENERAL
-ERR_TIMEOUT = config.ERR_TIMEOUT
-ERR_MEMORY = config.ERR_MEMORY
 
-
-# -----------------------------------------------------------------------------
-# Core function
-# -----------------------------------------------------------------------------
 def interpret_unitcell(input_path: str, name: str, current_dir: str):
-    """Orchestrates the cell2mol process for a CIF file."""
+    """Return cell results; raise ProcessingError on input or runtime failure."""
 
     refcell: Reference | None = None
     unitcell = None
     cells = None
-
-    exit_code = 0
+    structure = None
 
     try:
-        # Enforce timeout on the heavy lifting
+        refcell = interpret_reference(input_path, name, current_dir)
+        if refcell is None:
+            raise ProcessingError(
+                "Failed to create reference cell", config.ERR_CELL2MOL
+            )
+        if refcell.has_error():
+            return None
+
         with set_time_limit(config.TIMEOUT):
-            # ------------------------------------------------------
-            # Run Reference Interpretation and Initialize Unit Cell
-            # ------------------------------------------------------
-            refcell = interpret_reference(input_path, name, current_dir)
-
-            if not refcell:
-                logger.error("Failed to create reference cell from CIF.")
-                exit_code = ERR_CELL2MOL
-                return None
-
-            try:
-                structure = read(input_path, format="cif")
-            except (AssertionError, Exception) as e:
-                logger.error(f"ASE failed to parse {input_path}: {e}")
-                raise
-            cell_labels, cell_pos, cell_fracs = get_cell_atoms(structure)
-            cell_vector, cell_param, sym_ops = get_cell_parameters(structure)
+            structure = read_structure(read, input_path, "cif")
+            cell_labels, cell_pos, cell_fracs = extract_cell_atoms(structure)
+            cell_vector, cell_param, sym_ops = extract_cell_parameters(structure)
 
             unitcell = UnitCell.from_positional(
                 name=name,
@@ -102,82 +92,35 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
                 logger.info(
                     f" - Metal oxidation states comparison result: {metal_os_comparison}"
                 )
-                refcell.set_comparison_info(
+                refcell.set_comparison_results(
                     total_charge_comparison, metal_os_comparison
                 )
-                unitcell.set_comparison_info(
+                unitcell.set_comparison_results(
                     total_charge_comparison, metal_os_comparison
                 )
             else:
                 logger.error("cell2mol process encountered errors.")
                 logger.debug(" - Reference error case: %s", refcell.error_cases)
                 logger.debug(" - Unit cell error case: %s", unitcell.error_cases)
-                exit_code = ERR_CELL2MOL
 
-    # -------------------------------
-    # Memory errors
-    # -------------------------------
-    except MemoryError as exc:
-        logger.error("Memory limit reached. Attempting cleanup.")
-        gc.collect()
-
-        if refcell is not None:
-            if refcell.error_cases is None:
-                refcell.error_cases = {}
-            refcell.error_cases["memory"] = ERR_MEMORY
-        if unitcell is not None:
-            if unitcell.error_cases is None:
-                unitcell.error_cases = {}
-            unitcell.error_cases["memory"] = ERR_MEMORY
-
-        exit_with_error_exception(exc)
-        exit_code = ERR_MEMORY
-
-    # -------------------------------
-    # Timeout errors
-    # -------------------------------
-    except ProcessingTimeoutError as exc:
-        logger.error(f"Processing timed out after {config.TIMEOUT} seconds.")
-
-        if refcell is not None:
-            if refcell.error_cases is None:
-                refcell.error_cases = {}
-            refcell.error_cases["timeout"] = ERR_TIMEOUT
-        if unitcell is not None:
-            if unitcell.error_cases is None:
-                unitcell.error_cases = {}
-            unitcell.error_cases["timeout"] = ERR_TIMEOUT
-
-        exit_with_error_exception(exc)
-        exit_code = ERR_TIMEOUT
-
-    # -------------------------------
-    # All other runtime errors
-    # -------------------------------
     except Exception as exc:
-        logger.error(f"Unhandled error: {exc}")
-
-        if refcell is not None:
-            if refcell.error_cases is None:
-                refcell.error_cases = {}
-            refcell.error_cases["general"] = ERR_GENERAL
-        if unitcell is not None:
-            if unitcell.error_cases is None:
-                unitcell.error_cases = {}
-            unitcell.error_cases["general"] = ERR_GENERAL
-
-        exit_with_error_exception(exc)
-        exit_code = ERR_GENERAL
+        if isinstance(exc, ProcessingError) and refcell is None:
+            refcell = exc.result
+        if isinstance(exc, MemoryError):
+            structure = None
+            gc.collect()
+        logger.error("Unit-cell processing failed: %s", exc)
+        write_exception_error_log(exc)
+        raise_processing_error(exc, cells, refcell, unitcell)
 
     finally:
-        logger.info("Executing final output handling...")
-        _save_cell_outputs(name, current_dir, refcell, unitcell, cells)
+        save_partial_results(
+            lambda: _save_cell_outputs(name, current_dir, refcell, unitcell, cells),
+            cells,
+            refcell,
+            unitcell,
+        )
 
-        if exit_code != 0:
-            logger.info(f"Process exiting with code {exit_code}")
-            sys.exit(exit_code)
-
-    # return unitcell
     return cells
 
 
@@ -303,9 +246,6 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
 
 def _write_ref_detailed_summary(name, refcell, summary_path):
     """Writes the molecules info, species, errors, and warnings to file and log."""
-    # Retrieve pre-formatted messages (Warnings for True, INFO for None)
-    warning_messages = get_reference_warning_messages(refcell)
-
     # Write to File
     with open(summary_path, "w") as f:
         print(name, file=f)
@@ -325,7 +265,7 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
         print(f"  - Matched:    {matched_os}", file=f)
         print(f"  - Confidence: {confidence_str}", file=f)
 
-        write_cell_molecules_info(refcell, file=f)
+        write_cell_molecule_details(refcell, file=f)
         write_unique_species(refcell, file=f)
         write_plausible_charges(refcell, file=f)
 
@@ -333,7 +273,7 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
         if refcell.error_cases:
             all_codes = refcell.error_cases_all or {}
             for err_mode, code in refcell.error_cases.items():
-                msg = get_reference_error_message_all(all_codes.get(err_mode), code)
+                msg = get_reference_error_messages(all_codes.get(err_mode), code)
                 print(f"Reference Error (mode={err_mode}): {msg}", file=f)
 
 
@@ -349,7 +289,7 @@ def _write_unit_summary(name: str, unitcell, summary_path: str):
             f"Metal oxidation state comparison result: {getattr(unitcell, 'metal_os_comparison', 'N/A')}",
             file=f,
         )
-        write_cell_molecules_info(unitcell, file=f)
+        write_cell_molecule_details(unitcell, file=f)
 
         if unitcell.error_cases:
             # Print step-specific unit cell errors
@@ -365,6 +305,7 @@ def _safe_run(func, error_msg):
         func()
     except Exception:
         logger.exception(error_msg)
+        raise
 
 
 def _main():
@@ -381,12 +322,15 @@ def _main():
     ext = os.path.splitext(args.filepath)[1].lower()
 
     if ext != ".cif":
-        raise ValueError("Invalid input file format. Only .cif files are supported.")
+        sys.exit(config.ERR_INPUT)
 
-    interpret_unitcell(
-        input_path=input_path,
-        name=name,
-        current_dir=os.getcwd(),
+    sys.exit(
+        run_cli(
+            interpret_unitcell,
+            input_path=input_path,
+            name=name,
+            current_dir=os.getcwd(),
+        )
     )
 
 

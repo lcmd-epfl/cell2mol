@@ -4,7 +4,7 @@ import os
 import logging
 import numpy as np
 from ase.io import read
-from cell2mol.standardize_metal_os import standardize_reported_metal_os
+from cell2mol.standardize_metal_os import standardize_reported_metal_oxidation_states
 from cell2mol.utils import config
 from cell2mol.args import parsing_arguments
 from cell2mol.classes import Reference
@@ -16,51 +16,44 @@ from cell2mol.operations import (
 )
 from cell2mol.read_cif import (
     prefilter_cif,
-    get_cell_parameters,
-    get_wyckoff_positions,
-    get_geom_bond,
-    extract_info_from_cif,
-    compare_cif_with_reference,
+    extract_cell_parameters,
+    extract_atom_sites,
+    extract_bonds_and_moieties,
+    extract_cif_metadata,
+    check_cif_formula_mismatch,
 )
 from cell2mol.write_results import (
-    write_cell_molecules_info,
+    write_cell_molecule_details,
     write_unique_species,
     write_plausible_charges,
-    get_reference_error_message,
-    get_reference_error_message_all,
+    get_reference_error_messages,
     get_reference_warning_messages,
-    exit_with_error_input,
-    exit_with_error_exception,
+    write_input_error_log,
+    write_exception_error_log,
 )
-from cell2mol.connectivity import is_mismatch_adjacency
-from cell2mol.utils.limits import ProcessingTimeoutError, set_time_limit
-from cell2mol.utils.exceptions import ASEParseError
+from cell2mol.connectivity import has_adjacency_mismatch
+from cell2mol.utils.limits import set_time_limit
 import sys
+from cell2mol.utils.processing import (
+    ProcessingError,
+    read_structure,
+    raise_processing_error,
+    save_partial_results,
+    run_cli,
+)
 import gc
 
 logger = logging.getLogger(__name__)
 
-# Error Codes
-ERR_CELL2MOL = config.ERR_CELL2MOL
-ERR_ASE_PARSE = config.ERR_ASE_PARSE
-ERR_INPUT = config.ERR_INPUT
-ERR_GENERAL = config.ERR_GENERAL
-ERR_TIMEOUT = config.ERR_TIMEOUT
-ERR_MEMORY = config.ERR_MEMORY
-
 
 def interpret_reference(input_path, name, current_dir):
-    """
-    Process the reference molecules from a CIF file.
-    """
+    """Return reference results; raise ProcessingError on input or runtime failure."""
     logger.info("cell2mol version %s", config.VERSION)
     logger.info("Input CIF: %s", input_path)
     logger.debug("Timeout set to %d seconds", config.TIMEOUT)
 
     refcell = None
     structure = None
-    exit_code = 0
-    process_failure = False
 
     try:
         logger.info("Processing CIF file")
@@ -69,20 +62,15 @@ def interpret_reference(input_path, name, current_dir):
         if not cif_okay:
             for err_msg in error_message.splitlines():
                 logger.info(err_msg)
-            exit_with_error_input(
+            write_input_error_log(
                 f"CIF file is not suitable for processing\n{error_message}"
             )
-            exit_code = ERR_INPUT
-            return None
+            raise ProcessingError(error_message, config.ERR_INPUT)
         # Enforce timeout on the heavy lifting
         with set_time_limit(config.TIMEOUT):
-            try:
-                structure = read(input_path, format="cif")
-            except Exception as exc:
-                logger.error(f"ASE failed to parse {input_path}: {exc}")
-                raise ASEParseError from exc
+            structure = read_structure(read, input_path, "cif")
 
-            cell_vector, cell_param, _ = get_cell_parameters(structure)
+            cell_vector, cell_param, _ = extract_cell_parameters(structure)
             refcell = create_reference(input_path, name, cell_vector, cell_param)
 
             if refcell.has_error():
@@ -90,14 +78,13 @@ def interpret_reference(input_path, name, current_dir):
                     "Fails generating reference molecules (case=%s)",
                     (refcell.error_cases or {}).get("ref_molecules"),
                 )
-                process_failure = True
                 return refcell
 
             # Save intermediate success
             _handle_reference_outputs(name, current_dir, refcell)
 
             # Identify unique species and full species list
-            refcell.get_unique_species()
+            refcell.collect_unique_species()
 
             # Check for missing hydrogens
             refcell.check_hydrogens()
@@ -106,76 +93,31 @@ def interpret_reference(input_path, name, current_dir):
             refcell.get_plausible_charges()
 
             refcell.assess_errors(mode="hydrogens")
-            if refcell.has_error():
+            if refcell.has_error("hydrogens"):
                 logger.error(
                     "Fails checking hydrogens (case=%s)",
                     (refcell.error_cases or {}).get("hydrogens"),
                 )
-                process_failure = True
 
             refcell.assess_errors(mode="plausible_charges")
-            if refcell.has_error():
+            if refcell.has_error("plausible_charges"):
                 logger.error(
                     "Fails checking plausible charges (case=%s)",
                     (refcell.error_cases or {}).get("plausible_charges"),
                 )
-                process_failure = True
 
-    except ASEParseError as exc:
-        logger.error("ASE parsing failed.")
-        exit_with_error_exception(exc)
-        exit_code = ERR_ASE_PARSE
-
-    except MemoryError as exc:
-        # CRITICAL: Delete large objects and force GC *before* doing anything else
-        if structure is not None:
-            del structure
-        gc.collect()
-
-        logger.error("Memory limit reached. RAM cleared.")
-
-        if refcell is not None:
-            if refcell.error_cases is None:
-                refcell.error_cases = {}
-            refcell.error_cases["memory"] = ERR_MEMORY
-
-        # Now it is safe(r) to call the exit helper
-        exit_with_error_exception(exc)
-        exit_code = ERR_MEMORY
-
-    # 2. Handle Timeout Errors Second
-    except ProcessingTimeoutError as exc:
-        logger.error(f"Processing timed out after {config.TIMEOUT} seconds.")
-
-        if refcell is not None:
-            if refcell.error_cases is None:
-                refcell.error_cases = {}
-            refcell.error_cases["timeout"] = ERR_TIMEOUT
-
-        exit_with_error_exception(exc)
-        exit_code = ERR_TIMEOUT
-
-    # 3. Handle All Other Errors
     except Exception as exc:
-        logger.error(f"Unhandled error: {exc}")
-        if refcell is not None:
-            if refcell.error_cases is None:
-                refcell.error_cases = {}
-            refcell.error_cases["general"] = ERR_GENERAL
-        exit_with_error_exception(exc)
-        exit_code = ERR_GENERAL
+        if isinstance(exc, MemoryError):
+            structure = None
+            gc.collect()
+        logger.error("Reference processing failed: %s", exc)
+        write_exception_error_log(exc)
+        raise_processing_error(exc, refcell)
 
     finally:
-        logger.info("Executing final output handling...")
-        # Ensure we try to save whatever valid data we have (refcell might be None)
-        _handle_reference_outputs(name, current_dir, refcell)
-
-        if exit_code == 0 and process_failure:
-            exit_code = ERR_CELL2MOL
-
-        if exit_code != 0:
-            logger.info(f"Process exiting with code {exit_code}")
-            sys.exit(exit_code)
+        save_partial_results(
+            lambda: _handle_reference_outputs(name, current_dir, refcell), refcell
+        )
 
     return refcell
 
@@ -192,7 +134,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
         refcell (object): Reference Cell object.
     """
 
-    atom_site_labels, ref_labels, ref_fracs = get_wyckoff_positions(input_path)
+    atom_site_labels, ref_labels, ref_fracs = extract_atom_sites(input_path)
     ref_pos = np.asarray(frac2cart_fromparam(ref_fracs, cell_param))
 
     refcell = Reference.from_positional(
@@ -207,15 +149,15 @@ def create_reference(input_path, name, cell_vector, cell_param):
     refcell.set_subtype("reference")
 
     # Get CIF bond moiety information
-    geom_bond_cif, moiety_list_cif = get_geom_bond(input_path)
+    geom_bond_cif, moiety_list_cif = extract_bonds_and_moieties(input_path)
     refcell.set_cif_bond_moiety(geom_bond_cif, moiety_list_cif)
 
     # Extract additional CIF information
-    chemical_name, reported_metal_os, moiety_dicts = extract_info_from_cif(input_path)
-    refcell.set_additional_cif_info(chemical_name, reported_metal_os, moiety_dicts)
+    chemical_name, reported_metal_os, moiety_dicts = extract_cif_metadata(input_path)
+    refcell.set_cif_metadata(chemical_name, reported_metal_os, moiety_dicts)
 
     # Generate reference molecules
-    refcell.get_reference_molecules()
+    refcell.build_reference_molecules()
 
     if refcell.error_cases is None:
         refcell.error_cases = {}
@@ -234,7 +176,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
         f"Reference Metals found: {metal_label_list} with reported oxidation states: {reported_metal_os}"
     )
 
-    matched_list, confidence = standardize_reported_metal_os(
+    matched_list, confidence = standardize_reported_metal_oxidation_states(
         metal_label_list, reported_metal_os
     )
     logger.info(
@@ -250,7 +192,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
     # Gather warnings into a dictionary
     # --------------------------------------------------
     warnings_payload = {
-        "cif_mismatch": compare_cif_with_reference(moiety_dicts, refcell.refmoleclist),
+        "cif_mismatch": check_cif_formula_mismatch(moiety_dicts, refcell.refmoleclist),
         "over_polynuclear_limit": any(
             is_polynuclear_over_limit(ref.labels, max_metal_centers=config.MAX_METALS)
             for ref in refcell.refmoleclist
@@ -258,10 +200,10 @@ def create_reference(input_path, name, cell_vector, cell_param):
         "mixed_metals": any(
             has_mixed_metal_types(ref.labels) for ref in refcell.refmoleclist
         ),
-        "is_mismatch_adj": is_mismatch_adjacency(
+        "is_mismatch_adj": has_adjacency_mismatch(
             ref_labels, ref_pos, atom_site_labels, geom_bond_cif
         ),
-        "is_mismatch_metal_adj": is_mismatch_adjacency(
+        "is_mismatch_metal_adj": has_adjacency_mismatch(
             ref_labels, ref_pos, atom_site_labels, geom_bond_cif, metal_only=True
         ),
         "metal_coord_diff": has_different_metal_coordination(
@@ -273,7 +215,7 @@ def create_reference(input_path, name, cell_vector, cell_param):
     }
 
     # Set the warnings in the refcell object
-    refcell.set_potential_warning(warnings_payload)
+    refcell.set_potential_warnings(warnings_payload)
 
     return refcell
 
@@ -301,10 +243,6 @@ def _handle_reference_outputs(name, current_dir, refcell):
         "Failed to write reference summary",
     )
 
-    # from cell2mol.write_results import extract_refmoleclist_xyz
-    # if logger.isEnabledFor(logging.DEBUG) and not refcell.error_cases.get("ref_molecules", 0) == -1:
-    #     extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
-
 
 def _write_ref_detailed_summary(name, refcell, summary_path):
     """Writes the molecules info, species, errors, and warnings to file and log."""
@@ -330,7 +268,7 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
         print(f"  - Matched:    {matched_os}", file=f)
         print(f"  - Confidence: {confidence_str}", file=f)
 
-        write_cell_molecules_info(refcell, file=f)
+        write_cell_molecule_details(refcell, file=f)
 
         write_unique_species(refcell, file=f)
         write_plausible_charges(refcell, file=f)
@@ -339,7 +277,7 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
         if refcell.error_cases:
             all_codes = refcell.error_cases_all or {}
             for err_mode, code in refcell.error_cases.items():
-                msg = get_reference_error_message_all(all_codes.get(err_mode), code)
+                msg = get_reference_error_messages(all_codes.get(err_mode), code)
                 print(f"Reference Error (mode={err_mode}): {msg}", file=f)
 
         # Print potential issues and data status
@@ -354,7 +292,7 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
     # Log the specific error for the current operation mode
     all_codes = refcell.error_cases_all or {}
     for err_mode, code in refcell.error_cases.items():
-        current_err_msg = get_reference_error_message_all(all_codes.get(err_mode), code)
+        current_err_msg = get_reference_error_messages(all_codes.get(err_mode), code)
         logger.info("Reference Error (mode=%s): %s", err_mode, current_err_msg)
 
     if not warning_messages:
@@ -376,6 +314,7 @@ def _safe_run(func, error_msg):
         func()
     except Exception:
         logger.exception(error_msg)
+        raise
 
 
 def _main():
@@ -392,12 +331,15 @@ def _main():
     ext = os.path.splitext(args.filepath)[1].lower()
 
     if ext != ".cif":
-        raise ValueError("Invalid input file format. Only .cif files are supported.")
+        sys.exit(config.ERR_INPUT)
 
-    interpret_reference(
-        input_path=input_path,
-        name=name,
-        current_dir=os.getcwd(),
+    sys.exit(
+        run_cli(
+            interpret_reference,
+            input_path=input_path,
+            name=name,
+            current_dir=os.getcwd(),
+        )
     )
 
 
