@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import numpy as np
-from typing import Tuple, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast
 from cell2mol.operations import get_angle, unit_vector, perp_unit, kabsch_rotation
 from cell2mol.elementdata import ElementData
 from cell2mol.element_utils import ALKALI_AND_ALKALINE_EARTH_METALS
@@ -23,13 +23,10 @@ logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 
-def detect_missing_hydrogens(
-    atomic_number, center_coord, neighbor_coords, neighbor_labels
-):
+def detect_missing_carbon_hydrogens(center_coord, neighbor_coords, neighbor_labels):
     """Detect missing hydrogen atoms from local adjacency geometry.
 
     Args:
-        atomic_number (int): atomic number of the central atom
         center_coord (array-like): coordinates of the central atom
         neighbor_coords (list): coordinates of bonded neighboring atoms
         neighbor_labels (list): element symbols of bonded atoms
@@ -49,7 +46,7 @@ def detect_missing_hydrogens(
         unit_vector(np.subtract(coord, center_coord)) for coord in neighbor_coords
     ]
 
-    geometry, expected_coordination, geometry_report = infer_coordination_geometry(
+    geometry, expected_coordination, geometry_report = infer_local_geometry(
         bond_vectors
     )
 
@@ -77,7 +74,7 @@ def detect_missing_hydrogens(
     return missing_h, report, num_missing_h
 
 
-def infer_coordination_geometry(bond_vectors):
+def infer_local_geometry(bond_vectors):
     """Infer coordination geometry from bond vectors.
 
     Args:
@@ -152,14 +149,23 @@ def infer_coordination_geometry(bond_vectors):
 
 # Diatomic C-X moieties whose lone carbon is genuinely 1-coordinate (a triple
 # bond, e.g. cyanide C-N), so it must not be flagged as missing hydrogens.
-MOIETY_SKIP_CHECK = {"C-N", "C-P", "C-As", "C-Sb", "C-O", "C-S", "C-Se", "C-Te"}
+DIATOMIC_CARBON_EXEMPTIONS = {
+    "C-N",
+    "C-P",
+    "C-As",
+    "C-Sb",
+    "C-O",
+    "C-S",
+    "C-Se",
+    "C-Te",
+}
 
 
-def _missing_h_in_molecule(mol):
-    """Missing-H check for a single non-complex molecule specie.
+def _check_molecule_hydrogens(mol):
+    """Missing-H check for a single metal-free molecule specie.
 
     Args:
-        mol: a non-complex molecule Specie (no d-/f-block metals).
+        mol: a metal-free molecule Specie (no d-/f-block metals).
 
     Returns:
         tuple:
@@ -177,13 +183,11 @@ def _missing_h_in_molecule(mol):
         logger.warning("Isolated O atom detected (possible water with missing H)")
         return missing_h_in_carbon, missing_h_in_water
 
-    if mol.formula in MOIETY_SKIP_CHECK:
+    if mol.formula in DIATOMIC_CARBON_EXEMPTIONS:
         return missing_h_in_carbon, missing_h_in_water
 
     has_fullerene = (
-        mol.has_fullerene
-        if mol.has_fullerene is not None
-        else mol.evaluate_has_fullerene()
+        mol.has_fullerene if mol.has_fullerene is not None else mol.detect_fullerene()
     )
     is_open_cage = False
     if not has_fullerene:
@@ -207,8 +211,7 @@ def _missing_h_in_molecule(mol):
         neighbor_coords = [mol.coord[i] for i in atom.adjacency]
         neighbor_labels = [mol.labels[i] for i in atom.adjacency]
 
-        missing_h_detected, report, _ = detect_missing_hydrogens(
-            atom.atnum,
+        missing_h_detected, report, _ = detect_missing_carbon_hydrogens(
             atom.coord,
             neighbor_coords,
             neighbor_labels,
@@ -229,7 +232,7 @@ def _missing_h_in_molecule(mol):
     return missing_h_in_carbon, missing_h_in_water
 
 
-def _missing_h_in_ligand(lig, parent=None):
+def _check_ligand_hydrogens(lig, parent=None):
     """Missing-H check for a single ligand specie.
 
     Args:
@@ -311,7 +314,7 @@ def _missing_h_in_ligand(lig, parent=None):
             )
             missing_h_in_carbon = True
 
-    if lig.formula in MOIETY_SKIP_CHECK:
+    if lig.formula in DIATOMIC_CARBON_EXEMPTIONS:
         return (
             missing_h_in_carbon,
             missing_h_on_coordinated_o_donor,
@@ -319,9 +322,7 @@ def _missing_h_in_ligand(lig, parent=None):
         )
 
     has_fullerene = (
-        lig.has_fullerene
-        if lig.has_fullerene is not None
-        else lig.evaluate_has_fullerene()
+        lig.has_fullerene if lig.has_fullerene is not None else lig.detect_fullerene()
     )
     # See the matching comment above: skip the redundant open-cage
     # check once has_fullerene is already True.
@@ -355,8 +356,7 @@ def _missing_h_in_ligand(lig, parent=None):
         neighbor_coords = [parent.coord[i] for i in atom.adjacency]
         neighbor_labels = [parent.labels[i] for i in atom.adjacency]
 
-        missing_h_detected, report, _ = detect_missing_hydrogens(
-            atom.atnum,
+        missing_h_detected, report, _ = detect_missing_carbon_hydrogens(
             atom.coord,
             neighbor_coords,
             neighbor_labels,
@@ -381,14 +381,11 @@ def _missing_h_in_ligand(lig, parent=None):
     )
 
 
-def check_missing_hydrogens_in_specie(specie):
+def detect_species_missing_hydrogens(specie):
     """Check for missing hydrogen atoms in a single specie.
 
-    Specie-level counterpart of :func:`check_missing_hydrogens`, meant to be
-    called on entries of a reference cell's ``species_list`` (already-split
-    ligands, non-complex molecules, and metals). Metals carry no hydrogens and
-    always report clean. A complex molecule passed directly is dispatched to its
-    ligands.
+    Accept a ligand, metal-free molecule, metal, or complex molecule.
+    Metals report no missing hydrogens; complex molecules delegate to ligands.
 
     Args:
         specie: a Specie (Ligand, Molecule, or Metal).
@@ -413,13 +410,13 @@ def check_missing_hydrogens_in_specie(specie):
             missing_h_in_carbon,
             missing_h_on_coordinated_o_donor,
             missing_h_on_coordinated_n_donor,
-        ) = _missing_h_in_ligand(specie)
-    elif specie.is_non_complex_molecule:
-        missing_h_in_carbon, missing_h_in_water = _missing_h_in_molecule(specie)
+        ) = _check_ligand_hydrogens(specie)
+    elif specie.is_metal_free_molecule:
+        missing_h_in_carbon, missing_h_in_water = _check_molecule_hydrogens(specie)
     else:
         # A complex molecule handed in directly: fold over its ligands.
         for lig in getattr(specie, "ligands", None) or []:
-            c, o, n = _missing_h_in_ligand(lig, parent=specie)
+            c, o, n = _check_ligand_hydrogens(lig, parent=specie)
             missing_h_in_carbon |= c
             missing_h_on_coordinated_o_donor |= o
             missing_h_on_coordinated_n_donor |= n
@@ -441,49 +438,7 @@ def check_missing_hydrogens_in_specie(specie):
     )
 
 
-def check_missing_hydrogens(reference_molecules):
-    """Check for missing hydrogen atoms in reference molecules.
-
-    Args:
-        reference_molecules (list): list of reference molecule objects
-
-    Returns:
-        tuple:
-            has_missing_h (bool): True if missing hydrogens are detected
-            missing_h_in_carbon (bool): missing H in coordinated carbon atoms
-            missing_h_on_coordinated_donor (bool): missing H on a
-                coordinated O donor (water/hydroxide) or N donor
-                (ammonia) -- both as error code 3
-            missing_h_in_water (bool): missing H in isolated water
-    """
-    missing_h_in_carbon = False
-    missing_h_in_water = False
-    missing_h_on_coordinated_donor = False
-
-    logger.info("Detecting any missing hydrogens in reference molecules...")
-
-    for ref in reference_molecules:
-        has_missing_h, carbon, donor, water = check_missing_hydrogens_in_specie(ref)
-        missing_h_in_carbon |= carbon
-        missing_h_on_coordinated_donor |= donor
-        missing_h_in_water |= water
-
-    has_missing_h = (
-        missing_h_in_carbon or missing_h_on_coordinated_donor or missing_h_in_water
-    )
-
-    if not has_missing_h:
-        logger.info("No missing hydrogen atoms detected")
-
-    return (
-        has_missing_h,
-        missing_h_in_carbon,
-        missing_h_on_coordinated_donor,
-        missing_h_in_water,
-    )
-
-
-def place_hydrogens(
+def place_carbon_hydrogens(
     C,
     N1=None,
     N2=None,
@@ -531,7 +486,6 @@ def place_hydrogens(
     u2 = unit_vector(np.array([1, -1, -1], float))
     u3 = unit_vector(np.array([-1, 1, -1], float))
     u4 = unit_vector(np.array([-1, -1, 1], float))
-    # Utemp = [u1, u2, u3, u4]
 
     mode = hybridization.lower()
     if mode not in ("auto", "sp2", "sp3"):
@@ -642,7 +596,7 @@ def add_hydrogens(
     ligand: "Ligand",
     num_hydrogens: int,
     element: str = "H",
-) -> Tuple[bool, list[str], NDArray]:
+) -> tuple[bool, list[str], NDArray]:
     """Add hydrogens to a given atom site."""
 
     isadded = True
@@ -680,32 +634,29 @@ def add_hydrogens(
         )
 
         if atom.label == "C":
-            ismissingH, report, num_missingH = detect_missing_hydrogens(
-                atom.atnum,
+            ismissingH, report, num_missingH = detect_missing_carbon_hydrogens(
                 atom.coord,
                 bonded_atom_coord,
                 bonded_atom_labels,
             )
             logger.debug(
-                "detect_missing_hydrogens -> %s, %s, %d",
+                "detect_missing_carbon_hydrogens -> %s, %s, %d",
                 ismissingH,
                 report,
                 num_missingH,
             )
-        else:
-            ismissingH, report, num_missingH = True, "", 2
 
         Hs = None
 
         if num_hydrogens == 2:
             if len(bonded_atom_labels) == 1:
-                Hs = place_hydrogens(
+                Hs = place_carbon_hydrogens(
                     apos,
                     bonded_atom_coord[0],
                     hybridization="sp2",
                 )
             elif len(bonded_atom_labels) == 2:
-                Hs = place_hydrogens(
+                Hs = place_carbon_hydrogens(
                     apos,
                     bonded_atom_coord[0],
                     bonded_atom_coord[1],
@@ -714,7 +665,7 @@ def add_hydrogens(
 
         elif num_hydrogens == 3:
             if len(bonded_atom_labels) == 1:
-                Hs = place_hydrogens(
+                Hs = place_carbon_hydrogens(
                     apos,
                     bonded_atom_coord[0],
                     hybridization="sp3",
