@@ -17,7 +17,7 @@ from cell2mol.element_utils import (
     METALLOIDS,
     labels2formula,
 )
-from cell2mol.write_results import save_coordination_report
+from cell2mol.write_results import write_coordination_report
 import re
 
 logger = logging.getLogger(__name__)
@@ -859,5 +859,5 @@ def has_different_metal_coordination(
 
     logger.info("Coordination report for %s: %d records.", refcode, len(report))
     if report_csv is not None:
-        save_coordination_report(report, report_csv)
+        write_coordination_report(report, report_csv)
     return overall_difference

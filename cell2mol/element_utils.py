@@ -4,6 +4,10 @@ from cell2mol.my_types import NDArray
 
 elemdatabase = ElementData()
 
+NOBLE_GASES = {"He", "Ne", "Ar", "Kr", "Xe", "Rn"}
+
+HALOGENS = {"F", "Cl", "Br", "I"}
+
 TRANSITION_METALS = {
     "Sc",
     "Ti",
@@ -134,12 +138,10 @@ def labels2electrons(labels: list[str]):
         eleccount = 0
         for label in labels:
             eleccount += elemdatabase.elementnr[label]
-    elif isinstance(labels, str):
-        eleccount = elemdatabase.elementnr[labels]
     return eleccount
 
 
-def get_metal_idxs(labels: list[str]) -> list[int]:
+def get_df_block_metal_idxs(labels: list[str]) -> list[int]:
     """Transition metals, lanthanides, and actinides."""
     d_f_metals = TRANSITION_METALS | LANTHANIDES | ACTINIDES
     return [i for i, label in enumerate(labels) if label in d_f_metals]

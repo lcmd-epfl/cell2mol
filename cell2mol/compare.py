@@ -1,3 +1,5 @@
+"""Compare atom properties, species composition, and CIF charge reports."""
+
 import logging
 from cell2mol.elementdata import ElementData
 
@@ -6,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def compare_atoms(at1, at2, check_coordinates: bool = False):
-    # Compares Species, Coordinates, Charge and Spin
+    """Compare element symbols, available charges and spins, and optional coordinates."""
     if at1.label != at2.label:
         return False
     if check_coordinates:
@@ -26,6 +28,7 @@ def compare_atoms(at1, at2, check_coordinates: bool = False):
 
 
 def compare_metals(at1, at2, check_coordinates: bool = False):
+    """Compare metal element symbols and coordination formulas, optionally coordinates."""
     if at1.subtype != "metal" or at2.subtype != "metal":
         return False
 
@@ -33,9 +36,9 @@ def compare_metals(at1, at2, check_coordinates: bool = False):
         return False
 
     if at1.coord_sphere_formula is None:
-        at1.get_coord_sphere_formula()
+        at1.build_coordination_sphere_formula()
     if at2.coord_sphere_formula is None:
-        at2.get_coord_sphere_formula()
+        at2.build_coordination_sphere_formula()
     if at1.coord_sphere_formula != at2.coord_sphere_formula:
         return False
 
@@ -54,22 +57,20 @@ def compare_species(
     mol1,
     mol2,
 ):
+    """Compare atom counts, neutral electron counts, and element-pair adjacency counts."""
     elems = elemdatabase.elementnr.keys()
 
-    # a pair of species is compared on the basis of:
-    # 1) the total number of atoms
     if mol1.natoms != mol2.natoms:
         return False
 
-    # 2) the total number of electrons (as sum of atomic number)
     if mol1.eleccount != mol2.eleccount:
         return False
 
-    # 3) the number of atoms of each type
+    # Compare composition before building adjacency-type counts.
     if mol1.element_count is None:
-        mol1.set_element_count()
+        mol1.compute_element_count()
     if mol2.element_count is None:
-        mol2.set_element_count()
+        mol2.compute_element_count()
 
     assert mol1.element_count is not None
     assert mol2.element_count is not None
@@ -78,11 +79,10 @@ def compare_species(
         if elem != mol2.element_count[kdx]:
             return False
 
-    # 4) the number of adjacencies between each pair of element types
     if mol1.adj_types is None:
-        mol1.set_adj_types()
+        mol1.compute_adjacency_types()
     if mol2.adj_types is None:
-        mol2.set_adj_types()
+        mol2.compute_adjacency_types()
     assert mol1.adj_types is not None
     assert mol2.adj_types is not None
 
@@ -100,6 +100,7 @@ def compare_species(
 
 
 def compare_reference_indices(ref, mol):
+    """Compare atom counts, formulas, and reference atom indices, ignoring order."""
     if (ref.natoms == mol.natoms) and (ref.formula == mol.formula):
         ref_parent_indices = sorted(ref.get_parent_indices("reference"))
         mol_parent_indices = sorted(mol.get_parent_indices("reference"))
@@ -113,6 +114,7 @@ def compare_reference_indices(ref, mol):
 
 
 def compare_total_charge(refcell):
+    """Record assigned versus CIF charges; return False if any known pair disagrees."""
     for i, ref in enumerate(refcell.refmoleclist):
         if ref.totcharge_cif is not None and ref.totcharge is not None:
             ref.totcharge_agree = ref.totcharge_cif == ref.totcharge
@@ -129,12 +131,11 @@ def compare_total_charge(refcell):
 
 
 def compare_metal_oxidation_states(refcell):
+    """Compare assigned and reported metal oxidationstate counts.
+
+    Return None when reports or complete name matches are unavailable.
     """
-    Compare the list of metals found in the structure with
-    the reported metal oxidation states.
-    Returns True if they match, False otherwise.
-    """
-    # Create a dictionary to count occurrences of each metal
+    # Include unassigned metals as label_None tokens.
     metal_os_tag_list = []
     for ref in refcell.refmoleclist:
         if ref.metals:
@@ -179,7 +180,7 @@ def compare_metal_oxidation_states(refcell):
         else:
             metal_os_count[metal_os] = 1
 
-    # Create a dictionary to count occurrences of each reported oxidation state
+    # Compare occurrence counts, including repeated oxidation states.
     reported_os_count = {}
     for reported_metal_os in matched_list:
         if reported_metal_os in reported_os_count:

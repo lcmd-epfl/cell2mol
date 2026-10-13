@@ -300,7 +300,7 @@ def classify_fragments_and_molecules(initial_fragments, refmoleclist):
         incomplete_fragments = [incomplete_fragments[i] for i in order]
 
     for frag in incomplete_fragments + hydrogens:
-        frag.get_centroid()
+        frag.compute_centroid()
 
     logger.debug(
         "Incomplete fragments: %s",
@@ -629,12 +629,14 @@ def generate_unitcell_molecules(
             atom.add_parent(unitcell, index=idx)
         for atom, idx in zip(newmolec.atoms or [], mol.ref_indices):
             atom.add_parent(refcell, index=idx)
-        if newmolec.iscomplex or newmolec.has_ia_iia:
-            logger.debug("Is complex: %s", newmolec.formula)
-            logger.debug("Splitting complex: %s", newmolec.formula)
+        if newmolec.is_metal_complex or newmolec.has_s_block_metal:
+            logger.debug("Is Metal complex: %s", newmolec.formula)
+            logger.debug("Splitting Metal complex: %s", newmolec.formula)
             newmolec.split_complex()
-        elif newmolec.has_post_transition_metal:
-            logger.debug("Has post-transition metal: %s", newmolec.formula)
+        elif newmolec.is_post_transition_metal_complex:
+            logger.debug(
+                "Splitting post-transition metal complex: %s", newmolec.formula
+            )
             newmolec.split_complex(post_tms=True)
         else:
             newmolec.add_parent(newmolec, indices=[*range(0, newmolec.natoms, 1)])
@@ -667,14 +669,14 @@ def assign_unitcell_species(unitcell, reference_species_list):
     ref_molecules = [
         ref
         for ref in reference_species_list
-        if ref.subtype == "molecule" and ref.is_non_complex_molecule
+        if ref.subtype == "molecule" and ref.is_metal_free_molecule
     ]
     ref_ligands = [ref for ref in reference_species_list if ref.subtype == "ligand"]
     ref_metals = [ref for ref in reference_species_list if ref.subtype == "metal"]
 
     for mol in unitcell.moleclist:
-        # Case 1: non-complex molecule
-        if mol.is_non_complex_molecule:
+        # Case 1: metal-free molecule
+        if mol.is_metal_free_molecule:
             for ref in ref_molecules:
                 if compare_reference_indices(ref, mol):
                     mol.unique_index = ref.unique_index
@@ -888,7 +890,7 @@ def _build_fragments_from_blocklist(
         frag.add_parent(refcell, indices=ref_indices)
 
         # Geometry & bonding
-        frag.set_fractional_coord(mol_frac_coord)
+        frag.set_fractional_coordinates(mol_frac_coord)
         frag.set_adjacency_parameters(cov_factor, metal_factor)
         frag.set_atoms(
             create_adjacencies=True,
@@ -1082,8 +1084,8 @@ def _merge_fragment_pair(
         merged.cell_indices = merged_cell_indices
 
         merged.set_adjacency_parameters(cov_factor, metal_factor)
-        merged.set_element_count()
-        merged.get_centroid()
+        merged.compute_element_count()
+        merged.compute_centroid()
         merged.set_atoms(
             create_adjacencies=True,
             atom_site_labels=merged_atom_site_labels,
