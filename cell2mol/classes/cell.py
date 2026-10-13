@@ -1,5 +1,6 @@
 from __future__ import annotations
-import pickle
+
+from cell2mol.utils.serialization import ModelFileMixin
 import logging
 from typing import Any, TYPE_CHECKING, cast
 
@@ -9,25 +10,16 @@ from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
 from cell2mol.classes.molecule import Molecule
-from cell2mol.charge.specie_assigner import assemble_complex_charge_state
-from cell2mol.elementdata import ElementData
 from cell2mol.utils import BaseModel, config
-from cell2mol.my_types import NDArray, Type, SubType, Format
-from pathlib import Path
+from cell2mol.my_types import NDArray, Type, SubType
 
 if TYPE_CHECKING:
     from cell2mol.classes.reference import Reference
     from cell2mol.classes.unitcell import UnitCell
 
-try:
-    from typing import Self  # py3.11+
-except ImportError:
-    from typing_extensions import Self  # py3.10
 logger = logging.getLogger(__name__)
 
-elemdatabase = ElementData()
 
-Labels = list[str]
 _CHARGE_ERRORS = [("error_assign_charge", 8), ("error_create_bonds", 9)]
 _SPIN_ERRORS = [("error_get_spin", 10)]
 
@@ -65,13 +57,15 @@ ERROR_MAPS = {
 }
 
 
-class Cell(BaseModel):
-    model_config = {"arbitrary_types_allowed": True, "populate_by_name": True}
+class Cell(ModelFileMixin, BaseModel):
+    """Shared structure data, charge assignment, and step errors for cells."""
 
-    # Required constructor parameters
+    model_config = {"populate_by_name": True}
+
+    # Structure inputs
     name: str
-    labels: Labels
-    coord: NDArray = Field(alias="pos")  # Using alias to match original parameter name
+    labels: list[str]
+    coord: NDArray = Field(alias="pos")  # Legacy input alias
     frac_coord: NDArray
     cell_vector: NDArray
     cell_param: NDArray
@@ -79,60 +73,49 @@ class Cell(BaseModel):
     natoms: int | None = None
     subtype: SubType | None = None
 
-    # Unique species (only defined for reference) related attributes
     unique_indices: list[int] | None = None
 
-    # Specie for molecules, ligands, or metals
+    # Metal-free molecules, ligands, and metals used for charge balancing.
     species_list: list[Specie | Metal] | None = None
 
-    # Error assessment
+    # Step error flags, primary codes, and all matching codes.
     error_assign_charge: bool | None = None
     error_create_bonds: bool | None = None
     error_get_spin: bool | None = None
-    # error_case: int | None = None
-    # Primary (first-matching, most severe) error code per processing mode.
     error_cases: dict[str, int] | None = None
-    # Every code that fired for that mode. A mode can trigger several rules at
-    # once -- "hydrogens" is the usual case, where a structure can be short of
-    # hydrogens on a coordinated donor AND on carbon -- and reporting only the
-    # first hides the rest. error_cases keeps the single primary code, so exit
-    # codes and has_error() are unaffected.
     error_cases_all: dict[str, list[int]] | None = None
 
     # Comparison results
     total_charge_comparison: bool | None = None
     metal_os_comparison: bool | None = None
 
-    # Frozen fields
     version: str = Field(default=config.VERSION, frozen=True)
     type: Type = Field(default="cell")
 
     def model_post_init(self, __context: Any) -> None:
-        # Compute natoms from labels length
+        """Set the atom count when it is not supplied."""
         if self.natoms is None:
             self.natoms = len(self.labels)
 
     def set_subtype(self, subtype: SubType):
+        """Store the cell subtype."""
         self.subtype = subtype
 
-    def set_comparison_info(self, total_charge_comparison, metal_os_comparison):
-        """Save the results of total charge and metal oxidation state comparisons."""
+    def set_comparison_results(self, total_charge_comparison, metal_os_comparison):
+        """Store total-charge and metal oxidation-state comparison results."""
         self.total_charge_comparison = total_charge_comparison
         self.metal_os_comparison = metal_os_comparison
 
     def assign_charges(self, refmoleclist: list[Molecule] | None = None):
-        """
-        Master function to assign charges, create bonds, and log results.
-        """
-        # Determine molecule list and map charges
+        """Map charges, build bonds, assemble complexes, and log results."""
         if self.subtype == "reference":
             reference_self = cast("Reference", self)
-            molecule_list = reference_self.refmoleclist
+            molecule_list = self._get_molecules()
             reference_self.map_charges_to_reference()
             log_prefix = "Reference"
         elif self.subtype == "unitcell":
             unitcell_self = cast("UnitCell", self)
-            molecule_list = unitcell_self.moleclist
+            molecule_list = self._get_molecules()
             unitcell_self.map_charges_to_unitcell(refmoleclist=refmoleclist or [])
             log_prefix = "UnitCell"
         else:
@@ -142,35 +125,30 @@ class Cell(BaseModel):
         logger.info("Assigning Charges to %s Molecules", log_prefix)
         logger.info("=" * 40)
 
-        # Finalize bonds and Log results
-        self._finalize_bonds_and_prepare(molecule_list)
+        self._create_bonds_and_assemble_complexes(molecule_list)
         self._log_charge_results(molecule_list, log_prefix)
 
-    def _finalize_bonds_and_prepare(self, molecule_list):
-        """
-        Shared logic to finalize bonding and prepare complex molecules.
-        Only prepares molecules if bonding was successful.
-        """
+    def _create_bonds_and_assemble_complexes(self, molecule_list):
+        """Build bonds and assemble complexes, recording failures per molecule."""
+        from cell2mol.charge.charge_assignment import assemble_complex_charge_state
+
         overall_error = False
 
         for mol in molecule_list:
-            # Create Bonds
             try:
                 mol.create_bonds()
             except Exception as e:
                 mol.error_create_bonds = True
                 logger.error("Bonding failed for %s: %s", mol, e)
 
-            # Update overall error state if any create_bonds failed
             if mol.error_create_bonds:
                 overall_error = True
 
-            #  Prepare Complex Molecules (if bonding succeeded)
-            if not mol.is_non_complex_molecule and not mol.error_create_bonds:
+            # Assemble complexes only after bonding succeeds.
+            if not mol.is_metal_free_molecule and not mol.error_create_bonds:
                 try:
                     assemble_complex_charge_state(mol)
                 except Exception as e:
-                    # We flag the error state here as well
                     mol.error_create_bonds = True
                     overall_error = True
                     logger.error("Preparation failed for %s: %s", mol, e)
@@ -178,13 +156,13 @@ class Cell(BaseModel):
         self.error_create_bonds = overall_error
 
     def _log_charge_results(self, molecule_list, label: str):
-        """Shared logic to log the final state of molecules."""
+        """Log assigned molecule, ligand, and metal charges."""
         for idx, mol in enumerate(molecule_list):
             logger.info("ASSIGN_CHARGES: %s Molecule %d %s", label, idx, mol.formula)
 
-            if mol.is_non_complex_molecule:
+            if mol.is_metal_free_molecule:
                 logger.info(
-                    "Non-Complex %d: %s %s %s",
+                    "Metal-free %d: %s %s %s",
                     idx,
                     mol.formula,
                     mol.totcharge,
@@ -204,24 +182,23 @@ class Cell(BaseModel):
                 for kdx, met in enumerate(mol.metals):
                     logger.info("  Metal %d: %s %s", kdx, met.formula, met.charge)
 
+    def _get_molecules(self) -> list[Molecule] | None:
+        """Return molecules owned by the concrete cell subtype."""
+        if self.subtype == "reference":
+            return cast("Reference", self).refmoleclist
+        if self.subtype == "unitcell":
+            return cast("UnitCell", self).moleclist
+        raise ValueError(f"Unknown subtype {self.subtype} of Cell")
+
     def assign_spin(self):
-        """
-        Assign spin multiplicity for all molecules in the cell.
-        Attempts spin assignment for all molecules and records
-        whether any failures occurred.
-        """
+        """Assign spins to every molecule and record assignment failures."""
         logger.info("=" * 40)
         logger.info("       Assigning Spin multiplicity       ")
         logger.info("=" * 40)
 
         overall_error = False
 
-        if self.subtype == "reference":
-            moleclist = cast("Reference", self).refmoleclist
-        elif self.subtype == "unitcell":
-            moleclist = cast("UnitCell", self).moleclist
-        else:
-            raise ValueError(f"Unknown subtype {self.subtype} of Cell")
+        moleclist = self._get_molecules()
 
         if moleclist is None:
             raise ValueError(
@@ -232,14 +209,15 @@ class Cell(BaseModel):
             mol.error_get_spin = False
 
             try:
-                if mol.iscomplex:
+                if mol.is_metal_complex:
                     for metal in mol.metals or []:
                         if metal.coord_nr is None:
-                            metal.get_coordination_geometry()
-                            metal.get_coord_sphere_formula()
-                        metal.get_spin()
+                            metal.determine_coordination_geometry()
+                            metal.compute_relative_metal_radius()
+                            metal.build_coordination_sphere_formula()
+                        metal.assign_spin()
 
-                mol.get_spin()
+                mol.assign_spin()
 
             except Exception as e:
                 mol.error_get_spin = True
@@ -249,28 +227,8 @@ class Cell(BaseModel):
 
         self.error_get_spin = overall_error
 
-    def predict_metal_ox(self):
-        """Predict oxidation states for metals in all molecules in the cell."""
-        if self.subtype == "reference":
-            moleclist = cast("Reference", self).refmoleclist
-        elif self.subtype == "unitcell":
-            moleclist = cast("UnitCell", self).moleclist
-        else:
-            raise ValueError(f"Unknown subtype {self.subtype} of Cell")
-
-        if moleclist is None:
-            return
-
-        for mol in moleclist:
-            if mol.iscomplex:
-                for metal in mol.metals or []:
-                    if metal.coord_nr is None:
-                        metal.get_coordination_geometry()
-                        metal.get_coord_sphere_formula()
-                    metal.predict_charge()
-
     def assess_errors(self, mode):
-        """Assess error conditions for a specific processing mode."""
+        """Record the primary and all matching error codes for one processing step."""
         if self.error_cases is None:
             self.error_cases = {}
         if self.error_cases_all is None:
@@ -299,88 +257,26 @@ class Cell(BaseModel):
             if is_triggered:
                 triggered.append(code)
 
-        # Rules are listed most-severe-first, so the first hit is the primary
-        # code; keep every hit alongside it so nothing is silently dropped.
+        # Rule order sets priority; retain every match.
         self.error_cases_all[mode] = triggered
         self.error_cases[mode] = triggered[0] if triggered else 0
 
     def has_error(self, mode: str | None = None) -> bool:
-        """
-        Return True if an error exists.
-
-        If mode is provided, check only that processing mode.
-        If mode is None, check across all recorded modes.
-        """
+        """Check one processing step, or all recorded steps when mode is None."""
         if self.error_cases is None:
             return False
 
         if mode is not None:
             return self.error_cases.get(mode, 0) != 0
 
-        # Check all modes
         return any(code != 0 for code in self.error_cases.values())
 
-    def save(self, path: str | Path, *, format: Format = "pickle"):
-        if format == "json":
-            self._save_as_json(path)
-        elif format == "pickle":
-            self._save_as_pickle(path)
-        else:
-            raise ValueError(f"Unsupported format: {format}")
-
-    @classmethod
-    def load(cls, path: str | Path, *, format: Format = "pickle") -> Self:
-        if format == "json":
-            return cls._load_from_json(path)
-        elif format == "pickle":
-            return cls._load_from_pickle(path)
-        else:
-            raise ValueError(f"Unsupported format: {format}")
-
-    @deprecated("Use json format instead")
-    def _save_as_pickle(
-        self,
-        path: str | Path,
-    ):
-        logger.warning("Use json format instead")
-        with open(path, "wb") as fil:
-            pickle.dump(self, fil)
-
-    def _save_as_json(
-        self,
-        path: str | Path,
-    ):
-        if not str(path).endswith(".json"):
-            logger.warning("Use `.json` extension instead for path: %s", path)
-        # Pretty print with indent=4
-        with open(path, "w") as fd:
-            fd.write(self.to_json(indent=4))
-        # Minified version
-        # with open(path, "w") as fd:
-        #     fd.write(self.to_json(separators=(",", ":")))
-
-    @classmethod
-    def _load_from_json(
-        cls,
-        path: str | Path,
-    ) -> Self:
-        with open(path, "r") as fd:
-            return cls.from_json(fd.read())
-
-    @classmethod
-    @deprecated("Use json format instead")
-    def _load_from_pickle(
-        cls,
-        path: str | Path,
-    ):
-        with open(path, "rb") as fil:
-            return pickle.load(fil)
-
     def __str__(self):
-        """Return a string representation of the Cell object."""
+        """Return the formatted cell details."""
         return self.__repr__()
 
     def __repr__(self, indirect: bool = False):
+        """Return cell metadata and lattice parameters."""
         to_print = ""
         if not indirect:
             to_print = "------------- Cell2mol CELL Object ----------------\n"
@@ -392,12 +288,11 @@ class Cell(BaseModel):
         to_print += f" Num Atoms             = {self.natoms}\n"
         to_print += f" Cell Parameters a:c   = {self.cell_param[0:3]}\n"
         to_print += f" Cell Parameters al:ga = {self.cell_param[3:6]}\n"
-        # to_print += f' Cell Vector           = {self.cell_vector}\n'
         to_print += "---------------------------------------------------\n"
         return to_print
 
     @classmethod
-    @deprecated("Use cell() with the keyword arguments instead.")
+    @deprecated("Use Cell() with keyword arguments instead.")
     def from_positional(
         cls,
         name: str,
@@ -407,10 +302,11 @@ class Cell(BaseModel):
         cell_vector: NDArray | list[list[float]],
         cell_param: NDArray | list[float],
     ) -> "Cell":
+        """Construct a cell using the legacy positional interface."""
         return cls(
             name=name,
             labels=labels,
-            pos=np.asarray(pos),  # Using pos which gets aliased to coord
+            pos=np.asarray(pos),
             frac_coord=np.asarray(frac_coord),
             cell_vector=np.asarray(cell_vector),
             cell_param=np.asarray(cell_param),

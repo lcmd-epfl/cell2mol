@@ -7,18 +7,12 @@ from pydantic import Field
 from typing_extensions import deprecated
 
 from cell2mol.classes.atom import Atom
-from cell2mol.elementdata import ElementData
 from cell2mol.my_types import Type
 from cell2mol.utils import BaseModel
 
-elemdatabase = ElementData()
 
-
-###############
-### BOND ######
-###############
 class Bond(BaseModel):
-    model_config = {"arbitrary_types_allowed": True}
+    """Bond between shared atom objects, with order and Cartesian distance."""
 
     atom1: Atom
     atom2: Atom
@@ -27,20 +21,19 @@ class Bond(BaseModel):
     type: Type = Field(default="bond")
 
     def model_post_init(self, __context: Any) -> None:
-        if self.atom1 is not None and self.atom2 is not None:
-            self.distance = round(
-                float(
-                    np.linalg.norm(
-                        np.array(self.atom1.coord) - np.array(self.atom2.coord)
-                    )
-                ),
-                3,
-            )
+        """Compute the bond distance, rounded to three decimal places."""
+        self.distance = round(
+            float(
+                np.linalg.norm(np.array(self.atom1.coord) - np.array(self.atom2.coord))
+            ),
+            3,
+        )
 
     def __str__(self):
         return self.__repr__()
 
     def __repr__(self):
+        """Return atom labels, molecule indices, bond order, and distance."""
         to_print = ""
         to_print += "------------- Cell2mol BOND Object --------------\n"
         to_print += f" Type                     = {self.type}\n"
@@ -58,4 +51,5 @@ class Bond(BaseModel):
     @classmethod
     @deprecated("Use Bond() with keyword arguments instead.")
     def from_positional(cls, atom1: Atom, atom2: Atom, bond_order: float = 1) -> "Bond":
+        """Construct a bond using the legacy positional interface."""
         return cls(atom1=atom1, atom2=atom2, bond_order=bond_order)

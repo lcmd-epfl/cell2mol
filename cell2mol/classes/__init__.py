@@ -1,49 +1,47 @@
 from .atom import Atom
-from .molecule import Molecule
-from .ligand import Ligand
 from .metal import Metal
+from .bond import Bond
+from .protonation import Protonation
+from .charge_state import ChargeState
+from .specie import Specie
+from .group import Group
+from .ligand import Ligand
+from .molecule import Molecule
 from .cell import Cell
 from .reference import Reference
 from .unitcell import UnitCell
-from .cells import Cells
 from .molecule_set import MoleculeSet
-from .bond import Bond
-from .specie import Specie
-from .group import Group
-from .protonation import Protonation
-from .charge_state import ChargeState
+from .cells import Cells
 
 __all__ = [
     "Atom",
-    "Molecule",
-    "Ligand",
     "Metal",
+    "Bond",
+    "Protonation",
+    "ChargeState",
+    "Specie",
+    "Group",
+    "Ligand",
+    "Molecule",
     "Cell",
     "Reference",
     "UnitCell",
-    "Cells",
     "MoleculeSet",
-    "Bond",
-    "Specie",
-    "Group",
-    "Protonation",
-    "ChargeState",
+    "Cells",
 ]
 
-# Rebuild models to resolve forward references
-# This is needed because we use RefList["Specie"] and similar forward refs
-# that need to be resolved after all classes are imported
+# Resolve model references after every class is available.
 Atom.model_rebuild()
-Specie.model_rebuild()
 Metal.model_rebuild()
-Molecule.model_rebuild()
-Ligand.model_rebuild()
-Group.model_rebuild()
-Cell.model_rebuild()
-Reference.model_rebuild()
-UnitCell.model_rebuild()
-Cells.model_rebuild()
-MoleculeSet.model_rebuild()
 Bond.model_rebuild()
 Protonation.model_rebuild()
 ChargeState.model_rebuild()
+Specie.model_rebuild()
+Group.model_rebuild()
+Ligand.model_rebuild()
+Molecule.model_rebuild()
+Cell.model_rebuild()
+Reference.model_rebuild()
+UnitCell.model_rebuild()
+MoleculeSet.model_rebuild()
+Cells.model_rebuild()

@@ -1,105 +1,102 @@
 from __future__ import annotations
 
+from cell2mol.utils.serialization import ModelFileMixin
+
 import logging
-import pickle
-from pathlib import Path
-from typing import Any
 
 from pydantic import Field
 from typing_extensions import deprecated
 
-from cell2mol.charge.specie_assigner import assemble_complex_charge_state
 from cell2mol.classes.metal import Metal
-from cell2mol.classes.molecule import Molecule, assess_molecule_errors
+from cell2mol.classes.molecule import Molecule
 from cell2mol.classes.specie import Specie
-from cell2mol.my_types import Format, SubType, Type
+from cell2mol.my_types import SubType, Type
 from cell2mol.species_collection import (
-    collect_missing_hydrogens,
-    collect_plausible_charges,
+    collect_hydrogen_flags,
+    update_plausible_charges,
     collect_unique_species,
     map_charges_to_molecules,
 )
 from cell2mol.utils import BaseModel, config
 
-try:
-    from typing import Self  # py3.11+
-except ImportError:
-    from typing_extensions import Self  # py3.10
-
 logger = logging.getLogger(__name__)
 
+# Rule order sets primary-error priority; retain every matching code.
+MOLECULE_SET_ERROR_RULES = [
+    ("has_isolated_H", 1),
+    ("missing_H_in_Water", 2),
+    ("missing_H_on_CoordDonor", 3),
+    ("missing_H_in_Carbon", 4),
+    ("error_plausible_charges", 5),
+    ("error_multiple_distrib", 6),
+    ("error_empty_distrib", 7),
+    ("error_assign_charge", 8),
+    ("error_create_bonds", 9),
+    ("error_get_spin", 10),
+]
 
-class MoleculeSet(BaseModel):
-    """Several discrete molecules that are charge-balanced as one unit."""
 
-    model_config = {"arbitrary_types_allowed": True, "populate_by_name": True}
+class MoleculeSet(ModelFileMixin, BaseModel):
+    """Molecules from one XYZ input, balanced together against an input charge."""
 
     name: str
     moleclist: list[Molecule] = Field(default_factory=list)
 
-    # Total charge of the whole set, as supplied by the user
+    # User-supplied total charge.
     input_charge: int | None = None
 
-    # Unique species related attributes
+    # Unique species and the mapping of molecule species to them.
     unique_species: list[Specie | Metal] | None = None
     unique_indices: list[int] | None = None
     species_list: list[Specie | Metal] | None = None
 
-    # Missing hydrogens, aggregated over every molecule and specie
+    # Hydrogen flags aggregated across molecules and species.
     has_isolated_H: bool | None = None
     missing_H_in_Carbon: bool | None = None
     missing_H_on_CoordDonor: bool | None = None
     missing_H_in_Water: bool | None = None
     has_missing_H: bool | None = None
 
-    # Plausible integer charges per specie: metal oxidation states, or a
-    # ligand/molecule's total charges. NOT one entry per specie -- it is
-    # unique_species first, then all of species_list, so species recur at
-    # two indices. None marks a specie whose charges could not be found.
+    # Charge candidates for unique_species followed by species_list.
     plausible_charges: list[list[int] | None] | None = None
     error_plausible_charges: bool | None = None
-    # Set when two entries sharing a unique_index -- i.e. copies of the SAME
-    # specie -- enumerated to different charges.
+    # Different charge candidates for copies sharing a unique_index.
     error_inconsistent_plausible_charges: bool | None = None
     inconsistent_plausible_charges: dict[int, list[list[int] | None]] | None = None
 
-    # Error assessment
+    # Charge, bond, and spin failures.
     error_multiple_distrib: bool | None = None
     error_empty_distrib: bool | None = None
     error_assign_charge: bool | None = None
     error_create_bonds: bool | None = None
     error_get_spin: bool | None = None
-    # Primary (first-matching, most severe) code, and every code that fired.
+    # Primary code (zero on success) and all matching codes.
     error_case: int | None = None
     error_cases_all: list[int] | None = None
 
-    # Frozen fields
     version: str = Field(default=config.VERSION, frozen=True)
     type: Type = Field(default="molecule_set")
     subtype: SubType | None = Field(default="molecule_set")
 
-    @classmethod
-    @deprecated("Use MoleculeSet() with the keyword arguments instead.")
-    def from_positional(cls, name: str, moleclist: list[Molecule]) -> Self:
-        return cls(name=name, moleclist=moleclist)
-
     @property
     def formula(self) -> str:
+        """Join molecule formulas with a plus sign."""
         return " + ".join(mol.formula for mol in self.moleclist)
 
     @property
     def totcharge(self) -> int | None:
-        """Sum of the molecular charges, or None until they have been assigned."""
-        charges = [mol.totcharge for mol in self.moleclist]
-        if not charges or any(charge is None for charge in charges):
+        """Return the total assigned charge, or None for missing charges or molecules."""
+        if not self.moleclist:
             return None
-        return sum(charges)  # type: ignore[arg-type]
+        total = 0
+        for mol in self.moleclist:
+            if mol.totcharge is None:
+                return None
+            total += mol.totcharge
+        return total
 
-    # -------------------------------------------------------------------------
-    # Species
-    # -------------------------------------------------------------------------
-    def get_unique_species(self):
-        """Deduplicate the species of every molecule against each other."""
+    def collect_unique_species(self):
+        """Collect unique species and map all molecule species to them."""
         logger.info("Getting unique species in %s", self.subtype)
 
         (
@@ -110,31 +107,20 @@ class MoleculeSet(BaseModel):
 
         return self.unique_species
 
-    def get_plausible_charges(self):
+    def get_plausible_charges(self) -> list[list[int] | None] | None:
+        """Refresh and return charge candidates, recording inconsistencies."""
         if self.unique_species is None:
-            self.get_unique_species()
+            self.collect_unique_species()
 
-        (
-            self.plausible_charges,
-            self.error_plausible_charges,
-            self.inconsistent_plausible_charges,
-        ) = collect_plausible_charges(
-            self.unique_species, self.species_list, skip_missing_h=True
-        )
-        self.error_inconsistent_plausible_charges = bool(
-            self.inconsistent_plausible_charges
-        )
+        update_plausible_charges(self)
+        return self.plausible_charges
 
     def check_hydrogens(self):
-        """Check every molecule and specie for missing hydrogens.
-
-        Same screen the reference cell runs, over the blocks of the xyz file.
-        Call after ``get_unique_species``.
-        """
+        """Collect species if needed, then aggregate hydrogen flags."""
         if self.species_list is None:
-            self.get_unique_species()
+            self.collect_unique_species()
 
-        flags = collect_missing_hydrogens(self.moleclist, self.species_list)
+        flags = collect_hydrogen_flags(self.moleclist, self.species_list)
         self.has_isolated_H = flags["has_isolated_H"]
         self.missing_H_in_Carbon = flags["missing_H_in_Carbon"]
         self.missing_H_on_CoordDonor = flags["missing_H_on_CoordDonor"]
@@ -143,11 +129,10 @@ class MoleculeSet(BaseModel):
 
         return self.has_missing_H
 
-    # -------------------------------------------------------------------------
-    # Charges, bonds and spin
-    # -------------------------------------------------------------------------
     def assign_charges(self):
-        """Propagate the balanced charges onto every molecule and bond them."""
+        """Map balanced charges to molecules, create bonds, and assemble complexes."""
+        from cell2mol.charge.charge_assignment import assemble_complex_charge_state
+
         logger.info("Assigning charges to the %d molecules", len(self.moleclist))
 
         self.error_assign_charge = map_charges_to_molecules(
@@ -172,7 +157,7 @@ class MoleculeSet(BaseModel):
                     logger.info("    Metal %d %s %s", kdx, met.formula, met.charge)
             else:
                 logger.info(
-                    "Non-Complex %d: %s %s %s",
+                    "Metal-free %d: %s %s %s",
                     idx,
                     mol.formula,
                     mol.totcharge,
@@ -182,7 +167,7 @@ class MoleculeSet(BaseModel):
         logger.info("Total charge of %s: %s", self.name, self.totcharge)
 
     def create_bonds(self):
-        """Create bonds in every molecule, folding the failures together."""
+        """Create bonds in every molecule and record any failures."""
         overall_error = False
 
         for mol in self.moleclist:
@@ -198,20 +183,21 @@ class MoleculeSet(BaseModel):
 
         self.error_create_bonds = overall_error
 
-    def get_spin(self):
-        """Assign spin multiplicity to every molecule."""
+    def assign_spin(self):
+        """Assign molecule and metal spins, recording any failures."""
         overall_error = False
 
         for mol in self.moleclist:
             mol.error_get_spin = False
             try:
-                if mol.iscomplex:
+                if mol.is_metal_complex:
                     for metal in mol.metals or []:
                         if metal.coord_nr is None:
-                            metal.get_coordination_geometry()
-                            metal.get_coord_sphere_formula()
-                        metal.get_spin()
-                mol.get_spin()
+                            metal.determine_coordination_geometry()
+                            metal.compute_relative_metal_radius()
+                            metal.build_coordination_sphere_formula()
+                        metal.assign_spin()
+                mol.assign_spin()
             except Exception as e:
                 mol.error_get_spin = True
                 overall_error = True
@@ -220,54 +206,18 @@ class MoleculeSet(BaseModel):
 
         self.error_get_spin = overall_error
 
-    def assess_errors(self):
-        """Reduce the flags to error codes, on the same rules as ``Molecule``."""
-        return assess_molecule_errors(self)
-
-    # -------------------------------------------------------------------------
-    # Persistence
-    # -------------------------------------------------------------------------
-    def save(self, path: str | Path, *, format: Format = "json"):
-        if format == "json":
-            self._save_as_json(path)
-        elif format == "pickle":
-            self._save_as_pickle(path)
-        else:
-            raise ValueError(f"Unsupported format: {format}")
-
-    @classmethod
-    def load(cls, path: str | Path, *, format: Format = "json") -> Self:
-        if format == "json":
-            return cls._load_from_json(path)
-        elif format == "pickle":
-            return cls._load_from_pickle(path)
-        else:
-            raise ValueError(f"Unsupported format: {format}")
-
-    def _save_as_json(self, path: str | Path):
-        if not str(path).endswith(".json"):
-            logger.warning("Use `.json` extension instead for path: %s", path)
-        with open(path, "w") as fd:
-            fd.write(self.to_json(indent=4))
-
-    @deprecated("Use json format instead")
-    def _save_as_pickle(self, path: str | Path):
-        logger.warning("Use json format instead")
-        with open(path, "wb") as fil:
-            pickle.dump(self, fil)
-
-    @classmethod
-    def _load_from_json(cls, path: str | Path) -> Self:
-        with open(path, "r") as fd:
-            return cls.from_json(fd.read())
-
-    @classmethod
-    @deprecated("Use json format instead")
-    def _load_from_pickle(cls, path: str | Path) -> Any:
-        with open(path, "rb") as fil:
-            return pickle.load(fil)
+    def assess_errors(self) -> int:
+        """Record all matching error codes and return the first, or zero."""
+        self.error_cases_all = [
+            code
+            for attr, code in MOLECULE_SET_ERROR_RULES
+            if getattr(self, attr, False)
+        ]
+        self.error_case = self.error_cases_all[0] if self.error_cases_all else 0
+        return self.error_case
 
     def __repr__(self, indirect: bool = False):
+        """Return molecule formulas, assigned charges, and the total charge."""
         to_print = ""
         to_print += "----------- Cell2mol MOLECULE SET Object ------------\n"
         to_print += f" Name                         = {self.name}\n"
@@ -277,3 +227,9 @@ class MoleculeSet(BaseModel):
         to_print += f" Total charge                 = {self.totcharge}\n"
         to_print += "---------------------------------------------------\n"
         return to_print
+
+    @classmethod
+    @deprecated("Use MoleculeSet() with keyword arguments instead.")
+    def from_positional(cls, name: str, moleclist: list[Molecule]) -> MoleculeSet:
+        """Implement the base model's legacy positional constructor."""
+        return cls(name=name, moleclist=moleclist)

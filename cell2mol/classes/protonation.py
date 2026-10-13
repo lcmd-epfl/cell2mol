@@ -3,12 +3,12 @@ from __future__ import annotations
 import numpy as np
 from typing import Any, TYPE_CHECKING, cast
 from cell2mol.my_types import Type
-from cell2mol.connectivity import get_adjmatrix, get_adjmatrix_from_cif_bonds
+from cell2mol.connectivity import build_distance_adjacency, build_cif_bond_adjacency
 from cell2mol.element_utils import labels2formula, get_radii
 from cell2mol.utils.pydantic import BaseModel
 from cell2mol.my_types import NDArray
-from pydantic import Field, computed_field
-from typing_extensions import Literal, deprecated
+from pydantic import Field
+from typing_extensions import deprecated
 from cell2mol.elementdata import ElementData
 import logging
 from cell2mol.utils import config
@@ -22,76 +22,51 @@ elemdatabase = ElementData()
 
 
 class Protonation(BaseModel):
-    # Required constructor parameters
+    """Protonated coordinates, donor-site changes, and atom connectivity."""
+
+    # Protonated structure inputs
     labels: list[str]
     coord: NDArray
-    cov_factor: float
+    cov_factor: float  # Covalent-radius scale for distance-based adjacency.
 
-    # Total number of protons added
+    # Added protons, with per-site lists indexed by original parent atoms.
     n_protons_added: int
 
-    # Protons added per site (len = length of parent labels)
     site_proton_counts: list[int]
 
-    # Electrons donated from ligand lone pairs per site (len = length of parent labels)
+    # Electrons donated from ligand lone pairs.
     ligand_donor_electrons: list[int]
 
-    # Protonation mode
-    # "none" : no protonation
-    # "deterministic": apply chemical rules (fixed proton count per site)
-    # "combinatorial": explore combinations
-    mode: str | Literal["none", "deterministic", "combinatorial"] | None = None
+    # Modes: none, deterministic (chemical rules), or combinatorial.
+    mode: str | None = None
+
+    # Special-case builder name; None for the general engine.
+    origin: str | None = None
 
     parent: Specie | None = Field(default=None)
 
-    # Computed attributes with proper defaults
+    # Derived atom data
     natoms: int | None = None
     formula: str | None = None
     atnums: list[int] | None = None
     radii: NDArray | None = None
 
-    # Conditionally set attributes with None defaults (eliminates hasattr need)
-    atom_site_labels_indices: list[int] | None = None
+    # Original atom labels and protonated connectivity
     atom_site_labels: list[str] | None = None
     status: bool | None = None
     adjmat: NDArray | None = None
     adjnum: NDArray | None = None
 
-    # Frozen fields
     type: Type = Field(default="protonation")
 
-    # NOTE: Removed custom model_serializer that was returning "{}" string.
-    # This was breaking deserialization. Protonation now serializes normally.
-
-    @computed_field
-    @property
-    def computed_natoms(self) -> int:
-        return len(self.labels)
-
-    @computed_field
-    @property
-    def computed_formula(self) -> str:
-        return labels2formula(self.labels)
-
-    @computed_field
-    @property
-    def computed_atnums(self) -> list[int]:
-        return [elemdatabase.elementnr[label] for label in self.labels]
-
-    @computed_field
-    @property
-    def computed_radii(self) -> list[float]:
-        return get_radii(self.labels)
-
     def model_post_init(self, __context: Any) -> None:
-        # Set computed values
-        self.natoms = self.computed_natoms
-        self.formula = self.computed_formula
-        self.atnums = self.computed_atnums
-        self.radii = np.asarray(self.computed_radii)
+        """Initialize atom data and build connectivity when a parent is resolved."""
+        self.natoms = len(self.labels)
+        self.formula = labels2formula(self.labels)
+        self.atnums = [elemdatabase.elementnr[label] for label in self.labels]
+        self.radii = np.asarray(get_radii(self.labels))
 
-        # Handle conditional attribute setting based on parent
-        # Note: parent may be a string UUID during deserialization, skip in that case
+        # Serialized parent UUIDs are resolved after model construction.
         if self.parent is not None and not isinstance(self.parent, str):
             refcell = cast("Reference", self.parent.get_parent("reference"))
             bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
@@ -101,20 +76,13 @@ class Protonation(BaseModel):
                     atom.get_parent_index("reference")
                     for atom in self.parent.atoms or []
                 ]
-                self.atom_site_labels_indices = [
-                    idx for idx in raw_indices if idx is not None
-                ]
+                reference_indices = [idx for idx in raw_indices if idx is not None]
                 refcell_labels = refcell.atom_site_labels or []
                 self.atom_site_labels = [
-                    refcell_labels[idx] for idx in self.atom_site_labels_indices
+                    refcell_labels[idx] for idx in reference_indices
                 ]
 
-            # Zero-proton ("as-is") state: labels and coords are the parent
-            # specie's, unchanged, and the specie's adjacency was built with the
-            # same cov_factor / USE_BOND_INFO convention -- so it is valid as-is.
-            # Reuse it and skip the O(n^2) rebuild (get_adjmatrix / CIF-bond
-            # parsing followed by a no-op proton-fix loop). Falls through to the
-            # full recompute if the parent has no usable adjacency.
+            # Reuse parent connectivity when no protons were added.
             parent = self.parent
             if (
                 self.n_protons_added == 0
@@ -122,10 +90,7 @@ class Protonation(BaseModel):
                 and parent.adjmat.shape[0] == len(self.labels)
             ):
                 self.status = True
-                # dtype=int, not a bare copy: the full-recompute path below
-                # always yields a numeric matrix, so reusing the parent's must
-                # too. A specie that inherited its adjacency carries dtype=object,
-                # which consumers like nx.from_numpy_array reject.
+                # Convert inherited object arrays to numeric adjacency matrices.
                 self.adjmat = np.array(parent.adjmat, dtype=int, copy=True)
                 self.adjnum = (
                     np.array(parent.adjnum, dtype=int, copy=True)
@@ -139,176 +104,57 @@ class Protonation(BaseModel):
                 self.status = True
                 assert self.atom_site_labels is not None
                 assert bond_data is not None
-                adjmat = get_adjmatrix_from_cif_bonds(
+                self.adjmat = build_cif_bond_adjacency(
                     self.labels,
                     self.coord,
                     atom_site_labels=self.atom_site_labels,
                     bond_data=bond_data,
                 )
-                adjnum = adjmat.sum(axis=1)
-                base_count = len(self.labels) - self.n_protons_added
-                proton_count = 0
-                for idx, n_added in enumerate(self.site_proton_counts):
-                    if n_added > 0:
-                        coordinating_atom_label = (
-                            f"{self.labels[idx]} ({self.atom_site_labels[idx]})"
-                            if self.atom_site_labels
-                            else self.labels[idx]
-                        )
-                        logger.debug(
-                            "Coordinating atom site (idx: %d) %s %s add %s protons",
-                            idx,
-                            coordinating_atom_label,
-                            self.coord[idx],
-                            n_added,
-                        )
-                        for _ in range(n_added):
-                            added_idx = base_count + proton_count
-                            proton_count += 1
-                            logger.debug(
-                                "     Added proton site (idx: %d) %s %s",
-                                added_idx,
-                                self.labels[added_idx],
-                                self.coord[added_idx],
-                            )
-                            adjmat[idx, added_idx] += 1
-                            adjmat[added_idx, idx] += 1
-                            adjnum[idx] += 1
-                            adjnum[added_idx] += 1
-
-                self.adjmat = adjmat
-                self.adjnum = adjnum
             else:
-                # 1. Generate the initial adjacency matrix
-                self.status, self.adjmat, warning = get_adjmatrix(
-                    self.labels,
-                    self.coord,
-                    radii=self.radii,
-                    cov_factor=self.cov_factor,
-                    # add_atom=True,  # Not needed since we manually fix connectivity below
-                )
-
-                # 2. Synchronize adjnum with the new matrix
-                self.adjnum = self.adjmat.sum(axis=1)
-
-                # 3. Fix connectivity for unconditionally added protons
-                base_count = len(self.labels) - self.n_protons_added
-                proton_count = 0
-                for idx, n_added in enumerate(self.site_proton_counts):
-                    if n_added > 0:
-                        coordinating_atom_label = (
-                            f"{self.labels[idx]} ({self.atom_site_labels[idx]})"
-                            if self.atom_site_labels
-                            else self.labels[idx]
-                        )
-                        logger.debug(
-                            "Coordinating atom site (idx: %d) %s %s add %s protons",
-                            idx,
-                            coordinating_atom_label,
-                            self.coord[idx],
-                            n_added,
-                        )
-
-                        for _ in range(n_added):
-                            # Calculate the absolute index of the added atom in the current matrix
-                            added_idx = base_count + proton_count
-                            proton_count += 1
-                            logger.debug(
-                                "     Added proton site (idx: %d) %s %s",
-                                added_idx,
-                                self.labels[added_idx],
-                                self.coord[added_idx],
-                            )
-
-                            # Clear all 'accidental' bonds for the added atom
-                            self.adjmat[added_idx, :] = 0
-                            self.adjmat[:, added_idx] = 0
-
-                            # Enforce the single intended bond
-                            self.adjmat[idx, added_idx] = 1
-                            self.adjmat[added_idx, idx] = 1
-
-                # 4. Final Recalculation: Always recalculate adjnum after manual adjmat changes
-                self.adjnum = self.adjmat.sum(axis=1)
-
-            # if warning:
-            #     self.status = False
-
-    def reorder(self, map):
-        ## for protonation states with added protons, the reorder map will have fewer items. Correct it here
-        mapext = np.copy(map)
-        if self.n_protons_added > 0 and len(map) < len(self.labels):
-            for ldx in range(0, self.n_protons_added):
-                mapext = np.append(mapext, len(map) + ldx)
-
-        assert len(mapext) == len(self.labels)
-        assert len(map) == len(self.site_proton_counts)
-        if len(map) > 0:
-            self.labels = list(np.array(self.labels)[mapext])
-            self.coord = np.array(self.coord)[mapext]
-            self.atnums = list(np.array(self.atnums)[mapext])
-            self.radii = np.array(self.radii)[mapext]
-            # No more hasattr check needed - atom_site_labels is always defined (can be None)
-            if self.atom_site_labels is not None:
-                self.atom_site_labels = list(np.array(self.atom_site_labels)[map])
-            self.site_proton_counts = list(np.array(self.site_proton_counts)[map])
-            self.ligand_donor_electrons = list(
-                np.array(self.ligand_donor_electrons)[map]
-            )
-
-            self.typ = "Reordered"
-            assert self.parent is not None
-            refcell = cast("Reference", self.parent.get_parent("reference"))
-            bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
-            use_bond_info = config.USE_BOND_INFO
-            if use_bond_info:
-                self.status = True
-                assert self.atom_site_labels is not None
-                assert bond_data is not None
-                adjmat = get_adjmatrix_from_cif_bonds(
-                    self.labels,
-                    self.coord,
-                    atom_site_labels=self.atom_site_labels,
-                    bond_data=bond_data,
-                )
-                adjnum = adjmat.sum(axis=1)
-                count = 0
-                if len(self.site_proton_counts) > 0:
-                    for idx, n_added in enumerate(self.site_proton_counts):
-                        if n_added != 0:
-                            count += 1
-                            added_idx = len(self.site_proton_counts) - 1 + count
-                            adjmat[idx, added_idx] += 1
-                            adjmat[added_idx, idx] += 1
-                            adjnum[idx] += 1
-                            adjnum[added_idx] += 1
-
-                self.adjmat = adjmat
-                self.adjnum = adjnum
-            else:
-                self.status, self.adjmat, warning = get_adjmatrix(
+                self.status, self.adjmat, _ = build_distance_adjacency(
                     self.labels,
                     self.coord,
                     radii=self.radii,
                     cov_factor=self.cov_factor,
                 )
-                self.adjnum = self.adjmat.sum(axis=1)
-        return self
+            self._connect_added_protons(clear_accidental_bonds=not use_bond_info)
+
+    def _connect_added_protons(self, *, clear_accidental_bonds: bool) -> None:
+        """Connect trailing protons to donor sites and update adjacency counts."""
+        assert self.adjmat is not None
+        added_index = len(self.labels) - self.n_protons_added
+        for site, count in enumerate(self.site_proton_counts):
+            for _ in range(count):
+                if clear_accidental_bonds:
+                    self.adjmat[added_index, :] = 0
+                    self.adjmat[:, added_index] = 0
+                    self.adjmat[site, added_index] = 1
+                    self.adjmat[added_index, site] = 1
+                else:
+                    # Preserve CIF connectivity and add the surrogate bond.
+                    self.adjmat[site, added_index] += 1
+                    self.adjmat[added_index, site] += 1
+                logger.debug(
+                    "Connected added proton %d to donor site %d", added_index, site
+                )
+                added_index += 1
+        self.adjnum = self.adjmat.sum(axis=1)
 
     def __str__(self):
-        # This will make print(object) behave like before
         return self.__repr__()
 
     def __repr__(self):
+        """Return protonation inputs, status, and donor-site changes."""
         to_print = ""
         to_print += "------------- Cell2mol Protonation ----------------\n"
         to_print += f" Status                          = {self.status}\n"
         to_print += f" Labels                          = {self.labels}\n"
-        # No more hasattr check needed - atom_site_labels is always defined (can be None)
         if self.atom_site_labels is not None:
             to_print += f" Atom site labels                = {self.atom_site_labels}\n"
         to_print += f" Type                            = {self.type}\n"
         to_print += f" Protonation Mode                = {self.mode}\n"
+        if self.origin is not None:
+            to_print += f" Built by                        = {self.origin}\n"
         to_print += f" Number of added protons         = {self.n_protons_added}\n"
         to_print += f" Protons added in positions      = {self.site_proton_counts}\n"
         if sum(self.ligand_donor_electrons) > 0:
@@ -319,7 +165,7 @@ class Protonation(BaseModel):
         return to_print
 
     @classmethod
-    @deprecated("Use protonation() with the keyword arguments instead.")
+    @deprecated("Use Protonation() with keyword arguments instead.")
     def from_positional(
         cls,
         labels: list[str],
@@ -330,7 +176,9 @@ class Protonation(BaseModel):
         ligand_donor_electrons: list[int],
         mode: str | None = None,
         parent: Specie | None = None,
+        origin: str | None = None,
     ) -> "Protonation":
+        """Construct a protonation state using the legacy positional interface."""
         return cls(
             labels=labels,
             coord=coord,
@@ -340,4 +188,5 @@ class Protonation(BaseModel):
             ligand_donor_electrons=ligand_donor_electrons,
             mode=mode,
             parent=parent,
+            origin=origin,
         )

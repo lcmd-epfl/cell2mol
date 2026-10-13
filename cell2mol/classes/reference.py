@@ -11,143 +11,108 @@ from cell2mol.classes.molecule import Molecule
 from cell2mol.classes.specie import Specie
 from cell2mol.connectivity import split_species
 from cell2mol.species_collection import (
-    collect_missing_hydrogens,
-    collect_plausible_charges,
+    collect_hydrogen_flags,
+    update_plausible_charges,
     collect_unique_species,
     map_charges_to_molecules,
 )
 from cell2mol.operations import extract_from_list, get_moiety_indices_from_labels
-from cell2mol.elementdata import ElementData
 from cell2mol.utils import config
 from cell2mol.my_types import SubType, NDArray
 
 logger = logging.getLogger(__name__)
 
-elemdatabase = ElementData()
-
-
-Labels = list[str]
-
 
 class Reference(Cell):
-    model_config = {"arbitrary_types_allowed": True, "populate_by_name": True}
+    """CIF reference molecules, species, reported metadata, and processing flags."""
 
-    # Reference molecule lists
+    # Reference molecules and CIF atom labels
     refmoleclist: list[Molecule] | None = None
 
     atom_site_labels: list[str] | None = None
 
-    # CIF bond/moiety related attributes
+    # CIF bonds and moiety partitions
     geom_bond_cif: list[tuple[str, str, float]] | None = None
     moiety_list_cif: list[list[str]] | None = None
-    exist_cif_bond_moiety: bool | None = None
     moiety_indices: list[list[int]] | None = None
 
-    # Unique species related attributes
+    # Unique species used for charge balancing
     unique_species: list[Specie | Metal] | None = None
 
-    # Missing H related attributes
+    # Aggregated hydrogen flags
     has_isolated_H: bool | None = None
     missing_H_in_Carbon: bool | None = None
     missing_H_on_CoordDonor: bool | None = None
     missing_H_in_Water: bool | None = None
     has_missing_H: bool | None = None
 
-    # Retrieving plausible charges related attributes
-    # Plausible integer charges per specie: metal oxidation states, or a
-    # ligand/molecule's total charges. NOT one entry per specie -- it is
-    # unique_species first, then all of species_list, so species recur at
-    # two indices. None marks a specie whose charges could not be found.
+    # Charge candidates for unique_species followed by species_list.
+    # None marks failed enumeration; copies can occur in both lists.
     plausible_charges: list[list[int] | None] | None = None
     error_plausible_charges: bool | None = None
-    # Set when two entries sharing a unique_index -- i.e. copies of the SAME
-    # specie -- enumerated to different charges. Populated by
-    # get_plausible_charges; see inconsistent_plausible_charges for the detail.
+    # Different charge candidates for copies sharing a unique_index.
     error_inconsistent_plausible_charges: bool | None = None
-    # {unique_index: sorted list of the distinct charge sets that were found},
-    # for reporting. Empty/None when every copy agreed.
     inconsistent_plausible_charges: dict[int, list[list[int] | None]] | None = None
 
-    # Additional CIF related attributes
+    # Reported CIF metadata
     chemical_name: str | None = None
     reported_metal_os: list[tuple[str, int]] | None = None
-    # Reported metal OS matched to Metal_state tokens (e.g. ["Ni_2"]), produced
-    # by standardize_reported_metal_os during compare_metal_oxidation_states.
-    # The confidence is the fraction of reported names that matched a metal
-    # symbol -- i.e. how reliable the matching step was, not a judgement of the
-    # reported values.
+    # Matched metal-state tokens (e.g. Ni_2) and the fraction with known states.
     reported_metal_os_matched: list[str] | None = None
     metal_os_match_confidence: float | None = None
     moiety_dicts: list[dict[str, Any]] | None = None
 
-    # Potential warning flags dictionary allowing True, False, or None
+    # Warning flags: True=active, False=clear, None=check skipped.
     potential_warnings: dict[str, bool | None] | None = None
 
-    # Frozen fields
     subtype: SubType | None = Field(default="reference")
 
     def set_atom_site_labels(self, atom_site_labels):
-        """Set the atom site labels (e.g. Fe1, O2, C3, etc. from CIF file)."""
+        """Store CIF atom-site labels, such as Fe1 or O2."""
         self.atom_site_labels = atom_site_labels
 
     def set_cif_bond_moiety(self, geom_bond_cif=None, moiety_list_cif=None):
-        """Set and process bond moiety information from a CIF file."""
+        """Store CIF bonds and moieties, then map moieties to atom indices."""
         self.geom_bond_cif = geom_bond_cif
         self.moiety_list_cif = moiety_list_cif
 
-        self.exist_cif_bond_moiety = False
         self.moiety_indices = None
 
         if geom_bond_cif is None:
             return
 
-        self.exist_cif_bond_moiety = True
         self.moiety_indices = get_moiety_indices_from_labels(
             self.atom_site_labels, moiety_list_cif
         )
 
-    def set_additional_cif_info(self, chemical_name, reported_metal_os, moiety_dicts):
-        """
-        Set additional CIF information such as chemical name, reported metal
-        oxidation states, and moiety dictionaries.
-        """
+    def set_cif_metadata(self, chemical_name, reported_metal_os, moiety_dicts):
+        """Store the chemical name, reported oxidation states, and moiety metadata."""
         self.chemical_name = chemical_name
         self.reported_metal_os = reported_metal_os
         self.moiety_dicts = moiety_dicts
 
-    def set_potential_warning(self, warnings_dict: dict[str, bool | None]):
-        """
-        Directly stores the warnings dictionary and logs any active flags.
-        Based on CIF mismatch, polynuclear limit,
-        mixed metals, and adjacency mismatch, metal coordination differences.
-        """
+    def set_potential_warnings(self, warnings_dict: dict[str, bool | None]):
+        """Store warning flags and log active warnings and skipped checks."""
         self.potential_warnings = warnings_dict
 
-        # Log only actual warnings to the system console
         active = [k for k, v in warnings_dict.items() if v is True]
         if active:
             logger.warning(f"Reference Warnings: {active}")
 
-        # Log skipped checks as debug info
         skipped = [k for k, v in warnings_dict.items() if v is None]
         if skipped:
             logger.debug(f"Comparisons with CIF Skipped: {skipped}")
 
-    def get_reference_molecules(
+    def build_reference_molecules(
         self,
         cov_factor: float | None = None,
         metal_factor: float | None = None,
         use_bond_info: bool | None = None,
     ):
-        """
-        Generate reference molecules from atomic fractional coordinates and labels.
-        Args:
-            cov_factor (float): covalent radius scaling factor for adjacency
-            metal_factor (float): additional scaling factor for metals
-            use_bond_info (bool): whether to use CIF bond information
-        Returns:
-            list: list of reference molecule objects
-        """
+        """Build reference molecules, split complexes, and analyze coordination.
+
+        None options use the corresponding config defaults. Molecules are
+        partitioned by CIF moieties or distance-based connectivity."""
         if cov_factor is None:
             cov_factor = config.COV_FACTOR
         if metal_factor is None:
@@ -171,7 +136,7 @@ class Reference(Cell):
         atom_site_labels = self.atom_site_labels
         bond_data = self.geom_bond_cif
 
-        # Determine blocklist
+        # Partition atoms into molecule blocks.
         blocklist: list[list[int]]
         if use_bond_info:
             logger.info("Using CIF bond/moiety information for blocklist")
@@ -202,7 +167,6 @@ class Reference(Cell):
             return []
 
         self.refmoleclist = []
-        # Build reference molecules
         for b in blocklist:
             mol_labels = extract_from_list(b, ref_labels, dimension=1)
             mol_coord = extract_from_list(b, ref_pos.tolist(), dimension=1)
@@ -225,12 +189,14 @@ class Reference(Cell):
             for atom, idx in zip(newmolec.atoms or [], b):
                 atom.add_parent(self, index=idx)
 
-            if newmolec.iscomplex or newmolec.has_ia_iia:
-                logger.debug("Is complex: %s", newmolec.formula)
-                logger.debug("Splitting complex: %s", newmolec.formula)
+            if newmolec.is_metal_complex or newmolec.has_s_block_metal:
+                logger.debug("Is Metal complex: %s", newmolec.formula)
+                logger.debug("Splitting Metal complex: %s", newmolec.formula)
                 newmolec.split_complex()
-            elif newmolec.has_post_transition_metal:
-                logger.debug("Has post-transition metal: %s", newmolec.formula)
+            elif newmolec.is_post_transition_metal_complex:
+                logger.debug(
+                    "Splitting post-transition metal complex: %s", newmolec.formula
+                )
                 newmolec.split_complex(post_tms=True)
             else:
                 newmolec.add_parent(newmolec, indices=list(range(newmolec.natoms)))
@@ -240,7 +206,7 @@ class Reference(Cell):
         logger.info("Found %d reference molecules", len(self.refmoleclist))
         logger.info("Formulas: %s", [ref.formula for ref in self.refmoleclist])
 
-        # Post-processing: coordination analysis and structural-motif screening
+        # Analyze coordination and screen special structural motifs.
         for ref in self.refmoleclist:
             ref.analyze_coordination()
             ref.detect_special_moieties()
@@ -248,15 +214,11 @@ class Reference(Cell):
         return self.refmoleclist
 
     def check_hydrogens(self):
-        """Check every specie for missing hydrogens and aggregate the flags.
-
-        Feeds ``assess_errors(mode="hydrogens")``. Call after
-        ``get_unique_species``.
-        """
+        """Check for isolated hydrogen atoms and missing hydrogens."""
         if self.species_list is None:
-            self.get_unique_species()
+            self.collect_unique_species()
 
-        flags = collect_missing_hydrogens(self.refmoleclist, self.species_list)
+        flags = collect_hydrogen_flags(self.refmoleclist, self.species_list)
         self.has_isolated_H = flags["has_isolated_H"]
         self.missing_H_in_Carbon = flags["missing_H_in_Carbon"]
         self.missing_H_on_CoordDonor = flags["missing_H_on_CoordDonor"]
@@ -265,8 +227,8 @@ class Reference(Cell):
 
         return self.has_missing_H
 
-    def get_unique_species(self):
-        """Get unique species, unique indices, and species list in the Reference Cell."""
+    def collect_unique_species(self):
+        """Collect unique species and map all reference species to them."""
         logger.info("Getting unique species in %s", self.subtype)
 
         if not self.refmoleclist:
@@ -279,44 +241,26 @@ class Reference(Cell):
             self.species_list,
         ) = collect_unique_species(self.refmoleclist)
 
-    def get_plausible_charges(self) -> None:
-        """
-        Collect the plausible integer charges for every unique specie and every
-        entry of the species list. Nothing is selected here -- the final choice
-        is made later by the charge balancer.
-
-        A specie with no options records None. Species skipped up front because
-        they are missing hydrogens record None too (to keep the list positionally
-        aligned with unique_species + species_list) but do NOT set
-        error_plausible_charges -- that failure is already reported by
-        assess_errors(mode="hydrogens"), and double-reporting it hides which
-        structures failed on charge perception alone.
-        """
+    def get_plausible_charges(self) -> list[list[int] | None] | None:
+        """Refresh and return charge candidates, preserving missing-H entries as None."""
         assert self.subtype == "reference", (
             "get_plausible_charges should only be called on reference"
         )
 
         if self.unique_species is None:
-            self.get_unique_species()
+            self.collect_unique_species()
 
-        (
-            self.plausible_charges,
-            self.error_plausible_charges,
-            self.inconsistent_plausible_charges,
-        ) = collect_plausible_charges(
-            self.unique_species, self.species_list, skip_missing_h=True
-        )
-        self.error_inconsistent_plausible_charges = bool(
-            self.inconsistent_plausible_charges
-        )
+        update_plausible_charges(self)
+        return self.plausible_charges
 
     def map_charges_to_reference(self):
-        """Logic: Propagate charges from Unique Species to Reference Molecules."""
+        """Map balanced unique-species charges to reference molecules."""
         self.error_assign_charge = map_charges_to_molecules(
             self.unique_species, self.refmoleclist
         )
 
     def __repr__(self, indirect: bool = False):
+        """Return cell details and reference molecule formulas."""
         to_print = ""
         to_print += "------------- Cell2mol Reference Object --------------\n"
         to_print += Cell.__repr__(self, indirect=True)
@@ -329,7 +273,7 @@ class Reference(Cell):
         return to_print
 
     @classmethod
-    @deprecated("Use reference() with the keyword arguments instead.")
+    @deprecated("Use Reference() with keyword arguments instead.")
     def from_positional(
         cls,
         name: str,
@@ -339,10 +283,11 @@ class Reference(Cell):
         cell_vector: NDArray | list[list[float]],
         cell_param: NDArray | list[float],
     ) -> "Reference":
+        """Construct a reference using the legacy positional interface."""
         return cls(
             name=name,
             labels=labels,
-            pos=np.asarray(pos),  # Using pos which gets aliased to coord
+            pos=np.asarray(pos),
             frac_coord=np.asarray(frac_coord),
             cell_vector=np.asarray(cell_vector),
             cell_param=np.asarray(cell_param),

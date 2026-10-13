@@ -5,75 +5,43 @@ from typing import TYPE_CHECKING, cast
 import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
-from cell2mol.classes.atom import Atom
 from cell2mol.classes.group import Group
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.specie import Specie
 from cell2mol.connectivity import build_adjacency
 from cell2mol.utils import config
 from cell2mol.operations import get_angle
-from cell2mol.elementdata import ElementData
 from cell2mol.my_types import NOType, OptionalRefList, SubType, NDArray
 import logging
 
 if TYPE_CHECKING:
     from cell2mol.classes.molecule import Molecule
 
-elemdatabase = ElementData()
 logger = logging.getLogger(__name__)
 
 
 class Ligand(Specie):
-    model_config = {"arbitrary_types_allowed": True}
+    """Ligand with coordinating groups, hapticity, and nitrosyl geometry."""
 
     NO_type: NOType | None = None
-    # Cross-reference: points to atoms already in self.atoms
-    connected_atoms: OptionalRefList[Atom] = None
-    connected_idx: list[int] | None = None
     denticity: int | None = None
-    # Ownership: groups are children of this ligand
+    # Groups belong to this ligand; metals belong to the parent molecule.
     groups: list[Group] | None = Field(default=None)
     haptic_type: list[str] | None = None
     is_haptic: bool | None = None
     is_nitrosyl: bool | None = None
-    is_silylyne: bool | None = None
-    # Cross-reference: points to metals in parent Molecule
     metals: OptionalRefList[Metal] = None
     unique_index: int | None = None
 
     subtype: SubType | None = Field(default="ligand")
 
-    @classmethod
-    @deprecated("Use ligand(**kwargs) with keyword arguments")
-    def from_positional(
-        cls,
-        labels: list[str],
-        coord: NDArray | list[list[float]],
-        frac_coord: NDArray | list[list[float]] | None = None,
-        radii: NDArray | list[float] | None = None,
-    ) -> "Ligand":
-        return cls(
-            labels=labels,
-            coord=np.asarray(coord),
-            frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
-            radii=np.asarray(radii) if radii is not None else None,
-        )
-
-    def __repr__(self, indirect: bool = False):
-        to_print = ""
-        to_print += "------------- Cell2mol LIGAND Object --------------\n"
-        to_print += Specie.__repr__(self, indirect=True)
-        if self.groups is not None:
-            to_print += f" Number of Groups             = {len(self.groups)}\n"
-        to_print += "---------------------------------------------------\n"
-        return to_print
-
-    def get_connected_metals(self, use_bond_info: bool | None = None):
+    def determine_connected_metals(self, use_bond_info: bool | None = None) -> None:
+        """Rebuild the bonded-metal list using ligand–metal adjacency."""
         self.metals = []
         refcell = self.get_parent("reference")
         bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
-        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
-        metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
+        cov_factor = self.cov_factor
+        metal_factor = self.metal_factor
         mol = cast("Molecule", self.get_parent("molecule"))
 
         if use_bond_info is None:
@@ -108,39 +76,32 @@ class Ligand(Specie):
                         "Ligand %s is connected to %s", self.formula, met.label
                     )
 
-    def detect_special_moieties(self):
-        """
-        Screen this ligand for structural motifs that need special treatment.
-
-        Extends the Specie screen (fullerene / porphyrin / borane) with the
-        nitrosyl check, which only applies to ligands.
-        """
+    def detect_special_moieties(self) -> None:
+        """Detect special specie motifs and classify nitrosyl ligands."""
         super().detect_special_moieties()
 
-        self.evaluate_as_nitrosyl()
+        self.detect_nitrosyl()
         if self.is_nitrosyl:
             logger.debug("Ligand %s is a nitrosyl", self.formula)
 
-    def evaluate_as_nitrosyl(self):
+    def detect_nitrosyl(self) -> bool:
+        """Detect an NO ligand and compute its geometry when present."""
         self.is_nitrosyl = False
         if self.natoms == 2 and "N" in self.labels and "O" in self.labels:
             self.is_nitrosyl = True
-            self.get_nitrosyl_geom()
+            self.compute_nitrosyl_geometry()
         return self.is_nitrosyl
 
-    def get_nitrosyl_geom(self, thres: float = 160) -> str:
-        """Get the geometry of a Nitrosyl ligand."""
-        # Determines whether the M-N-O angle of a Nitrosyl "ligand" is "Bent" or "Linear"
-        # Each case is treated differently
-        # return NO_type: "Linear" or "Bent"
+    def compute_nitrosyl_geometry(self, angle_threshold: float = 160) -> NOType:
+        """Classify the nearest metal's M–N–O angle using a threshold in degrees."""
         if self.atoms is None:
             self.set_atoms()
         if self.metals is None:
-            self.get_connected_metals()
+            self.determine_connected_metals()
 
         central = None
         extreme = None
-        for idx, a in enumerate(self.atoms or []):
+        for a in self.atoms or []:
             if a.label == "N":
                 central = a.coord.copy()
             if a.label == "O":
@@ -150,7 +111,7 @@ class Ligand(Specie):
 
         metals = self.metals or []
         dist = []
-        for idx, met in enumerate(metals):
+        for met in metals:
             metal = np.array(met.coord)
             dist.append(np.linalg.norm(central - metal))
         tgt = int(np.argmin(dist))
@@ -159,59 +120,60 @@ class Ligand(Specie):
         vector2 = np.subtract(np.array(central), np.array(metal))
 
         angle = get_angle(vector1, vector2)
-        if np.degrees(angle) > float(thres):
+        if np.degrees(angle) > float(angle_threshold):
             self.NO_type = "Linear"
         else:
             self.NO_type = "Bent"
 
         return self.NO_type
 
-    def get_connected_idx(self):
-        # Remember madjmat should not be computed at the ligand level.
-        # Since the metal is not there.
-        # Operate at the molecular level.
-        # We get the parent molecule, and the indices of the ligand atoms in the molecule
-        self.connected_idx = []
-        if self.madjnum is None:
-            self.set_inherit_adjmatrix("molecule")
-        for idx, con in enumerate(self.madjnum if self.madjnum is not None else []):
-            if con > 0:
-                self.connected_idx.append(idx)
-        return self.connected_idx
-
-    def get_connected_atoms(self):
-        if self.atoms is None:
-            self.set_atoms()
-        if self.connected_idx is None:
-            self.get_connected_idx()
-        connected_idx = self.connected_idx or []
-        self.connected_atoms = []
-        for idx, at in enumerate(self.atoms or []):
-            if idx in connected_idx and (at.mconnec or 0) > 0:
-                self.connected_atoms.append(at)
-            elif idx in connected_idx and at.mconnec == 0:
-                logger.warning("Atom appears in connected_idx, but has mconnec=0")
-        return self.connected_atoms
-
-    def get_denticity(self):
+    def update_denticity(self):
+        """Sum group denticities; return None when groups are unavailable."""
         if self.groups is None:
             return None
         self.denticity = 0
         for g in self.groups:
-            self.denticity += g.get_denticity()
+            self.denticity += g.update_denticity()
         return self.denticity
 
-    def get_hapticity(self):
+    def update_hapticity(self):
+        """Collect group haptic modes; return None when groups are unavailable."""
         if self.groups is None:
             return None
         self.is_haptic = False
         self.haptic_type = []
         for gr in self.groups:
             if gr.is_haptic is None:
-                gr.get_hapticity()
+                gr.update_hapticity()
             if gr.is_haptic and gr.haptic_type is not None:
                 self.haptic_type.append(gr.haptic_type)
         if len(self.haptic_type) > 0:
             self.is_haptic = True
 
         return self.haptic_type
+
+    def __repr__(self, indirect: bool = False):
+        """Return specie details and the number of coordinating groups."""
+        to_print = ""
+        to_print += "------------- Cell2mol LIGAND Object --------------\n"
+        to_print += Specie.__repr__(self, indirect=True)
+        if self.groups is not None:
+            to_print += f" Number of Groups             = {len(self.groups)}\n"
+        to_print += "---------------------------------------------------\n"
+        return to_print
+
+    @classmethod
+    @deprecated("Use ligand(**kwargs) with keyword arguments")
+    def from_positional(
+        cls,
+        labels: list[str],
+        coord: NDArray | list[list[float]],
+        frac_coord: NDArray | list[list[float]] | None = None,
+        radii: NDArray | list[float] | None = None,
+    ) -> "Ligand":
+        return cls(
+            labels=labels,
+            coord=np.asarray(coord),
+            frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
+            radii=np.asarray(radii) if radii is not None else None,
+        )

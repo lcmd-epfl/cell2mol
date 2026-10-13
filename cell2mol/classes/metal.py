@@ -6,13 +6,12 @@ import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
 from cell2mol.classes.atom import Atom
-from cell2mol.charge.charge_state_resolver import get_plausible_metal_os
-from cell2mol.spin import assign_spin_metal, predict_ox_state
-from cell2mol.operations import compute_centroid, get_dist
+from cell2mol.spin import predict_metal_spin
+from cell2mol.operations import get_dist
 from cell2mol.elementdata import ElementData
 from cell2mol.coordination_sphere import (
-    handle_metal_coordination,
-    define_coordination_geometry,
+    build_coordination_groups,
+    determine_coordination_geometry,
 )
 from cell2mol.my_types import RefList, Spin, SubType, NDArray
 from cell2mol.connectivity import build_adjacency
@@ -30,27 +29,22 @@ elemdatabase = ElementData()
 
 
 class Metal(Atom):
-    # Cross-reference: points to other metals in parent Molecule
+    """Metal atom with coordination geometry, oxidation states, and spin."""
+
+    # References to connected atoms and groups in the parent molecule.
     metals: RefList[Metal] | None = Field(default=None)
     connected_nonmetal_atoms: RefList[Atom] | None = Field(default=None)
-    # Cross-reference: points to Group objects
     groups: RefList[Group] | None = Field(default=None)
     coord_nr: int | None = None
-    coord_geometry: str | Literal["Undefined"] | None = None
+    coord_geometry: str | None = None
     geom_deviation: float | Literal["Undefined"] | None = None
     rel_metal_radius: float | None = None
-    rel_metal_radius_test: float | None = None
-    rel_metal_radius_allpoint: float | None = None
-    rel_metal_radius_detail: dict[str, Any] | None = None
     coord_nr_with_metal_bonds: int | None = None
-    coord_geometry_with_metal_bonds: str | Literal["Undefined"] | None = None
+    coord_geometry_with_metal_bonds: str | None = None
     geom_deviation_with_metal_bonds: float | Literal["Undefined"] | None = None
-    metal_factor: float | None = None
-    cov_factor: float | None = None
     coord_sphere_atoms: list[Atom] | None = None
     coord_sphere_formula: str | None = None
     unique_index: int | None = None
-    charge: int | None = None
     plausible_os: list[int] | None = None
     spin: Spin | None = None
     valence_elec: int | None = None
@@ -58,25 +52,8 @@ class Metal(Atom):
 
     subtype: SubType = Field(default="metal")
 
-    @classmethod
-    @deprecated("Use metal() with the keyword arguments instead.")
-    def from_positional(
-        cls,
-        label: str,
-        coord: NDArray | list[float],
-        frac_coord: NDArray | list[float] | None = None,
-        radii: float | None = None,
-    ) -> "Metal":
-        return cls(
-            label=label,
-            coord=np.asarray(coord),
-            frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
-            radii=radii,
-        )
-
-    #######################################################
-    def get_valence_elec(self, m_ox: int):
-        """Count valence electrons for a given transition metal and metal oxidation state"""
+    def compute_valence_electron_count(self, m_ox: int):
+        """Compute and store the valence electron count for an oxidation state."""
         v_elec = elemdatabase.valenceelectrons[self.label] - m_ox
         if v_elec >= 0:
             self.valence_elec = v_elec
@@ -86,11 +63,16 @@ class Metal(Atom):
         return self.valence_elec
 
     def get_connected_metals(self, use_bond_info: bool | None = None):
-        if getattr(self, "metals", None) is not None:
+        """Cache bonded metals using madjmat or pairwise adjacency calculations."""
+        if self.metals is not None:
             return self.metals
 
+        mol = cast("Molecule | None", self.get_parent("molecule"))
+        if mol is None:
+            logger.debug("No parent molecule found, skipping metal connectivity check")
+            return []
+
         self.metals = []
-        mol = cast("Molecule", self.get_parent("molecule"))
         self_mol_idx = self.get_parent_index("molecule")
         assert self_mol_idx is not None
         if mol.madjmat is not None:
@@ -113,8 +95,8 @@ class Metal(Atom):
 
         refcell = self.get_parent("reference")
         bond_data = getattr(refcell, "geom_bond_cif", None) if refcell else None
-        cov_factor = getattr(self, "cov_factor", config.COV_FACTOR)
-        metal_factor = getattr(self, "metal_factor", config.METAL_FACTOR)
+        cov_factor = self.cov_factor
+        metal_factor = self.metal_factor
 
         if use_bond_info is None:
             use_bond_info = config.USE_BOND_INFO
@@ -157,7 +139,8 @@ class Metal(Atom):
         return self.metals
 
     def get_connected_nonmetal_atoms(self):
-        if getattr(self, "connected_nonmetal_atoms", None) is not None:
+        """Cache nonmetal atoms connected through the parent's madjmat."""
+        if self.connected_nonmetal_atoms is not None:
             return self.connected_nonmetal_atoms
 
         self.connected_nonmetal_atoms = []
@@ -197,23 +180,18 @@ class Metal(Atom):
         return self.connected_nonmetal_atoms
 
     def get_connected_groups(self):
-        """
-        Lazy load and Triggers the metal coordination refinement process
-        and stores the resulting list of coordinated Group objects.
-        """
+        """Refine and cache coordinated groups; return None without a parent."""
         if not self.check_parent("molecule"):
             return None
 
-        # Check if already computed
-        current_groups = getattr(self, "groups", None)
-        if current_groups is None:
-            # handle_metal_coordination returns a list of Group objects
-            result = handle_metal_coordination(self)
+        if self.groups is None:
+            result = build_coordination_groups(self)
             self.groups = result
 
         return self.groups
 
-    def get_coordination_geometry(self):
+    def determine_coordination_geometry(self):
+        """Determine and store coordination geometry, also including bonded metals."""
         logger.debug(
             "Define coordination geometry of Metal %s%s",
             self.label,
@@ -224,11 +202,8 @@ class Metal(Atom):
 
         (self.coord_nr, self.coord_geometry, self.geom_deviation) = cast(
             "tuple[Any, ...]",
-            define_coordination_geometry(self, coord_groups or []),
+            determine_coordination_geometry(self, coord_groups or []),
         )
-
-        self.rel_metal_radius = self.get_relative_metal_radius()
-        self.rel_metal_radius_test = self.get_relative_metal_radius_test()
 
         if self.metals is None:
             self.get_connected_metals()
@@ -245,30 +220,21 @@ class Metal(Atom):
                 self.geom_deviation_with_metal_bonds,
             ) = cast(
                 "tuple[Any, ...]",
-                define_coordination_geometry(self, whole_coord),
+                determine_coordination_geometry(self, whole_coord),
             )
 
         return self.coord_geometry
 
-    def get_coord_sphere_atoms(self):
-        """
-        Identifies atoms in the first coordination sphere of the metal.
-        Uses the adjacency matrix from the parent molecule to find direct bonds.
-
-        Returns:
-            List[Atom]: A list of Atom objects directly bonded to this metal.
-        """
-        # Safety check: Ensure parent molecule existence
+    def get_coordination_sphere_atoms(self):
+        """Cache neighbors from the parent's adjmat; return None without a parent."""
         if not self.check_parent("molecule"):
             logger.warning(f"Metal {self.label} has no parent molecule reference.")
             return None
 
-        # Use cached value if exists, otherwise compute it
-        if getattr(self, "coord_sphere_atoms", None) is None:
+        if self.coord_sphere_atoms is None:
             mol = cast("Specie", self.get_parent("molecule"))
             midx = self.get_parent_index("molecule")
 
-            # Extract atoms from adjacency matrix
             if (
                 mol is not None
                 and mol.atoms is not None
@@ -283,205 +249,70 @@ class Metal(Atom):
 
         return self.coord_sphere_atoms
 
-    def get_coord_sphere_formula(self):
-        """
-        Constructs the chemical formula for the first coordination sphere.
-        Returns:
-            str: The chemical formula of the coordination sphere.
-        """
-        # Ensure coordination atoms are identified first
-        if getattr(self, "coord_sphere_atoms", None) is None:
-            self.get_coord_sphere_atoms()
+    def build_coordination_sphere_formula(self):
+        """Build and store the coordination sphere formula from atom labels."""
+        if self.coord_sphere_atoms is None:
+            self.get_coordination_sphere_atoms()
 
-        # Extract labels and generate the formula
         atom_labels = [at.label for at in self.coord_sphere_atoms or []]
         self.coord_sphere_formula = labels2formula(atom_labels)
 
         return self.coord_sphere_formula
 
-    def get_relative_metal_radius(self):
-        if self.groups is None:
-            self.get_connected_groups()
-        diff_list = []
-        for group in self.groups or []:
-            if not group.is_haptic:
-                for atom in group.atoms or []:
-                    diff = (
-                        get_dist(list(self.coord), list(atom.coord))
-                        - elemdatabase.CovalentRadius3[atom.label]
-                    )
-                    diff = round(float(diff), 3)
-                    diff_list.append(diff)
-            else:
-                haptic_center_label = "C"
-                haptic_center_coord = compute_centroid(
-                    np.array([atom.coord for atom in group.atoms or []])
-                )
-                diff = (
-                    get_dist(list(self.coord), list(haptic_center_coord))
-                    - elemdatabase.CovalentRadius3[haptic_center_label]
-                )
-                diff = round(float(diff), 3)
-                diff_list.append(diff)
-        if len(diff_list) > 0:
-            average = round(float(np.mean(diff_list)), 3)
-        else:
-            average = 0.0
+    def compute_relative_metal_radius(self) -> float:
+        """Compute relative radius, weighting each haptic group as one donor.
 
-        logger.debug("diff_list(distance-covalent_radius)=%s", diff_list)
-        logger.debug("average=%s", average)
-
-        self.rel_metal_radius = round(
-            average / elemdatabase.CovalentRadius3[self.label], 3
-        )
-
-        logger.info(
-            "rel_metal_radius=%s for Metal %s%s",
-            self.rel_metal_radius,
-            self.label,
-            f" ({self.atom_site_label})" if self.atom_site_label else "",
-        )
-        return self.rel_metal_radius
-
-    def get_relative_metal_radius_test(self):
-        """Test variant of :meth:`get_relative_metal_radius`.
-
-        Point (non-haptic) donors are treated identically to the original: one
-        diff per atom, ``dist(metal, atom) - CovalentRadius3[atom.label]``.
-
-        For a haptic group the original method collapses the group to its
-        centroid and uses a single carbon covalent radius. Here instead we
-        compute a per-atom diff for every atom in the haptic group using each
-        atom's own coordinate and covalent radius, then append the group's
-        *mean* diff as its single contribution (so a haptic group still weighs
-        the same as one point donor in the final average).
+        Subtract donor covalent radii from bond distances, then normalize the
+        mean excess by the metal covalent radius. Return zero without donors.
         """
         if self.groups is None:
             self.get_connected_groups()
-        metal_radii = elemdatabase.CovalentRadius3[self.label]
-        diff_list = []
-        diff_list_allpoint = []
-        diff_list_original = []
-        group_details = []
+
+        diff_list: list[float] = []
         for group in self.groups or []:
-            coord_atoms = []
+            atom_diffs: list[float] = []
             for atom in group.atoms or []:
                 distance = round(float(get_dist(list(self.coord), list(atom.coord))), 3)
-                radii = elemdatabase.CovalentRadius3[atom.label]
-                coord_atoms.append(
-                    {
-                        "label": atom.label,
-                        "distance": distance,
-                        "radii": round(float(radii), 3),
-                        "diff": round(float(distance - radii), 3),
-                    }
-                )
-            atom_diffs = [ca["diff"] for ca in coord_atoms]
-            group_diff = round(float(np.mean(atom_diffs)), 3) if atom_diffs else None
-
-            # all-point weighting: every atom (haptic or not) counts individually
-            diff_list_allpoint.extend(atom_diffs)
-
-            group_diff_centroid = None
-            if not group.is_haptic:
-                # each point donor contributes its own diff (identical in all variants)
-                diff_list.extend(atom_diffs)
-                diff_list_original.extend(atom_diffs)
+                donor_radius = elemdatabase.CovalentRadius3[atom.label]
+                atom_diffs.append(round(float(distance - donor_radius), 3))
+            if group.is_haptic:
+                if atom_diffs:
+                    diff_list.append(round(float(np.mean(atom_diffs)), 3))
             else:
-                # test variant: haptic group contributes the mean diff of its atoms
-                if group_diff is not None:
-                    diff_list.append(group_diff)
-                # original variant: haptic group -> distance to centroid minus carbon radius
-                if group.atoms:
-                    centroid = compute_centroid(
-                        np.array([atom.coord for atom in group.atoms])
-                    )
-                    group_diff_centroid = round(
-                        float(
-                            get_dist(list(self.coord), list(centroid))
-                            - elemdatabase.CovalentRadius3["C"]
-                        ),
-                        3,
-                    )
-                    diff_list_original.append(group_diff_centroid)
+                diff_list.extend(atom_diffs)
 
-            group_details.append(
-                {
-                    "formula": group.formula,
-                    "is_haptic": group.is_haptic,
-                    "haptic_type": group.haptic_type,
-                    "coord_atoms": coord_atoms,
-                    "group_diff": group_diff,
-                    "group_diff_centroid": group_diff_centroid,
-                }
-            )
-        if len(diff_list) > 0:
-            average = round(float(np.mean(diff_list)), 3)
-        else:
-            average = 0.0
-
-        if len(diff_list_allpoint) > 0:
-            average_allpoint = round(float(np.mean(diff_list_allpoint)), 3)
-        else:
-            average_allpoint = 0.0
-
-        if len(diff_list_original) > 0:
-            average_original = round(float(np.mean(diff_list_original)), 3)
-        else:
-            average_original = 0.0
-
-        logger.debug("diff_list_test(distance-covalent_radius)=%s", diff_list)
-        logger.debug("average_test=%s", average)
-
-        self.rel_metal_radius_test = round(average / metal_radii, 3)
-        self.rel_metal_radius_allpoint = round(average_allpoint / metal_radii, 3)
-        rel_metal_radius_original = round(average_original / metal_radii, 3)
-
-        self.rel_metal_radius_detail = {
-            "metal": self.label,
-            "metal_radii": round(float(metal_radii), 3),
-            "groups": group_details,
-            "average_diff_original": average_original,
-            "rel_metal_radius_original": rel_metal_radius_original,
-            "average_diff_test": average,
-            "rel_metal_radius_test": self.rel_metal_radius_test,
-            "average_diff_allpoint": average_allpoint,
-            "rel_metal_radius_allpoint": self.rel_metal_radius_allpoint,
-        }
-
-        logger.info(
-            "rel_metal_radius_test=%s for Metal %s%s",
-            self.rel_metal_radius_test,
-            self.label,
-            f" ({self.atom_site_label})" if self.atom_site_label else "",
+        average = round(float(np.mean(diff_list)), 3) if diff_list else 0.0
+        self.rel_metal_radius = round(
+            average / elemdatabase.CovalentRadius3[self.label], 3
         )
-        return self.rel_metal_radius_test
+        return self.rel_metal_radius
 
-    def get_plausible_os(self):
+    def get_plausible_oxidation_states(self):
+        """Look up and store plausible oxidation states."""
+        from cell2mol.charge.oxidation_states import get_plausible_metal_os
+
         self.plausible_os = get_plausible_metal_os(self)
         return self.plausible_os
 
-    def get_spin(self):
-        self.spin = assign_spin_metal(self)
+    def assign_spin(self):
+        """Assign and store the metal spin multiplicity."""
+        self.spin = predict_metal_spin(self)
         logger.info(
             "Spin multiplicity of the metal %s is assigned as %s", self.label, self.spin
         )
 
-    def predict_charge(self):
-        # TODO: integrate metal OS prediction model here
-        self.charge_by_ML = predict_ox_state(self)
-
-    def reset_charge(self):
-        Atom.reset_charge(
-            self
-        )  ## First uses the generic atom class function for itself
+    def reset_charge(self) -> None:
+        """Clear charge, oxidation-state candidates, spin, and valence count."""
+        super().reset_charge()
         self.plausible_os = None
+        self.spin = None
+        self.valence_elec = None
 
     def __str__(self):
-        # This will make print(object) behave like before
         return self.__repr__()
 
     def __repr__(self, indirect: bool = False):
+        """Return atom details, coordination formula, and oxidation-state candidates."""
         to_print = ""
         to_print += "------------- Cell2mol METAL Object --------------\n"
         to_print += Atom.__repr__(self, indirect=True)
@@ -491,3 +322,19 @@ class Metal(Atom):
             to_print += f" Plausible Oxidation States   = {self.plausible_os}\n"
         to_print += "----------------------------------------------------\n"
         return to_print
+
+    @classmethod
+    @deprecated("Use metal() with the keyword arguments instead.")
+    def from_positional(
+        cls,
+        label: str,
+        coord: NDArray | list[float],
+        frac_coord: NDArray | list[float] | None = None,
+        radii: float | None = None,
+    ) -> "Metal":
+        return cls(
+            label=label,
+            coord=np.asarray(coord),
+            frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
+            radii=radii,
+        )
