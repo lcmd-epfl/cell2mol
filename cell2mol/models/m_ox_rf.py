@@ -12,7 +12,7 @@ import pandas as pd
 matplotlib.use("Agg")
 import numpy as np
 from sys import argv
-from cell2mol.spin import make_geom_list
+from cell2mol.spin import build_geometry_index
 
 
 dataframe = argv[1]
@@ -28,7 +28,7 @@ print(df.columns)
 
 df["geom_nr"] = ""
 for tmc in df.refcode:
-    df.loc[df.refcode == tmc, "geom_nr"] = make_geom_list()[
+    df.loc[df.refcode == tmc, "geom_nr"] = build_geometry_index()[
         df[df.refcode == tmc].geometry.item()
     ]
 
