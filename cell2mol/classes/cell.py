@@ -8,7 +8,7 @@ import numpy as np
 from typing_extensions import deprecated
 from pydantic import Field
 from cell2mol.classes.metal import Metal
-from cell2mol.classes.specie import Specie
+from cell2mol.classes.species import Species
 from cell2mol.classes.molecule import Molecule
 from cell2mol.utils import BaseModel, config
 from cell2mol.my_types import NDArray, Type, SubType
@@ -76,7 +76,7 @@ class Cell(ModelFileMixin, BaseModel):
     unique_indices: list[int] | None = None
 
     # Metal-free molecules, ligands, and metals used for charge balancing.
-    species_list: list[Specie | Metal] | None = None
+    species_list: list[Species | Metal] | None = None
 
     # Step error flags, primary codes, and all matching codes.
     error_assign_charge: bool | None = None

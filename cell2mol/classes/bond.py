@@ -4,15 +4,26 @@ from typing import Any
 
 import numpy as np
 from pydantic import Field
-from typing_extensions import deprecated
+from typing_extensions import TypedDict, deprecated
 
 from cell2mol.classes.atom import Atom
 from cell2mol.my_types import Type
 from cell2mol.utils import BaseModel
 
 
+class BondRecord(TypedDict):
+    """One undirected bond with indices local to its owning Species."""
+
+    atom_indices: list[int]
+    order: float
+    distance: float
+
+
 class Bond(BaseModel):
-    """Bond between shared atom objects, with order and Cartesian distance."""
+    """Legacy object retained for reading old JSON and pickle graphs.
+
+    New species store inline BondRecord dictionaries instead.
+    """
 
     atom1: Atom
     atom2: Atom

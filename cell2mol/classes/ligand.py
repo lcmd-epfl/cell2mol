@@ -7,11 +7,17 @@ from pydantic import Field
 from typing_extensions import deprecated
 from cell2mol.classes.group import Group
 from cell2mol.classes.metal import Metal
-from cell2mol.classes.specie import Specie
+from cell2mol.classes.species import Species
 from cell2mol.connectivity import build_adjacency
 from cell2mol.utils import config
 from cell2mol.operations import get_angle
-from cell2mol.my_types import NOType, OptionalRefList, SubType, NDArray
+from cell2mol.my_types import (
+    CoordinationMode,
+    NOType,
+    OptionalRefList,
+    SubType,
+    NDArray,
+)
 import logging
 
 if TYPE_CHECKING:
@@ -20,11 +26,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Ligand(Specie):
+class Ligand(Species):
     """Ligand with coordinating groups, hapticity, and nitrosyl geometry."""
 
     NO_type: NOType | None = None
     denticity: int | None = None
+    # Keys are metal atom indices in the parent Molecule.
+    denticity_by_metal: dict[int, int] | None = None
     # Groups belong to this ligand; metals belong to the parent molecule.
     groups: list[Group] | None = Field(default=None)
     haptic_type: list[str] | None = None
@@ -77,7 +85,7 @@ class Ligand(Specie):
                     )
 
     def detect_special_moieties(self) -> None:
-        """Detect special specie motifs and classify nitrosyl ligands."""
+        """Detect special species motifs and classify nitrosyl ligands."""
         super().detect_special_moieties()
 
         self.detect_nitrosyl()
@@ -127,36 +135,192 @@ class Ligand(Specie):
 
         return self.NO_type
 
-    def update_denticity(self):
-        """Sum group denticities; return None when groups are unavailable."""
-        if self.groups is None:
+    @property
+    def coordination(self) -> dict[int, CoordinationMode]:
+        """View existing contacts as kappa donors and eta sites per metal.
+
+        Metal keys are parent Molecule atom indices; donor indices are local
+        to this ligand. Metal-specific groups take precedence over merged
+        ligand groups. This view neither perceives bonds nor stores new state.
+        Unavailable connectivity yields an empty mapping.
+        """
+        atoms = self.atoms or []
+        local_indices = {id(atom): index for index, atom in enumerate(atoms)}
+        mol = cast("Molecule | None", self.get_parent("molecule"))
+        metals = (
+            self.metals if self.metals is not None else (mol.metals if mol else None)
+        )
+        result: dict[int, CoordinationMode] = {}
+        for metal in metals or []:
+            metal_index = metal.get_parent_index("molecule")
+            if metal_index is None:
+                raise ValueError(
+                    "Coordination requires metal indices in the parent molecule"
+                )
+            contacts = {
+                index
+                for index, atom in enumerate(atoms)
+                if metal_index in atom.metal_contact_indices
+            }
+            if not contacts:
+                continue
+            eta_sites: set[tuple[int, ...]] = set()
+            groups = metal.groups if metal.groups is not None else self.groups
+            for group in groups or []:
+                if not group.is_haptic:
+                    continue
+                site = tuple(
+                    sorted(
+                        {
+                            local_indices[id(atom)]
+                            for atom in group.atoms or []
+                            if id(atom) in local_indices
+                            and local_indices[id(atom)] in contacts
+                        }
+                    )
+                )
+                # A single contact to a ring is localized, not an eta site.
+                if len(site) > 1:
+                    eta_sites.add(site)
+            eta_atoms = {index for site in eta_sites for index in site}
+            result[metal_index] = {
+                "kappa_atoms": sorted(contacts - eta_atoms),
+                "eta_groups": [list(site) for site in sorted(eta_sites)],
+            }
+            logger.debug(
+                "Ligand %s: metal index=%d, coordination=%s",
+                self.formula,
+                metal_index,
+                result[metal_index],
+            )
+        return result
+
+    @property
+    def coordinated_metals(self) -> list[int]:
+        """Parent Molecule atom indices of metals with ligand contacts."""
+        return list(self.coordination)
+
+    @property
+    def mu(self) -> int:
+        """Number of coordinated metals; terminal ligands have mu=1."""
+        return len(self.coordinated_metals)
+
+    @property
+    def is_bridging(self) -> bool:
+        """Whether this ligand contacts more than one metal."""
+        return self.mu > 1
+
+    @property
+    def kappa_per_metal(self) -> dict[int, int]:
+        """Number of localized donor atoms at each metal, excluding eta atoms."""
+        return {
+            metal: len(info["kappa_atoms"]) for metal, info in self.coordination.items()
+        }
+
+    @property
+    def eta_per_metal(self) -> dict[int, list[int]]:
+        """Hapticities of all eta sites at each metal, including empty lists."""
+        return {
+            metal: [len(site) for site in info["eta_groups"]]
+            for metal, info in self.coordination.items()
+        }
+
+    @property
+    def denticity_per_metal(self) -> dict[int, int]:
+        """Denticity equals kappa count, never eta atom or site count."""
+        return self.kappa_per_metal
+
+    @property
+    def donor_atoms(self) -> list[int]:
+        """Unique ligand-local kappa donor indices; eta atoms are excluded."""
+        return sorted(
+            {
+                index
+                for info in self.coordination.values()
+                for index in info["kappa_atoms"]
+            }
+        )
+
+    @property
+    def has_mixed_coordination(self) -> bool:
+        """Whether both kappa and eta interactions occur, at any metals."""
+        modes = list(self.coordination.values())
+        return any(info["kappa_atoms"] for info in modes) and any(
+            info["eta_groups"] for info in modes
+        )
+
+    def update_denticity(self) -> dict[int, int] | None:
+        """Refresh legacy summaries from kappa counts, excluding eta sites.
+
+        The scalar is populated only for a single coordinated metal.
+        """
+        self.denticity = None
+        self.denticity_by_metal = None
+        logger.debug("Updating denticity for ligand %s", self.formula)
+        if self.groups is None or self.metals is None:
+            logger.debug(
+                "Skipping denticity: groups available=%s, metals available=%s",
+                self.groups is not None,
+                self.metals is not None,
+            )
             return None
-        self.denticity = 0
-        for g in self.groups:
-            self.denticity += g.update_denticity()
-        return self.denticity
+        self.denticity_by_metal = self.denticity_per_metal
+        if len(self.denticity_by_metal) == 1:
+            self.denticity = next(iter(self.denticity_by_metal.values()))
+        logger.debug(
+            "Ligand %s: denticity_by_metal=%s, scalar denticity=%s",
+            self.formula,
+            self.denticity_by_metal,
+            self.denticity,
+        )
+        return self.denticity_by_metal
 
     def update_hapticity(self):
         """Collect group haptic modes; return None when groups are unavailable."""
+        logger.debug("Updating hapticity for ligand %s", self.formula)
         if self.groups is None:
+            logger.debug(
+                "Skipping hapticity for ligand %s: groups unavailable", self.formula
+            )
             return None
         self.is_haptic = False
         self.haptic_type = []
-        for gr in self.groups:
+        for group_index, gr in enumerate(self.groups):
+            logger.debug(
+                "Ligand group %d (%s): is_haptic=%s, mode=%s, recompute=%s",
+                group_index,
+                gr.formula,
+                gr.is_haptic,
+                gr.haptic_type,
+                gr.is_haptic is None,
+            )
             if gr.is_haptic is None:
                 gr.update_hapticity()
+            logger.debug(
+                "Ligand group %d: is_haptic=%s, mode=%s, include=%s",
+                group_index,
+                gr.is_haptic,
+                gr.haptic_type,
+                bool(gr.is_haptic and gr.haptic_type is not None),
+            )
             if gr.is_haptic and gr.haptic_type is not None:
                 self.haptic_type.append(gr.haptic_type)
         if len(self.haptic_type) > 0:
             self.is_haptic = True
+        logger.debug(
+            "Ligand %s: is_haptic=%s, haptic_type=%s",
+            self.formula,
+            self.is_haptic,
+            self.haptic_type,
+        )
 
         return self.haptic_type
 
     def __repr__(self, indirect: bool = False):
-        """Return specie details and the number of coordinating groups."""
+        """Return species details and the number of coordinating groups."""
         to_print = ""
         to_print += "------------- Cell2mol LIGAND Object --------------\n"
-        to_print += Specie.__repr__(self, indirect=True)
+        to_print += Species.__repr__(self, indirect=True)
         if self.groups is not None:
             to_print += f" Number of Groups             = {len(self.groups)}\n"
         to_print += "---------------------------------------------------\n"
@@ -166,13 +330,13 @@ class Ligand(Specie):
     @deprecated("Use ligand(**kwargs) with keyword arguments")
     def from_positional(
         cls,
-        labels: list[str],
+        symbols: list[str],
         coord: NDArray | list[list[float]],
         frac_coord: NDArray | list[list[float]] | None = None,
         radii: NDArray | list[float] | None = None,
     ) -> "Ligand":
         return cls(
-            labels=labels,
+            symbols=symbols,
             coord=np.asarray(coord),
             frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
             radii=np.asarray(radii) if radii is not None else None,

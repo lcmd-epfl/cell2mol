@@ -13,15 +13,15 @@ from cell2mol.coordination_sphere import (
     build_coordination_groups,
     determine_coordination_geometry,
 )
-from cell2mol.my_types import RefList, Spin, SubType, NDArray
+from cell2mol.my_types import CoordinationMode, RefList, Spin, SubType, NDArray
 from cell2mol.connectivity import build_adjacency
-from cell2mol.element_utils import labels2formula
+from cell2mol.element_utils import symbols2formula
 from cell2mol.utils import config
 
 if TYPE_CHECKING:
     from cell2mol.classes.group import Group
     from cell2mol.classes.molecule import Molecule
-    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.species import Species
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,80 @@ class Metal(Atom):
 
     subtype: SubType = Field(default="metal")
 
+    @property
+    def coordination(self) -> dict[int, CoordinationMode]:
+        """Inverse ligand view keyed by position in Molecule.ligands.
+
+        Donor indices remain local to the corresponding ligand. No inverse
+        state is stored. Missing parent context yields an empty mapping.
+        """
+        mol = cast("Molecule | None", self.get_parent("molecule"))
+        metal_index = self.get_parent_index("molecule")
+        if mol is None or metal_index is None:
+            return {}
+        result: dict[int, CoordinationMode] = {}
+        for ligand_index, ligand in enumerate(mol.ligands or []):
+            mode = ligand.coordination.get(metal_index)
+            if mode is not None:
+                result[ligand_index] = mode
+        return result
+
+    @property
+    def coordinated_ligands(self) -> list[int]:
+        """Positions of coordinated ligands in Molecule.ligands."""
+        return list(self.coordination)
+
+    def _coordination_atom_indices(self, haptic: bool) -> list[int]:
+        mol = cast("Molecule | None", self.get_parent("molecule"))
+        if mol is None:
+            return []
+        indices: set[int] = set()
+        for ligand_index, mode in self.coordination.items():
+            ligand = (mol.ligands or [])[ligand_index]
+            atom_map = ligand.get_parent_indices("molecule")
+            if atom_map is None:
+                raise ValueError(
+                    "Coordinated ligand requires parent molecule atom indices"
+                )
+            local = (
+                [index for site in mode["eta_groups"] for index in site]
+                if haptic
+                else mode["kappa_atoms"]
+            )
+            indices.update(atom_map[index] for index in local)
+        return sorted(indices)
+
+    @property
+    def kappa_atoms(self) -> list[int]:
+        """Molecule atom indices of localized ligand donors only."""
+        return self._coordination_atom_indices(haptic=False)
+
+    @property
+    def eta_atoms(self) -> list[int]:
+        """Molecule atom indices of haptic ligand atoms only."""
+        return self._coordination_atom_indices(haptic=True)
+
+    @property
+    def coordinated_atoms(self) -> list[int]:
+        """Union of kappa and eta ligand atoms; excludes metal-metal bonds.
+
+        Unlike coord_sphere_atoms, this returns indices, not Atom objects.
+        """
+        return sorted(set(self.kappa_atoms) | set(self.eta_atoms))
+
+    @property
+    def coordination_number_atoms(self) -> int:
+        """Unique ligand atom contacts, counting all eta atoms."""
+        return len(self.coordinated_atoms)
+
+    @property
+    def coordination_number_sites(self) -> int:
+        """Kappa donors plus eta sites; excludes metal-metal bonds."""
+        return sum(
+            len(mode["kappa_atoms"]) + len(mode["eta_groups"])
+            for mode in self.coordination.values()
+        )
+
     def compute_valence_electron_count(self, m_ox: int):
         """Compute and store the valence electron count for an oxidation state."""
         v_elec = elemdatabase.valenceelectrons[self.label] - m_ox
@@ -63,7 +137,7 @@ class Metal(Atom):
         return self.valence_elec
 
     def get_connected_metals(self, use_bond_info: bool | None = None):
-        """Cache bonded metals using madjmat or pairwise adjacency calculations."""
+        """Cache bonded metals using metal_contact_matrix or pairwise adjacency calculations."""
         if self.metals is not None:
             return self.metals
 
@@ -75,8 +149,8 @@ class Metal(Atom):
         self.metals = []
         self_mol_idx = self.get_parent_index("molecule")
         assert self_mol_idx is not None
-        if mol.madjmat is not None:
-            mol_madjmat = mol.madjmat
+        if mol.metal_contact_matrix is not None:
+            mol_madjmat = mol.metal_contact_matrix
             for met in mol.metals or []:
                 if met is self:
                     continue
@@ -85,7 +159,7 @@ class Metal(Atom):
                 if mol_madjmat[self_mol_idx][met_mol_idx] >= 1:
                     self.metals.append(met)
                     logger.debug(
-                        "Metal %s%s is connected to Metal %s%s (existing mol.adjmat)",
+                        "Metal %s%s is connected to Metal %s%s (existing mol.adjacency_matrix)",
                         self.label,
                         f" ({self.atom_site_label})" if self.atom_site_label else "",
                         met.label,
@@ -139,7 +213,7 @@ class Metal(Atom):
         return self.metals
 
     def get_connected_nonmetal_atoms(self):
-        """Cache nonmetal atoms connected through the parent's madjmat."""
+        """Cache nonmetal atoms connected through the parent's metal_contact_matrix."""
         if self.connected_nonmetal_atoms is not None:
             return self.connected_nonmetal_atoms
 
@@ -148,15 +222,17 @@ class Metal(Atom):
             logger.debug("No parent molecule found, skipping atom connectivity check")
             return self.connected_nonmetal_atoms
 
-        mol = cast("Specie", self.get_parent("molecule"))
+        mol = cast("Species", self.get_parent("molecule"))
         self_mol_idx = self.get_parent_index("molecule")
         assert mol is not None
         assert self_mol_idx is not None
-        if mol.madjmat is None:
-            logger.debug("No mol.madjmat found, skipping atom connectivity check")
+        if mol.metal_contact_matrix is None:
+            logger.debug(
+                "No mol.metal_contact_matrix found, skipping atom connectivity check"
+            )
             return self.connected_nonmetal_atoms
 
-        mol_madjmat = mol.madjmat
+        mol_madjmat = mol.metal_contact_matrix
         assert mol.atoms is not None
         for idx, val in enumerate(mol_madjmat[self_mol_idx]):
             if idx == self_mol_idx or val < 1:
@@ -168,7 +244,7 @@ class Metal(Atom):
                 continue
             self.connected_nonmetal_atoms.append(atom)
             logger.debug(
-                "Metal %s%s is connected to Atom %s%s (existing mol.adjmat)",
+                "Metal %s%s is connected to Atom %s%s (existing mol.adjacency_matrix)",
                 self.label,
                 f" ({self.atom_site_label})" if self.atom_site_label else "",
                 atom.label,
@@ -179,7 +255,7 @@ class Metal(Atom):
         )
         return self.connected_nonmetal_atoms
 
-    def get_connected_groups(self):
+    def get_connected_groups(self) -> list[Group] | None:
         """Refine and cache coordinated groups; return None without a parent."""
         if not self.check_parent("molecule"):
             return None
@@ -198,11 +274,11 @@ class Metal(Atom):
             f" ({self.atom_site_label})" if self.atom_site_label else "",
         )
 
-        coord_groups = self.get_connected_groups()
+        coord_groups: list[Group | Metal] = list(self.get_connected_groups() or [])
 
         (self.coord_nr, self.coord_geometry, self.geom_deviation) = cast(
             "tuple[Any, ...]",
-            determine_coordination_geometry(self, coord_groups or []),
+            determine_coordination_geometry(self, coord_groups),
         )
 
         if self.metals is None:
@@ -210,7 +286,7 @@ class Metal(Atom):
 
         if len(self.metals or []) > 0:
             connected_metals = self.metals or []
-            whole_coord = (coord_groups or []) + connected_metals
+            whole_coord = coord_groups + connected_metals
 
             logger.debug("Including metal-metal bonds for: %s", self.label)
 
@@ -226,23 +302,25 @@ class Metal(Atom):
         return self.coord_geometry
 
     def get_coordination_sphere_atoms(self):
-        """Cache neighbors from the parent's adjmat; return None without a parent."""
+        """Cache neighbors from the parent's adjacency_matrix; return None without a parent."""
         if not self.check_parent("molecule"):
             logger.warning(f"Metal {self.label} has no parent molecule reference.")
             return None
 
         if self.coord_sphere_atoms is None:
-            mol = cast("Specie", self.get_parent("molecule"))
+            mol = cast("Species", self.get_parent("molecule"))
             midx = self.get_parent_index("molecule")
 
             if (
                 mol is not None
                 and mol.atoms is not None
-                and mol.adjmat is not None
+                and mol.adjacency_matrix is not None
                 and midx is not None
             ):
                 self.coord_sphere_atoms = [
-                    mol.atoms[i] for i, val in enumerate(mol.adjmat[midx]) if val >= 1
+                    mol.atoms[i]
+                    for i, val in enumerate(mol.adjacency_matrix[midx])
+                    if val >= 1
                 ]
             else:
                 self.coord_sphere_atoms = []
@@ -255,7 +333,7 @@ class Metal(Atom):
             self.get_coordination_sphere_atoms()
 
         atom_labels = [at.label for at in self.coord_sphere_atoms or []]
-        self.coord_sphere_formula = labels2formula(atom_labels)
+        self.coord_sphere_formula = symbols2formula(atom_labels)
 
         return self.coord_sphere_formula
 
@@ -327,14 +405,14 @@ class Metal(Atom):
     @deprecated("Use metal() with the keyword arguments instead.")
     def from_positional(
         cls,
-        label: str,
+        symbol: str,
         coord: NDArray | list[float],
         frac_coord: NDArray | list[float] | None = None,
-        radii: float | None = None,
+        radius: float | None = None,
     ) -> "Metal":
         return cls(
-            label=label,
+            symbol=symbol,
             coord=np.asarray(coord),
             frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
-            radii=radii,
+            radius=radius,
         )

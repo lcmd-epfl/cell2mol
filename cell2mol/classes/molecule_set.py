@@ -9,7 +9,7 @@ from typing_extensions import deprecated
 
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.molecule import Molecule
-from cell2mol.classes.specie import Specie
+from cell2mol.classes.species import Species
 from cell2mol.my_types import SubType, Type
 from cell2mol.species_collection import (
     collect_hydrogen_flags,
@@ -46,9 +46,9 @@ class MoleculeSet(ModelFileMixin, BaseModel):
     input_charge: int | None = None
 
     # Unique species and the mapping of molecule species to them.
-    unique_species: list[Specie | Metal] | None = None
+    unique_species: list[Species | Metal] | None = None
     unique_indices: list[int] | None = None
-    species_list: list[Specie | Metal] | None = None
+    species_list: list[Species | Metal] | None = None
 
     # Hydrogen flags aggregated across molecules and species.
     has_isolated_H: bool | None = None

@@ -8,7 +8,7 @@ from typing_extensions import deprecated
 from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.molecule import Molecule
-from cell2mol.classes.specie import Specie
+from cell2mol.classes.species import Species
 from cell2mol.connectivity import split_species
 from cell2mol.species_collection import (
     collect_hydrogen_flags,
@@ -37,7 +37,7 @@ class Reference(Cell):
     moiety_indices: list[list[int]] | None = None
 
     # Unique species used for charge balancing
-    unique_species: list[Specie | Metal] | None = None
+    unique_species: list[Species | Metal] | None = None
 
     # Aggregated hydrogen flags
     has_isolated_H: bool | None = None

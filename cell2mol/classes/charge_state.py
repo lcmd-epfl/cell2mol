@@ -20,22 +20,39 @@ _LEGACY_FIELD_NAMES = {
     "protonated_abstotal": "protonated_abs_total_charge",
     "protonated_abs_atcharge": "protonated_sum_abs_atom_charges",
     "protonated_zwitt": "protonated_is_zwitterionic",
-    "specie_abstotal": "specie_abs_total_charge",
-    "specie_abs_atcharge": "specie_sum_abs_atom_charges",
-    "specie_zwitt": "specie_is_zwitterionic",
+    "species_abstotal": "species_abs_total_charge",
+    "species_abs_atcharge": "species_sum_abs_atom_charges",
+    "species_zwitt": "species_is_zwitterionic",
     "uncorr_total_charge": "protonated_total_charge",
     "uncorr_atom_charges": "protonated_atom_charges",
     "uncorr_abstotal": "protonated_abs_total_charge",
     "uncorr_abs_atcharge": "protonated_sum_abs_atom_charges",
     "uncorr_zwitt": "protonated_is_zwitterionic",
-    "corr_total_charge": "specie_total_charge",
-    "corr_atom_charges": "specie_atom_charges",
-    "corr_abstotal": "specie_abs_total_charge",
-    "corr_abs_atcharge": "specie_sum_abs_atom_charges",
-    "corr_zwitt": "specie_is_zwitterionic",
-    "corr_rdkit_obj": "specie_rdkit_obj",
-    "corr_smiles": "specie_smiles",
+    "corr_total_charge": "species_total_charge",
+    "corr_atom_charges": "species_atom_charges",
+    "corr_abstotal": "species_abs_total_charge",
+    "corr_abs_atcharge": "species_sum_abs_atom_charges",
+    "corr_zwitt": "species_is_zwitterionic",
+    "corr_rdkit_obj": "species_rdkit_obj",
+    "corr_smiles": "species_smiles",
 }
+
+
+# Legacy snapshots of values now provided by read-only properties.
+_DERIVED_FIELD_NAMES = frozenset(
+    {
+        "protonated_abs_total_charge",
+        "protonated_sum_abs_atom_charges",
+        "protonated_is_zwitterionic",
+        "matches_target_charge",
+        "site_proton_counts",
+        "ligand_donor_electrons",
+        "n_protons_added",
+        "species_abs_total_charge",
+        "species_sum_abs_atom_charges",
+        "species_is_zwitterionic",
+    }
+)
 
 
 def eval_chargelist(atom_charges: list[int]) -> tuple[int, int, bool]:
@@ -53,7 +70,7 @@ def eval_chargelist(atom_charges: list[int]) -> tuple[int, int, bool]:
 
 
 class ChargeState(BaseModel):
-    """Store charges and molecular forms for the original and protonated specie."""
+    """Store charges and molecular forms for the original and protonated species."""
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -67,40 +84,76 @@ class ChargeState(BaseModel):
     allow_charged_fragments: bool
     protonation: Protonation = Field(...)
 
-    # Protonated charge metrics
-    protonated_abs_total_charge: int | None = None
-    protonated_sum_abs_atom_charges: int | None = None
-    protonated_is_zwitterionic: bool | None = None
-    matches_target_charge: bool | None = None
+    # Original species charges
+    species_total_charge: int = Field(default=0)
+    species_atom_charges: list[int] = Field(default_factory=list)
 
-    # Protonation data
-    site_proton_counts: list[int] | None = None
-    ligand_donor_electrons: list[int] | None = None
-    n_protons_added: int | None = None
-
-    # Original specie charges
-    specie_total_charge: int = Field(default=0)
-    specie_atom_charges: list[int] = Field(default_factory=list)
-
-    # Specie charge metrics
-    specie_abs_total_charge: int | None = None
-    specie_sum_abs_atom_charges: int | None = None
-    specie_is_zwitterionic: bool | None = None
-
-    # Original specie molecular forms restored from the protonated state.
-    specie_rdkit_obj: RDKitObject | None = None
-    specie_smiles: str | None = None
+    # Original species molecular forms restored from the protonated state.
+    species_rdkit_obj: RDKitObject | None = None
+    species_smiles: str | None = None
 
     type: str = Field(default="charge_state", frozen=True)
+
+    @property
+    def protonated_abs_total_charge(self) -> int:
+        """Return absolute net charge from the current charge list."""
+        return eval_chargelist(self.protonated_atom_charges)[0]
+
+    @property
+    def protonated_sum_abs_atom_charges(self) -> int:
+        """Return sum of absolute atomic charges from the current charge list."""
+        return eval_chargelist(self.protonated_atom_charges)[1]
+
+    @property
+    def protonated_is_zwitterionic(self) -> bool:
+        """Return whether the current protonated charges have both signs."""
+        return eval_chargelist(self.protonated_atom_charges)[2]
+
+    @property
+    def species_abs_total_charge(self) -> int:
+        """Return absolute net charge from the current charge list."""
+        return eval_chargelist(self.species_atom_charges)[0]
+
+    @property
+    def species_sum_abs_atom_charges(self) -> int:
+        """Return sum of absolute atomic charges from the current charge list."""
+        return eval_chargelist(self.species_atom_charges)[1]
+
+    @property
+    def species_is_zwitterionic(self) -> bool:
+        """Return whether the current species charges have both signs."""
+        return eval_chargelist(self.species_atom_charges)[2]
+
+    @property
+    def matches_target_charge(self) -> bool:
+        """Return whether the protonated net charge matches the target."""
+        return self.protonated_total_charge == self.protonated_target_charge
+
+    @property
+    def site_proton_counts(self) -> list[int]:
+        """Read per-site proton counts from the shared protonation state."""
+        return self.protonation.site_proton_counts
+
+    @property
+    def ligand_donor_electrons(self) -> list[int]:
+        """Read donated electrons from the shared protonation state."""
+        return self.protonation.ligand_donor_electrons
+
+    @property
+    def n_protons_added(self) -> int:
+        """Read the number of added protons from the protonation state."""
+        return self.protonation.n_protons_added
 
     @model_validator(mode="before")
     @classmethod
     def _migrate_legacy_field_names(cls, data: Any) -> Any:
         """Rename legacy fields before model validation."""
         if isinstance(data, dict):
+            data = data.copy()
             for old, new in _LEGACY_FIELD_NAMES.items():
-                if old in data and new not in data:
-                    data[new] = data.pop(old)
+                if old in data:
+                    data.setdefault(new, data.pop(old))
+            data = {k: v for k, v in data.items() if k not in _DERIVED_FIELD_NAMES}
         return data
 
     def __setstate__(self, state: dict[str, Any]) -> None:
@@ -112,76 +165,59 @@ class ChargeState(BaseModel):
             for old, new in _LEGACY_FIELD_NAMES.items():
                 if old in container:
                     if isinstance(container, dict):
-                        if new not in container:
-                            container[new] = container.pop(old)
+                        container.setdefault(new, container.pop(old))
                     else:  # Pydantic fields set
                         container.discard(old)
                         container.add(new)
+        for key in ("__dict__", "__pydantic_extra__", "__pydantic_fields_set__"):
+            container = state.get(key)
+            if container is None:
+                continue
+            for name in _DERIVED_FIELD_NAMES:
+                if isinstance(container, dict):
+                    container.pop(name, None)
+                else:
+                    container.discard(name)
         super().__setstate__(state)
 
     def model_post_init(self, __context: Any) -> None:
-        """Compute charge metrics and restore the original specie."""
-        (
-            self.protonated_abs_total_charge,
-            self.protonated_sum_abs_atom_charges,
-            self.protonated_is_zwitterionic,
-        ) = eval_chargelist(self.protonated_atom_charges)
-
-        self.matches_target_charge = (
-            self.protonated_total_charge == self.protonated_target_charge
-        )
-
-        self.site_proton_counts = self.protonation.site_proton_counts
-        self.ligand_donor_electrons = self.protonation.ligand_donor_electrons
-        self.n_protons_added = self.protonation.n_protons_added
-
+        """Restore the original specie; metrics are computed on access."""
         self._log_initialization()
 
         # Replace the charge list to avoid duplicates on reload.
         if len(self.site_proton_counts) > 0:
-            specie_charges = []
+            species_charges = []
             # Original atoms precede added hydrogens.
             for idx, n_add in enumerate(self.site_proton_counts):
                 if n_add > 0:
                     # Undo added protons and account for donated electrons.
-                    specie_charges.append(
+                    species_charges.append(
                         self.protonated_atom_charges[idx]
                         - self.site_proton_counts[idx]
                         + self.ligand_donor_electrons[idx]
                     )
                 else:
-                    specie_charges.append(self.protonated_atom_charges[idx])
-            self.specie_atom_charges = specie_charges
-            self.specie_total_charge = int(np.sum(specie_charges))
+                    species_charges.append(self.protonated_atom_charges[idx])
+            self.species_atom_charges = species_charges
+            self.species_total_charge = int(np.sum(species_charges))
         else:
-            self.specie_total_charge = self.protonated_total_charge
-            self.specie_atom_charges = self.protonated_atom_charges.copy()
-
-        (
-            self.specie_abs_total_charge,
-            self.specie_sum_abs_atom_charges,
-            self.specie_is_zwitterionic,
-        ) = eval_chargelist(self.specie_atom_charges)
+            self.species_total_charge = self.protonated_total_charge
+            self.species_atom_charges = self.protonated_atom_charges.copy()
 
         # Finalize even without added H; reuse existing SMILES on reload.
-        if self.is_valid and not self.specie_smiles:
+        if self.is_valid and not self.species_smiles:
             try:
-                obj, self.specie_smiles, fixed = self._build_specie_mol()
-                self.specie_rdkit_obj = obj
+                obj, self.species_smiles, fixed = self._build_species_mol()
+                self.species_rdkit_obj = obj
                 if fixed:
-                    # Sync charge metrics if finalization reports a repair.
-                    self.specie_atom_charges = [
+                    # Sync source charges if finalization reports a repair.
+                    self.species_atom_charges = [
                         int(a.GetFormalCharge()) for a in obj.GetAtoms()
                     ]
-                    self.specie_total_charge = int(np.sum(self.specie_atom_charges))
-                    (
-                        self.specie_abs_total_charge,
-                        self.specie_sum_abs_atom_charges,
-                        self.specie_is_zwitterionic,
-                    ) = eval_chargelist(self.specie_atom_charges)
+                    self.species_total_charge = int(np.sum(self.species_atom_charges))
             except Exception as e:
                 logger.debug(
-                    "Could not build specie mol (protonated SMILES %s): %s",
+                    "Could not build species mol (protonated SMILES %s): %s",
                     self.protonated_smiles,
                     e,
                 )
@@ -220,34 +256,34 @@ class ChargeState(BaseModel):
             ", ".join(protonated_sites) if protonated_sites else "none",
         )
 
-    def _build_specie_mol(self) -> tuple[RDKitObject, str, bool]:
-        """Restore the original specie by removing added H and applying its charges.
+    def _build_species_mol(self) -> tuple[RDKitObject, str, bool]:
+        """Restore the original species by removing added H and applying its charges.
 
         Return (mol, SMILES, False); the flag is retained for compatibility.
         The parent and protonated molecule remain unchanged.
         """
         from rdkit import Chem
-        from cell2mol.charge.molecule_builder import finalize_specie_mol
+        from cell2mol.charge.molecule_builder import finalize_species_mol
 
-        n_orig = len(self.specie_atom_charges)
+        n_orig = len(self.species_atom_charges)
         rw = Chem.RWMol(self.protonated_rdkit_obj)
         for idx in range(rw.GetNumAtoms() - 1, n_orig - 1, -1):
             rw.RemoveAtom(idx)
-        for idx, q in enumerate(self.specie_atom_charges):
+        for idx, q in enumerate(self.species_atom_charges):
             atom = rw.GetAtomWithIdx(idx)
             atom.SetFormalCharge(int(q))
             atom.SetNoImplicit(True)
-        return finalize_specie_mol(rw.GetMol())
+        return finalize_species_mol(rw.GetMol())
 
     def summary(self) -> str:
         """Return charge, status, added H, zwitterion flag, and shortened SMILES."""
-        smi = self.specie_smiles or self.protonated_smiles or ""
+        smi = self.species_smiles or self.protonated_smiles or ""
         if len(smi) > 48:
             smi = smi[:45] + "..."
-        tags = " zwitt" if self.specie_is_zwitterionic else ""
+        tags = " zwitt" if self.species_is_zwitterionic else ""
         nH = self.n_protons_added if self.n_protons_added is not None else "?"
         return (
-            f"<ChargeState q={self.specie_total_charge:+d} "
+            f"<ChargeState q={self.species_total_charge:+d} "
             f"{'OK' if self.is_valid else 'FAIL'} nH={nH}{tags} {smi!r}>"
         )
 
@@ -255,8 +291,8 @@ class ChargeState(BaseModel):
         """Return full charge-state details; use summary() for a compact view."""
         lines = [
             "------------- Cell2mol Charge State ---------------",
-            f" Valid                          = {self.is_valid}",
-            f" Protonated Target Charge                    = {self.protonated_target_charge}",
+            f" Valid                           = {self.is_valid}",
+            f" Protonated Target Charge        = {self.protonated_target_charge}",
             f" Number of Protons Added         = {self.n_protons_added}",
             f" Protonated Total Charge         = {self.protonated_total_charge}",
             f" Smiles (protonated)             = {self.protonated_smiles}",
@@ -266,13 +302,13 @@ class ChargeState(BaseModel):
                 f" Ligand Donor Electrons          = {sum(self.ligand_donor_electrons)}"
             )
         lines += [
-            f" Specie Total Charge             = {self.specie_total_charge}",
-            f" Specie Sum Abs Atom Charges    = {self.specie_sum_abs_atom_charges}",
-            f" Smiles (specie)                 = {self.specie_smiles}",
+            f" Species Total Charge             = {self.species_total_charge}",
+            f" Species Sum Abs Atom Charges     = {self.species_sum_abs_atom_charges}",
+            f" Smiles (species)                 = {self.species_smiles}",
         ]
-        if self.specie_is_zwitterionic:
+        if self.species_is_zwitterionic:
             lines.append(
-                f" Specie Is Zwitterion?           = {self.specie_is_zwitterionic}"
+                f" Species Is Zwitterion?           = {self.species_is_zwitterionic}"
             )
 
         lines.append("---------------------------------------------------")

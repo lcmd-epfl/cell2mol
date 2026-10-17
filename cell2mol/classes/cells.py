@@ -61,8 +61,8 @@ class Cells(ModelFileMixin, BaseModel):
             to_print += "(Unitcell)                                \n"
             to_print += f" # Molecules:          = {len(unitcell.moleclist)}\n"
             to_print += " with Formula:                               \n"
-            for idx, m in enumerate(unitcell.moleclist):
-                to_print += f"    {idx}: {m.formula} \n"
+            for idx, mol in enumerate(unitcell.moleclist):
+                to_print += f"    {idx}: {mol.formula} \n"
         to_print += "---------------------------------------------------\n"
         return to_print
 

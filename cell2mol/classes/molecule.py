@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from cell2mol.utils.serialization import ModelFileMixin
-from typing import TYPE_CHECKING, cast
+from typing import Any, TYPE_CHECKING, cast
 
 import numpy as np
 from typing_extensions import deprecated
 from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.ligand import Ligand
-from cell2mol.classes.specie import Specie
+from cell2mol.classes.species import Species
 from cell2mol.connectivity import split_species, merge_coordination_groups
 from cell2mol.element_utils import (
-    labels2formula,
+    symbols2formula,
     get_df_block_metal_idxs,
     get_alkali_alkaline_earth_metal_idxs,
     get_post_transition_metal_idxs,
@@ -31,11 +31,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Molecule(ModelFileMixin, Specie):
+class Molecule(ModelFileMixin, Species):
     """Molecule structure with child ligands, metals, and coordination results."""
 
-    haptic_type: list[str] | None = None
-    is_haptic: bool | None = None
     ligands: list[Ligand] | None = Field(default=None)
     metals: list[Metal] | None = Field(default=None)
     spin: Spin | None = None
@@ -51,6 +49,25 @@ class Molecule(ModelFileMixin, Specie):
     # Per-molecule failures; a MoleculeSet folds them into its own flags.
     error_create_bonds: bool | None = None
     error_get_spin: bool | None = None
+
+    @property
+    def has_haptic_coordination(self) -> bool:
+        """Whether any ligand-metal interaction contains an eta site.
+
+        Derived from existing coordination; does not build missing groups.
+        """
+        return any(
+            mode["eta_groups"]
+            for ligand in self.ligands or []
+            for mode in ligand.coordination.values()
+        )
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Discard obsolete molecule hapticity summaries from legacy pickle."""
+        for name in ("is_haptic", "haptic_type"):
+            state.get("__dict__", {}).pop(name, None)
+            state.get("__pydantic_fields_set__", set()).discard(name)
+        super().__setstate__(state)
 
     @property
     def contains_metal(self) -> bool:
@@ -220,7 +237,7 @@ class Molecule(ModelFileMixin, Specie):
                 else None
             )
 
-            logger.info("  Ligand: %s", labels2formula(lig_labels))
+            logger.info("  Ligand: %s", symbols2formula(lig_labels))
 
             if lig_frac_coord is not None:
                 ligand = Ligand.from_positional(
@@ -319,11 +336,11 @@ class Molecule(ModelFileMixin, Specie):
                 )
                 for atom in group.atoms or []:
                     logger.debug(
-                        f"    Atom: {atom.atom_site_label}, connec: {atom.connec} mconnec: {atom.mconnec}"
+                        f"    Atom: {atom.atom_site_label}, neighbor_count: {atom.neighbor_count} metal_contact_count: {atom.metal_contact_count}"
                     )
 
     def detect_special_moieties(self):
-        """Screen ligands in metal-containing molecules, or the whole metal-free specie."""
+        """Screen ligands in metal-containing molecules, or the whole metal-free species."""
 
         if not self.contains_metal:
             super().detect_special_moieties()
@@ -380,8 +397,8 @@ class Molecule(ModelFileMixin, Specie):
             n = len(lig.groups)
             adj = {i: set() for i in range(n)}
 
-            assert self.adjmat is not None
-            adjmat = self.adjmat
+            assert self.adjacency_matrix is not None
+            adjacency_matrix = self.adjacency_matrix
             group_atom_sets = [
                 {atom.get_parent_index("molecule") for atom in g.atoms or []}
                 for g in lig.groups
@@ -402,7 +419,7 @@ class Molecule(ModelFileMixin, Specie):
                     # Otherwise link groups joined by a bond.
                     for ai in atoms_i:
                         for aj in atoms_j:
-                            if adjmat[ai, aj]:
+                            if adjacency_matrix[ai, aj]:
                                 connected = True
                                 break
                         if connected:
@@ -451,33 +468,17 @@ class Molecule(ModelFileMixin, Specie):
 
             lig.groups = merged_groups
 
-    def update_hapticity(self):
-        """Collect ligand haptic modes and update the molecule hapticity flag."""
-        if self.ligands is None:
-            self.split_complex()
-        self.is_haptic = False
-        self.haptic_type = []
-        if self.is_metal_complex:
-            for lig in self.ligands or []:
-                if lig.is_haptic is None:
-                    lig.update_hapticity()
-                if lig.is_haptic:
-                    self.is_haptic = True
-                for entry in lig.haptic_type or []:
-                    self.haptic_type.append(entry)
-
-        return self.haptic_type
-
     def create_bonds(self):
         """Build atom bonds and metal links, recording bond-generation failures."""
         from cell2mol.charge.molecule_builder import (
-            create_bonds_specie,
+            create_bonds_species,
             create_metal_ligand_bonds,
             create_metal_metal_bonds,
         )
 
+        self.bonds = []
         if self.is_metal_free_molecule:
-            result = create_bonds_specie(self)
+            result = create_bonds_species(self)
             if not result:
                 logger.error("Error for metal-free molecule %s", self.formula)
                 self.error_create_bonds = True
@@ -497,11 +498,18 @@ class Molecule(ModelFileMixin, Specie):
                         "Ligand %s has no SMILES after charge assignment. Cannot create bonds.",
                         lig.formula,
                     )
-                result = create_bonds_specie(lig)
+                result = create_bonds_species(lig)
                 if not result:
                     logger.error("Error for ligand %s", lig.formula)
                     self.error_create_bonds = True
                     return
+
+                positions = {id(atom): i for i, atom in enumerate(self.atoms or [])}
+                for bond in lig.bonds:
+                    indices = [
+                        positions[id(lig.atoms[i])] for i in bond["atom_indices"]
+                    ]
+                    self.add_bond(indices, bond["order"])
 
                 logger.debug("Bonds created for ligand %s", lig.formula)
 
@@ -517,10 +525,10 @@ class Molecule(ModelFileMixin, Specie):
         self.error_create_bonds = False
 
     def __repr__(self, indirect: bool = False):
-        """Return specie details and counts of child ligands and metals."""
+        """Return species details and counts of child ligands and metals."""
         to_print = ""
         to_print += "------------- Cell2mol MOLECULE Object --------------\n"
-        to_print += Specie.__repr__(self, indirect=True)
+        to_print += Species.__repr__(self, indirect=True)
         if self.ligands is not None:
             to_print += f" Number of Ligands            = {len(self.ligands)}\n"
         if self.metals is not None:
@@ -532,14 +540,14 @@ class Molecule(ModelFileMixin, Specie):
     @deprecated("Use Molecule() with keyword arguments instead.")
     def from_positional(
         cls,
-        labels: list[str],
+        symbols: list[str],
         coord: NDArray | list[list[float]],
         frac_coord: NDArray | list[list[float]] | None = None,
         radii: NDArray | list[float] | None = None,
     ) -> "Molecule":
         """Construct a molecule using the legacy positional interface."""
         return cls(
-            labels=labels,
+            symbols=symbols,
             coord=np.asarray(coord),
             frac_coord=np.asarray(frac_coord) if frac_coord is not None else None,
             radii=np.asarray(radii) if radii is not None else None,
