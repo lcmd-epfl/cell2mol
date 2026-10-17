@@ -85,7 +85,7 @@ def collect_unique_species(moleclist):
                 typelist_mols.append([mol, kdx])
                 unique_species.append(mol)
                 logger.debug(
-                    "New molecule found with: formula=%s and added in specie type %d",
+                    "New molecule found with: formula=%s and added in species type %d",
                     mol.formula,
                     kdx,
                 )
@@ -117,7 +117,7 @@ def collect_unique_species(moleclist):
                 typelist_mets.append([met, kdx])
                 unique_species.append(met)
                 logger.debug(
-                    "New metal found with: formula=%s and added in specie type %d",
+                    "New metal found with: formula=%s and added in species type %d",
                     met.formula,
                     kdx,
                 )
@@ -145,7 +145,7 @@ def collect_unique_species(moleclist):
                 typelist_ligs.append([lig, kdx])
                 unique_species.append(lig)
                 logger.debug(
-                    "New ligand found with: formula=%s added in specie type %d",
+                    "New ligand found with: formula=%s added in species type %d",
                     lig.formula,
                     kdx,
                 )
@@ -184,32 +184,33 @@ def collect_hydrogen_flags(moleclist, species_list):
 
     logger.info("Has isolated hydrogen: %s", has_isolated_h)
 
-    species = species_list or []
     missing = []
-    for specie in species:
+
+    for species in species_list:
         # Metals have no hydrogen-check method.
-        if specie.subtype == "metal":
+        if species.subtype == "metal":
             continue
-        if specie.check_hydrogens():
-            missing.append(specie)
+        if species.check_hydrogens():
+            missing.append(species)
 
     logger.info(
         "Missing hydrogens found in %d/%d species: %s",
         len(missing),
-        len(species),
+        len(species_list or []),
         [s.formula for s in missing],
     )
 
     flags = {
         "has_isolated_H": has_isolated_h,
         "missing_H_in_Carbon": any(
-            getattr(s, "missing_H_in_Carbon", False) for s in species
+            getattr(species, "missing_H_in_Carbon", False) for species in species_list
         ),
         "missing_H_on_CoordDonor": any(
-            getattr(s, "missing_H_on_CoordDonor", False) for s in species
+            getattr(species, "missing_H_on_CoordDonor", False)
+            for species in species_list
         ),
         "missing_H_in_Water": any(
-            getattr(s, "missing_H_in_Water", False) for s in species
+            getattr(species, "missing_H_in_Water", False) for species in species_list
         ),
     }
     flags["has_missing_H"] = (
@@ -240,37 +241,37 @@ def collect_plausible_charges(
     """
     plausible_charges: list[list[int] | None] = []
 
-    all_targets = [(specie, "unique specie") for specie in unique_species or []]
-    all_targets.extend([(specie, "species list") for specie in species_list or []])
+    all_targets = [(species, "unique species") for species in unique_species or []]
+    all_targets.extend([(species, "species list") for species in species_list or []])
 
     # Separate hydrogen-related skips from enumeration failures.
     skipped_for_missing_h: set[int] = set()
 
-    for idx, (specie, context_label) in enumerate(all_targets):
+    for idx, (species, context_label) in enumerate(all_targets):
         logger.info(
-            "Get plausible charge states for %s: %s", context_label, specie.formula
+            "Get plausible charge states for %s: %s", context_label, species.formula
         )
 
-        if skip_missing_h and specie.subtype != "metal":
-            if specie.has_missing_H is None:
-                specie.check_hydrogens()
-            if specie.has_missing_H:
+        if skip_missing_h and species.subtype != "metal":
+            if species.has_missing_H is None:
+                species.check_hydrogens()
+            if species.has_missing_H:
                 logger.warning(
-                    "Specie %s has missing hydrogens; skipping charge-state "
+                    "Species %s has missing hydrogens; skipping charge-state "
                     "enumeration and recording None",
-                    specie.formula,
+                    species.formula,
                 )
                 plausible_charges.append(None)
                 skipped_for_missing_h.add(idx)
                 continue
 
-        if specie.subtype == "metal":
-            plausible = specie.get_plausible_oxidation_states()
+        if species.subtype == "metal":
+            plausible = species.get_plausible_oxidation_states()
             plausible_charges.append(plausible if plausible else None)
         else:
-            plausible = specie.get_plausible_charge_states()
+            plausible = species.get_plausible_charge_states()
             plausible_charges.append(
-                [cs.specie_total_charge for cs in plausible] if plausible else None
+                [cs.species_total_charge for cs in plausible] if plausible else None
             )
 
     unexplained = [
@@ -282,13 +283,13 @@ def collect_plausible_charges(
 
     if skipped_for_missing_h:
         logger.info(
-            "Plausible charges: %d specie entr(ies) skipped for missing "
+            "Plausible charges: %d species entr(ies) skipped for missing "
             "hydrogens (not counted as a charge error)",
             len(skipped_for_missing_h),
         )
     if unexplained:
         logger.error(
-            "Plausible charges: %d specie entr(ies) with no charges found: %s",
+            "Plausible charges: %d species entr(ies) with no charges found: %s",
             len(unexplained),
             [all_targets[i][0].formula for i in unexplained],
         )
@@ -303,7 +304,7 @@ def collect_plausible_charges(
 def find_charge_inconsistencies(all_targets, plausible_charges, skipped_for_missing_h):
     """Find differing charge candidates among copies sharing a unique_index.
 
-    all_targets contains (specie, context_label) pairs aligned with candidates.
+    all_targets contains (species, context_label) pairs aligned with candidates.
     Ignore skipped positions and charge-list order. Return
     {unique_index: distinct candidate lists}, logging differences without raising.
     """
@@ -313,10 +314,10 @@ def find_charge_inconsistencies(all_targets, plausible_charges, skipped_for_miss
         return inconsistent
 
     by_unique_index: dict[int, list[list[int] | None]] = {}
-    for idx, (specie, _context) in enumerate(all_targets):
+    for idx, (species, _context) in enumerate(all_targets):
         if idx in skipped_for_missing_h:
             continue
-        unique_index = getattr(specie, "unique_index", None)
+        unique_index = getattr(species, "unique_index", None)
         if unique_index is None:
             continue
         by_unique_index.setdefault(unique_index, []).append(plausible_charges[idx])
@@ -336,14 +337,14 @@ def find_charge_inconsistencies(all_targets, plausible_charges, skipped_for_miss
         ]
         formula = next(
             (
-                spec.formula
-                for spec, _ in all_targets
-                if getattr(spec, "unique_index", None) == unique_index
+                species.formula
+                for species, _ in all_targets
+                if getattr(species, "unique_index", None) == unique_index
             ),
             "?",
         )
         logger.warning(
-            "Plausible charges disagree between copies of the same specie "
+            "Plausible charges disagree between copies of the same species "
             "%s (unique_index=%d): %s. The charge finally assigned depends "
             "on which copy is stored first.",
             formula,
@@ -364,44 +365,44 @@ def map_charges_to_molecules(unique_species, moleclist) -> bool:
 
     error_assign_charge = False
 
-    for specie in unique_species or []:
-        specie_unique_index = getattr(specie, "unique_index", None)
+    for species in unique_species or []:
+        species_unique_index = getattr(species, "unique_index", None)
         for mol in moleclist or []:
             try:
                 if mol.is_metal_free_molecule:
-                    if mol.unique_index == specie_unique_index:
-                        set_charge_state(specie, mol, mode=1)
+                    if mol.unique_index == species_unique_index:
+                        set_charge_state(species, mol, mode=1)
                     continue
 
                 for lig in mol.ligands or []:
-                    if lig.unique_index != specie_unique_index:
+                    if lig.unique_index != species_unique_index:
                         continue
                     try:
-                        set_charge_state(specie, lig, mode=1)
+                        set_charge_state(species, lig, mode=1)
                     except Exception:
                         error_assign_charge = True
                     if lig.totcharge is None:
                         logger.warning(
-                            "Ligand %s charge not set from Specie %s",
+                            "Ligand %s charge not set from Species %s",
                             lig.formula,
-                            specie_unique_index,
+                            species_unique_index,
                         )
                         error_assign_charge = True
 
                 for met in mol.metals or []:
-                    if met.unique_index != specie_unique_index:
+                    if met.unique_index != species_unique_index:
                         continue
                     try:
-                        specie_charge = getattr(specie, "charge", None)
-                        if specie_charge is not None:
-                            met.set_charge(specie_charge)
+                        species_charge = getattr(species, "charge", None)
+                        if species_charge is not None:
+                            met.set_charge(species_charge)
                     except Exception:
                         error_assign_charge = True
 
             except Exception as e:
                 error_assign_charge = True
                 logger.error(
-                    "Error mapping charge for Specie %s: %s", specie_unique_index, e
+                    "Error mapping charge for Species %s: %s", species_unique_index, e
                 )
 
     return error_assign_charge

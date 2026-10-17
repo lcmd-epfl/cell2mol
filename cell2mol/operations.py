@@ -15,7 +15,7 @@ from cell2mol.element_utils import (
     ACTINIDES,
     POST_TRANSITION_METALS,
     METALLOIDS,
-    labels2formula,
+    symbols2formula,
 )
 from cell2mol.write_results import write_coordination_report
 import re
@@ -617,7 +617,7 @@ def is_polynuclear_over_limit(labels: list[str], max_metal_centers: int = 6) -> 
         logger.warning(
             "Detected polynuclear complex exceeding metal center limit (%d): %s",
             max_metal_centers,
-            labels2formula(labels),
+            symbols2formula(labels),
         )
         logger.debug("Total metal counts: %d", total_metal_count)
         logger.debug("Metal type counts: %s", log_map)
@@ -648,10 +648,10 @@ def has_mixed_metal_types(labels: list[str]) -> bool:
     if total_metal_count == tm_count:
         logger.info(
             "TM-only complex detected: %s",
-            labels2formula(labels),
+            symbols2formula(labels),
         )
         return False
-    logger.warning("Mixed metal types detected in complex: %s", labels2formula(labels))
+    logger.warning("Mixed metal types detected in complex: %s", symbols2formula(labels))
     logger.debug("Total metal counts: %d", total_metal_count)
     logger.debug("Metal type counts: %s", log_map)
     # Mixed metal types detected

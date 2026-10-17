@@ -89,7 +89,7 @@ def interpret_reference(input_path, name, current_dir):
             # Check for missing hydrogens
             refcell.check_hydrogens()
 
-            # Identify the plausible charge states for specie in the reference molecules
+            # Identify the plausible charge states for species in the reference molecules
             refcell.get_plausible_charges()
 
             refcell.assess_errors(mode="hydrogens")

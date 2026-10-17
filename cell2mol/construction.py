@@ -299,9 +299,6 @@ def classify_fragments_and_molecules(initial_fragments, refmoleclist):
         order = np.argsort(frag_sizes)[::-1]
         incomplete_fragments = [incomplete_fragments[i] for i in order]
 
-    for frag in incomplete_fragments + hydrogens:
-        frag.compute_centroid()
-
     logger.debug(
         "Incomplete fragments: %s",
         [frag.formula for frag in incomplete_fragments],
@@ -1084,8 +1081,6 @@ def _merge_fragment_pair(
         merged.cell_indices = merged_cell_indices
 
         merged.set_adjacency_parameters(cov_factor, metal_factor)
-        merged.compute_element_count()
-        merged.compute_centroid()
         merged.set_atoms(
             create_adjacencies=True,
             atom_site_labels=merged_atom_site_labels,

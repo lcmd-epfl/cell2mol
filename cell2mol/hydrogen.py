@@ -17,7 +17,7 @@ from cell2mol.my_types import NDArray
 
 if TYPE_CHECKING:
     from cell2mol.classes.ligand import Ligand
-    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.species import Species
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
@@ -162,10 +162,10 @@ DIATOMIC_CARBON_EXEMPTIONS = {
 
 
 def _check_molecule_hydrogens(mol):
-    """Missing-H check for a single metal-free molecule specie.
+    """Missing-H check for a single metal-free molecule species.
 
     Args:
-        mol: a metal-free molecule Specie (no d-/f-block metals).
+        mol: a metal-free molecule Species (no d-/f-block metals).
 
     Returns:
         tuple:
@@ -192,7 +192,7 @@ def _check_molecule_hydrogens(mol):
     is_open_cage = False
     if not has_fullerene:
         is_open_cage, _ = has_open_fullerene(
-            mol.get_atomic_numbers(), mol.adjmat, mol.coord
+            mol.get_atomic_numbers(), mol.adjacency_matrix, mol.coord
         )
     if has_fullerene or is_open_cage:
         logger.debug(
@@ -205,11 +205,11 @@ def _check_molecule_hydrogens(mol):
         return missing_h_in_carbon, missing_h_in_water
 
     for atom in mol.atoms:
-        if atom.label != "C" or atom.adjacency is None:
+        if atom.label != "C" or atom.neighbor_indices is None:
             continue
 
-        neighbor_coords = [mol.coord[i] for i in atom.adjacency]
-        neighbor_labels = [mol.labels[i] for i in atom.adjacency]
+        neighbor_coords = [mol.coord[i] for i in atom.neighbor_indices]
+        neighbor_labels = [mol.labels[i] for i in atom.neighbor_indices]
 
         missing_h_detected, report, _ = detect_missing_carbon_hydrogens(
             atom.coord,
@@ -233,10 +233,10 @@ def _check_molecule_hydrogens(mol):
 
 
 def _check_ligand_hydrogens(lig, parent=None):
-    """Missing-H check for a single ligand specie.
+    """Missing-H check for a single ligand species.
 
     Args:
-        lig: a Ligand specie.
+        lig: a Ligand species.
         parent: the parent molecule whose coord/labels arrays the ligand's
             atom adjacency indexes into. Defaults to ``lig.get_parent("molecule")``.
 
@@ -329,7 +329,7 @@ def _check_ligand_hydrogens(lig, parent=None):
     is_open_cage = False
     if not has_fullerene:
         is_open_cage, _ = has_open_fullerene(
-            lig.get_atomic_numbers(), lig.adjmat, lig.coord
+            lig.get_atomic_numbers(), lig.adjacency_matrix, lig.coord
         )
     if has_fullerene or is_open_cage:
         logger.debug(
@@ -347,14 +347,14 @@ def _check_ligand_hydrogens(lig, parent=None):
 
     only_carbon = all(el == "C" for el in lig.labels) and lig.natoms > 2
     for atom in lig.atoms:
-        if atom.label != "C" or atom.adjacency is None:
+        if atom.label != "C" or atom.neighbor_indices is None:
             continue
 
-        if atom.mconnec >= 1 and not only_carbon:
+        if atom.metal_contact_count >= 1 and not only_carbon:
             continue
 
-        neighbor_coords = [parent.coord[i] for i in atom.adjacency]
-        neighbor_labels = [parent.labels[i] for i in atom.adjacency]
+        neighbor_coords = [parent.coord[i] for i in atom.neighbor_indices]
+        neighbor_labels = [parent.labels[i] for i in atom.neighbor_indices]
 
         missing_h_detected, report, _ = detect_missing_carbon_hydrogens(
             atom.coord,
@@ -381,14 +381,14 @@ def _check_ligand_hydrogens(lig, parent=None):
     )
 
 
-def detect_species_missing_hydrogens(specie):
-    """Check for missing hydrogen atoms in a single specie.
+def detect_species_missing_hydrogens(species):
+    """Check for missing hydrogen atoms in a single species.
 
     Accept a ligand, metal-free molecule, metal, or complex molecule.
     Metals report no missing hydrogens; complex molecules delegate to ligands.
 
     Args:
-        specie: a Specie (Ligand, Molecule, or Metal).
+        species: a Species (Ligand, Molecule, or Metal).
 
     Returns:
         tuple:
@@ -403,20 +403,20 @@ def detect_species_missing_hydrogens(specie):
     missing_h_on_coordinated_o_donor = False
     missing_h_on_coordinated_n_donor = False
 
-    if specie.subtype == "metal":
+    if species.subtype == "metal":
         pass  # a bare metal centre has no hydrogens to be missing
-    elif specie.subtype == "ligand":
+    elif species.subtype == "ligand":
         (
             missing_h_in_carbon,
             missing_h_on_coordinated_o_donor,
             missing_h_on_coordinated_n_donor,
-        ) = _check_ligand_hydrogens(specie)
-    elif specie.is_metal_free_molecule:
-        missing_h_in_carbon, missing_h_in_water = _check_molecule_hydrogens(specie)
+        ) = _check_ligand_hydrogens(species)
+    elif species.is_metal_free_molecule:
+        missing_h_in_carbon, missing_h_in_water = _check_molecule_hydrogens(species)
     else:
         # A complex molecule handed in directly: fold over its ligands.
-        for lig in getattr(specie, "ligands", None) or []:
-            c, o, n = _check_ligand_hydrogens(lig, parent=specie)
+        for lig in getattr(species, "ligands", None) or []:
+            c, o, n = _check_ligand_hydrogens(lig, parent=species)
             missing_h_in_carbon |= c
             missing_h_on_coordinated_o_donor |= o
             missing_h_on_coordinated_n_donor |= n
@@ -611,8 +611,8 @@ def add_hydrogens(
         bonded_atom_coord = []
         bonded_atom_labels = []
 
-        molecule_parent = cast("Specie", ligand.get_parent("molecule"))
-        for adj in atom.adjacency:
+        molecule_parent = cast("Species", ligand.get_parent("molecule"))
+        for adj in atom.neighbor_indices:
             n_label = molecule_parent.labels[adj]
             n_coord = molecule_parent.coord[adj]
 
@@ -628,7 +628,7 @@ def add_hydrogens(
             "atom=%s site=%s adjacency=%s bonded_labels=%s num_hydrogens=%d",
             atom.label,
             atom.atom_site_label,
-            atom.adjacency,
+            atom.neighbor_indices,
             bonded_atom_labels,
             num_hydrogens,
         )

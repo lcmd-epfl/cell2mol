@@ -36,7 +36,7 @@ import numpy as np
 import os
 from cell2mol import __file__
 import yaml
-from cell2mol.element_utils import labels2formula
+from cell2mol.element_utils import symbols2formula
 from cell2mol.operations import compute_centroid
 from cell2mol.connectivity import try_add_ligand_atom, identify_haptic_mode
 from cell2mol.elementdata import ElementData
@@ -474,7 +474,6 @@ def build_coordination_groups(metal: Metal) -> list[Group]:
             group_obj.origin = "build_coordination_groups"
 
             group_obj.update_hapticity()
-            group_obj.update_denticity()
 
             group_mol_indices = [_molecule_atom_index(a) for a in atoms]
             group_ligand_indices = [
@@ -583,8 +582,8 @@ def get_neighbors_in_group(atom: Atom, group_indices: list[int]) -> list[Atom]:
     if molecule is None or molecule.atoms is None:
         raise ValueError("Coordination atom has no parent molecule atoms")
     neighboring_nonmetal_atoms = []
-    for adj in atom.adjacency:
-        if adj not in atom.metal_adjacency:
+    for adj in atom.neighbor_indices:
+        if adj not in atom.metal_contact_indices:
             neighboring_nonmetal_atoms.append(molecule.atoms[adj])
 
     group_index_set = set(group_indices or [])
@@ -630,7 +629,7 @@ def sort_group_atoms_by_margin(
         "atom_site_labels": site_labels,
         "distances": [],
         "margins": [],
-        "formula": labels2formula([a.label for a in sorted_gr_atoms]),
+        "formula": symbols2formula([a.label for a in sorted_gr_atoms]),
         "is_haptic": group["is_haptic"],
         "haptic_type": group["haptic_type"],
     }
@@ -761,7 +760,7 @@ def validate_coordinated_atoms(
                 "(group formula: %s -> updated formula: %s)",
                 [a.label for a in updated],
                 sorted_group["formula"],
-                labels2formula([a.label for a in updated]),
+                symbols2formula([a.label for a in updated]),
             )
         else:
             logger.debug(
@@ -817,8 +816,8 @@ def validate_coordinated_atoms(
         if atom.label != "Si":
             continue
 
-        metal_adjacency = getattr(atom, "metal_adjacency", [])
-        n_metal_adjacency = len(metal_adjacency)
+        metal_contact_indices = getattr(atom, "metal_contact_indices", [])
+        n_metal_adjacency = len(metal_contact_indices)
 
         should_remove_si = (
             atom_margin is not None and atom_margin > 0.25 and n_metal_adjacency == 1
@@ -1173,7 +1172,7 @@ def partition_coordination_groups(
                 [atom.label for atom in gr_atoms],
             )
         partitioned_group_dict[idx] = {
-            "formula": labels2formula([atom.label for atom in gr_atoms]),
+            "formula": symbols2formula([atom.label for atom in gr_atoms]),
             "is_haptic": is_haptic,
             "haptic_type": haptic_type,
             "gr_atoms": gr_atoms,

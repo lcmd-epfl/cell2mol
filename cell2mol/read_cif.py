@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, TypedDict
 from ase import Atoms
 from collections import Counter
 from cell2mol.element_utils import (
-    labels2formula,
+    symbols2formula,
     get_alkali_alkaline_earth_metal_idxs,
     TRANSITION_METALS,
 )
@@ -594,7 +594,7 @@ def check_cif_formula_mismatch(
     formulas_from_refcell = [ref.formula for ref in refmoleclist]
 
     formulas_from_cif = [
-        labels2formula(expand_formula_symbols(moiety["formula"]))
+        symbols2formula(expand_formula_symbols(moiety["formula"]))
         for moiety in moiety_dicts
     ]
     ratios_from_cif = [moiety["ratio"] for moiety in moiety_dicts]

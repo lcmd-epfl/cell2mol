@@ -17,7 +17,7 @@ from typing import cast
 from ase import Atoms
 from ase.io import read
 from cell2mol.classes import Molecule, MoleculeSet
-from cell2mol.element_utils import labels2formula
+from cell2mol.element_utils import symbols2formula
 from cell2mol.connectivity import split_species
 from cell2mol.operations import extract_from_list
 from cell2mol.write_results import (
@@ -136,7 +136,7 @@ def interpret_molecule(input_path, name, input_charge, current_dir):
                 logger.info(
                     "Block %d: %s (%d atoms)",
                     idx,
-                    labels2formula(block_labels),
+                    symbols2formula(block_labels),
                     len(block_labels),
                 )
                 moleclist.append(build_molecule(block_labels, block_coords))

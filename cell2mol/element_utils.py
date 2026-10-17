@@ -110,11 +110,11 @@ HAPTIC_PRETTY = {
 }
 
 
-def labels2formula(labels: list[str]):
+def symbols2formula(symbols: list[str]):
     elems = elemdatabase.elementnr.keys()
     formula = []
     for z in elems:
-        nz = list(labels).count(z)
+        nz = list(symbols).count(z)
         if nz > 1:
             formula.append(f"{z}{nz}-")
         if nz == 1:
@@ -123,82 +123,84 @@ def labels2formula(labels: list[str]):
     return formula
 
 
-def labels2ratio(labels: list[str]):
+def symbols2ratio(symbols: list[str]):
     elems = elemdatabase.elementnr.keys()
     ratio = []
     for z in elems:
-        nz = list(labels).count(z)
+        nz = list(symbols).count(z)
         if nz > 0:
             ratio.append(nz)
     return ratio
 
 
-def labels2electrons(labels: list[str]):
-    if isinstance(labels, list):
+def symbols2electrons(symbols: list[str]):
+    if isinstance(symbols, list):
         eleccount = 0
-        for label in labels:
-            eleccount += elemdatabase.elementnr[label]
+        for symbol in symbols:
+            eleccount += elemdatabase.elementnr[symbol]
     return eleccount
 
 
-def get_df_block_metal_idxs(labels: list[str]) -> list[int]:
+def get_df_block_metal_idxs(symbols: list[str]) -> list[int]:
     """Transition metals, lanthanides, and actinides."""
     d_f_metals = TRANSITION_METALS | LANTHANIDES | ACTINIDES
-    return [i for i, label in enumerate(labels) if label in d_f_metals]
+    return [i for i, symbol in enumerate(symbols) if symbol in d_f_metals]
 
 
-def get_transition_metal_idxs(labels: list[str]) -> list[int]:
+def get_transition_metal_idxs(symbols: list[str]) -> list[int]:
     """Transition metals."""
-    return [i for i, label in enumerate(labels) if label in TRANSITION_METALS]
+    return [i for i, symbol in enumerate(symbols) if symbol in TRANSITION_METALS]
 
 
-def get_lanthanide_actinide_idxs(labels: list[str]) -> list[int]:
+def get_lanthanide_actinide_idxs(symbols: list[str]) -> list[int]:
     """Lanthanides and actinides."""
     lanthanide_actinide_elements = LANTHANIDES | ACTINIDES
     return [
-        i for i, label in enumerate(labels) if label in lanthanide_actinide_elements
+        i for i, symbol in enumerate(symbols) if symbol in lanthanide_actinide_elements
     ]
 
 
-def get_alkali_alkaline_earth_metal_idxs(labels: list[str]) -> list[int]:
+def get_alkali_alkaline_earth_metal_idxs(symbols: list[str]) -> list[int]:
     """Alkali metals (Group 1) and alkaline earth metals (Group 2)."""
     return [
-        i for i, label in enumerate(labels) if label in ALKALI_AND_ALKALINE_EARTH_METALS
+        i
+        for i, symbol in enumerate(symbols)
+        if symbol in ALKALI_AND_ALKALINE_EARTH_METALS
     ]
 
 
-def get_post_transition_metal_idxs(labels: list[str]) -> list[int]:
+def get_post_transition_metal_idxs(symbols: list[str]) -> list[int]:
     """Post-transition metals."""
-    return [i for i, label in enumerate(labels) if label in POST_TRANSITION_METALS]
+    return [i for i, symbol in enumerate(symbols) if symbol in POST_TRANSITION_METALS]
 
 
-def get_metalloid_idxs(labels: list[str]) -> list[int]:
+def get_metalloid_idxs(symbols: list[str]) -> list[int]:
     """Metalloids."""
-    return [i for i, label in enumerate(labels) if label in METALLOIDS]
+    return [i for i, symbol in enumerate(symbols) if symbol in METALLOIDS]
 
 
-def get_radii(labels: list[str]):
+def get_radii(symbols: list[str]):
     radii = []
-    for lab in labels:
-        if lab[-1].isdigit():
-            label = lab[:-1]
+    for symbol in symbols:
+        if symbol[-1].isdigit():
+            symbol = symbol[:-1]
         else:
-            label = lab
-        radii.append(elemdatabase.CovalentRadius3[label])
+            symbol = symbol
+        radii.append(elemdatabase.CovalentRadius3[symbol])
     return radii
 
 
-def get_element_count(labels: list[str], heavy_only: bool = False) -> NDArray:
+def get_element_count(symbols: list[str], heavy_only: bool = False) -> NDArray:
     elems: list[str] = list(elemdatabase.elementnr.keys())
     elem_to_idx: dict[str, int] = {elem: idx for idx, elem in enumerate(elems)}
 
     count = np.zeros(len(elems), dtype=int)
 
-    for label in labels:
-        if heavy_only and label in {"H", "D"}:
+    for symbol in symbols:
+        if heavy_only and symbol in {"H", "D"}:
             continue
 
-        idx = elem_to_idx.get(label)
+        idx = elem_to_idx.get(symbol)
         if idx is not None:
             count[idx] += 1
 

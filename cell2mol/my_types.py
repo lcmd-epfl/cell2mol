@@ -6,6 +6,14 @@ from pydantic import BeforeValidator, GetCoreSchemaHandler, PlainSerializer
 from pydantic_core import CoreSchema, core_schema
 from rdkit import Chem
 from rdkit.Chem import Mol
+from typing_extensions import TypedDict
+
+
+class CoordinationMode(TypedDict):
+    """Localized donors and contiguous haptic sites, using ligand-local indices."""
+
+    kappa_atoms: list[int]
+    eta_groups: list[list[int]]
 
 
 # =============================================================================
@@ -90,10 +98,11 @@ OptionalRefList = list[T] | None
 
 Spin = int
 Type = Literal[
+    "atomset",
     "cell",
     "cells",
     "molecule_set",
-    "specie",
+    "species",
     "protonation",
     "charge_state",
     "atom",

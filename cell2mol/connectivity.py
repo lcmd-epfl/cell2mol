@@ -13,7 +13,7 @@ from cell2mol.element_utils import (
     get_df_block_metal_idxs,
     get_post_transition_metal_idxs,
     get_alkali_alkaline_earth_metal_idxs,
-    labels2formula,
+    symbols2formula,
 )
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
@@ -173,7 +173,7 @@ def build_adjacency(
             metal_only=metal_only,
         )
     if warn_on_mismatch and adj_dist is not None and adj_conn is not None:
-        logger.debug("Sum of Formula: %s", labels2formula(labels))
+        logger.debug("Sum of Formula: %s", symbols2formula(labels))
         is_consistent = np.allclose(adj_dist, adj_conn)
         if not is_consistent:
             logger.info(
@@ -434,7 +434,7 @@ def build_distance_adjacency(
             Defaults to False.
     Returns:
         isgood (int): 1 if molecule is valid, 0 otherwise.
-        adjmat (list): Adjacency matrix.
+        adjacency_matrix (list): Adjacency matrix.
         warning (bool): True if valence violations were found, False otherwise.
     """
     isgood = True
@@ -447,8 +447,8 @@ def build_distance_adjacency(
         metal_factor = config.METAL_FACTOR
 
     natoms = len(labels)
-    adjmat = np.zeros((natoms, natoms), dtype=int)
-    madjmat = np.zeros((natoms, natoms), dtype=int)
+    adjacency_matrix = np.zeros((natoms, natoms), dtype=int)
+    metal_contact_matrix = np.zeros((natoms, natoms), dtype=int)
 
     df_block_metal_idxs = get_df_block_metal_idxs(labels)
     s_block_metal_idxs = get_alkali_alkaline_earth_metal_idxs(labels)
@@ -492,38 +492,43 @@ def build_distance_adjacency(
             if dist > thres:
                 continue
 
-            adjmat[i, j] = adjmat[j, i] = 1
+            adjacency_matrix[i, j] = adjacency_matrix[j, i] = 1
 
             if metal_only and pair_contains_metal(
                 i, j, labels, df_block_metal_idxs, s_block_metal_idxs
             ):
-                madjmat[i, j] = madjmat[j, i] = 1
+                metal_contact_matrix[i, j] = metal_contact_matrix[j, i] = 1
 
     if not isgood:
-        return False, (madjmat if metal_only else adjmat), False
+        return False, (metal_contact_matrix if metal_only else adjacency_matrix), False
 
     # --- valence correction ---
     warning = False
     if not add_atom:
-        adjmat, madjmat, warning = correct_valence_violations(
-            adjmat, madjmat, labels, pos, radii, atom_site_labels=atom_site_labels
+        adjacency_matrix, metal_contact_matrix, warning = correct_valence_violations(
+            adjacency_matrix,
+            metal_contact_matrix,
+            labels,
+            pos,
+            radii,
+            atom_site_labels=atom_site_labels,
         )
-    return True, (madjmat if metal_only else adjmat), warning
+    return True, (metal_contact_matrix if metal_only else adjacency_matrix), warning
 
 
 def correct_valence_violations(
-    adjmat, madjmat, labels, pos, radii, atom_site_labels=None
+    adjacency_matrix, metal_contact_matrix, labels, pos, radii, atom_site_labels=None
 ):
     """Detect and correct valence violations in an adjacency matrix.
     Args:
-        adjmat (np.ndarray): Adjacency matrix.
+        adjacency_matrix (np.ndarray): Adjacency matrix.
         labels (list): List of atomic labels.
         pos (list): List of atomic positions.
         radii (list): List of atomic radii.
         atom_site_labels (list, optional): List of atomic site labels. Defaults to None.
     Returns:
-        adjmat (np.ndarray): Corrected adjacency matrix.
-        madjmat (np.ndarray): Corrected metal adjacency matrix.
+        adjacency_matrix (np.ndarray): Corrected adjacency matrix.
+        metal_contact_matrix (np.ndarray): Corrected metal adjacency matrix.
         warning (bool): True if any valence violations were found and corrected,
             False otherwise.
     """
@@ -540,7 +545,7 @@ def correct_valence_violations(
     )
 
     for i in range(natoms):
-        indices = np.where(adjmat[i])[0]
+        indices = np.where(adjacency_matrix[i])[0]
         n_connec_metals = len(set(indices) & metal_indices)
         if n_connec_metals == len(indices):
             continue
@@ -607,7 +612,7 @@ def correct_valence_violations(
 
         for j, margin in connections[:to_remove]:
             if margin > 0.2:
-                adjmat[i, j] = adjmat[j, i] = 0
+                adjacency_matrix[i, j] = adjacency_matrix[j, i] = 0
                 logger.info(
                     "Removed bond %d-%d %s%s:%s-%s%s:%s, dist=%.3f, margin=%.3f",
                     i,
@@ -622,7 +627,7 @@ def correct_valence_violations(
                     margin,
                 )
 
-    return adjmat, madjmat, warning
+    return adjacency_matrix, metal_contact_matrix, warning
 
 
 def build_cif_bond_adjacency(
@@ -641,12 +646,12 @@ def build_cif_bond_adjacency(
     bonds are included.
 
     Returns:
-        adjmat (np.ndarray): Adjacency matrix.
+        adjacency_matrix (np.ndarray): Adjacency matrix.
     """
     indices = {atom: i for i, atom in enumerate(atom_site_labels)}
     natoms = len(labels)
 
-    adjmat = np.zeros((natoms, natoms), dtype=int)
+    adjacency_matrix = np.zeros((natoms, natoms), dtype=int)
 
     df_block_metal_idxs = set(get_df_block_metal_idxs(labels))
     s_block_metal_idxs = set(get_alkali_alkaline_earth_metal_idxs(labels))
@@ -669,9 +674,9 @@ def build_cif_bond_adjacency(
         ):
             continue
 
-        adjmat[i, j] = adjmat[j, i] = 1
+        adjacency_matrix[i, j] = adjacency_matrix[j, i] = 1
 
-    return adjmat
+    return adjacency_matrix
 
 
 def count_bonds_by_element_pair(label: list[str], conmat: np.ndarray) -> np.ndarray:
@@ -755,7 +760,7 @@ def split_species(
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
 
-    adjmat = build_adjacency(
+    adjacency_matrix = build_adjacency(
         labels=labels,
         positions=positions,
         atom_site_labels=atom_site_labels,
@@ -766,13 +771,13 @@ def split_species(
         warn_on_mismatch=warn_on_mismatch,
         detail=detail,
     )
-    if adjmat is None:
+    if adjacency_matrix is None:
         logger.warning("Adjacency matrix is None. Returning empty blocklist.")
         return []
-    adjnum = adjmat.sum(axis=1)
+    neighbor_counts = adjacency_matrix.sum(axis=1)
 
-    degree = np.diag(adjnum)
-    lap = adjmat - degree
+    degree = np.diag(neighbor_counts)
+    lap = adjacency_matrix - degree
 
     # creates block matrix
     graph = csr_matrix(lap)
@@ -857,7 +862,7 @@ def split_blocks_by_rings(
         else:
             gr_atom_site_labels = None
 
-        adjmat = build_adjacency(
+        adjacency_matrix = build_adjacency(
             labels=gr_labels,
             positions=np.asarray(gr_coord),
             atom_site_labels=gr_atom_site_labels,
@@ -869,7 +874,7 @@ def split_blocks_by_rings(
             detail=False,
         )
 
-        G = nx.from_numpy_array(np.array(adjmat))
+        G = nx.from_numpy_array(np.array(adjacency_matrix))
 
         if not nx.is_connected(G):
             new_blocklist.append(b)
@@ -966,7 +971,7 @@ def identify_haptic_mode(atoms: list[Atom], use_bond_info: bool | None = None):
         tuple: (is_haptic (bool), haptic_type (str), topology analysis (dict))
     """
     labels = [atom.label for atom in atoms]
-    group_formula = labels2formula(labels)
+    group_formula = symbols2formula(labels)
     is_haptic = False  # old self.hapticity
     haptic_type = None  # old self.hapttype
 
@@ -1059,16 +1064,16 @@ def is_single_ring(atoms: list[Atom], use_bond_info: bool | None = None) -> bool
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
 
-    adjmat = build_adjacency(
+    adjacency_matrix = build_adjacency(
         labels=labels,
         positions=np.asarray(positions),
         atom_site_labels=atom_site_labels,
         bond_data=bond_data,
         use_bond_info=use_bond_info,
     )
-    if adjmat is None:
+    if adjacency_matrix is None:
         return False
-    G = nx.from_numpy_array(np.array(adjmat))
+    G = nx.from_numpy_array(np.array(adjacency_matrix))
 
     # Check if the graph is connected
     if not nx.is_connected(G):
@@ -1126,7 +1131,7 @@ def analyze_topology(
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
 
-    adjmat = build_adjacency(
+    adjacency_matrix = build_adjacency(
         labels=labels,
         positions=np.asarray(positions),
         atom_site_labels=atom_site_labels,
@@ -1134,10 +1139,10 @@ def analyze_topology(
         use_bond_info=use_bond_info,
     )
 
-    if adjmat is None:
+    if adjacency_matrix is None:
         return _empty_result(is_connected=False)
 
-    G = nx.from_numpy_array(np.array(adjmat))
+    G = nx.from_numpy_array(np.array(adjacency_matrix))
 
     is_connected = nx.is_connected(G)
     if not is_connected:
@@ -1231,7 +1236,7 @@ def merge_coordination_groups(parent_molecule, groups, parent_ligand):
         """
         bonded = []
         atom_indices = [a.get_parent_index("molecule") for a in atom_subset]
-        adj = parent_molecule.adjmat
+        adj = parent_molecule.adjacency_matrix
 
         for m in metal_candidates:
             m_idx = m.get_parent_index("molecule")
@@ -1318,7 +1323,7 @@ def merge_coordination_groups(parent_molecule, groups, parent_ligand):
     # --- 4. Standard Merged Path (One Group) ---
     else:
         labels = [a.label for a in all_atoms]
-        formula = labels2formula(labels)
+        formula = symbols2formula(labels)
 
         # Determine Name
         ring_map = {

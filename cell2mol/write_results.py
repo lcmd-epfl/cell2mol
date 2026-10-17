@@ -258,7 +258,7 @@ def get_molecule_error_messages(codes, fallback_code=0):
     return "; ".join(get_molecule_error_message(code) for code in codes)
 
 
-def write_cell_molecule_details(cell, file=None):
+def write_cell_molecule_details(cell, file=None, *, detailed=True):
     """Write numbered molecule details for a reference or unit cell."""
     if cell.subtype == "reference":
         cell_type = "Reference"
@@ -276,11 +276,50 @@ def write_cell_molecule_details(cell, file=None):
     print(f"\nMolecules in {cell.subtype}:", file=file)
 
     for i, mol in enumerate(molecule_list):
-        write_molecule_details(mol, file=file, index=i)
+        write_molecule_details(mol, file=file, index=i, detailed=detailed)
 
 
-def write_molecule_details(mol, file=None, index=None):
-    """Write molecule, metal, ligand, and donor-group details to a stream or stdout."""
+def _coordination_atom_label(atom):
+    """Use CIF site labels when available, otherwise the element symbol."""
+    return atom.atom_site_label or atom.label
+
+
+def _coordination_mode_text(ligand, mode, metal=None):
+    """Format one interaction without exposing internal atom indices."""
+    atoms = ligand.atoms or []
+    parts = []
+    if mode["kappa_atoms"]:
+        labels = [_coordination_atom_label(atoms[i]) for i in mode["kappa_atoms"]]
+        parts.append(f"kappa{len(labels)} [{', '.join(labels)}]")
+    for site in mode["eta_groups"]:
+        labels = [_coordination_atom_label(atoms[i]) for i in site]
+        text = f"eta{len(site)} [{', '.join(labels)}]"
+        site_atoms = {id(atoms[i]) for i in site}
+        groups = (
+            metal.groups
+            if metal is not None and metal.groups is not None
+            else ligand.groups
+        )
+        for group in groups or []:
+            if (
+                group.is_haptic
+                and group.haptic_type
+                and {id(atom) for atom in group.atoms or []} == site_atoms
+            ):
+                text += f" haptic_type={group.haptic_type}"
+                break
+        parts.append(text)
+    return "; ".join(parts) or "no donor contacts"
+
+
+def write_molecule_details(mol, file=None, index=None, *, detailed=False):
+    """Write compact coordination summaries using site labels or elements.
+
+    L1, L2, ... identify ligand copies in mol.ligands. Internal coordination
+    indices stay unchanged. Detailed output adds SMILES, donor totals and
+    legacy geometry-point counts.
+    Reporting does not perceive bonds or refresh cached results.
+    """
     if mol is None:
         print("\nNo molecule object.", file=file)
         return
@@ -289,13 +328,13 @@ def write_molecule_details(mol, file=None, index=None):
     mol_info_parts = [f"{prefix} {mol.formula}"]
 
     if mol.is_metal_complex:
-        mol_info_parts.append("(Metal Complex)")
+        mol_info_parts.append("(Contains d/f-block metals)")
     if mol.has_s_block_metal:
-        mol_info_parts.append("(Complex with Alkali or Alkaline metals)")
+        mol_info_parts.append("(Contains alkali or alkaline-earth metals)")
     if mol.is_post_transition_metal_complex:
-        mol_info_parts.append("(Complex with Post-Transition metals)")
+        mol_info_parts.append("(Post-transition-metal-only category)")
     if mol.is_metal_free_molecule:
-        mol_info_parts.append("(Non-complex)")
+        mol_info_parts.append("(Metal-free molecule)")
 
     if mol.totcharge is not None:
         mol_info_parts.append(f"totcharge={mol.totcharge}")
@@ -305,111 +344,109 @@ def write_molecule_details(mol, file=None, index=None):
         mol_info_parts.append(f"totcharge_agree={mol.totcharge_agree}")
     if getattr(mol, "spin", None) is not None:
         mol_info_parts.append(f"spin_multiplicity={mol.spin}")
-    if mol.smiles is not None:
+    if detailed and mol.smiles is not None:
         mol_info_parts.append(f"smiles={mol.smiles}")
 
     print(" ".join(mol_info_parts), file=file)
 
-    # Metal coordination details
-    if not mol.is_metal_free_molecule and hasattr(mol, "metals"):
-        for met in mol.metals:
-            met_info = f"\t{met.formula} ({met.subtype})"
+    if mol.is_metal_free_molecule:
+        return
 
-            labels = getattr(met, "atom_site_label", None)
-            if labels:
-                met_info += f" atom_site_label={labels}"
+    metals = mol.metals or []
+    ligands = mol.ligands or []
+    metal_by_index = {met.get_parent_index("molecule"): met for met in metals}
+    if metals or ligands:
+        print(
+            "\tCoordination: CIF site labels / XYZ element symbols; "
+            "L1, L2, ... identify ligand copies. "
+            "Atom contacts and sites exclude metal-metal bonds.",
+            file=file,
+        )
 
-            if met.charge is not None:
-                met_info += f" metal_OS={met.charge}"
-            elif getattr(met, "plausible_os", None) is not None:
-                met_info += f" metal_plausible_OS={met.plausible_os}"
+    for met in metals:
+        parts = [f"\tMetal {_coordination_atom_label(met)}"]
+        if met.charge is not None:
+            parts.append(f"OS={met.charge}")
+        elif met.plausible_os is not None:
+            parts.append(f"plausible_OS={met.plausible_os}")
+        if met.spin is not None:
+            parts.append(f"spin_multiplicity={met.spin}")
+        print(" ".join(parts), file=file)
+        coordination = met.coordination
+        contact_info = (
+            f"\t  ligands=[{', '.join(f'L{i + 1}' for i in coordination)}] "
+            f"atom_contacts={met.coordination_number_atoms}"
+        )
+        if met.coord_sphere_formula:
+            contact_info += f" coord_sphere_formula={met.coord_sphere_formula}"
+        print(contact_info, file=file)
+        geometry_parts = [f"coordination_points={met.coordination_number_sites}"]
+        if met.coord_geometry is not None:
+            geometry_parts.append(f"geometry={met.coord_geometry}")
+        if met.geom_deviation is not None:
+            geometry_parts.append(f"deviation={met.geom_deviation}")
+        if geometry_parts:
+            print("\t  " + " ".join(geometry_parts), file=file)
+        for ligand_index, mode in coordination.items():
+            print(
+                f"\t  L{ligand_index + 1}: "
+                f"{_coordination_mode_text(ligands[ligand_index], mode, met)}",
+                file=file,
+            )
+        if met.metals:
+            labels = [_coordination_atom_label(other) for other in met.metals]
+            print(
+                f"\t  metal-metal=[{', '.join(labels)}] "
+                f"coordination_points_with_metal_bonds={met.coord_nr_with_metal_bonds} "
+                f"geometry={met.coord_geometry_with_metal_bonds} "
+                f"deviation={met.geom_deviation_with_metal_bonds}",
+                file=file,
+            )
 
-            if getattr(met, "spin", None) is not None:
-                met_info += f" metal_spin={met.spin}"
-
-            print(met_info, file=file)
-
-            if getattr(met, "coord_sphere_formula", None):
-                print(
-                    f"\t|--coord_sphere_formula={met.coord_sphere_formula}", file=file
+    for ligand_index, lig in enumerate(ligands):
+        coordination = lig.coordination
+        has_kappa = any(mode["kappa_atoms"] for mode in coordination.values())
+        has_eta = any(mode["eta_groups"] for mode in coordination.values())
+        parts = [f"\tLigand L{ligand_index + 1}: {lig.formula}"]
+        if lig.totcharge is not None:
+            parts.append(f"charge={lig.totcharge}")
+        elif lig.plausible_charge_states is not None:
+            parts.append(
+                f"charge_candidates={'available' if lig.plausible_charge_states else 'none'}"
+            )
+        parts.extend(
+            [
+                f"mu={len(coordination)}",
+                f"bridging={len(coordination) > 1}",
+                f"haptic={has_eta}",
+                f"mixed={has_kappa and has_eta}",
+            ]
+        )
+        print(" ".join(parts), file=file)
+        for metal_index, mode in coordination.items():
+            metal = metal_by_index.get(metal_index)
+            if metal is None:
+                metal = next(
+                    (
+                        candidate
+                        for candidate in lig.metals or []
+                        if candidate.get_parent_index("molecule") == metal_index
+                    ),
+                    None,
                 )
-
-            if all(
-                hasattr(met, attr)
-                for attr in ("coord_nr", "coord_geometry", "geom_deviation")
-            ):
-                print(
-                    f"\t|--coord_nr={met.coord_nr} coord_geometry={met.coord_geometry} geom_deviation={met.geom_deviation}",
-                    file=file,
-                )
-
-            if getattr(met, "groups", None):
-                for group in met.groups:
-                    group_info = f"\t|--(group) {group.labels}"
-                    group_atom_site_labels = [
-                        a.atom_site_label
-                        for a in group.atoms
-                        if a.atom_site_label is not None
-                    ]
-                    if group_atom_site_labels:
-                        group_info += f" atom_site_labels={group_atom_site_labels}"
-                    if hasattr(group, "denticity"):
-                        group_info += f" denticity={group.denticity}"
-                    if getattr(group, "is_haptic", False):
-                        group_info += f" haptic_type={group.haptic_type}"
-
-                    print(group_info, file=file)
-
-            # Metal–metal links
-            if hasattr(met, "metals") and hasattr(met, "coord_nr_with_metal_bonds"):
-                bonded_metals = [m.label for m in met.metals]
-                if bonded_metals:
-                    print(
-                        f"\t|--bonded metals={bonded_metals} coord_nr_with_metal_bonds={met.coord_nr_with_metal_bonds} "
-                        f"coord_geometry_with_metal_bonds={getattr(met, 'coord_geometry_with_metal_bonds', 'N/A')} "
-                        f"geom_deviation_with_metal_bonds={getattr(met, 'geom_deviation_with_metal_bonds', 'N/A')}",
-                        file=file,
-                    )
-
-    # Ligand and donor-group details
-    if not mol.is_metal_free_molecule and getattr(mol, "ligands", None):
-        for lig in mol.ligands:
-            lig_info = f"\t{lig.formula} ({lig.subtype})"
-            for attr in ("smiles", "denticity", "totcharge"):
-                val = getattr(lig, attr, None)
-                if val is not None:
-                    lig_info += f" {attr}={val}"
-            if (
-                getattr(lig, "plausible_charge_states", None) is not None
-                and getattr(lig, "totcharge", None) is None
-            ):
-                status = "Exists" if lig.plausible_charge_states else "Does not exist"
-                lig_info += f" lig.plausible_charge_states {status}"
-
-            print(lig_info, file=file)
-
-            if getattr(lig, "groups", None):
-                for group in lig.groups:
-                    group_info = f"\t|--(group) {group.labels}"
-                    group_atom_site_labels = [
-                        a.atom_site_label
-                        for a in group.atoms
-                        if a.atom_site_label is not None
-                    ]
-                    if group_atom_site_labels:
-                        group_info += f" atom_site_labels={group_atom_site_labels}"
-                    if hasattr(group, "denticity"):
-                        group_info += f" denticity={group.denticity}"
-                    if getattr(group, "is_haptic", False):
-                        group_info += f" haptic_type={group.haptic_type}"
-
-                    if getattr(group, "metals", None):
-                        labels = [
-                            getattr(m, "atom_site_label", None) or m.label
-                            for m in group.metals
-                        ]
-                        group_info += f" connected_metals={labels}"
-                    print(group_info, file=file)
+            metal_label = (
+                _coordination_atom_label(metal)
+                if metal is not None
+                else "unknown metal"
+            )
+            print(
+                f"\t  -> {metal_label}: {_coordination_mode_text(lig, mode, metal)}",
+                file=file,
+            )
+        if not coordination:
+            print("\t  No coordination contacts available.", file=file)
+        if detailed and lig.smiles is not None:
+            print(f"\t  smiles={lig.smiles}", file=file)
 
 
 def write_unique_species(object, file):
@@ -422,41 +459,55 @@ def write_unique_species(object, file):
 
     print(f"\nUnique Species in {object.subtype}:", file=file)
 
-    for specie in unique_species:
+    for species in unique_species:
         parts = [
-            f"unique_index={specie.unique_index}",
-            f"{specie.formula}",
-            f"({specie.subtype})",
+            f"unique_index={species.unique_index}",
+            f"{species.formula}",
+            f"({species.subtype})",
         ]
 
-        if specie.subtype == "metal":
-            parts.append(f"coord_sphere_formula={specie.coord_sphere_formula}")
-            if getattr(specie, "charge", None) is not None:
-                parts.append(f"charge={specie.charge}")
+        if species.subtype == "metal":
+            parts.append(f"coord_sphere_formula={species.coord_sphere_formula}")
+            if getattr(species, "charge", None) is not None:
+                parts.append(f"charge={species.charge}")
 
-        elif specie.subtype == "ligand":
-            parts.append(f"denticity={specie.denticity}")
-            if specie.is_haptic:
-                parts.append(f"haptic_type={specie.haptic_type}")
-            if getattr(specie, "smiles", None) is not None:
-                parts.append(f"smiles={specie.smiles}")
-            if getattr(specie, "totcharge", None) is not None:
-                parts.append(f"totcharge={specie.totcharge}")
-            if getattr(specie, "groups", None) is not None:
-                parts.append(f"groups={[group.formula for group in specie.groups]}")
+        elif species.subtype == "ligand":
+            metal_labels = {
+                metal.get_parent_index("molecule"): _coordination_atom_label(metal)
+                for metal in species.metals or []
+            }
+            modes = []
+            for metal_index, mode in species.coordination.items():
+                counts = []
+                if mode["kappa_atoms"]:
+                    counts.append(f"kappa{len(mode['kappa_atoms'])}")
+                counts.extend(f"eta{len(site)}" for site in mode["eta_groups"])
+                modes.append(
+                    f"{metal_labels.get(metal_index, 'unknown metal')}:"
+                    + "+".join(counts)
+                )
+            parts.append(f"coordination=[{', '.join(modes)}]")
+            if species.is_haptic:
+                parts.append(f"haptic_type={species.haptic_type}")
+            if getattr(species, "smiles", None) is not None:
+                parts.append(f"smiles={species.smiles}")
+            if getattr(species, "totcharge", None) is not None:
+                parts.append(f"totcharge={species.totcharge}")
+            if getattr(species, "groups", None) is not None:
+                parts.append(f"groups={[group.formula for group in species.groups]}")
 
         else:
-            if getattr(specie, "smiles", None) is not None:
-                parts.append(f"smiles={specie.smiles}")
-            if getattr(specie, "totcharge", None) is not None:
-                parts.append(f"totcharge={specie.totcharge}")
+            if getattr(species, "smiles", None) is not None:
+                parts.append(f"smiles={species.smiles}")
+            if getattr(species, "totcharge", None) is not None:
+                parts.append(f"totcharge={species.totcharge}")
 
         print("\t" + " ".join(parts), file=file)
 
 
-def _get_charge_state_failure_reason(specie) -> str:
+def _get_charge_state_failure_reason(species) -> str:
     """Explain skipped charge enumeration or the absence of valid charge states."""
-    if getattr(specie, "has_missing_H", False):
+    if getattr(species, "has_missing_H", False):
         kinds = [
             name
             for flag, name in (
@@ -464,22 +515,22 @@ def _get_charge_state_failure_reason(specie) -> str:
                 ("missing_H_on_CoordDonor", "coordinated donor"),
                 ("missing_H_in_Water", "water"),
             )
-            if getattr(specie, flag, False)
+            if getattr(species, flag, False)
         ]
         detail = ", ".join(kinds) if kinds else "unspecified site"
         if detail == "coordinated donor":
-            detail += f" {specie.formula}"
+            detail += f" {species.formula}"
         return f"SKIPPED: missing hydrogens on {detail}"
 
-    warning = getattr(specie, "protonation_warning", None)
+    warning = getattr(species, "protonation_warning", None)
     if warning:
         return f"SKIPPED: protonation not auto-handled ({warning})"
 
     # Report the final valence-search limit before earlier perception limits.
-    if getattr(specie, "valence_search_too_large", False):
+    if getattr(species, "valence_search_too_large", False):
         return "SKIPPED: valence search space too large, enumeration terminated"
 
-    if getattr(specie, "bond_perception_capped", False):
+    if getattr(species, "bond_perception_capped", False):
         return "SKIPPED: bond order assignment exceeded its iteration limit"
 
     return "NO PLAUSIBLE CHARGE STATES FOUND"
@@ -489,24 +540,24 @@ def write_plausible_charges(object, file=None):
     """Write charge candidates, missing-state reasons, and inconsistencies between copies."""
     if object.species_list is not None:
         print(f"\nPossible charges of species in {object.subtype}:", file=file)
-        for specie in object.species_list:
-            info = f"\tunique_index={specie.unique_index} {specie.formula} ({specie.subtype})"
+        for species in object.species_list:
+            info = f"\tunique_index={species.unique_index} {species.formula} ({species.subtype})"
 
-            if specie.subtype == "metal":
-                info += f" coord_sphere_formula={getattr(specie, 'coord_sphere_formula', 'N/A')}"
+            if species.subtype == "metal":
+                info += f" coord_sphere_formula={getattr(species, 'coord_sphere_formula', 'N/A')}"
 
-            if specie.subtype == "metal":
-                plausible = getattr(specie, "plausible_os", None)
+            if species.subtype == "metal":
+                plausible = getattr(species, "plausible_os", None)
             else:
-                plausible = getattr(specie, "plausible_charge_states", None)
+                plausible = getattr(species, "plausible_charge_states", None)
 
             if plausible is not None:
-                if specie.subtype == "metal":
+                if species.subtype == "metal":
                     info += f" plausible_os={plausible}"
                 else:
                     info += f"\n\tplausible_charge_states={plausible}"
             else:
-                info += f" {_get_charge_state_failure_reason(specie)}"
+                info += f" {_get_charge_state_failure_reason(species)}"
 
             print(info, file=file)
     else:
@@ -516,15 +567,15 @@ def write_plausible_charges(object, file=None):
     inconsistent = getattr(object, "inconsistent_plausible_charges", None)
     if inconsistent:
         print(
-            "\nWARNING: plausible charges disagree between copies of the same specie:",
+            "\nWARNING: plausible charges disagree between copies of the same species:",
             file=file,
         )
         for unique_index, variants in sorted(inconsistent.items()):
             formula = next(
                 (
-                    spec.formula
-                    for spec in (object.species_list or [])
-                    if getattr(spec, "unique_index", None) == unique_index
+                    species.formula
+                    for species in (object.species_list or [])
+                    if getattr(species, "unique_index", None) == unique_index
                 ),
                 "?",
             )
@@ -542,9 +593,11 @@ def log_charge_diagnostics(newcell, refcell) -> None:
     logger.debug("#### Charge State & Index Validation ####")
 
     if hasattr(refcell, "plausible_charges") and refcell.plausible_charges:
-        for specie, options in zip(refcell.unique_species, refcell.plausible_charges):
+        for species, options in zip(refcell.unique_species, refcell.plausible_charges):
             logger.debug(
-                "Unique Specie %s (Formula: %s):", specie.unique_index, specie.formula
+                "Unique Species %s (Formula: %s):",
+                species.unique_index,
+                species.formula,
             )
             logger.debug("  > Plausible Charge Options: %s", options)
     else:
@@ -564,21 +617,21 @@ def _validate_species_indices(cell, label: str) -> None:
         )
         return
 
-    for i, (specie, mapped_idx) in enumerate(
+    for i, (species, mapped_idx) in enumerate(
         zip(cell.species_list, cell.unique_indices)
     ):
-        if mapped_idx != specie.unique_index:
+        if mapped_idx != species.unique_index:
             logger.warning(
                 "MISMATCH at list index %d: Species %s claims UniqueID %s, "
                 "but mapping list has %s.",
                 i,
-                specie.formula,
-                specie.unique_index,
+                species.formula,
+                species.unique_index,
                 mapped_idx,
             )
         else:
             logger.debug(
-                "\t[OK] %s (UniqueID: %s)", specie.formula, specie.unique_index
+                "\t[OK] %s (UniqueID: %s)", species.formula, species.unique_index
             )
 
 

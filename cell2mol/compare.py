@@ -1,9 +1,7 @@
 """Compare atom properties, species composition, and CIF charge reports."""
 
 import logging
-from cell2mol.elementdata import ElementData
 
-elemdatabase = ElementData()
 logger = logging.getLogger(__name__)
 
 
@@ -58,45 +56,22 @@ def compare_species(
     mol2,
 ):
     """Compare atom counts, neutral electron counts, and element-pair adjacency counts."""
-    elems = elemdatabase.elementnr.keys()
-
     if mol1.natoms != mol2.natoms:
         return False
 
     if mol1.eleccount != mol2.eleccount:
         return False
 
-    # Compare composition before building adjacency-type counts.
-    if mol1.element_count is None:
-        mol1.compute_element_count()
-    if mol2.element_count is None:
-        mol2.compute_element_count()
-
-    assert mol1.element_count is not None
-    assert mol2.element_count is not None
-
-    for kdx, elem in enumerate(mol1.element_count):
-        if elem != mol2.element_count[kdx]:
-            return False
-
-    if mol1.adj_types is None:
-        mol1.compute_adjacency_types()
-    if mol2.adj_types is None:
-        mol2.compute_adjacency_types()
-    assert mol1.adj_types is not None
-    assert mol2.adj_types is not None
-
-    count = 0
-    for kdx, (elem, row1) in enumerate(zip(elems, mol1.adj_types)):
-        for ldx, (elem2, val1) in enumerate(zip(elems, row1)):
-            val2 = mol2.adj_types[kdx, ldx]
-            if val1 != val2:
-                count += 1
-
-    if count > 0:
+    element_count1 = mol1.compute_element_count()
+    element_count2 = mol2.compute_element_count()
+    if not (element_count1 == element_count2).all():
         return False
-    else:
-        return True
+
+    adj_types1 = mol1.compute_adjacency_types()
+    adj_types2 = mol2.compute_adjacency_types()
+    assert adj_types1 is not None
+    assert adj_types2 is not None
+    return bool((adj_types1 == adj_types2).all())
 
 
 def compare_reference_indices(ref, mol):
