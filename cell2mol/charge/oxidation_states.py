@@ -144,16 +144,16 @@ def get_plausible_metal_os(metal: Metal) -> list[int]:
     """
 
     mol = cast("Molecule", metal.get_parent("molecule"))
-    if mol.is_haptic is None:
-        mol.update_hapticity()
-
-    metal_os = METAL_OXIDATION_STATES[metal.label]
+    metal_os = METAL_OXIDATION_STATES[metal.label].copy()
 
     # Allow 0 oxidation state for selected metals under specific conditions
     zero_os_metals = {"Fe", "Ni", "Ru"}
     if metal.label in zero_os_metals:
         has_CO = any(lig.formula == "C-O" for lig in mol.ligands or [])
-        if (has_CO or mol.is_haptic) and 0 not in metal_os:
+        has_haptic_ligands = any(
+            mode["eta_groups"] for mode in metal.coordination.values()
+        )
+        if (has_CO or has_haptic_ligands) and 0 not in metal_os:
             metal_os.append(0)
 
     return metal_os

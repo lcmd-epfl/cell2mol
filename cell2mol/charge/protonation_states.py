@@ -27,7 +27,7 @@ from cell2mol.elementdata import ElementData
 elemdatabase = ElementData()
 
 if TYPE_CHECKING:
-    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.species import Species
     from cell2mol.classes.ligand import Ligand
 
 logger = logging.getLogger(__name__)
@@ -50,90 +50,90 @@ ALL_OR_NOTHING_CLASS_SIZE = 3
 ############################################################
 
 
-def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
+def enumerate_protonation_states(species: Species) -> list[Protonation] | None:
     """Protonation states for a ligand or metal-free molecule; None for anything
     else.
     """
-    if specie.type != "specie":
+    if species.type != "species":
         return None
 
-    if specie.subtype == "group":
+    if species.subtype == "group":
         return None
 
-    if specie.subtype == "molecule":
-        if specie.is_metal_free_molecule:
-            return get_asis_protonation_state(specie)
+    if species.subtype == "molecule":
+        if species.is_metal_free_molecule:
+            return get_asis_protonation_state(species)
         else:
             logger.info(
-                "Specie %s (%s) is a complex molecule. Do not protonate.",
-                specie.formula,
-                specie.subtype,
+                "Species %s (%s) is a complex molecule. Do not protonate.",
+                species.formula,
+                species.subtype,
             )
             return None
 
-    if specie.formula in MANUAL_CHARGE_ASSIGN_SPECIES:
-        return get_asis_protonation_state(specie)
+    if species.formula in MANUAL_CHARGE_ASSIGN_SPECIES:
+        return get_asis_protonation_state(species)
 
     has_fullerene = (
-        specie.has_fullerene
-        if specie.has_fullerene is not None
-        else specie.detect_fullerene()
+        species.has_fullerene
+        if species.has_fullerene is not None
+        else species.detect_fullerene()
     )
 
     if has_fullerene:
-        if specie.coord is not None and not check_fullerene_sphericity(specie.coord):
+        if species.coord is not None and not check_fullerene_sphericity(species.coord):
             logger.warning(
                 "%s passed fullerene topology check but failed sphericity "
                 "check - possible disorder/AC artifact; proceeding anyway",
-                specie.formula,
+                species.formula,
             )
-        logger.debug("Fullerene cage detected for %s", specie.formula)
-        return get_asis_protonation_state(specie)
+        logger.debug("Fullerene cage detected for %s", species.formula)
+        return get_asis_protonation_state(species)
 
     has_porphyrin = (
-        specie.has_porphyrin
-        if specie.has_porphyrin is not None
-        else specie.detect_porphyrin()
+        species.has_porphyrin
+        if species.has_porphyrin is not None
+        else species.detect_porphyrin()
     )
     # Build clean N4 cores automatically; flag expanded rings or outside donors for review.
     if has_porphyrin:
         macrocycles = find_all_porphyrin_macrocycles(
-            specie.get_atomic_numbers(), specie.adjmat
+            species.get_atomic_numbers(), species.adjacency_matrix
         )
         is_expanded = any(len(mac_n) >= 5 for mac_n, _c, _core in macrocycles)
         logger.debug(
             "%d porphyrin-family macrocycle(s) detected for %s "
             "(expanded: %s, contracted: %s)",
             len(macrocycles),
-            specie.formula,
+            species.formula,
             is_expanded,
             [is_contracted for _n, is_contracted, _c in macrocycles],
         )
         # The builder filters ineligible core N; outside donors do not change free-base sites.
         if not is_expanded:
-            return _generate_porphyrin_protonation_states(specie, macrocycles)
+            return _generate_porphyrin_protonation_states(species, macrocycles)
         # Expanded k>=5, but its metals may cut it into ordinary N4 pockets.
-        pockets = _metal_pocket_macrocycles(specie)
+        pockets = _metal_pocket_macrocycles(species)
         if pockets:
             logger.info(
                 "%s: expanded macrocycle resolves into %d metal-bound N4 "
                 "pocket(s) %s; protonating a trans pair in each.",
-                specie.formula,
+                species.formula,
                 len(pockets),
                 [pocket for _n, _c, pocket in pockets],
             )
-            return _generate_porphyrin_protonation_states(specie, pockets)
+            return _generate_porphyrin_protonation_states(species, pockets)
 
-    if specie.subtype == "ligand":
-        parent = cast("Specie", specie.get_parent("molecule"))
+    if species.subtype == "ligand":
+        parent = cast("Species", species.get_parent("molecule"))
         if (
             parent is not None
             and parent.has_s_block_metal
             and not parent.is_metal_complex
         ):
-            return get_asis_protonation_state(specie)
+            return get_asis_protonation_state(species)
 
-    ligand = cast("Ligand", specie)
+    ligand = cast("Ligand", species)
     protonation_states: list[Protonation] = []
 
     newlab = ligand.labels.copy()
@@ -146,7 +146,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
     protonated_indices_to_reset: list[int] = []  # old : reset_H_indices
 
     max_combinations = 16
-    logger.info("Processing %s (%s):", specie.formula, specie.subtype)
+    logger.info("Processing %s (%s):", species.formula, species.subtype)
 
     logger.info("Ligand formula: %s, natoms: %d", ligand.formula, ligand.natoms)
     groups = ligand.groups or []
@@ -230,7 +230,7 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
                     f"too many combinatorial protonation states even count-only "
                     f"per donor signature ({n_count_only} > {max_combinations})"
                 )
-                return _warn_and_return(specie, reason, return_asis=True)
+                return _warn_and_return(species, reason, return_asis=True)
             site_classes = merged
 
     for idx, a in enumerate(ligand.atoms or []):
@@ -280,11 +280,10 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
 
     if is_fully_deterministic or force_deterministic_mode:
         protonation_states.append(
-            Protonation.from_positional(
-                labels=newlab,
+            Protonation(
+                symbols=newlab,
                 coord=np.asarray(newcoord),
                 cov_factor=ligand.cov_factor,
-                n_protons_added=n_protons_added,
                 site_proton_counts=site_proton_counts.tolist(),
                 ligand_donor_electrons=ligand_donor_electrons.tolist(),
                 mode="deterministic",
@@ -354,40 +353,38 @@ def enumerate_protonation_states(specie: Specie) -> list[Protonation] | None:
                     element="H",
                     unconditional=True,
                 )
-        prot = Protonation.from_positional(
-            labels=newlab,
+        prot = Protonation(
+            symbols=newlab,
             coord=np.asarray(newcoord),
             cov_factor=ligand.cov_factor,
-            n_protons_added=n_protons_added,
             site_proton_counts=site_proton_counts.tolist(),
             ligand_donor_electrons=ligand_donor_electrons.tolist(),
             mode="combinatorial",
             parent=ligand,
         )
 
-        if prot.status:
+        if prot.is_valid:
             protonation_states.append(prot)
 
     return protonation_states
 
 
-def get_asis_protonation_state(specie: Specie) -> list[Protonation]:
-    """Wrap the unchanged specie in a Protonation state for charge enumeration."""
+def get_asis_protonation_state(species: Species) -> list[Protonation]:
+    """Wrap the unchanged species in a Protonation state for charge enumeration."""
     logger.debug(
         "Creating as-is (no-proton) protonation for %s (%s)",
-        specie.formula,
-        specie.subtype,
+        species.formula,
+        species.subtype,
     )
 
-    asis_protonation = Protonation.from_positional(
-        labels=specie.labels,
-        coord=specie.coord,
-        cov_factor=specie.cov_factor,
-        n_protons_added=0,
-        site_proton_counts=[0] * len(specie.labels),
-        ligand_donor_electrons=[0] * len(specie.labels),
+    asis_protonation = Protonation(
+        symbols=species.labels,
+        coord=species.coord,
+        cov_factor=species.cov_factor,
+        site_proton_counts=[0] * len(species.labels),
+        ligand_donor_electrons=[0] * len(species.labels),
         mode="none",
-        parent=specie,
+        parent=species,
     )
 
     return [asis_protonation]
@@ -399,16 +396,16 @@ def get_asis_protonation_state(specie: Specie) -> list[Protonation]:
 
 
 def _warn_and_return(
-    specie: Specie, reason: str, return_asis: bool = False
+    species: Species, reason: str, return_asis: bool = False
 ) -> list[Protonation] | None:
     """Record a protonation warning and return None, or an as-is state if requested."""
-    logger.warning("%s: %s -- not auto-handled", specie.formula, reason)
-    specie.protonation_warning = reason
+    logger.warning("%s: %s -- not auto-handled", species.formula, reason)
+    species.protonation_warning = reason
     if return_asis:
         logger.info(
             "Returning as-is protonation state and setting protonation_warning."
         )
-        return get_asis_protonation_state(specie)
+        return get_asis_protonation_state(species)
     logger.info("Returning None protonation state and setting protonation_warning.")
     return None
 
@@ -424,7 +421,7 @@ def _environment_classes(ligand: "Ligand", indices: list[int]) -> list[list[int]
     if not unique:
         return []
 
-    adj = np.asarray(ligand.adjmat)
+    adj = np.asarray(ligand.adjacency_matrix)
     n = adj.shape[0]
     neighbours = [np.nonzero(adj[i])[0].tolist() for i in range(n)]
 
@@ -476,9 +473,9 @@ def _donor_signature(
     assert molecule is not None, "Donor signatures require a parent molecule"
     a = atoms[idx]
     mol_labels = molecule.labels
-    metal_adj = set(a.metal_adjacency)
-    non_metal = sorted(mol_labels[j] for j in a.adjacency if j not in metal_adj)
-    return (a.label, a.mconnec, tuple(non_metal))
+    metal_adj = set(a.metal_contact_indices)
+    non_metal = sorted(mol_labels[j] for j in a.neighbor_indices if j not in metal_adj)
+    return (a.label, a.metal_contact_count, tuple(non_metal))
 
 
 ############################################################
@@ -486,16 +483,16 @@ def _donor_signature(
 ############################################################
 
 
-def _charged_moiety_atoms(specie) -> set[int]:
+def _charged_moiety_atoms(species) -> set[int]:
     """Find moiety oxygens whose charges are already fixed; exclude them from protonation."""
     try:
         return {
             idx
-            for _centre, atom_locals, _kind, _nc in _find_charged_moiety(specie)
+            for _centre, atom_locals, _kind, _nc in _find_charged_moiety(species)
             for idx in atom_locals
         }
     except Exception as exc:  # detection is an optimisation, never a hard gate
-        logger.debug("Charged-moiety detection failed for %s: %s", specie.formula, exc)
+        logger.debug("Charged-moiety detection failed for %s: %s", species.formula, exc)
         return set()
 
 
@@ -514,12 +511,12 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
         a = ligand.atoms[idx]
 
         logger.debug(
-            "        HANDLE_HAPTIC: idx=%d, label=%s %s, connec=%d, mconnec=%d",
+            "        HANDLE_HAPTIC: idx=%d, label=%s %s, neighbor_count=%d, metal_contact_count=%d",
             idx,
             a.label,
             f", atom_site_label={a.atom_site_label}" if a.atom_site_label else "",
-            a.connec,
-            a.mconnec,
+            a.neighbor_count,
+            a.metal_contact_count,
         )
 
     # Helper: add up to N hydrogens on parent_indices
@@ -533,11 +530,11 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
             atom = ligand.atoms[idx]
             adjacency_dict[idx] = [
                 molecule.labels[adj]
-                for adj in atom.adjacency
-                if adj not in atom.metal_adjacency
+                for adj in atom.neighbor_indices
+                if adj not in atom.metal_contact_indices
             ]
             metal_adjacency_dict[idx] = [
-                molecule.labels[adj] for adj in atom.metal_adjacency
+                molecule.labels[adj] for adj in atom.metal_contact_indices
             ]
 
         def _select_sites(strict_mode: bool):
@@ -670,8 +667,8 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
         issubstituted = False
         for idx in parent_indices:
             a = ligand.atoms[idx]
-            if a.mconnec == 1:
-                for adj in a.adjacency:
+            if a.metal_contact_count == 1:
+                for adj in a.neighbor_indices:
                     if ligand.get_parent("molecule").labels[adj] != "As":
                         issubstituted = True
         _assign_protonation_sites(0 if issubstituted else 1)
@@ -681,8 +678,8 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
         issubstituted = False
         for idx in parent_indices:
             a = ligand.atoms[idx]
-            if a.mconnec == 1:
-                for adj in a.adjacency:
+            if a.metal_contact_count == 1:
+                for adj in a.neighbor_indices:
                     if ligand.get_parent("molecule").labels[adj] != "P":
                         issubstituted = True
         _assign_protonation_sites(0 if issubstituted else 1)
@@ -713,12 +710,12 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
 
                 adjacency_dict[idx] = [
                     molecule.atoms[adj]
-                    for adj in atom.adjacency
-                    if adj not in atom.metal_adjacency
+                    for adj in atom.neighbor_indices
+                    if adj not in atom.metal_contact_indices
                 ]
 
                 metal_adjacency_dict[idx] = [
-                    molecule.atoms[adj] for adj in atom.metal_adjacency
+                    molecule.atoms[adj] for adj in atom.metal_contact_indices
                 ]
 
             for idx in parent_indices:
@@ -788,11 +785,11 @@ def _handle_non_haptic_group(
         a = ligand.atoms[idx]
         atom_label = a.label + (f" ({a.atom_site_label})" if a.atom_site_label else "")
         logger.debug(
-            "        HANDLE_NON_HAPTIC: idx=%d, label=%s, connec=%d, mconnec=%d",
+            "        HANDLE_NON_HAPTIC: idx=%d, label=%s, neighbor_count=%d, metal_contact_count=%d",
             idx,
             atom_label,
-            a.connec,
-            a.mconnec,
+            a.neighbor_count,
+            a.metal_contact_count,
         )
 
         # Skip moiety oxygens whose charges are already fixed.
@@ -806,13 +803,13 @@ def _handle_non_haptic_group(
             continue
 
         adj_labels = []
-        for adj in a.adjacency:
-            if adj not in a.metal_adjacency:
+        for adj in a.neighbor_indices:
+            if adj not in a.metal_contact_indices:
                 adj_labels.append(ligand.get_parent("molecule").labels[adj])
 
         # Simple ionic cases
         if a.label in HALOGENS:
-            if a.connec == 0:
+            if a.neighbor_count == 0:
                 site_proton_counts[idx] = 1
 
         # Oxygen
@@ -842,7 +839,7 @@ def _handle_non_haptic_group(
 
                 else:
                     # Pyridine N is neutral; other ring compositions remain combinatorial sites.
-                    graph = nx.from_numpy_array(ligand.adjmat.astype(float))
+                    graph = nx.from_numpy_array(ligand.adjacency_matrix.astype(float))
                     rings = nx.minimum_cycle_basis(graph)
 
                     def _is_pyridine_ring(ring) -> bool:
@@ -917,7 +914,9 @@ def _handle_non_haptic_group(
                     if numH == 2 and ligand.formula == "H2-C":
                         site_proton_counts[idx] = 2
                     else:
-                        graph = nx.from_numpy_array(ligand.adjmat.astype(float))
+                        graph = nx.from_numpy_array(
+                            ligand.adjacency_matrix.astype(float)
+                        )
                         cycles = nx.cycle_basis(graph)
                         in_cycles = [c for c in cycles if idx in c]
 
@@ -958,7 +957,7 @@ def _handle_non_haptic_group(
                 site_proton_counts[idx] = 3
                 ligand_donor_electrons[idx] = 2
             elif len(adj_labels) == 2:
-                graph = nx.from_numpy_array(ligand.adjmat.astype(float))
+                graph = nx.from_numpy_array(ligand.adjacency_matrix.astype(float))
                 cycles = nx.cycle_basis(graph)
                 in_cycles = [c for c in cycles if idx in c]
 

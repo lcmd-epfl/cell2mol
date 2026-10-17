@@ -19,7 +19,7 @@ def select_and_prune_charge_states(
 ) -> list[ChargeState]:
     """Select a representative structure for each charge, then prune artifact charges.
 
-    Group valid candidates by specie total charge and call select_best_structure_for_charge
+    Group valid candidates by species total charge and call select_best_structure_for_charge
     for each group. Return the surviving states as a list, or [] if none remain.
     This retains multiple possible charges; final charge selection is handled
     by the charge balancer.
@@ -30,7 +30,7 @@ def select_and_prune_charge_states(
 
     by_charge: dict[int, list[ChargeState]] = defaultdict(list)
     for state in valid:
-        by_charge[state.specie_total_charge].append(state)
+        by_charge[state.species_total_charge].append(state)
 
     best_per_charge = [
         select_best_structure_for_charge(by_charge[charge], charge)
@@ -59,7 +59,7 @@ def select_best_structure_for_charge(
             charge,
             len(ranked),
             ranking_key(best),
-            best.specie_smiles,
+            best.species_smiles,
             ranking_key(ranked[1]),
         )
 
@@ -74,7 +74,9 @@ def ranking_key(state: ChargeState) -> tuple:
         -earned_aromatic_atoms,  # most aromatic atoms
         _protons_on_aromatic_atoms(state),  # protons kept off aromatic atoms
         spurious_separation,  # least spurious +/- pairing
-        state.specie_smiles or state.protonated_smiles or "",  # deterministic tie-break
+        state.species_smiles
+        or state.protonated_smiles
+        or "",  # deterministic tie-break
     )
 
 
@@ -115,10 +117,10 @@ def _better_drawn_sibling(winner: ChargeState, pool: list[ChargeState]) -> Charg
     if best is not winner:
         logger.debug(
             "   Better-drawn sibling at charge %+d: %s -> %s (%s)",
-            winner.specie_total_charge,
+            winner.species_total_charge,
             _structural_quality(winner),
             _structural_quality(best),
-            best.specie_smiles,
+            best.species_smiles,
         )
     return best
 
@@ -180,12 +182,12 @@ def _drop_lone_pair_stripped_charges(states: list[ChargeState]) -> list[ChargeSt
             if signature is None
             else next(
                 (
-                    other.specie_total_charge
+                    other.species_total_charge
                     for jdx, other in enumerate(states)
                     if jdx != idx
                     and signatures[jdx] == signature
-                    and abs(other.specie_total_charge)
-                    < abs(states[idx].specie_total_charge)
+                    and abs(other.species_total_charge)
+                    < abs(states[idx].species_total_charge)
                 ),
                 None,
             )
@@ -196,9 +198,9 @@ def _drop_lone_pair_stripped_charges(states: list[ChargeState]) -> list[ChargeSt
             logger.debug(
                 "   Dropping charge %+d: same bonds as charge %+d, the extra "
                 "charge is a stripped lone pair (%s)",
-                states[idx].specie_total_charge,
+                states[idx].species_total_charge,
                 beaten_by,
-                states[idx].specie_smiles,
+                states[idx].species_smiles,
             )
 
     return kept or states
@@ -208,10 +210,12 @@ def _has_cationic_donor(state: ChargeState) -> bool:
     """True when an atom coordinating a metal carries a positive formal charge."""
     parent = getattr(state.protonation, "parent", None)
     atoms = getattr(parent, "atoms", None) or []
-    charges = state.specie_atom_charges or []
+    charges = state.species_atom_charges or []
     if not atoms or len(atoms) != len(charges):
         return False
-    return any((a.mconnec or 0) > 0 and q > 0 for a, q in zip(atoms, charges))
+    return any(
+        (a.metal_contact_count or 0) > 0 and q > 0 for a, q in zip(atoms, charges)
+    )
 
 
 def _drop_cationic_donors(states: list[ChargeState]) -> list[ChargeState]:
@@ -227,8 +231,8 @@ def _drop_cationic_donors(states: list[ChargeState]) -> list[ChargeState]:
         if _has_cationic_donor(state):
             logger.debug(
                 "   Dropping charge %+d: positive formal charge on a metal donor (%s)",
-                state.specie_total_charge,
-                state.specie_smiles,
+                state.species_total_charge,
+                state.species_smiles,
             )
     return clean
 
@@ -237,11 +241,11 @@ def _has_charged_uncoordinated_carbon(state: ChargeState) -> bool:
     """True when a carbon that coordinates nothing carries a formal charge."""
     parent = getattr(state.protonation, "parent", None)
     atoms = getattr(parent, "atoms", None) or []
-    charges = state.specie_atom_charges or []
+    charges = state.species_atom_charges or []
     if not atoms or len(atoms) != len(charges):
         return False
     return any(
-        a.label == "C" and (a.mconnec or 0) == 0 and q != 0
+        a.label == "C" and (a.metal_contact_count or 0) == 0 and q != 0
         for a, q in zip(atoms, charges)
     )
 
@@ -264,8 +268,8 @@ def _drop_charged_uncoordinated_carbons(
             logger.debug(
                 "   Dropping charge %+d: formal charge on a carbon that "
                 "coordinates no metal (%s)",
-                state.specie_total_charge,
-                state.specie_smiles,
+                state.species_total_charge,
+                state.species_smiles,
             )
     return clean
 
@@ -283,7 +287,7 @@ def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
     for i, (arom_i, sep_i) in enumerate(quality):
         dominated_by = next(
             (
-                (states[j].specie_total_charge, arom_j, sep_j)
+                (states[j].species_total_charge, arom_j, sep_j)
                 for j, (arom_j, sep_j) in enumerate(quality)
                 if j != i
                 and (
@@ -291,16 +295,16 @@ def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
                     or (
                         arom_j > arom_i
                         and sep_j <= sep_i
-                        and abs(states[j].specie_total_charge)
-                        <= abs(states[i].specie_total_charge)
+                        and abs(states[j].species_total_charge)
+                        <= abs(states[i].species_total_charge)
                     )
                     or (
                         arom_j == arom_i
                         and sep_j == sep_i
                         and _protonation_pattern(states[j])
                         == _protonation_pattern(states[i])
-                        and abs(states[j].specie_total_charge)
-                        < abs(states[i].specie_total_charge)
+                        and abs(states[j].species_total_charge)
+                        < abs(states[i].species_total_charge)
                     )
                 )
             ),
@@ -313,7 +317,7 @@ def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
             logger.debug(
                 "   Dropping charge %+d (aromatic %d, separation %d): dominated "
                 "by charge %+d (aromatic %d, separation %d)",
-                states[i].specie_total_charge,
+                states[i].species_total_charge,
                 arom_i,
                 sep_i,
                 winner_charge,
@@ -326,13 +330,13 @@ def _drop_dominated_charges(states: list[ChargeState]) -> list[ChargeState]:
 
 
 def _artifact_separation(state: ChargeState) -> int:
-    """Return min(positive charge, negative charge) in the specie frame,
+    """Return min(positive charge, negative charge) in the species frame,
     excluding obligate pairs. Added protons can hide separation in the protonated frame.
     """
-    charges = state.specie_atom_charges or state.protonated_atom_charges or []
+    charges = state.species_atom_charges or state.protonated_atom_charges or []
     mol = (
-        state.specie_rdkit_obj
-        if state.specie_atom_charges
+        state.species_rdkit_obj
+        if state.species_atom_charges
         else state.protonated_rdkit_obj
     )
     obligate: set[int] = set()
@@ -345,14 +349,14 @@ def _artifact_separation(state: ChargeState) -> int:
 
 def _is_artifact_zwitterion(charge_state: ChargeState) -> bool:
     """Detect zwitterions after excluding obligate charge separation."""
-    mol = charge_state.specie_rdkit_obj
-    charges = charge_state.specie_atom_charges or []
+    mol = charge_state.species_rdkit_obj
+    charges = charge_state.species_atom_charges or []
     if mol is None or mol.GetNumAtoms() != len(charges):
-        return bool(charge_state.specie_is_zwitterionic)
+        return bool(charge_state.species_is_zwitterionic)
 
     obligate = obligate_charge_separation_atoms(mol)
     if not obligate:
-        return bool(charge_state.specie_is_zwitterionic)
+        return bool(charge_state.species_is_zwitterionic)
 
     remaining = [q for idx, q in enumerate(charges) if idx not in obligate]
     return any(q > 0 for q in remaining) and any(q < 0 for q in remaining)
@@ -365,7 +369,7 @@ def _drawing_looks_forced(state: ChargeState) -> bool:
 
 def _structural_quality(state: ChargeState) -> tuple[int, int]:
     """Return earned aromatic atoms in the protonated frame and artifact
-    separation in the specie frame; prefer more of the former and less of the latter.
+    separation in the species frame; prefer more of the former and less of the latter.
     """
     added_indices = [
         idx for idx, n in enumerate(state.protonation.site_proton_counts or []) if n > 0
@@ -377,7 +381,7 @@ def _structural_quality(state: ChargeState) -> tuple[int, int]:
             "   Discounting %d unearned aromatic atom(s) %s for charge %+d (%s)",
             len(unearned),
             sorted(unearned),
-            state.specie_total_charge,
-            state.specie_smiles,
+            state.species_total_charge,
+            state.species_smiles,
         )
     return int(aromatic["Aromatic atoms"]) - len(unearned), _artifact_separation(state)

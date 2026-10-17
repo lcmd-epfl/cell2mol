@@ -32,28 +32,30 @@ def generate_sb_halide_charge_state(prot: Protonation) -> ChargeState | None:
     (except SbX6: -1), or 3*n_Sb-n_halogens for clusters.
     """
     assert (
-        prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
+        prot.natoms is not None
+        and prot.adjacency_matrix is not None
+        and prot.atomic_numbers is not None
     )
 
-    sb_indices = [i for i, label in enumerate(prot.labels) if label == "Sb"]
-    halogen_indices = [i for i, label in enumerate(prot.labels) if label in HALOGENS]
+    sb_indices = [i for i, label in enumerate(prot.symbols) if label == "Sb"]
+    halogen_indices = [i for i, label in enumerate(prot.symbols) if label in HALOGENS]
 
     if not sb_indices or (len(sb_indices) + len(halogen_indices)) != prot.natoms:
         logger.warning(
-            "Unexpected structure for Sb-halide specie %s; expected only Sb and halogens",
+            "Unexpected structure for Sb-halide species %s; expected only Sb and halogens",
             prot.formula,
         )
         return None
 
-    adjmat = np.asarray(prot.adjmat)
+    adjacency_matrix = np.asarray(prot.adjacency_matrix)
 
     rwmol = Chem.RWMol()
-    for atomic_num in prot.atnums:
+    for atomic_num in prot.atomic_numbers:
         rwmol.AddAtom(Chem.Atom(atomic_num))
 
     for i in range(prot.natoms):
         for j in range(i + 1, prot.natoms):
-            if adjmat[i, j] != 0:
+            if adjacency_matrix[i, j] != 0:
                 rwmol.AddBond(i, j, Chem.BondType.SINGLE)
 
     is_polynuclear = len(sb_indices) > 1
@@ -62,7 +64,7 @@ def generate_sb_halide_charge_state(prot: Protonation) -> ChargeState | None:
         sb_atom.SetNoImplicit(True)
 
         if not is_polynuclear:
-            degree = int(np.count_nonzero(adjmat[idx]))
+            degree = int(np.count_nonzero(adjacency_matrix[idx]))
             sb_charge = -1 if degree == 6 else 3 - degree
             sb_atom.SetFormalCharge(sb_charge)
 
@@ -73,7 +75,7 @@ def generate_sb_halide_charge_state(prot: Protonation) -> ChargeState | None:
 
         # Distribute 3*n_Sb-n_halogens round-robin, preferring terminal halogens.
         halogen_sb_degree = {
-            j: sum(1 for idx in sb_indices if adjmat[idx, j] != 0)
+            j: sum(1 for idx in sb_indices if adjacency_matrix[idx, j] != 0)
             for j in halogen_indices
         }
         n_negative = len(halogen_indices) - 3 * len(sb_indices)
@@ -87,7 +89,7 @@ def generate_sb_halide_charge_state(prot: Protonation) -> ChargeState | None:
                 candidates = [
                     j
                     for j in halogen_indices
-                    if j not in assigned and adjmat[idx, j] != 0
+                    if j not in assigned and adjacency_matrix[idx, j] != 0
                 ]
                 if not candidates:
                     continue

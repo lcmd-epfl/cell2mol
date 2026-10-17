@@ -9,7 +9,7 @@ import logging
 
 if TYPE_CHECKING:
     from cell2mol.classes.molecule import Molecule
-    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.species import Species
 
 logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
@@ -330,8 +330,8 @@ def _total_bond_order(atom) -> int:
 ############################################################
 
 
-def finalize_specie_mol(mol: RDKitObject):
-    """Sanitize the specie molecule and generate conformer-independent SMILES.
+def finalize_species_mol(mol: RDKitObject):
+    """Sanitize the species molecule and generate conformer-independent SMILES.
 
     Return (molecule, SMILES, False); the final field is retained for compatibility.
     """
@@ -378,6 +378,7 @@ def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
             "Add metal atom %s to rdkit molecule object", Chem.MolToSmiles(temp_mol)
         )
 
+    combined_mol: RDKitObject = temp_mol
     for lig in mol.ligands or []:
         assert lig.rdkit_obj is not None
         for lig_atom, a in zip(lig.atoms or [], lig.rdkit_obj.GetAtoms()):
@@ -395,9 +396,9 @@ def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
             lig.totcharge,
         )
 
-        temp_mol = Chem.CombineMols(temp_mol, lig.rdkit_obj)
+        combined_mol = Chem.CombineMols(combined_mol, lig.rdkit_obj)
 
-    new_mol = Chem.RWMol(temp_mol)
+    new_mol = Chem.RWMol(combined_mol)
 
     if mol.natoms != new_mol.GetNumAtoms():
         raise ValueError(
@@ -411,8 +412,7 @@ def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
         ][0]
         new_order.append(mol_idx)
 
-    new_mol = Chem.RenumberAtoms(new_mol, new_order)
-    new_mol = Chem.RWMol(new_mol)
+    new_mol = Chem.RWMol(Chem.RenumberAtoms(new_mol, new_order))
 
     for met in metals:
         met_idx = met.get_parent_index("molecule")
@@ -434,11 +434,12 @@ def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
 
         for idx in coordinating_atoms_indices:
             assert idx is not None
-            if new_mol.GetBondBetweenAtoms(idx, met_idx):
+            existing_bond = new_mol.GetBondBetweenAtoms(idx, met_idx)
+            if existing_bond is not None:
                 logger.debug(
                     "Already added %s %s",
                     idx,
-                    new_mol.GetBondBetweenAtoms(idx, met_idx).GetBondType(),
+                    existing_bond.GetBondType(),
                 )
             elif idx in all_metals_indices:
                 new_mol.AddBond(idx, met_idx, Chem.BondType.UNSPECIFIED)
@@ -466,8 +467,13 @@ def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
         except Exception:
             return new_mol.GetMol(), smiles
 
-    if mol.is_haptic:
-        logger.info("TMC_SMILES: %s %s", mol.is_haptic, mol.haptic_type)
+    haptic_coordination = [
+        ligand.eta_per_metal
+        for ligand in mol.ligands or []
+        if any(ligand.eta_per_metal.values())
+    ]
+    if haptic_coordination:
+        logger.info("TMC_SMILES: haptic coordination=%s", haptic_coordination)
         tmc_rdkit_obj = Chem.rdmolops.DativeBondsToHaptic(tmc_rdkit_obj)
         logger.info("TMC_SMILES: %s", Chem.MolToSmiles(tmc_rdkit_obj))
 
@@ -477,64 +483,42 @@ def generate_tmc_rdkit_obj_smiles(mol: "Molecule"):
 
 
 ############################################################
-# Specie and metal bond assembly
+# Species and metal bond assembly
 ############################################################
 
 
-def create_bonds_specie(specie: "Specie", rdkit_obj: RDKitObject | None = None):
-    """Populate specie.atoms with one Bond per bond in the deprotonated RDKit molecule."""
-    from cell2mol.classes import Bond
-
+def create_bonds_species(species: "Species", rdkit_obj: RDKitObject | None = None):
+    """Replace species-local bond records from the deprotonated RDKit form."""
     if rdkit_obj is None:
-        rdkit_obj = specie.rdkit_obj
+        rdkit_obj = species.rdkit_obj
     assert rdkit_obj is not None
-
-    n_atoms = specie.natoms
-    n_atoms_rdkit = rdkit_obj.GetNumAtoms()
-    if n_atoms != n_atoms_rdkit:
-        logger.error(
-            "create_bonds_specie: %s atom-count mismatch (specie %d vs rdkit %d); "
-            "expected the deprotonated specie rdkit_obj",
-            specie.subtype,
-            n_atoms,
-            n_atoms_rdkit,
-        )
+    assert species.atoms is not None
+    if species.natoms != rdkit_obj.GetNumAtoms():
+        logger.error("create_bonds_species: %s atom-count mismatch", species.subtype)
         return False
 
-    for idx, rdkit_atom in enumerate(rdkit_obj.GetAtoms()):
-        for b in rdkit_atom.GetBonds():
-            a1 = b.GetBeginAtomIdx()
-            a2 = b.GetEndAtomIdx()
-            end_label = specie.atoms[a2].label
-            end_symbol = rdkit_obj.GetAtomWithIdx(a2).GetSymbol()
-            # Skip if the end-atom element disagrees (allow D<->H for deuterium).
-            if end_label != end_symbol and not (end_label == "D" and end_symbol == "H"):
-                logger.debug("Bond end-atom mismatch %s vs %s", end_label, end_symbol)
-                continue
-            start, end = (a2, a1) if a2 == idx else (a1, a2)
-            specie.atoms[idx].add_bond(
-                Bond.from_positional(
-                    specie.atoms[start], specie.atoms[end], b.GetBondTypeAsDouble()
-                )
-            )
-
-        if not specie.atoms[idx].bonds and specie.natoms != 1:
-            logger.error(
-                "NO BONDS for %s with %s RDKit object index %d.",
-                specie.atoms[idx].label,
-                specie.subtype,
-                idx,
-            )
+    for atom, rdkit_atom in zip(species.atoms, rdkit_obj.GetAtoms()):
+        symbol = rdkit_atom.GetSymbol()
+        if atom.symbol != symbol and not (atom.symbol == "D" and symbol == "H"):
+            logger.error("Bond atom mismatch %s vs %s", atom.symbol, symbol)
             return False
 
+    records = []
+    connected = set()
+    for bond in rdkit_obj.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        records.append(species.make_bond_record([i, j], bond.GetBondTypeAsDouble()))
+        connected.update((i, j))
+    if species.natoms != 1 and len(connected) != species.natoms:
+        logger.error("NO BONDS for one or more atoms of %s", species.formula)
+        return False
+    species.bonds = records
     return True
 
 
 def create_metal_ligand_bonds(mol: "Molecule"):
-    # Adds Metal-Ligand Bonds, with a zero order:
-    from cell2mol.classes import Bond
-
-    assert mol.madjmat is not None
+    # Preserve the existing metal-ligand order of one.
+    assert mol.metal_contact_matrix is not None
     if (
         mol.is_metal_complex
         or mol.has_s_block_metal
@@ -548,19 +532,11 @@ def create_metal_ligand_bonds(mol: "Molecule"):
                 for met in mol.metals or []:
                     index_2 = met.get_parent_index("molecule")
                     assert index_2 is not None
-                    isconnected = mol.madjmat[index_1, index_2] == 1
+                    isconnected = mol.metal_contact_matrix[index_1, index_2] == 1
                     if isconnected:
-                        if index_1 < index_2:
-                            bond_startatom = at
-                            bond_endatom = met
-                        else:
-                            bond_startatom = met
-                            bond_endatom = at
-                        newbond = Bond.from_positional(bond_startatom, bond_endatom, 1)
-                        at.add_bond(newbond)
-                        met.add_bond(newbond)
+                        mol.add_bond([index_1, index_2], order=1)
                         count += 1
-                if count != at.mconnec:
+                if count != at.metal_contact_count:
                     logger.error(
                         "Error creating bonds for atom: \n%s\n of ligand: \n%s\n",
                         at,
@@ -569,10 +545,8 @@ def create_metal_ligand_bonds(mol: "Molecule"):
 
 
 def create_metal_metal_bonds(mol: "Molecule"):
-    from cell2mol.classes import Bond
-
     # Adds Metal-Metal Bonds, with a zero order:
-    assert mol.madjmat is not None
+    assert mol.metal_contact_matrix is not None
     if (
         mol.is_metal_complex
         or mol.has_s_block_metal
@@ -589,14 +563,6 @@ def create_metal_metal_bonds(mol: "Molecule"):
                         continue
                     index_2 = met2.get_parent_index("molecule")
                     assert index_2 is not None
-                    isconnected = mol.madjmat[index_1, index_2] == 1
+                    isconnected = mol.metal_contact_matrix[index_1, index_2] == 1
                     if isconnected:
-                        if index_1 < index_2:
-                            bond_startatom = met1
-                            bond_endatom = met2
-                        else:
-                            bond_startatom = met2
-                            bond_endatom = met1
-                        newbond = Bond.from_positional(bond_startatom, bond_endatom, 0)
-                        met1.add_bond(newbond)
-                        met2.add_bond(newbond)
+                        mol.add_bond([index_1, index_2], order=0)

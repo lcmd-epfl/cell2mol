@@ -29,7 +29,7 @@ from cell2mol.classes.charge_state import ChargeState
 from cell2mol.classes.protonation import Protonation
 
 if TYPE_CHECKING:
-    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.species import Species
 
 logger = logging.getLogger(__name__)
 
@@ -39,26 +39,26 @@ logger = logging.getLogger(__name__)
 ############################################################
 
 
-def generate_charge_states(spec: Specie) -> list[ChargeState] | None:
+def generate_charge_states(species: Species) -> list[ChargeState] | None:
     """Best Lewis structure for each charge a ligand or metal-free molecule can
     carry, or None if bond order perception found nothing.
     """
-    if spec.protonation_states is None:
-        spec.get_protonation_states()
-    if not spec.protonation_states:
-        logger.warning("No protonation states available for %s", spec.formula)
+    if species.protonation_states is None:
+        species.get_protonation_states()
+    if not species.protonation_states:
+        logger.warning("No protonation states available for %s", species.formula)
         return None
 
-    if spec.formula in MANUAL_CHARGE_ASSIGN_SPECIES:
-        charge_state = generate_manual_charge_state(spec)
+    if species.formula in MANUAL_CHARGE_ASSIGN_SPECIES:
+        charge_state = generate_manual_charge_state(species)
         return [charge_state] if charge_state is not None else None
 
-    special_charge_states = generate_special_charge_states(spec)
+    special_charge_states = generate_special_charge_states(species)
     if special_charge_states is not None:
         return special_charge_states
 
     diagnostics: dict[str, bool] = {}
-    valid_states = _enumerate_valid_states(spec, diagnostics)
+    valid_states = _enumerate_valid_states(species, diagnostics)
 
     best = select_and_prune_charge_states(valid_states)
 
@@ -68,20 +68,20 @@ def generate_charge_states(spec: Specie) -> list[ChargeState] | None:
 
     # Report why bond order assignment gave up only when it found nothing at all.
     found_nothing = not best
-    spec.valence_search_too_large = bool(
+    species.valence_search_too_large = bool(
         diagnostics.get("valence_search_too_large") and found_nothing
     )
-    spec.bond_perception_capped = bool(
+    species.bond_perception_capped = bool(
         diagnostics.get("bond_perception_capped") and found_nothing
     )
     return best or None
 
 
 def _enumerate_valid_states(
-    spec: Specie, diagnostics: dict[str, bool]
+    species: Species, diagnostics: dict[str, bool]
 ) -> list[ChargeState]:
     """Every valid structure over all protonation states and candidate charges."""
-    protonation_states = spec.protonation_states
+    protonation_states = species.protonation_states
     if not protonation_states:
         return []
 
@@ -97,10 +97,10 @@ def _enumerate_valid_states(
         return states
 
     for prot in protonation_states:
-        candidate_charges = get_candidate_charges(spec, prot)
+        candidate_charges = get_candidate_charges(species, prot)
         logger.debug(
             "Enumerating %s | protonation %s (nH=%d) | candidate charges %s",
-            spec.formula,
+            species.formula,
             prot.formula,
             prot.n_protons_added,
             candidate_charges,
@@ -119,21 +119,21 @@ def _enumerate_valid_states(
 
 def _with_ttf_oxidised_states(states: list[ChargeState]) -> list[ChargeState]:
     """Append the oxidised states of a tetrathiafulvalene-type donor."""
-    neutral = next((s for s in states if s.specie_total_charge == 0), None)
+    neutral = next((s for s in states if s.species_total_charge == 0), None)
     if neutral is None:
         return states
 
-    found = {s.specie_total_charge for s in states}
+    found = {s.species_total_charge for s in states}
     added = [
         state
         for state in generate_oxidised_donor_charge_states(neutral)
-        if state.specie_total_charge not in found
+        if state.species_total_charge not in found
     ]
     if added:
         logger.debug(
             "Tetrathiafulvalene-type donor %s: adding oxidised states %s",
             neutral.protonation.formula,
-            [s.specie_total_charge for s in added],
+            [s.species_total_charge for s in added],
         )
     return states + added
 
@@ -143,14 +143,14 @@ def _with_ttf_oxidised_states(states: list[ChargeState]) -> list[ChargeState]:
 ############################################################
 
 
-def get_candidate_charges(spec: Specie, prot: Protonation) -> list[int]:
+def get_candidate_charges(species: Species, prot: Protonation) -> list[int]:
     """Return parity-compatible charges in the protonated frame.
 
     Candidates stay fixed across protonation states so added protons lower the
-    specie charge. Use a formula or moiety anchor, otherwise a charge sweep.
+    species charge. Use a formula or moiety anchor, otherwise a charge sweep.
     """
-    anchor = _anchored_specie_charges(spec)
-    candidates = list(anchor) if anchor is not None else _sweep_charges(spec)
+    anchor = _anchored_species_charges(species)
+    candidates = list(anchor) if anchor is not None else _sweep_charges(species)
 
     kept = _filter_by_electron_parity(candidates, prot)
     if not kept:
@@ -168,9 +168,9 @@ def get_candidate_charges(spec: Specie, prot: Protonation) -> list[int]:
     return kept
 
 
-def _anchored_specie_charges(spec: Specie) -> list[int] | None:
+def _anchored_species_charges(species: Species) -> list[int] | None:
     """Fixed formula or moiety charges used as protonated-frame candidates."""
-    formula = spec.formula
+    formula = species.formula
 
     if formula in {"C-O", "H2-O", "C-N", "C-S", "C-Se", "C-Te", "C-P", "C-As", "C-Sb"}:
         return [0]
@@ -180,7 +180,7 @@ def _anchored_specie_charges(spec: Specie) -> list[int] | None:
         return [0]
 
     # Moiety anchors avoid expensive polycarboxylate charge sweeps.
-    charged_moieties = _find_charged_moiety(spec)
+    charged_moieties = _find_charged_moiety(species)
 
     # Cation-only detection may miss delocalized anions; use the sweep instead.
     if not any(net_charge < 0 for *_, net_charge in charged_moieties):
@@ -197,16 +197,16 @@ def _anchored_specie_charges(spec: Specie) -> list[int] | None:
     return [anchor]
 
 
-def _sweep_charges(spec: Specie) -> list[int]:
-    """Fallback protonated-charge sweep for a specie with no chemical anchor."""
-    if spec.is_metal_free_molecule:
+def _sweep_charges(species: Species) -> list[int]:
+    """Fallback protonated-charge sweep for a species with no chemical anchor."""
+    if species.is_metal_free_molecule:
         return [0, -1, 1, -2, 2, -3, 3, -4, 4]
     return [0, -1, 1, -2, 2]
 
 
 def _filter_by_electron_parity(charges: list[int], prot: Protonation) -> list[int]:
     """Keep charges with an even valence-electron count; may return an empty list."""
-    atnums = prot.atnums
+    atnums = prot.atomic_numbers
     if not atnums:
         return list(charges)
 

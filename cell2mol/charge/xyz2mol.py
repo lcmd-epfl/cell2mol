@@ -25,7 +25,7 @@ import networkx as nx
 
 from rdkit import Chem
 from cell2mol.elementdata import ElementData
-from cell2mol.element_utils import labels2formula
+from cell2mol.element_utils import symbols2formula
 
 logger = logging.getLogger(__name__)
 
@@ -632,7 +632,7 @@ def AC2BO(
     valences_list_of_lists = []
     AC_valence = [int(x) for x in AC.sum(axis=1)]
 
-    formula = labels2formula([elemdatabase.elementsym[atom] for atom in atoms])
+    formula = symbols2formula([elemdatabase.elementsym[atom] for atom in atoms])
     wrong = 0
 
     nitro_forced = _nitro_forced_valences(AC, atoms)

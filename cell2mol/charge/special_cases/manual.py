@@ -46,7 +46,7 @@ BRIDGED_CLUSTER_CHARGES = {
 ############################################################
 
 
-def generate_manual_charge_state(spec):
+def generate_manual_charge_state(species):
     """Generates a ChargeState for special species using formula-based lookups."""
     REGISTRY = {
         "O4-Cl": ("Cl", "[O-]Cl(=O)(=O)=O", -1),
@@ -68,27 +68,27 @@ def generate_manual_charge_state(spec):
         "C-N-S": (None, "[N-]=C=S", -1),
     }
 
-    formula = spec.formula
+    formula = species.formula
 
     if formula in BRIDGED_CLUSTER_CHARGES:
         return _manual_charge_state_from_adjacency(
-            spec, BRIDGED_CLUSTER_CHARGES[formula]
+            species, BRIDGED_CLUSTER_CHARGES[formula]
         )
 
     target_atom, smiles, charge = REGISTRY.get(formula, (None, None, 0))
 
     if formula == "N-O":
         target_atom = "O"
-        is_bent = getattr(spec, "NO_type", "") == "Bent"
+        is_bent = getattr(species, "NO_type", "") == "Bent"
         smiles, charge = ("[N-]=O", -1) if is_bent else ("[N]=O", 0)
     assert smiles is not None, f"No manual SMILES registered for formula {formula}"
 
     mol = Chem.MolFromSmiles(smiles, sanitize=False)
-    order = list(range(spec.natoms))
+    order = list(range(species.natoms))
     new_order = order
 
     if not target_atom:
-        label_order = _manual_label_order(mol, spec)
+        label_order = _manual_label_order(mol, species)
         if label_order is not None:
             new_order = label_order
 
@@ -104,11 +104,12 @@ def generate_manual_charge_state(spec):
                 formula,
             )
         else:
-            for idx, atom in enumerate(spec.atoms):
+            for idx, atom in enumerate(species.atoms):
                 # 'central' means the atom connected to two others of the same type
                 if target_atom == "central":
                     adj_labels = [
-                        spec.get_parent("molecule").labels[a] for a in atom.adjacency
+                        species.get_parent("molecule").labels[a]
+                        for a in atom.neighbor_indices
                     ]
                     if adj_labels.count(atom.label) == 2:
                         new_order = reorder_element(order, smiles_idx, idx)
@@ -126,7 +127,7 @@ def generate_manual_charge_state(spec):
         "Manual Charge: %s | SMILES: %s | Order: %s", formula, smiles, new_order
     )
 
-    # With no added H, reuse registry specie fields to avoid re-sanitizing its Lewis structure.
+    # With no added H, reuse registry species fields to avoid re-sanitizing its Lewis structure.
     return ChargeState(
         is_valid=True,
         protonated_total_charge=total_charge,
@@ -135,9 +136,9 @@ def generate_manual_charge_state(spec):
         protonated_smiles=smiles,
         protonated_target_charge=charge,
         allow_charged_fragments=True,
-        protonation=spec.protonation_states[0],
-        specie_rdkit_obj=mol,
-        specie_smiles=smiles,
+        protonation=species.protonation_states[0],
+        species_rdkit_obj=mol,
+        species_smiles=smiles,
     )
 
 
@@ -146,23 +147,23 @@ def generate_manual_charge_state(spec):
 ############################################################
 
 
-def _manual_charge_state_from_adjacency(spec, charge: int):
+def _manual_charge_state_from_adjacency(species, charge: int):
     """Build a bridged cluster from adjacency; place its known charge on the first heavy atom."""
-    adjmat = np.asarray(spec.adjmat, dtype=int)
+    adjacency_matrix = np.asarray(species.adjacency_matrix, dtype=int)
 
     rwmol = Chem.RWMol()
-    for atnum in spec.get_atomic_numbers():
+    for atnum in species.get_atomic_numbers():
         rwmol.AddAtom(Chem.Atom(int(atnum)))
-    for i in range(spec.natoms):
-        for j in range(i + 1, spec.natoms):
-            if adjmat[i, j] != 0:
+    for i in range(species.natoms):
+        for j in range(i + 1, species.natoms):
+            if adjacency_matrix[i, j] != 0:
                 rwmol.AddBond(i, j, Chem.BondType.SINGLE)
 
     for atom in rwmol.GetAtoms():
         # Prevent implicit H on bridge-bonded atoms.
         atom.SetNoImplicit(True)
 
-    heavy = [i for i, label in enumerate(spec.labels) if label != "H"]
+    heavy = [i for i, label in enumerate(species.labels) if label != "H"]
     charge_site = heavy[0] if heavy else 0
     rwmol.GetAtomWithIdx(charge_site).SetFormalCharge(charge)
 
@@ -172,7 +173,7 @@ def _manual_charge_state_from_adjacency(spec, charge: int):
 
     logger.debug(
         "Manual bridged-cluster charge: %s | total %d on atom %d | SMILES: %s",
-        spec.formula,
+        species.formula,
         charge,
         charge_site,
         smiles,
@@ -186,9 +187,9 @@ def _manual_charge_state_from_adjacency(spec, charge: int):
         protonated_smiles=smiles,
         protonated_target_charge=charge,
         allow_charged_fragments=True,
-        protonation=spec.protonation_states[0],
-        specie_rdkit_obj=mol,
-        specie_smiles=smiles,
+        protonation=species.protonation_states[0],
+        species_rdkit_obj=mol,
+        species_smiles=smiles,
     )
 
 
@@ -207,13 +208,13 @@ def _manual_anchor_index(mol, target_atom: str) -> int | None:
     return None
 
 
-def _manual_label_order(mol, spec) -> list[int] | None:
-    """Map registry atoms to specie order by element; return None if elements repeat."""
+def _manual_label_order(mol, species) -> list[int] | None:
+    """Map registry atoms to species order by element; return None if elements repeat."""
     symbols = [atom.GetSymbol() for atom in mol.GetAtoms()]
     if len(set(symbols)) != len(symbols):
         return None
 
-    atoms = getattr(spec, "atoms", None) or []
+    atoms = getattr(species, "atoms", None) or []
     if len(atoms) != len(symbols):
         return None
 
@@ -225,7 +226,7 @@ def _manual_label_order(mol, spec) -> list[int] | None:
         logger.warning(
             "Manual Charge: %s has labels %s that the registry SMILES %s does "
             "not cover; keeping the SMILES atom order",
-            spec.formula,
+            species.formula,
             [a.label for a in atoms],
             Chem.MolToSmiles(mol),
         )

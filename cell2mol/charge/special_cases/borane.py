@@ -192,28 +192,30 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
     Compare vertex electrons v-2+x with 2*(n+1) for closo or 2*(n+2) for nido.
     """
     assert (
-        prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
+        prot.natoms is not None
+        and prot.adjacency_matrix is not None
+        and prot.atomic_numbers is not None
     )
 
-    adjmat = np.asarray(prot.adjmat)
+    adjacency_matrix = np.asarray(prot.adjacency_matrix)
 
-    cage_indices = find_borane_cage_indices(prot.atnums, adjmat) or []
-    boron_indices = [i for i in cage_indices if prot.atnums[i] == 5]
+    cage_indices = find_borane_cage_indices(prot.atomic_numbers, adjacency_matrix) or []
+    boron_indices = [i for i in cage_indices if prot.atomic_numbers[i] == 5]
     exo_indices = [i for i in range(prot.natoms) if i not in cage_indices]
 
     if not boron_indices:
         logger.warning(
-            "Unexpected structure for borane/carborane specie %s; no boron "
+            "Unexpected structure for borane/carborane species %s; no boron "
             "cage atoms found",
             prot.formula,
         )
         return None
 
     # Apply Wade’s rules independently to each cage.
-    cages = find_borane_cages(prot.atnums, adjmat)
+    cages = find_borane_cages(prot.atomic_numbers, adjacency_matrix)
     if not cages:
         logger.warning(
-            "Borane/carborane specie %s failed cage topology re-check", prot.formula
+            "Borane/carborane species %s failed cage topology re-check", prot.formula
         )
         return None
 
@@ -226,13 +228,15 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
         outside = [i for i in range(prot.natoms) if i not in own]
         contributed_se = 0
         for i in indices:
-            valence_electrons = 3 if prot.atnums[i] == 5 else 4
-            exo_count = int(np.count_nonzero(adjmat[i][outside])) if outside else 0
+            valence_electrons = 3 if prot.atomic_numbers[i] == 5 else 4
+            exo_count = (
+                int(np.count_nonzero(adjacency_matrix[i][outside])) if outside else 0
+            )
             contributed_se += valence_electrons - 2 + exo_count
-        cage_boron = [i for i in indices if prot.atnums[i] == 5]
+        cage_boron = [i for i in indices if prot.atomic_numbers[i] == 5]
         if not cage_boron:
             logger.warning(
-                "Borane/carborane specie %s has a cage with no boron", prot.formula
+                "Borane/carborane species %s has a cage with no boron", prot.formula
             )
             return None
         cage_charges.append((cage_boron[0], contributed_se - required_se))
@@ -248,8 +252,8 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
     simple_exo = {
         i
         for i in exo_indices
-        if prot.labels[i] in allowed_simple_labels
-        and int(np.count_nonzero(adjmat[i])) == 1
+        if prot.symbols[i] in allowed_simple_labels
+        and int(np.count_nonzero(adjacency_matrix[i])) == 1
     }
     complex_roots = [i for i in exo_indices if i not in simple_exo]
 
@@ -263,15 +267,18 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
     for root in complex_roots:
         if root in visited_complex:
             continue
-        fragment = _collect_substituent_fragment(root, cage_indices, adjmat)
+        fragment = _collect_substituent_fragment(root, cage_indices, adjacency_matrix)
         visited_complex.update(fragment)
 
         attach_bonds = [
-            (c, s) for c in cage_indices for s in fragment if adjmat[c, s] != 0
+            (c, s)
+            for c in cage_indices
+            for s in fragment
+            if adjacency_matrix[c, s] != 0
         ]
         if not attach_bonds:
             logger.warning(
-                "Borane/carborane specie %s has a substituent fragment "
+                "Borane/carborane species %s has a substituent fragment "
                 "with no bond back to the cage; cannot split",
                 prot.formula,
             )
@@ -279,7 +286,7 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
         attach_atoms = [s for _c, s in attach_bonds]
 
         frag_charge, frag_atom_charges, frag_bond_orders = _charge_capped_fragment(
-            fragment, attach_atoms, adjmat, prot.atnums, prot.formula
+            fragment, attach_atoms, adjacency_matrix, prot.atomic_numbers, prot.formula
         )
         if frag_charge is None:
             return None
@@ -288,12 +295,12 @@ def generate_borane_charge_state(prot: Protonation) -> ChargeState | None:
         fragment_bond_orders.update(frag_bond_orders)
 
     rwmol = Chem.RWMol()
-    for atomic_num in prot.atnums:
+    for atomic_num in prot.atomic_numbers:
         rwmol.AddAtom(Chem.Atom(atomic_num))
 
     for i in range(prot.natoms):
         for j in range(i + 1, prot.natoms):
-            if adjmat[i, j] != 0:
+            if adjacency_matrix[i, j] != 0:
                 bond_type = fragment_bond_orders.get(
                     frozenset((i, j)), Chem.BondType.SINGLE
                 )
@@ -351,10 +358,12 @@ def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | N
     Count full valence at shared vertices and one electron per bridging H.
     """
     assert (
-        prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
+        prot.natoms is not None
+        and prot.adjacency_matrix is not None
+        and prot.atomic_numbers is not None
     )
 
-    split = find_conjuncto_borane_split(prot.atnums, prot.adjmat)
+    split = find_conjuncto_borane_split(prot.atomic_numbers, prot.adjacency_matrix)
     if split is None:
         logger.warning(
             "No conjuncto (fused multi-cage) borane split found for %s",
@@ -367,10 +376,10 @@ def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | N
     m = 2
     n = len(cage_indices)
 
-    boron_indices = [i for i in cage_indices if prot.atnums[i] == 5]
+    boron_indices = [i for i in cage_indices if prot.atomic_numbers[i] == 5]
     if not boron_indices:
         logger.warning(
-            "Unexpected structure for conjuncto borane/carborane specie "
+            "Unexpected structure for conjuncto borane/carborane species "
             "%s; no boron cage atoms found",
             prot.formula,
         )
@@ -383,7 +392,7 @@ def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | N
     if p is None:
         logger.warning(
             "No manually-verified missing-vertex count (p) registered for "
-            "conjuncto cage composition %s (specie %s); cannot compute charge",
+            "conjuncto cage composition %s (species %s); cannot compute charge",
             cage_key,
             prot.formula,
         )
@@ -391,15 +400,15 @@ def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | N
 
     required_se = 2 * (m + n + o + p)
 
-    adjmat = np.asarray(prot.adjmat)
+    adjacency_matrix = np.asarray(prot.adjacency_matrix)
     exo_indices = [i for i in range(prot.natoms) if i not in cage_indices]
 
     bridging_h = {
         i
         for i in exo_indices
-        if prot.labels[i] == "H"
-        and int(np.count_nonzero(adjmat[i])) == 2
-        and all(int(j) in cage_indices for j in np.nonzero(adjmat[i])[0])
+        if prot.symbols[i] == "H"
+        and int(np.count_nonzero(adjacency_matrix[i])) == 2
+        and all(int(j) in cage_indices for j in np.nonzero(adjacency_matrix[i])[0])
     }
 
     allowed_simple_labels = {"H"} | HALOGENS
@@ -407,8 +416,8 @@ def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | N
         i
         for i in exo_indices
         if i not in bridging_h
-        and prot.labels[i] in allowed_simple_labels
-        and int(np.count_nonzero(adjmat[i])) == 1
+        and prot.symbols[i] in allowed_simple_labels
+        and int(np.count_nonzero(adjacency_matrix[i])) == 1
     }
     complex_roots = [
         i for i in exo_indices if i not in simple_exo and i not in bridging_h
@@ -416,9 +425,11 @@ def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | N
 
     contributed_se = len(bridging_h)
     for i in cage_indices:
-        valence_electrons = 3 if prot.atnums[i] == 5 else 4
+        valence_electrons = 3 if prot.atomic_numbers[i] == 5 else 4
         terminal_exo = [
-            j for j in exo_indices if adjmat[i, j] != 0 and j not in bridging_h
+            j
+            for j in exo_indices
+            if adjacency_matrix[i, j] != 0 and j not in bridging_h
         ]
         x = len(terminal_exo)
         contributed_se += valence_electrons if x == 0 else (valence_electrons - 2 + x)
@@ -434,15 +445,18 @@ def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | N
     for root in complex_roots:
         if root in visited_complex:
             continue
-        fragment = _collect_substituent_fragment(root, cage_indices, adjmat)
+        fragment = _collect_substituent_fragment(root, cage_indices, adjacency_matrix)
         visited_complex.update(fragment)
 
         attach_bonds = [
-            (c, s) for c in cage_indices for s in fragment if adjmat[c, s] != 0
+            (c, s)
+            for c in cage_indices
+            for s in fragment
+            if adjacency_matrix[c, s] != 0
         ]
         if not attach_bonds:
             logger.warning(
-                "Conjuncto borane/carborane specie %s has a substituent "
+                "Conjuncto borane/carborane species %s has a substituent "
                 "fragment with no bond back to the cage; cannot split",
                 prot.formula,
             )
@@ -450,7 +464,7 @@ def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | N
         attach_atoms = [s for _c, s in attach_bonds]
 
         frag_charge, frag_atom_charges, frag_bond_orders = _charge_capped_fragment(
-            fragment, attach_atoms, adjmat, prot.atnums, prot.formula
+            fragment, attach_atoms, adjacency_matrix, prot.atomic_numbers, prot.formula
         )
         if frag_charge is None:
             return None
@@ -459,12 +473,12 @@ def generate_conjuncto_borane_charge_state(prot: Protonation) -> ChargeState | N
         fragment_bond_orders.update(frag_bond_orders)
 
     rwmol = Chem.RWMol()
-    for atomic_num in prot.atnums:
+    for atomic_num in prot.atomic_numbers:
         rwmol.AddAtom(Chem.Atom(atomic_num))
 
     for i in range(prot.natoms):
         for j in range(i + 1, prot.natoms):
-            if adjmat[i, j] != 0:
+            if adjacency_matrix[i, j] != 0:
                 bond_type = fragment_bond_orders.get(
                     frozenset((i, j)), Chem.BondType.SINGLE
                 )

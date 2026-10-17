@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def _collect_substituent_fragment(
-    root: int, cage_indices: list[int], adjmat: np.ndarray
+    root: int, cage_indices: list[int], adjacency_matrix: np.ndarray
 ) -> list[int]:
     """Return atoms reachable from root without crossing into the cage."""
     cage_set = set(cage_indices)
@@ -25,7 +25,7 @@ def _collect_substituent_fragment(
     while frontier:
         next_frontier = []
         for i in frontier:
-            for j in np.nonzero(adjmat[i])[0]:
+            for j in np.nonzero(adjacency_matrix[i])[0]:
                 j = int(j)
                 if j in cage_set or j in visited:
                     continue
@@ -38,7 +38,7 @@ def _collect_substituent_fragment(
 def _charge_capped_fragment(
     fragment: list[int],
     attach_atoms: list[int],
-    adjmat: np.ndarray,
+    adjacency_matrix: np.ndarray,
     atnums,
     formula: str | None,
 ) -> tuple[int | None, dict[int, int], dict[frozenset[int], "Chem.BondType"]]:
@@ -52,7 +52,7 @@ def _charge_capped_fragment(
     local_ac = np.zeros((k + n_caps, k + n_caps), dtype=int)
     for a in fragment:
         for b in fragment:
-            if a != b and adjmat[a, b] != 0:
+            if a != b and adjacency_matrix[a, b] != 0:
                 local_ac[local_index[a], local_index[b]] = 1
     for cap_offset, attach_atom in enumerate(attach_atoms):
         cap_idx = k + cap_offset
@@ -80,13 +80,13 @@ def _charge_capped_fragment(
             frag_bond_orders = {}
             for a in fragment:
                 for b in fragment:
-                    if a < b and adjmat[a, b] != 0:
+                    if a < b and adjacency_matrix[a, b] != 0:
                         bond = mol.GetBondBetweenAtoms(local_index[a], local_index[b])
                         frag_bond_orders[frozenset((a, b))] = bond.GetBondType()
             return charge, frag_atom_charges, frag_bond_orders
 
     logger.warning(
-        "Could not determine a charge for a capped substituent fragment on specie %s",
+        "Could not determine a charge for a capped substituent fragment on species %s",
         formula,
     )
     return None, {}, {}

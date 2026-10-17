@@ -55,7 +55,7 @@ def generate_oxidised_donor_charge_states(
     neutral: ChargeState,
 ) -> list[ChargeState]:
     """Build the radical-cation and dication states of a neutral TTF-type donor."""
-    if neutral.specie_total_charge != 0 or neutral.protonated_rdkit_obj is None:
+    if neutral.species_total_charge != 0 or neutral.protonated_rdkit_obj is None:
         return []
 
     states = []

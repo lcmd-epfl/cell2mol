@@ -216,26 +216,32 @@ def generate_fullerene_charge_state(prot: Protonation) -> ChargeState | None:
     substituted carbons. Add substituent charges separately.
     """
     assert (
-        prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
+        prot.natoms is not None
+        and prot.adjacency_matrix is not None
+        and prot.atomic_numbers is not None
     )
 
-    cage_indices = find_fullerene_cage_indices(prot.atnums, prot.adjmat)
+    cage_indices = find_fullerene_cage_indices(
+        prot.atomic_numbers, prot.adjacency_matrix
+    )
     if not cage_indices:
         logger.warning("No fullerene cage core found for %s", prot.formula)
         return None
 
-    adjmat = np.asarray(prot.adjmat)
+    adjacency_matrix = np.asarray(prot.adjacency_matrix)
     cage_set = set(cage_indices)
     exo_indices = [i for i in range(prot.natoms) if i not in cage_set]
 
     cage_local_to_global = dict(enumerate(cage_indices))
     global_to_cage_local = {gi: local for local, gi in cage_local_to_global.items()}
 
-    sub_ac = adjmat[np.ix_(cage_indices, cage_indices)]
+    sub_ac = adjacency_matrix[np.ix_(cage_indices, cage_indices)]
     cage_graph = nx.from_numpy_array(sub_ac)
 
     substituted_cage_atoms = {
-        gi for gi in cage_indices if any(adjmat[gi, j] != 0 for j in exo_indices)
+        gi
+        for gi in cage_indices
+        if any(adjacency_matrix[gi, j] != 0 for j in exo_indices)
     }
     unsubstituted_local = [
         global_to_cage_local[gi]
@@ -265,8 +271,8 @@ def generate_fullerene_charge_state(prot: Protonation) -> ChargeState | None:
     simple_exo = {
         i
         for i in exo_indices
-        if prot.labels[i] in allowed_simple_labels
-        and int(np.count_nonzero(adjmat[i])) == 1
+        if prot.symbols[i] in allowed_simple_labels
+        and int(np.count_nonzero(adjacency_matrix[i])) == 1
     }
     complex_roots = [i for i in exo_indices if i not in simple_exo]
 
@@ -276,15 +282,18 @@ def generate_fullerene_charge_state(prot: Protonation) -> ChargeState | None:
     for root in complex_roots:
         if root in visited_complex:
             continue
-        fragment = _collect_substituent_fragment(root, cage_indices, adjmat)
+        fragment = _collect_substituent_fragment(root, cage_indices, adjacency_matrix)
         visited_complex.update(fragment)
 
         attach_bonds = [
-            (c, s) for c in cage_indices for s in fragment if adjmat[c, s] != 0
+            (c, s)
+            for c in cage_indices
+            for s in fragment
+            if adjacency_matrix[c, s] != 0
         ]
         if not attach_bonds:
             logger.warning(
-                "Fullerene specie %s has a substituent fragment with no "
+                "Fullerene species %s has a substituent fragment with no "
                 "bond back to the cage; cannot split",
                 prot.formula,
             )
@@ -292,7 +301,7 @@ def generate_fullerene_charge_state(prot: Protonation) -> ChargeState | None:
         attach_atoms = [s for _c, s in attach_bonds]
 
         frag_charge, frag_atom_charges, frag_bond_orders = _charge_capped_fragment(
-            fragment, attach_atoms, adjmat, prot.atnums, prot.formula
+            fragment, attach_atoms, adjacency_matrix, prot.atomic_numbers, prot.formula
         )
         if frag_charge is None:
             return None
@@ -301,12 +310,12 @@ def generate_fullerene_charge_state(prot: Protonation) -> ChargeState | None:
         fragment_bond_orders.update(frag_bond_orders)
 
     rwmol = Chem.RWMol()
-    for atomic_num in prot.atnums:
+    for atomic_num in prot.atomic_numbers:
         rwmol.AddAtom(Chem.Atom(atomic_num))
 
     for i in range(prot.natoms):
         for j in range(i + 1, prot.natoms):
-            if adjmat[i, j] == 0:
+            if adjacency_matrix[i, j] == 0:
                 continue
             pair = frozenset((i, j))
             if pair in fragment_bond_orders:
@@ -368,15 +377,17 @@ def generate_fullerene_dimer_charge_states(
     Return all four ±1 charge combinations; topology cannot choose their signs.
     """
     assert (
-        prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
+        prot.natoms is not None
+        and prot.adjacency_matrix is not None
+        and prot.atomic_numbers is not None
     )
 
-    split = find_fullerene_dimer_split(prot.atnums, prot.adjmat)
+    split = find_fullerene_dimer_split(prot.atomic_numbers, prot.adjacency_matrix)
     if split is None:
         logger.warning("No fullerene dimer split found for %s", prot.formula)
         return None
 
-    adjmat = np.asarray(prot.adjmat)
+    adjacency_matrix = np.asarray(prot.adjacency_matrix)
     bridge_a, bridge_b = split["bridge"]
 
     double_bonds: set[frozenset[int]] = set()
@@ -384,7 +395,7 @@ def generate_fullerene_dimer_charge_states(
 
     for cage_atoms, bridge_atom in zip(split["cages"], (bridge_a, bridge_b)):
         matching_atoms = [i for i in cage_atoms if i != bridge_atom]
-        sub_ac = adjmat[np.ix_(matching_atoms, matching_atoms)]
+        sub_ac = adjacency_matrix[np.ix_(matching_atoms, matching_atoms)]
         local_to_global = dict(enumerate(matching_atoms))
 
         cage_graph = nx.from_numpy_array(sub_ac)
@@ -396,7 +407,7 @@ def generate_fullerene_dimer_charge_states(
         ]
         if len(unmatched_local) != 1:
             logger.warning(
-                "Fullerene dimer specie %s: expected exactly 1 unpaired "
+                "Fullerene dimer species %s: expected exactly 1 unpaired "
                 "atom in cage after excluding the bridge atom, found %d; "
                 "cannot build a Kekule structure",
                 prot.formula,
@@ -410,12 +421,12 @@ def generate_fullerene_dimer_charge_states(
         leftover_atoms.append(local_to_global[unmatched_local[0]])
 
     rwmol = Chem.RWMol()
-    for atomic_num in prot.atnums:
+    for atomic_num in prot.atomic_numbers:
         rwmol.AddAtom(Chem.Atom(atomic_num))
 
     for i in range(prot.natoms):
         for j in range(i + 1, prot.natoms):
-            if adjmat[i, j] == 0:
+            if adjacency_matrix[i, j] == 0:
                 continue
             bond_type = (
                 Chem.BondType.DOUBLE

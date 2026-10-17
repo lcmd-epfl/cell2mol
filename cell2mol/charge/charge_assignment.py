@@ -11,7 +11,7 @@ from cell2mol.charge.special_cases.manual import generate_manual_charge_state
 from cell2mol.charge.molecule_builder import generate_tmc_rdkit_obj_smiles
 
 if TYPE_CHECKING:
-    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.species import Species
     from cell2mol.classes.metal import Metal
 
 logger = logging.getLogger(__name__)
@@ -22,49 +22,51 @@ logger = logging.getLogger(__name__)
 ############################################################
 
 
-def assign_charge_to_specie(specie: "Specie | Metal", final_charge: int):
-    """Apply an already-selected total charge to one specie or metal,
+def assign_charge_to_species(species: "Species | Metal", final_charge: int):
+    """Apply an already-selected total charge to one species or metal,
     rebuilding its per-atom charges and RDKit object.
     """
-    specie_unique_index = getattr(specie, "unique_index", None)
+    species_unique_index = getattr(species, "unique_index", None)
     logger.debug(
         "Target: %s (unique index: %s) | Final Charge: %d",
-        specie.formula,
-        specie_unique_index,
+        species.formula,
+        species_unique_index,
         final_charge,
     )
 
-    if specie.subtype == "metal":
-        metal = cast("Metal", specie)
+    if species.subtype == "metal":
+        metal = cast("Metal", species)
         metal.set_charge(final_charge)
 
         logger.debug(
             "Updated Metal: %s | Formula: %s | Charge: %d",
-            specie_unique_index,
+            species_unique_index,
             metal.formula,
             metal.charge,
         )
-    elif getattr(specie, "is_metal_free_molecule", False) or specie.subtype == "ligand":
-        target = cast("Specie", specie)
+    elif (
+        getattr(species, "is_metal_free_molecule", False) or species.subtype == "ligand"
+    ):
+        target = cast("Species", species)
         target_states = target.plausible_charge_states or []
-        available_charges = [cs.specie_total_charge for cs in target_states]
+        available_charges = [cs.species_total_charge for cs in target_states]
 
         try:
             idx = available_charges.index(final_charge)
             cs = target_states[idx]
 
-            # Use deprotonated specie fields.
+            # Use deprotonated species fields.
             target.charge_state = cs
             target.set_charges(
-                cs.specie_total_charge,
-                cs.specie_atom_charges,
-                cs.specie_smiles,
-                cs.specie_rdkit_obj,
+                cs.species_total_charge,
+                cs.species_atom_charges,
+                cs.species_smiles,
+                cs.species_rdkit_obj,
             )
 
             logger.debug(
                 "Updated State: %s | Formula: %s | Total Charge: %d | SMILES: %s",
-                specie_unique_index,
+                species_unique_index,
                 target.formula,
                 target.totcharge,
                 target.smiles,
@@ -74,7 +76,7 @@ def assign_charge_to_specie(specie: "Specie | Metal", final_charge: int):
             logger.error(
                 "Failed to assign charge %d to %s. Available options were: %s",
                 final_charge,
-                specie.formula,
+                species.formula,
                 available_charges,
             )
 
@@ -120,7 +122,7 @@ def set_charge_state(reference, target, mode: int):
 
 
 def _transfer_state_to_reference_copy(
-    reference: "Specie", target: "Specie", final_charge
+    reference: "Species", target: "Species", final_charge
 ):
     """Transfer by graph isomorphism; rebuild manual species or fall back to target states."""
 
@@ -140,7 +142,7 @@ def _transfer_state_to_reference_copy(
             target.get_plausible_charge_states()
 
         target_states = target.plausible_charge_states or []
-        charge_list = [c.specie_total_charge for c in target_states]
+        charge_list = [c.species_total_charge for c in target_states]
 
         try:
             idx = charge_list.index(final_charge)
@@ -156,19 +158,19 @@ def _transfer_state_to_reference_copy(
 
     target.charge_state = cs
 
-    if final_charge != cs.specie_total_charge:
+    if final_charge != cs.species_total_charge:
         logger.warning(
             "Target %s: Requested charge %d != Selected state charge %d",
             target.formula,
             final_charge,
-            cs.specie_total_charge,
+            cs.species_total_charge,
         )
 
     target.set_charges(
-        cs.specie_total_charge,
-        cs.specie_atom_charges,
-        cs.specie_smiles,
-        cs.specie_rdkit_obj,
+        cs.species_total_charge,
+        cs.species_atom_charges,
+        cs.species_smiles,
+        cs.species_rdkit_obj,
     )
     logger.debug(
         "Mode 1 Applied: %s (Q=%d) %s", target.formula, target.totcharge, target.smiles
@@ -176,13 +178,13 @@ def _transfer_state_to_reference_copy(
 
 
 def _transfer_state_by_connectivity(
-    reference: "Specie", target: "Specie", final_charge
+    reference: "Species", target: "Species", final_charge
 ) -> bool:
     """Transfer the solved RDKit molecule by atom mapping; return False to request fallback."""
     new_order = _connectivity_new_order(reference, target)
     if new_order is None:
         logger.debug(
-            "No graph isomorphism between unique specie %s and its copy; "
+            "No graph isomorphism between unique species %s and its copy; "
             "falling back to the copy's own charge states",
             target.formula,
         )
@@ -214,7 +216,7 @@ def _transfer_state_by_connectivity(
     return True
 
 
-def _transfer_state_to_unit_cell(reference: "Specie", target: "Specie", final_charge):
+def _transfer_state_to_unit_cell(reference: "Species", target: "Species", final_charge):
     """Mode 2: Transfers RDKit object from reference to target, reordering atoms."""
 
     if not target.subtype == "ligand" and not target.is_metal_free_molecule:
@@ -263,39 +265,41 @@ def _transfer_state_to_unit_cell(reference: "Specie", target: "Specie", final_ch
 ############################################################
 
 
-def _connectivity_graph(spec) -> nx.Graph[int]:
+def _connectivity_graph(species) -> nx.Graph[int]:
     """Build an element-labelled connectivity graph without bond orders."""
     graph = nx.Graph()
-    atomic_numbers = [int(z) for z in spec.get_atomic_numbers()]
+    atomic_numbers = [int(z) for z in species.get_atomic_numbers()]
 
-    mconnec = [a.mconnec or 0 for a in spec.atoms or []]
-    if len(mconnec) != len(atomic_numbers):
-        mconnec = [0] * len(atomic_numbers)
+    metal_contact_count = [a.metal_contact_count or 0 for a in species.atoms or []]
+    if len(metal_contact_count) != len(atomic_numbers):
+        metal_contact_count = [0] * len(atomic_numbers)
 
     for i, atomic_num in enumerate(atomic_numbers):
-        graph.add_node(i, element=atomic_num, donor=(atomic_num, mconnec[i]))
+        graph.add_node(
+            i, element=atomic_num, donor=(atomic_num, metal_contact_count[i])
+        )
 
-    adjmat = np.asarray(spec.adjmat)
-    rows, cols = np.nonzero(np.triu(adjmat, k=1))
+    adjacency_matrix = np.asarray(species.adjacency_matrix)
+    rows, cols = np.nonzero(np.triu(adjacency_matrix, k=1))
     graph.add_edges_from(zip(rows.tolist(), cols.tolist()))
     return graph
 
 
-def _connectivity_new_order(ref_spec, target_spec) -> list[int] | None:
+def _connectivity_new_order(ref_species, target_species) -> list[int] | None:
     """Return an atom mapping for RenumberAtoms, preferring aligned metal donors.
 
     Return None if graphs differ; a shared unique_index does not guarantee isomorphism.
     """
     # Return None for unavailable mappings so callers can use target charge states.
-    if getattr(ref_spec, "natoms", None) != getattr(target_spec, "natoms", None):
+    if getattr(ref_species, "natoms", None) != getattr(target_species, "natoms", None):
         return None
     try:
-        ref_graph = _connectivity_graph(ref_spec)
-        target_graph = _connectivity_graph(target_spec)
+        ref_graph = _connectivity_graph(ref_species)
+        target_graph = _connectivity_graph(target_species)
     except (AttributeError, TypeError, ValueError) as exc:
         logger.debug(
             "Cannot build a connectivity graph for %s: %s",
-            getattr(target_spec, "formula", "?"),
+            getattr(target_species, "formula", "?"),
             exc,
         )
         return None
@@ -308,10 +312,10 @@ def _connectivity_new_order(ref_spec, target_spec) -> list[int] | None:
             return None
         logger.debug(
             "No isomorphism of %s aligns metal coordination; matching elements only",
-            target_spec.formula,
+            target_species.formula,
         )
 
-    new_order = [0] * target_spec.natoms
+    new_order = [0] * target_species.natoms
     for ref_idx, target_idx in mapping.items():
         new_order[target_idx] = ref_idx
     return new_order

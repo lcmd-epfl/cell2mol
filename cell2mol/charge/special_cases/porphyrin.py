@@ -15,7 +15,7 @@ from cell2mol.classes.protonation import Protonation
 from cell2mol.connectivity import try_add_ligand_atom
 
 if TYPE_CHECKING:
-    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.species import Species
 
 from ._fragments import _charge_capped_fragment, _collect_substituent_fragment
 
@@ -82,21 +82,20 @@ def porphyrin_reference_protonation_sites(
 
 
 def _generate_porphyrin_protonation_states(
-    specie: Specie,
+    species: Species,
     macrocycles: list[tuple[list[int], bool, list[int]]],
 ) -> list[Protonation]:
     """Generate free-base N-H patterns: trans N4 pairs, 1/3 H for contracted
     rings, or m0 ± 1 for expanded rings. Fall back to the as-is state.
     """
-    asis_state = Protonation.from_positional(
-        labels=specie.labels,
-        coord=specie.coord,
-        cov_factor=specie.cov_factor,
-        n_protons_added=0,
-        site_proton_counts=[0] * len(specie.labels),
-        ligand_donor_electrons=[0] * len(specie.labels),
+    asis_state = Protonation(
+        symbols=species.labels,
+        coord=species.coord,
+        cov_factor=species.cov_factor,
+        site_proton_counts=[0] * len(species.labels),
+        ligand_donor_electrons=[0] * len(species.labels),
         mode="none",
-        parent=specie,
+        parent=species,
     )
 
     # Baseline free-base sites (m0): alternating N-H per ring.
@@ -125,17 +124,17 @@ def _generate_porphyrin_protonation_states(
         return [asis_state]
 
     # Only unsubstituted coordinating ring N can accept a free-base proton.
-    adjmat = np.asarray(specie.adjmat)
-    atoms = specie.atoms or []
+    adjacency_matrix = np.asarray(species.adjacency_matrix)
+    atoms = species.atoms or []
 
     def _can_be_protonated(idx: int) -> bool:
-        neighbours = np.nonzero(adjmat[idx])[0]
-        if (atoms[idx].mconnec or 0) == 0:
+        neighbours = np.nonzero(adjacency_matrix[idx])[0]
+        if (atoms[idx].metal_contact_count or 0) == 0:
             return False
-        if any(specie.labels[j] == "H" for j in neighbours):
+        if any(species.labels[j] == "H" for j in neighbours):
             return False
         # A third heavy neighbour is an exocyclic substituent.
-        return sum(1 for j in neighbours if specie.labels[j] != "H") <= 2
+        return sum(1 for j in neighbours if species.labels[j] != "H") <= 2
 
     base_add = [n for n in base_sites if _can_be_protonated(n)]
     extra_bare = [
@@ -155,27 +154,26 @@ def _generate_porphyrin_protonation_states(
 
     states: list[Protonation] = []
     for sites in site_sets:
-        newlab = list(specie.labels)
-        newcoord = list(specie.coord)
+        newlab = list(species.labels)
+        newcoord = list(species.coord)
         for site in sites:
             _, newlab, newcoord = try_add_ligand_atom(
-                newlab, newcoord, site, specie, element="H", unconditional=True
+                newlab, newcoord, site, species, element="H", unconditional=True
             )
 
-        site_proton_counts = [0] * len(specie.labels)
+        site_proton_counts = [0] * len(species.labels)
         for site in sites:
             site_proton_counts[site] = 1
 
         states.append(
-            Protonation.from_positional(
-                labels=newlab,
+            Protonation(
+                symbols=newlab,
                 coord=np.asarray(newcoord),
-                cov_factor=specie.cov_factor,
-                n_protons_added=len(sites),
+                cov_factor=species.cov_factor,
                 site_proton_counts=site_proton_counts,
                 mode="deterministic",
-                parent=specie,
-                ligand_donor_electrons=[0] * len(specie.labels),
+                parent=species,
+                ligand_donor_electrons=[0] * len(species.labels),
                 origin="porphyrin",
             )
         )
@@ -189,14 +187,18 @@ def _generate_porphyrin_protonation_states(
 
 
 def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
-    """Build a neutral Kekulized free-base core; specie charge is minus added
+    """Build a neutral Kekulized free-base core; species charge is minus added
     protons plus substituent charges. Return None to request general enumeration.
     """
     assert (
-        prot.natoms is not None and prot.adjmat is not None and prot.atnums is not None
+        prot.natoms is not None
+        and prot.adjacency_matrix is not None
+        and prot.atomic_numbers is not None
     )
 
-    macrocycles = find_all_porphyrin_macrocycles(prot.atnums, prot.adjmat)
+    macrocycles = find_all_porphyrin_macrocycles(
+        prot.atomic_numbers, prot.adjacency_matrix
+    )
     if not macrocycles:
         logger.warning("No porphyrin-family macrocycle found for %s", prot.formula)
         return None
@@ -205,14 +207,14 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
     core_sets = [set(core) for _n, _c, core in macrocycles]
     core_atoms = sorted(set().union(*core_sets))
 
-    adjmat = np.asarray(prot.adjmat)
+    adjacency_matrix = np.asarray(prot.adjacency_matrix)
     core_set = set(core_atoms)
     exo_indices = [i for i in range(prot.natoms) if i not in core_set]
 
     def _has_explicit_h(atom_idx: int) -> bool:
         return any(
-            prot.labels[j] == "H" and int(np.count_nonzero(adjmat[j])) == 1
-            for j in np.nonzero(adjmat[atom_idx])[0]
+            prot.symbols[j] == "H" and int(np.count_nonzero(adjacency_matrix[j])) == 1
+            for j in np.nonzero(adjacency_matrix[atom_idx])[0]
         )
 
     # Pyrrolic N-H and imine-type N are both neutral in the free base.
@@ -230,11 +232,11 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
     misplaced = [
         idx
         for idx, n_added in enumerate(prot.site_proton_counts or [])
-        if n_added and prot.atnums[idx] != 7
+        if n_added and prot.atomic_numbers[idx] != 7
     ]
     if misplaced:
         logger.warning(
-            "Porphyrin-family specie %s protonates %d non-nitrogen site(s) %s; "
+            "Porphyrin-family species %s protonates %d non-nitrogen site(s) %s; "
             "its charge is not -(protons added)",
             prot.formula,
             len(misplaced),
@@ -245,7 +247,7 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
     simple_exo = {
         i
         for i in exo_indices
-        if prot.labels[i] == "H" and int(np.count_nonzero(adjmat[i])) == 1
+        if prot.symbols[i] == "H" and int(np.count_nonzero(adjacency_matrix[i])) == 1
     }
     complex_roots = [i for i in exo_indices if i not in simple_exo]
 
@@ -254,15 +256,15 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
     for root in complex_roots:
         if root in visited_complex:
             continue
-        fragment = _collect_substituent_fragment(root, core_atoms, adjmat)
+        fragment = _collect_substituent_fragment(root, core_atoms, adjacency_matrix)
         visited_complex.update(fragment)
 
         attach_bonds = [
-            (c, s) for c in core_atoms for s in fragment if adjmat[c, s] != 0
+            (c, s) for c in core_atoms for s in fragment if adjacency_matrix[c, s] != 0
         ]
         if not attach_bonds:
             logger.warning(
-                "Porphyrin-family specie %s has a substituent fragment with "
+                "Porphyrin-family species %s has a substituent fragment with "
                 "no bond back to the macrocycle; cannot split",
                 prot.formula,
             )
@@ -272,10 +274,10 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
         attach_atoms = [s for _c, s in attach_bonds]
 
         frag_charge, frag_atom_charges, frag_bond_orders = _charge_capped_fragment(
-            fragment, attach_atoms, adjmat, prot.atnums, prot.formula
+            fragment, attach_atoms, adjacency_matrix, prot.atomic_numbers, prot.formula
         )
         logger.debug(
-            "Porphyrin-family specie %s substituent fragment %s has charge %d",
+            "Porphyrin-family species %s substituent fragment %s has charge %d",
             prot.formula,
             fragment,
             frag_charge,
@@ -290,11 +292,12 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
     saturated_core = {
         i
         for i in core_atoms
-        if int(np.count_nonzero(adjmat[i])) >= 4 and prot.labels[i] in ("C", "N")
+        if int(np.count_nonzero(adjacency_matrix[i])) >= 4
+        and prot.symbols[i] in ("C", "N")
     }
     if saturated_core:
         logger.debug(
-            "Porphyrin-family specie %s has %d saturated ring atom(s) %s; "
+            "Porphyrin-family species %s has %d saturated ring atom(s) %s; "
             "bonding them as single rather than aromatic",
             prot.formula,
             len(saturated_core),
@@ -302,12 +305,12 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
         )
 
     rwmol = Chem.RWMol()
-    for atomic_num in prot.atnums:
+    for atomic_num in prot.atomic_numbers:
         rwmol.AddAtom(Chem.Atom(atomic_num))
 
     for i in range(prot.natoms):
         for j in range(i + 1, prot.natoms):
-            if adjmat[i, j] == 0:
+            if adjacency_matrix[i, j] == 0:
                 continue
             pair = frozenset((i, j))
             if pair in fragment_bond_orders:
@@ -379,20 +382,22 @@ def generate_porphyrin_charge_state(prot: Protonation) -> ChargeState | None:
 
 
 def _metal_pocket_macrocycles(
-    specie: Specie,
+    species: Species,
 ) -> list[tuple[list[int], bool, list[int]]]:
     """Build one N4 pseudo-macrocycle per metal; require four unsubstituted N donors each."""
-    molecule = specie.get_parent("molecule")
-    atoms = specie.atoms or []
+    molecule = species.get_parent("molecule")
+    atoms = species.atoms or []
     if molecule is None or not atoms:
         return []
 
-    adjmat = np.asarray(specie.adjmat)
+    adjacency_matrix = np.asarray(species.adjacency_matrix)
     pockets: dict[int, list[int]] = {}
     for idx, atom in enumerate(atoms):
-        for metal_idx in atom.metal_adjacency or []:
+        for metal_idx in atom.metal_contact_indices or []:
             heavy = sum(
-                1 for j in np.nonzero(adjmat[idx])[0] if specie.labels[j] != "H"
+                1
+                for j in np.nonzero(adjacency_matrix[idx])[0]
+                if species.labels[j] != "H"
             )
             if atom.label != "N" or heavy > 2:
                 return []
@@ -404,7 +409,7 @@ def _metal_pocket_macrocycles(
     return [
         (
             _order_pocket_trans(
-                molecule.atoms[metal_idx].coord, nitrogens, specie.coord
+                molecule.atoms[metal_idx].coord, nitrogens, species.coord
             ),
             False,
             sorted(nitrogens),

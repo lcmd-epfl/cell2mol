@@ -5,7 +5,7 @@ from typing import List
 from cell2mol.charge.aromaticity import aromatic_info
 from cell2mol.charge.oxidation_states import METAL_OS_OBSERVED, METAL_OXIDATION_STATES
 from cell2mol.write_results import log_charge_diagnostics
-from cell2mol.charge.charge_assignment import assign_charge_to_specie
+from cell2mol.charge.charge_assignment import assign_charge_to_species
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +76,8 @@ def balance_unitcell_charge(refcell, unitcell):
 
     # Assign unique species now; propagate to copies in refcell.assign_charges().
     final_charges = unique_species_charges[0]
-    for specie, charge in zip(refcell.unique_species, final_charges):
-        assign_charge_to_specie(specie, charge)
+    for species, charge in zip(refcell.unique_species, final_charges):
+        assign_charge_to_species(species, charge)
 
     return refcell, unitcell
 
@@ -99,7 +99,7 @@ def balance_molecule_charge(molset, input_charge: int = 0):
         logger.error("No charge states available for some species.")
         return molset
 
-    unique_indices = [spec.unique_index for spec in molset.species_list]
+    unique_indices = [species.unique_index for species in molset.species_list]
 
     expanded_species_charges, unique_species_charges = resolve_charge_distributions(
         unique_indices, molset.unique_species, input_charge=input_charge
@@ -119,11 +119,11 @@ def balance_molecule_charge(molset, input_charge: int = 0):
 
     final_charges = unique_species_charges[0]
     if molset.unique_species is not None:
-        for specie, charge in zip(molset.unique_species, final_charges):
-            assign_charge_to_specie(specie, charge)
-            for ref_specie in molset.species_list:
-                if specie.unique_index == ref_specie.unique_index:
-                    assign_charge_to_specie(ref_specie, charge)
+        for species, charge in zip(molset.unique_species, final_charges):
+            assign_charge_to_species(species, charge)
+            for ref_species in molset.species_list:
+                if species.unique_index == ref_species.unique_index:
+                    assign_charge_to_species(ref_species, charge)
     return molset
 
 
@@ -146,25 +146,25 @@ def resolve_charge_distributions(
 
     species_charge_options: List[List[int]] = []
 
-    for idx, spec in enumerate(unique_species):
+    for idx, species in enumerate(unique_species):
         options = []
 
-        if spec.subtype == "metal":
-            options = _get_metal_options(spec, rare, predict)
+        if species.subtype == "metal":
+            options = _get_metal_options(species, rare, predict)
         else:
-            options = _get_ligand_options(spec, aromatic)
+            options = _get_ligand_options(species, aromatic)
 
         if not options:
             logger.error(
                 "Unique Species %s (Index %d) has no valid charge options.",
-                spec.formula,
+                species.formula,
                 idx,
             )
             return [], []
 
         species_charge_options.append(options)
 
-    logger.debug("Charge options per unique specie: %s", species_charge_options)
+    logger.debug("Charge options per unique species: %s", species_charge_options)
     logger.debug("Unique indices mapping: %s", unique_indices)
 
     expanded_species_charges = []
@@ -209,35 +209,35 @@ def resolve_charge_distributions(
 ############################################################
 
 
-def _get_metal_options(spec, rare: bool, predict: bool) -> List[int]:
+def _get_metal_options(species, rare: bool, predict: bool) -> List[int]:
     """Determines valid oxidation states for metal species."""
     all_possible_m_ox = [0, 1, 2, 3, 4, 5, 6, 7]
 
     if rare:
-        rare_states = [x for x in all_possible_m_ox if x not in spec.plausible_os]
-        logger.debug("RARE METAL OXIDATION STATES: %s %s", spec.formula, rare_states)
+        rare_states = [x for x in all_possible_m_ox if x not in species.plausible_os]
+        logger.debug("RARE METAL OXIDATION STATES: %s %s", species.formula, rare_states)
         return rare_states
 
-    return list(spec.plausible_os)
+    return list(species.plausible_os)
 
 
-def _get_ligand_options(spec, aromatic: bool) -> List[int]:
+def _get_ligand_options(species, aromatic: bool) -> List[int]:
     """Determines valid charges for ligand species, optionally filtering by aromaticity."""
-    plausible = spec.plausible_charge_states
+    plausible = species.plausible_charge_states
 
     if not plausible:
         return []
 
     if len(plausible) == 1:
-        return [plausible[0].specie_total_charge]
+        return [plausible[0].species_total_charge]
 
     if aromatic:
-        return _filter_by_aromaticity(spec, plausible)
+        return _filter_by_aromaticity(species, plausible)
 
-    return [cs.specie_total_charge for cs in plausible]
+    return [cs.species_total_charge for cs in plausible]
 
 
-def _filter_by_aromaticity(spec, plausible) -> List[int]:
+def _filter_by_aromaticity(species, plausible) -> List[int]:
     """Selects charge states that maximize aromatic atoms, then aromatic rings."""
     aromatic_stats = []
     for cs in plausible:
@@ -250,7 +250,7 @@ def _filter_by_aromaticity(spec, plausible) -> List[int]:
         info = aromatic_info(cs.protonated_rdkit_obj, added_indices)
         aromatic_stats.append(
             {
-                "charge": cs.specie_total_charge,
+                "charge": cs.species_total_charge,
                 "smiles": cs.protonated_smiles,
                 "atoms": info["Aromatic atoms"],
                 "rings": info["Number of aromatic rings"],
@@ -261,8 +261,8 @@ def _filter_by_aromaticity(spec, plausible) -> List[int]:
     atoms_counts = [x["atoms"] for x in aromatic_stats]
     rings_counts = [x["rings"] for x in aromatic_stats]
 
-    logger.debug("  aromatic_counts: %s %s", spec.formula, atoms_counts)
-    logger.debug("  aromatic_ring: %s %s", spec.formula, rings_counts)
+    logger.debug("  aromatic_counts: %s %s", species.formula, atoms_counts)
+    logger.debug("  aromatic_ring: %s %s", species.formula, rings_counts)
 
     if all(count == 0 for count in atoms_counts):
         return [x["charge"] for x in aromatic_stats]
@@ -303,14 +303,14 @@ def _preferred_distributions(
         occurrences[u_idx] = occurrences.get(u_idx, 0) + 1
 
     metal_indices = [
-        idx for idx, spec in enumerate(unique_species) if spec.subtype == "metal"
+        idx for idx, species in enumerate(unique_species) if species.subtype == "metal"
     ]
 
     def separated_charge(distribution: List[int]) -> int:
         return sum(
             abs(charge) * occurrences.get(idx, 0)
-            for idx, (charge, spec) in enumerate(zip(distribution, unique_species))
-            if spec.subtype != "metal"
+            for idx, (charge, species) in enumerate(zip(distribution, unique_species))
+            if species.subtype != "metal"
         )
 
     histograms = {
@@ -365,23 +365,23 @@ def _preferred_distributions(
 def _infer_metal_charge_from_fixed_ligands(
     unique_indices, unique_species, input_charge: int = 0
 ) -> List[int] | None:
-    """Infer one metal specie charge from ligand combinations and observed states.
+    """Infer one metal species charge from ligand combinations and observed states.
 
     Accept a unique solution or a decisive frequency winner. Return charges in
     unique_species order, or None for ambiguity or multiple metal species.
     """
     metal_unique_indices: set[int] = set()
     non_metal_options: List[tuple[int, List[int]]] = []
-    for idx, spec in enumerate(unique_species):
-        if spec.subtype == "metal":
+    for idx, species in enumerate(unique_species):
+        if species.subtype == "metal":
             metal_unique_indices.add(idx)
         else:
-            options = sorted(set(_get_ligand_options(spec, aromatic=False)))
+            options = sorted(set(_get_ligand_options(species, aromatic=False)))
             if not options:
                 logger.debug(
-                    "Cannot infer metal charge: non-metal specie %s (index %d) "
+                    "Cannot infer metal charge: non-metal species %s (index %d) "
                     "has no charge options.",
-                    spec.formula,
+                    species.formula,
                     idx,
                 )
                 return None
@@ -405,7 +405,7 @@ def _infer_metal_charge_from_fixed_ligands(
         )
         return None
 
-    # How many times each unique specie occurs in the cell.
+    # How many times each unique species occurs in the cell.
     occurrences = {idx: 0 for idx, _ in non_metal_options}
     metal_occurrences = 0
     for u_idx in unique_indices:

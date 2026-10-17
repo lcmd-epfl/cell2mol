@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import networkx as nx
 
 if TYPE_CHECKING:
-    from cell2mol.classes.specie import Specie
+    from cell2mol.classes.species import Species
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 def _find_charged_moiety(
-    spec: Specie,
+    species: Species,
 ) -> list[tuple[int, list[int], str, int]]:
     """Find net-charged oxo groups and cationic N, ignoring metal coordination.
 
-    Return (centre index, atom indices, kind, net charge) in specie atom order.
+    Return (centre index, atom indices, kind, net charge) in species atom order.
     """
-    atoms = spec.atoms or []
-    parent_molecule = spec.get_parent("molecule")
+    atoms = species.atoms or []
+    parent_molecule = species.get_parent("molecule")
     neighbor_source = (
         parent_molecule.atoms
         if parent_molecule is not None and parent_molecule.atoms is not None
@@ -42,7 +42,7 @@ def _find_charged_moiety(
 
         # Non-metal neighbours only (adjacency minus the metal subset).
         nonmetal_neighbor_idxs = [
-            j for j in atom.adjacency if j not in atom.metal_adjacency
+            j for j in atom.neighbor_indices if j not in atom.metal_contact_indices
         ]
         n_nonmetal = len(nonmetal_neighbor_idxs)
         n_oxygen = 0
@@ -52,9 +52,11 @@ def _find_charged_moiety(
             if neighbor.label != "O":
                 continue
             n_oxygen += 1
-            # Terminal O: the centre is its only non-metal neighbour (connec == 1).
+            # Terminal O: the centre is its only non-metal neighbour (neighbor_count == 1).
             neighbor_nonmetal_neighbor_idxs = [
-                j for j in neighbor.adjacency if j not in neighbor.metal_adjacency
+                j
+                for j in neighbor.neighbor_indices
+                if j not in neighbor.metal_contact_indices
             ]
 
             if len(neighbor_nonmetal_neighbor_idxs) == 1:
@@ -91,11 +93,13 @@ def _find_cationic_nitrogen(
     cations: list[tuple[int, list[int], str, int]] = []
     for i, atom in enumerate(atoms):
         # A cation has no lone pair to donate, so it is never a metal donor.
-        if atom.label != "N" or atom.metal_adjacency:
+        if atom.label != "N" or atom.metal_contact_indices:
             continue
 
         neighbors = [
-            neighbor_source[j] for j in atom.adjacency if j not in atom.metal_adjacency
+            neighbor_source[j]
+            for j in atom.neighbor_indices
+            if j not in atom.metal_contact_indices
         ]
         # Terminal O -> N-oxide / nitro / azide: obligate pair, counted elsewhere.
         if any(n.label == "O" and _nonmetal_connectivity(n) == 1 for n in neighbors):
@@ -171,15 +175,17 @@ def _amidinium_rings(
                 continue
             nitrogens = [j for j in ring if atoms[j].label == "N"]
             # A cation has no lone pair to donate, so it is never a metal donor.
-            if len(nitrogens) != 2 or any(atoms[j].metal_adjacency for j in nitrogens):
+            if len(nitrogens) != 2 or any(
+                atoms[j].metal_contact_indices for j in nitrogens
+            ):
                 continue
             # Terminal O/S on the ring -> cyclic urea or thiourea, neutral.
             if any(
                 neighbor_source[k].label in ("O", "S")
                 and _nonmetal_connectivity(neighbor_source[k]) == 1
                 for j in ring
-                for k in atoms[j].adjacency
-                if k not in atoms[j].metal_adjacency
+                for k in atoms[j].neighbor_indices
+                if k not in atoms[j].metal_contact_indices
             ):
                 continue
             cations.append((nitrogens[0], nitrogens, "amidinium-N", 1))
@@ -193,8 +199,8 @@ def _rings_by_atom(
     graph = nx.Graph()
     graph.add_nodes_from(range(len(atoms)))
     for i, atom in enumerate(atoms):
-        for j in atom.adjacency:
-            if j in atom.metal_adjacency:
+        for j in atom.neighbor_indices:
+            if j in atom.metal_contact_indices:
                 continue
             local_j = local_idx_by_id.get(id(neighbor_source[j]))
             if local_j is None or local_j == i:
@@ -210,4 +216,6 @@ def _rings_by_atom(
 
 def _nonmetal_connectivity(atom) -> int:
     """Sigma bonds to non-metals, the count every rule here is keyed on."""
-    return len([j for j in atom.adjacency if j not in atom.metal_adjacency])
+    return len(
+        [j for j in atom.neighbor_indices if j not in atom.metal_contact_indices]
+    )

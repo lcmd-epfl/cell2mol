@@ -60,8 +60,10 @@ def generate_valid_charge_states(
 ):
     valid_charge_states_dict = {charge: [] for charge in candidate_charges}
 
-    if not _specie_supported_by_rddeterminebonds(
-        prot.atnums, prot.adjmat, atom_site_labels=prot.atom_site_labels
+    if not _species_supported_by_rddeterminebonds(
+        prot.atomic_numbers,
+        prot.adjacency_matrix,
+        atom_site_labels=prot.atom_site_labels,
     ):
         # Unsupported elements go directly to modified AC2mol.
         logger.debug(
@@ -147,9 +149,9 @@ def determine_bond_using_rdDetermineBonds(
     for charge in candidate_charges:
         try:
             rdkit_obj = generate_rdkit_mol_from_rdDetermineBonds(
-                atoms=prot.atnums,
+                atoms=prot.atomic_numbers,
                 coords=prot.coord,
-                AC=prot.adjmat,
+                AC=prot.adjacency_matrix,
                 charge=charge,
                 sanitize=True,
                 allow_charged_fragments=allow_charged_fragments,
@@ -197,8 +199,8 @@ def determine_bond_using_modified_AC2mol(
 ):
     for charge in candidate_charges:
         rdkit_obj = generate_rdkit_mol_from_AC2mol(
-            atoms=prot.atnums,
-            AC=prot.adjmat,
+            atoms=prot.atomic_numbers,
+            AC=prot.adjacency_matrix,
             charge=charge,
             allow_charged_fragments=allow_charged_fragments,
             diagnostics=diagnostics,
@@ -362,7 +364,7 @@ def generate_rdkit_mol_from_AC2mol(
 ############################################################
 
 
-def _specie_supported_by_rddeterminebonds(
+def _species_supported_by_rddeterminebonds(
     atoms: list[int],
     ac,  # adjacency matrix
     atomic_valence: dict[int, list[int]] = rdkit_atomic_valence,
@@ -372,7 +374,7 @@ def _specie_supported_by_rddeterminebonds(
     ac = np.asarray(ac)
     n_atoms = len(atoms)
     if n_atoms == 1:
-        logger.debug("Single atom specie - skipping rddeterminebonds")
+        logger.debug("Single atom species - skipping rddeterminebonds")
         return False
     for i in range(n_atoms):
         atom_num = atoms[i]
