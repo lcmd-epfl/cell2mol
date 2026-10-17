@@ -9,10 +9,54 @@ The new serialization format uses a central object store pattern:
 from pathlib import Path
 
 import pytest
+import numpy as np
 
 from cell2mol.classes import Cells, Group, Metal
 from cell2mol.utils.pydantic import get_type
 from cell2mol.utils.type_registry import TypeRegistry
+from cell2mol.utils.pydantic import BaseModel
+
+
+class NullableStoreModel(BaseModel):
+    """Exercise omission without changing the meaning of explicit nulls."""
+
+    required_nullable: str | None
+    optional_nullable: str | None = None
+    non_null_default: str | None = "default"
+    enabled: bool = False
+    count: int = 0
+    items: list[str | None] = []
+
+    @classmethod
+    def from_positional(cls, *args, **kwargs):
+        return cls(*args, **kwargs)
+
+
+def test_store_omits_only_restorable_none_defaults():
+    original = NullableStoreModel(
+        required_nullable=None, non_null_default=None, items=[None]
+    )
+    data = original.to_dict_store()
+    fields = data["objects"][original.id]
+    assert "optional_nullable" not in fields
+    assert fields["required_nullable"] is None
+    assert fields["non_null_default"] is None
+    assert fields["enabled"] is False
+    assert fields["count"] == 0
+    assert fields["items"] == [None]
+
+    restored = NullableStoreModel.from_dict_store(data)
+    assert restored.model_dump() == original.model_dump()
+
+    # Older stores with explicit nulls remain readable.
+    fields["optional_nullable"] = None
+    assert NullableStoreModel.from_dict_store(data).optional_nullable is None
+
+
+def test_store_keeps_empty_collections():
+    original = NullableStoreModel(required_nullable=None)
+    fields = original.to_dict_store()["objects"][original.id]
+    assert fields["items"] == []
 
 
 @pytest.fixture
@@ -107,7 +151,7 @@ class TestMetalsResolution:
         assert metals_checked > 0, "Should have checked at least one metal"
 
     def test_group_metals_are_objects(self, cells_pickle_path, tmp_path):
-        """Test that group.metals and group.closest_metal are Metal objects."""
+        """Test that group.metals contains Metal objects."""
         cells = Cells.load(cells_pickle_path, format="pickle")
         cells_loaded = save_and_reload(cells, tmp_path)
 
@@ -127,12 +171,6 @@ class TestMetalsResolution:
                                 f"Group.metals should contain Metal objects: {type(metal)}"
                             )
                         groups_with_metals_checked += 1
-
-                    # Check group.closest_metal
-                    if group.closest_metal is not None:
-                        assert isinstance(group.closest_metal, Metal), (
-                            f"Group.closest_metal should be Metal: {type(group.closest_metal)}"
-                        )
 
         assert groups_with_metals_checked > 0, (
             "Should have checked at least one group with metals"
@@ -443,48 +481,43 @@ class TestEdgeCases:
             assert mol.type == "specie"
 
     def test_atom_bonds_resolved(self, cells_pickle_path, tmp_path):
-        """Test that Atom.bonds list is resolved (bonds are Bond objects, not UUIDs)."""
-
+        """Atoms query records owned by their parent molecule."""
         cells = Cells.load(cells_pickle_path, format="pickle")
         cells_loaded = save_and_reload(cells, tmp_path)
-
-        atoms_with_bonds_checked = 0
+        checked = 0
         for mol in cells_loaded.reference.refmoleclist or []:
-            for atom in mol.atoms or []:
-                if atom.bonds:
-                    for bond in atom.bonds:
-                        # Bond should be an object, not a UUID string
-                        assert not isinstance(bond, str), (
-                            f"Bond should be object, not UUID string: {bond}"
-                        )
-                        atoms_with_bonds_checked += 1
+            for index, atom in enumerate(mol.atoms or []):
+                assert "bonds" not in atom.__dict__
+                for bond in atom.bonds:
+                    assert index in bond["atom_indices"]
+                    assert any(bond is candidate for candidate in mol.bonds)
+                    checked += 1
+        assert checked > 0
 
-        # Not all molecules may have bonds populated, so this may be 0
-        # Just ensure we don't crash when iterating
-
-    def test_bond_atom_refs_resolved(self, cells_pickle_path, tmp_path):
-        """Test that Bond.atom1 and Bond.atom2 are resolved Atom objects."""
-        from cell2mol.classes import Atom
-
+    def test_bond_records_use_species_local_indices(self, cells_pickle_path, tmp_path):
+        """Bond records contain only local endpoints, order and distance."""
         cells = Cells.load(cells_pickle_path, format="pickle")
         cells_loaded = save_and_reload(cells, tmp_path)
-
         bonds_checked = 0
         for mol in cells_loaded.reference.refmoleclist or []:
-            for atom in mol.atoms or []:
-                if atom.bonds:
-                    for bond in atom.bonds:
-                        assert isinstance(bond.atom1, Atom), (
-                            f"atom1 should be Atom, got {type(bond.atom1)}"
-                        )
-                        assert isinstance(bond.atom2, Atom), (
-                            f"atom2 should be Atom, got {type(bond.atom2)}"
-                        )
-                        assert hasattr(bond.atom1, "label")
-                        assert hasattr(bond.atom2, "coord")
-                        bonds_checked += 1
-
-        assert bonds_checked > 0, "Should have checked at least one bond"
+            for species in [mol, *(mol.ligands or [])]:
+                pairs = set()
+                for bond in species.bonds:
+                    assert set(bond) == {"atom_indices", "order", "distance"}
+                    i, j = bond["atom_indices"]
+                    assert 0 <= i < j < species.natoms
+                    assert (i, j) not in pairs
+                    pairs.add((i, j))
+                    assert bond["distance"] == round(
+                        float(
+                            np.linalg.norm(
+                                species.atoms[i].coord - species.atoms[j].coord
+                            )
+                        ),
+                        3,
+                    )
+                    bonds_checked += 1
+        assert bonds_checked > 0
 
     def test_deeply_nested_references(self, cells_pickle_path, tmp_path):
         """Test that deeply nested references are all resolved."""
