@@ -80,13 +80,15 @@ def prefilter_cif(cif_file_path):
 
     if any([radical, disorder, notfound_atom, polymeric]):
         if radical:
-            messages.append("Radical found in .cif file.")
+            messages.append("Radical structures are currently not supported.")
         if disorder:
-            messages.append("Disorder found in .cif file.")
+            messages.append("Disordered structures are currently not supported.")
         if notfound_atom:
-            messages.append("No fractional coordinates found in .cif file.")
+            messages.append(
+                "Input cannot be processed: fractional coordinates are missing."
+            )
         if polymeric:
-            messages.append("Polymeric structure found in .cif file.")
+            messages.append("Polymeric structures are currently not supported.")
         return False, "\n".join(messages)
     else:
         return True, ""

@@ -10,6 +10,10 @@ from cell2mol.utils.limits import ProcessingTimeoutError
 logger = logging.getLogger(__name__)
 
 
+class UnsupportedInput(Exception):
+    """Input rejected before processing because it is not supported."""
+
+
 class ProcessingError(Exception):
     """Processing failure with an exit code and any available partial result."""
 
@@ -23,6 +27,8 @@ def exception_exit_code(exc):
     """Classify input, ASE, memory, timeout, and other processing failures."""
     if isinstance(exc, ProcessingError):
         return exc.exit_code
+    if isinstance(exc, UnsupportedInput):
+        return config.ERR_INPUT
     if isinstance(exc, MemoryError):
         return config.ERR_MEMORY
     if isinstance(exc, ProcessingTimeoutError):

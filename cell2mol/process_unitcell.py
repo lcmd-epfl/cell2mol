@@ -25,6 +25,7 @@ from cell2mol.compare import compare_metal_oxidation_states, compare_total_charg
 import sys
 from cell2mol.utils.processing import (
     ProcessingError,
+    UnsupportedInput,
     read_structure,
     raise_processing_error,
     save_partial_results,
@@ -103,6 +104,8 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
                 logger.debug(" - Reference error case: %s", refcell.error_cases)
                 logger.debug(" - Unit cell error case: %s", unitcell.error_cases)
 
+    except UnsupportedInput:
+        raise
     except Exception as exc:
         if isinstance(exc, ProcessingError) and refcell is None:
             refcell = exc.result

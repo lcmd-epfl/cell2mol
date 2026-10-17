@@ -35,7 +35,7 @@ from cell2mol.connectivity import has_adjacency_mismatch
 from cell2mol.utils.limits import set_time_limit
 import sys
 from cell2mol.utils.processing import (
-    ProcessingError,
+    UnsupportedInput,
     read_structure,
     raise_processing_error,
     save_partial_results,
@@ -63,9 +63,9 @@ def interpret_reference(input_path, name, current_dir):
             for err_msg in error_message.splitlines():
                 logger.info(err_msg)
             write_input_error_log(
-                f"CIF file is not suitable for processing\n{error_message}"
+                f"Input is not supported by cell2mol\n{error_message}"
             )
-            raise ProcessingError(error_message, config.ERR_INPUT)
+            raise UnsupportedInput(error_message)
         # Enforce timeout on the heavy lifting
         with set_time_limit(config.TIMEOUT):
             structure = read_structure(read, input_path, "cif")
@@ -106,6 +106,8 @@ def interpret_reference(input_path, name, current_dir):
                     (refcell.error_cases or {}).get("plausible_charges"),
                 )
 
+    except UnsupportedInput:
+        raise
     except Exception as exc:
         if isinstance(exc, MemoryError):
             structure = None
