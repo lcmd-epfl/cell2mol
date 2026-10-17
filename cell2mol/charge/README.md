@@ -39,8 +39,7 @@ Donor protonation patterns
 
 - **System charge:** `balance_unitcell_charge` targets 0;
   `balance_molecule_charge` targets the user-supplied `input_charge` for XYZ input.
-- **Protonated frame:** specie charge = protonated charge − added proton count
-  + ligand donor electrons.
+- **Protonated frame:** species charge = protonated charge − added proton count + ligand donor electrons.
 - **Repair and validate candidate structures:** correct artificial charge
   separation and associated bond orders, then check chemical validity.
 - **Rank within a charge:** choose one representative structure for each charge

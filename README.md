@@ -6,79 +6,90 @@ cell2mol: Unit Cell to Molecule Interpretation
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/lcmd-epfl/cell2mol/dev?labpath=App.ipynb)
 
 ## Contents
-* [About](#about-)
-* [Install](#install-)
-* [Examples](#examples-)
-* [Errors](#errors-)
 
-## About [↑](#about)
+* [About](#about)
+* [Install](#install)
+* [Examples](#examples)
+* [Documentation](#documentation)
 
-Program that interprets .cif files of molecular crystals and retrieves structural, connectivity and charge information of all molecules present in the unit cell. This includes (but is not limited to):
+## About
 
-- Atomic coordinates, labels
-- Total molecular charge, and formal atomic charges, including metal oxidation states
-- Connectivity network as defined by either the adjacency matrix or the bond-order matrix
+cell2mol converts atomic coordinates into molecular structures with assigned
+connectivity, bond orders, formal charges, and metal oxidation states. It
+supports molecular crystals supplied as CIF files and individual molecules or
+collections of molecules supplied as XYZ files.
 
-The program generates a so-called "cell" object, with hierarchical information on the unit cell. "Cells" have "Molecules". Molecules that hold a transition metal are considered a "Complex". Complexes are made of "Ligands" and "Metals". "Ligands" are made of "Groups" of connected "Atoms".
+For CIF input, cell2mol builds reference molecules from the listed atom sites
+and can reconstruct molecules in the unit cell. Metal complexes are separated
+into metal atoms and ligands, with coordinating donor groups identified within
+each ligand. Coordination analysis describes how ligands bind to each metal,
+including denticity, hapticity, and bridging between metals, and characterizes
+metal coordination geometries.
 
-"Complexes", "Ligands", "Metals" and "Groups" host the information of their constituent "Atoms". That way, cell2mol provides a very in-depth interpretation of unit cells, which can be particularly useful to generate controlled databases for Quantum Chemistry and Machine Learning applications.
+Charge assignment generates candidate structures for ligands and metal-free
+molecules, assigns bond orders and atom-level formal charges, and checks their
+chemical validity. Certain chemical moieties require careful treatment when assigning bond
+orders and formal charges. Candidate species charges and metal oxidation
+states are then combined to satisfy the system charge: a neutral unit cell for
+CIF processing or a user-supplied total charge for XYZ input.
 
-The code runs on pure python with minimal dependencies:
-- `numpy`
-- `scipy`
-- `pandas`
-- `networkx`
-- `RDkit`
+Results retain the relationships between cells, molecules, ligands, donor groups,
+and atoms, together with coordinates, molecular representations, and processing
+flags. These structured models can be saved and loaded for further analysis,
+quantum chemistry calculations, and machine learning workflows. See the
+[documentation guides](#documentation) for the data models and charge-assignment
+workflow.
 
-For portability, we provide an exemplary conda environment in `environment.yml` which can be used to construct a conda environment with all necessary dependencies by running:
+## Install
 
-`conda env create -f environment.yml`
+PyPI publication is planned. For now, clone the repository and install with pip:
 
-Afterwards, the created environment can be activated and the following steps should proceed smoothly. We also provide a `requirements.txt` file that should streamline virtual environment creation with pip, if desired.
-
-## Install [↑](#install)
-
-Download and add c2m_driver.py to your path. No strings attached. Run as:
-
-```python
-python c2m_driver.py [-h] -i FILENAME [-s STEP]
+```bash
+git clone https://github.com/lcmd-epfl/cell2mol.git
+cd cell2mol
+pip install .
 ```
 
-You can also execute:
+Alternatively, use uv from the repository root:
 
-```python
-python setup.py install
+```bash
+uv sync
+uv run python -m cell2mol --help
 ```
 
-to install cell2mol as a python module. Afterwards, you can call cell2mol as:
+## Examples
 
-```python
-python -m cell2mol [-h] -i FILENAME [-s STEP]
+Interpret molecules built from atom sites listed in a CIF:
+
+```bash
+python -m cell2mol -i structure.cif -t reference
 ```
 
-which is the recommended way. Options can be consulted using the `-h` flag in either case.
+Reconstruct and interpret the full unit cell:
 
-## Examples [↑](#examples)
-
-The test/infodata subdirectory contains a copious amount of tests which double as examples. Any of the .cif files can be run as:
-
-```python
-python -m cell2mol -i [FILENAME]
+```bash
+python -m cell2mol -i structure.cif -t unitcell
 ```
 
-An output file will be created locally. Additionally, a .gmol file containing the analyzed unit cell will be written by cell2mol. The cell object contains all the information following the class specifications, and can be loaded using the pickle library for further usage.
+Interpret an XYZ input with a supplied total charge:
 
-As a reference, cell2mol characterizes the crystal structure of "YOXKUS" (available in the test/infodata directory) as follows: YOXKUS has 4 Re complexes and no counterion or solvent molecules. Each complex has 3 types of ligands. The first ligand bears a -1 charge, and is connected to the Re ion through two groups of atoms. The first group consists of a substituted Cp ring with η5 hapticity, and the other is the P atom of a diphenylphosphine, with κ1 denticity. The second ligand is an iodine atom with -1 charge, and appears twice. The third is a neutral CO ligand, with a -1 and a +1 formal charge in the C and O atoms, respectively, and a triple bond between them.
+```bash
+python -m cell2mol -i molecules.xyz -t molecule --charge 0
+```
 
-A flowchart of the entire process is given below:
+For an XYZ input containing multiple molecules, `--charge` is the total charge of all molecules in the input. In a uv project, use `uv run python -m cell2mol` with the same arguments.
 
-![Flowchart of cell2mol](./images/Flowchart_cell2mol.png)
+Show available options:
 
-## Known errors [↑](#errors)
+```bash
+python -m cell2mol --help
+```
 
-Few chemical patterns tend to be poorly interpreted by cell2mol, because of inconsistencies in either cell2mol itself, or in xyz2mol.
+Processing writes JSON models and legacy pickle files, depending on the workflow.
 
-cell2mol determines the bond order between atoms based on their connectivity, typical atomic valence electrons of the atoms involved, and the most plausible total charge of the molecule. cell2mol is inevitably incorrect if there is an extra electron or radical chemical species. Other known ligands with wrong interpretations are the triiodide (I<sub>3</sub><sup>-</sup>), and azide (N<sub>3</sub><sup>-</sup>) ions. Future development of cell2mol will aim a fixing those errors. If users identify other common misinterpretations, please contact the authors.
+## Documentation
 
-
----
+| Guide | Covers |
+| --- | --- |
+| [Class structure](cell2mol/classes/README.md) | Model inheritance, object relationships, file roles, parent links, and saving/loading results |
+| [Charge assignment](cell2mol/charge/README.md) | Candidate generation, bond orders, chemical-family rules, charge balancing, and module roles |
