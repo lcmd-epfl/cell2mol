@@ -53,8 +53,11 @@ can be saved to and loaded from files.
 
 ## Object relationships
 
+**Structure and coordination**
+
 ```mermaid
-flowchart TD
+%%{init: {"flowchart": {"nodeSpacing": 20, "rankSpacing": 35, "curve": "rounded"}}}%%
+flowchart LR
     Cells -->|reference| Reference
     Cells -->|unitcell| UnitCell
     Reference -->|refmoleclist| Molecule
@@ -63,19 +66,45 @@ flowchart TD
     Molecule -->|ligands| Ligand
     Molecule -->|metals| Metal
     Molecule -->|atoms| Atom
-    Ligand -->|groups: coordinating donor groups| Group
+    Ligand -->|groups| Group
     Ligand -->|atoms| Atom
     Group -->|atoms| Atom
     Metal -.->|groups| Group
     Ligand -.->|metals| Metal
     Group -.->|metals| Metal
-    Species -->|atoms: inherited from AtomSet| Atom
-    Species -->|bonds: inline records| BondRecord
+
+    classDef container fill:#e8efff,stroke:#6483bd,color:#172b4d
+    classDef fragment fill:#e8f5ef,stroke:#639b80,color:#183c2c
+    classDef atom fill:#fff3df,stroke:#bb9455,color:#503716
+    class Cells,Reference,UnitCell,MoleculeSet container
+    class Molecule,Ligand,Group fragment
+    class Atom,Metal atom
+```
+
+**Data shared by molecules and ligands**
+
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 20, "rankSpacing": 35, "curve": "rounded"}}}%%
+flowchart LR
+    Species["Species<br/>(Molecule / Ligand)"] -->|atoms| Atom
+    Species -->|bonds| BondRecord
     Species -->|protonation_states| Protonation
-    Species -->|charge_state / plausible_charge_states| ChargeState
+    Species -->|charge_state¹| ChargeState
     ChargeState -->|protonation| Protonation
     Protonation -.->|parent| Species
+
+    classDef species fill:#e8f5ef,stroke:#639b80,color:#183c2c
+    classDef data fill:#f0ecff,stroke:#9580bf,color:#35254f
+    classDef atom fill:#fff3df,stroke:#bb9455,color:#503716
+    class Species species
+    class BondRecord,Protonation,ChargeState data
+    class Atom atom
 ```
+
+¹ `plausible_charge_states` lists the candidate `ChargeState` objects generated
+for a ligand or metal-free molecule. `charge_state` stores the assigned
+`ChargeState`, including its total charge, atom formal charges, and molecular
+representation.
 
 Read each arrow as “this object has a link to that object.” Solid arrows show
 stored objects or lists; dashed arrows show coordination links or a link back

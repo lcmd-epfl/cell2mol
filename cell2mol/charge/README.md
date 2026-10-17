@@ -15,7 +15,7 @@ Donor protonation patterns
   → Candidate charges / chemical-family builders
   → Bond orders → repair → validation
   → Select one structure per charge → prune artifacts
-  → Balance charges → apply structures to symmetry copies
+  → Balance charges → transfer charge states across species and symmetry copies
 ```
 
 ## Modules
