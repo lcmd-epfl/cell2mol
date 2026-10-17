@@ -210,6 +210,15 @@ class BaseModel(pydantic.BaseModel, metaclass=ABCMeta):
                 # won't have it set. Fall back to the field's own declared
                 # default rather than crashing serialization.
                 value = field_info.get_default(call_default_factory=True)
+            # Only omit values that the loader can restore to the same None
+            # default. Required nullable fields and non-None defaults must stay.
+            if (
+                value is None
+                and not field_info.is_required()
+                and field_info.default is None
+                and field_info.default_factory is None
+            ):
+                continue
             data[field_name] = _serialize_value(value, context)
 
         store.set(self.id, data)
@@ -226,7 +235,12 @@ class BaseModel(pydantic.BaseModel, metaclass=ABCMeta):
 
         All BaseModel references are replaced with UUID strings.
         Each object appears exactly once in the store.
+        Optional fields with a None default are omitted when unset; loading
+        restores their defaults. Required fields and other values are retained.
         """
+        from cell2mol.utils.bond_records import upgrade_pickle_bonds
+
+        upgrade_pickle_bonds(self)
         store = ObjectStore()
 
         # Use model_dump with store context
@@ -244,11 +258,16 @@ class BaseModel(pydantic.BaseModel, metaclass=ABCMeta):
         """Serialize to JSON string with central object store."""
         # if separators is not None:
         #     return json.dumps(self.to_dict_store(), separators=separators)
-        return json.dumps(self.to_dict_store(), indent=indent)
+        return json.dumps(self.to_dict_store(), indent=indent, separators=separators)
 
     # =========================================================================
     # Deserialization with Two-Pass Reference Resolution
     # =========================================================================
+
+    @classmethod
+    def _migrate_serialized_data(cls, data: Any) -> Any:
+        """Normalize legacy inputs before constructing an object graph node."""
+        return data
 
     @classmethod
     def from_dict_store(cls, data: dict[str, Any]) -> Self:
@@ -305,6 +324,9 @@ class BaseModel(pydantic.BaseModel, metaclass=ABCMeta):
             if hasattr(obj, "model_post_init"):
                 obj.model_post_init(None)
 
+        from cell2mol.utils.bond_records import upgrade_store_bonds
+
+        upgrade_store_bonds(store, registry)
         root = registry.get(root_id)
         if root is None:
             raise ValueError(f"Root object '{root_id}' not found in store")
@@ -333,13 +355,26 @@ def _construct_without_post_init(
 
     This replicates the logic of model_construct but skips the post_init call.
     """
+    data = cls._migrate_serialized_data(data)
     obj = cls.__new__(cls)
     fields_set: set[str] = set()
     fields_values: dict[str, Any] = {}
 
     for name, field in cls.model_fields.items():
-        if name in data:
-            value = data[name]
+        input_name = name
+        if name not in data and isinstance(
+            field.validation_alias, pydantic.AliasChoices
+        ):
+            input_name = next(
+                (
+                    alias
+                    for alias in field.validation_alias.choices
+                    if isinstance(alias, str) and alias in data
+                ),
+                name,
+            )
+        if input_name in data:
+            value = data[input_name]
             # Convert values to expected types (NDArray, RDKit Mol, etc.)
             value = _convert_field_value(value, field)
             fields_values[name] = value

@@ -26,9 +26,9 @@ class TypeRegistry:
             cls._instance = cls()
         return cls._instance
 
-    def register(self, type_cls: type[BaseModel]) -> None:
+    def register(self, type_cls: type[BaseModel], *, name: str | None = None) -> None:
         """Register a class by its name."""
-        self._types[type_cls.__name__] = type_cls
+        self._types[name or type_cls.__name__] = type_cls
 
     def get(self, name: str) -> type[BaseModel]:
         """Get a class by name. Raises ValueError if not found."""

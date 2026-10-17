@@ -36,7 +36,9 @@ class ModelFileMixin:
     def _save_as_json(self, path: str | Path) -> None:
         if not str(path).endswith(".json"):
             logger.warning("Use `.json` extension instead for path: %s", path)
-        Path(path).write_text(self.to_json(indent=4), encoding="utf-8")
+        Path(path).write_text(
+            self.to_json(indent=1, separators=(",", ":")), encoding="utf-8"
+        )
 
     @classmethod
     def _load_from_json(cls, path: str | Path) -> Self:
@@ -44,6 +46,9 @@ class ModelFileMixin:
 
     @deprecated("Use json format instead")
     def _save_as_pickle(self, path: str | Path) -> None:
+        from cell2mol.utils.bond_records import upgrade_pickle_bonds
+
+        upgrade_pickle_bonds(self)
         logger.warning("Use json format instead")
         with open(path, "wb") as handle:
             pickle.dump(self, handle)
@@ -51,5 +56,9 @@ class ModelFileMixin:
     @classmethod
     @deprecated("Use json format instead")
     def _load_from_pickle(cls, path: str | Path) -> Any:
+        from cell2mol.utils.bond_records import upgrade_pickle_bonds
+
         with open(path, "rb") as handle:
-            return pickle.load(handle)
+            obj = pickle.load(handle)
+        upgrade_pickle_bonds(obj)
+        return obj
