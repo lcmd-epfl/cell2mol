@@ -30,3 +30,12 @@ ENV/
 env.bak/
 venv.bak/
 .conda/
+
+# Local charge implementation notes
+/cell2mol/charge/README.local.md
+
+# Local class documentation backup
+/cell2mol/classes/README.local.md
+
+# Local charge rebalancing script
+/utils/rebalance_charges.py

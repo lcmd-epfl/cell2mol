@@ -1,1 +1,0 @@
-refcode	metal	charge_cell2mol	charge_BVS	dictionary	unique_indices
