@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import logging
+import signal
+import threading
+import time
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, cast
 
 import networkx as nx
@@ -15,6 +19,47 @@ if TYPE_CHECKING:
     from cell2mol.classes.metal import Metal
 
 logger = logging.getLogger(__name__)
+
+_CONNECTIVITY_TRANSFER_TIMEOUT = 30.0  # seconds
+
+
+class _ConnectivityTransferTimeout(Exception):
+    pass
+
+
+@contextmanager
+def _limit_connectivity_transfer(seconds):
+    """Limit a transfer while preserving any enclosing processing alarm."""
+    if (
+        not hasattr(signal, "setitimer")
+        or threading.current_thread() is not threading.main_thread()
+    ):
+        # Avoid an unbounded search where a local alarm cannot be installed.
+        raise _ConnectivityTransferTimeout
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    remaining, interval = signal.getitimer(signal.ITIMER_REAL)
+    if remaining and remaining <= seconds:
+        # The enclosing timeout takes precedence and must propagate normally.
+        yield
+        return
+
+    def expire(signum, frame):
+        raise _ConnectivityTransferTimeout
+
+    started = time.monotonic()
+    signal.signal(signal.SIGALRM, expire)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+        if remaining:
+            signal.setitimer(
+                signal.ITIMER_REAL,
+                max(remaining - (time.monotonic() - started), 1e-6),
+                interval,
+            )
 
 
 ############################################################
@@ -181,39 +226,49 @@ def _transfer_state_by_connectivity(
     reference: "Species", target: "Species", final_charge
 ) -> bool:
     """Transfer the solved RDKit molecule by atom mapping; return False to request fallback."""
-    new_order = _connectivity_new_order(reference, target)
-    if new_order is None:
+    try:
+        with _limit_connectivity_transfer(_CONNECTIVITY_TRANSFER_TIMEOUT):
+            new_order = _connectivity_new_order(reference, target)
+            if new_order is None:
+                logger.debug(
+                    "No graph isomorphism between unique species %s and its copy; "
+                    "falling back to the copy's own charge states",
+                    target.formula,
+                )
+                return False
+
+            rdkit_obj = Chem.RenumberAtoms(reference.rdkit_obj, new_order)
+            atom_charges = [
+                rdkit_obj.GetAtomWithIdx(i).GetFormalCharge()
+                for i in range(target.natoms)
+            ]
+            total_charge = int(sum(atom_charges))
+
+            if total_charge != final_charge:
+                logger.warning(
+                    "Mode 1 transfer for %s produced charge %d, expected %d; falling back",
+                    target.formula,
+                    total_charge,
+                    final_charge,
+                )
+                return False
+
+            target.charge_state = reference.charge_state
+            target.set_charges(total_charge, atom_charges, reference.smiles, rdkit_obj)
+            logger.debug(
+                "Mode 1 transferred by connectivity: %s (Q=%d) %s",
+                target.formula,
+                target.totcharge,
+                target.smiles,
+            )
+            return True
+    except _ConnectivityTransferTimeout:
         logger.debug(
-            "No graph isomorphism between unique species %s and its copy; "
-            "falling back to the copy's own charge states",
+            "Connectivity transfer for %s exceeded its time limit or is unavailable; "
+            "using the copy's own charge states",
             target.formula,
         )
         return False
-
-    rdkit_obj = Chem.RenumberAtoms(reference.rdkit_obj, new_order)
-    atom_charges = [
-        rdkit_obj.GetAtomWithIdx(i).GetFormalCharge() for i in range(target.natoms)
-    ]
-    total_charge = int(sum(atom_charges))
-
-    if total_charge != final_charge:
-        logger.warning(
-            "Mode 1 transfer for %s produced charge %d, expected %d; falling back",
-            target.formula,
-            total_charge,
-            final_charge,
-        )
-        return False
-
-    target.charge_state = reference.charge_state
-    target.set_charges(total_charge, atom_charges, reference.smiles, rdkit_obj)
-    logger.debug(
-        "Mode 1 transferred by connectivity: %s (Q=%d) %s",
-        target.formula,
-        target.totcharge,
-        target.smiles,
-    )
-    return True
 
 
 def _transfer_state_to_unit_cell(reference: "Species", target: "Species", final_charge):
