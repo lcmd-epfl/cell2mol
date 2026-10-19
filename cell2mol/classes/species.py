@@ -87,13 +87,23 @@ class Species(AtomSet):
         return [bond for bond in self.bonds if index in bond["atom_indices"]]
 
     def detect_porphyrin(self) -> bool:
-        """Detect and store whether a porphyrin-family N4 macrocycle is present."""
-        from cell2mol.charge.special_cases import is_porphyrin_macrocycle
+        """Detect porphyrin-family macrocycles and log their structural types."""
+        from cell2mol.charge.special_cases.porphyrin import (
+            find_all_porphyrin_macrocycles,
+        )
 
-        has_porphyrin, _ = is_porphyrin_macrocycle(
+        macrocycles = find_all_porphyrin_macrocycles(
             self.get_atomic_numbers(), self.adjacency_matrix
         )
-        self.has_porphyrin = has_porphyrin
+        self.has_porphyrin = bool(macrocycles)
+        for nitrogens, is_contracted, _core in macrocycles:
+            if len(nitrogens) > 4:
+                description = "an expanded porphyrin-family macrocycle"
+            elif is_contracted:
+                description = "a contracted porphyrin-family macrocycle"
+            else:
+                description = "a porphyrin-type macrocycle"
+            logger.debug("%s %s contains %s", self.subtype, self.formula, description)
         return self.has_porphyrin
 
     def detect_fullerene(self) -> bool:
@@ -119,8 +129,6 @@ class Species(AtomSet):
             logger.debug("%s %s has a fullerene", self.subtype, self.formula)
 
         self.detect_porphyrin()
-        if self.has_porphyrin:
-            logger.debug("%s %s has a porphyrin", self.subtype, self.formula)
 
         self.detect_borane()
         if self.has_borane:

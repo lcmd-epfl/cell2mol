@@ -127,7 +127,19 @@ def _generate_porphyrin_protonation_states(
     adjacency_matrix = np.asarray(species.adjacency_matrix)
     atoms = species.atoms or []
 
+    # Metal N4 pockets may include pyridine substituents. Only actual
+    # pyrrole nitrogens in the macrocycle can receive free-base protons.
+    core_nitrogens = {
+        n
+        for nitrogens, _contracted, _core in find_all_porphyrin_macrocycles(
+            species.get_atomic_numbers(), adjacency_matrix
+        )
+        for n in nitrogens
+    }
+
     def _can_be_protonated(idx: int) -> bool:
+        if idx not in core_nitrogens:
+            return False
         neighbours = np.nonzero(adjacency_matrix[idx])[0]
         if (atoms[idx].metal_contact_count or 0) == 0:
             return False
@@ -135,6 +147,21 @@ def _generate_porphyrin_protonation_states(
             return False
         # A third heavy neighbour is an exocyclic substituent.
         return sum(1 for j in neighbours if species.labels[j] != "H") <= 2
+
+    # In mixed N4 pockets, skip non-pyrrole donors and fill two eligible
+    # pyrrole sites. All-pyrrole pockets retain their original trans pair.
+    for nitrogens, contracted, _core in macrocycles:
+        if len(nitrogens) != 4 or contracted:
+            continue
+        if all(n in core_nitrogens for n in nitrogens):
+            continue
+        selected = [n for n in base_sites if n in nitrogens and _can_be_protonated(n)]
+        for n in nitrogens:
+            if len(selected) >= 2:
+                break
+            if n not in selected and _can_be_protonated(n):
+                selected.append(n)
+        base_sites = [n for n in base_sites if n not in nitrogens] + selected
 
     base_add = [n for n in base_sites if _can_be_protonated(n)]
     extra_bare = [
