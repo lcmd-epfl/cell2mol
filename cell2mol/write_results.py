@@ -9,8 +9,76 @@ import traceback
 import logging
 import pandas as pd
 from pathlib import Path
+import numpy as np
+from cell2mol.elementdata import ElementData
 
 logger = logging.getLogger(__name__)
+elemdatabase = ElementData()
+
+
+def _xyz_text(labels, pos, comment=""):
+    """Validate coordinates and build one XYZ frame before writing any output."""
+    labels = list(labels)
+    positions = np.asarray(pos, dtype=float)
+    if positions.shape != (len(labels), 3):
+        raise ValueError("XYZ coordinates must have shape (number of labels, 3)")
+    if not np.isfinite(positions).all():
+        raise ValueError("XYZ coordinates must be finite")
+    if any(label not in elemdatabase.elementnr.keys() for label in labels):
+        raise ValueError("XYZ labels must be valid element symbols")
+    if "\n" in comment or "\r" in comment:
+        raise ValueError("XYZ comment must be a single line")
+    rows = [str(len(labels)), comment]
+    rows.extend(
+        f"{label:<2}  {x:15.8f}  {y:15.8f}  {z:15.8f}"
+        for label, (x, y, z) in zip(labels, positions)
+    )
+    return "\n".join(rows) + "\n"
+
+
+def printxyz(labels, pos):
+    """Print one XYZ frame to standard output."""
+    print(_xyz_text(labels, pos), end="")
+
+
+def writexyz(
+    fdir, fname, labels, pos, charge: int | str = 0, spin: int | str = 1, info: str = ""
+):
+    """Write an XYZ frame with charge, spin multiplicity, and optional info."""
+    comment = " ".join(str(value) for value in (charge, spin, info) if str(value))
+    text = _xyz_text(labels, pos, comment)
+    path = Path(fdir) / fname
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def extract_refmoleclist_xyz(fdir, refmoleclist, name: str):
+    """Export reference molecules, using CIF charges and minimum multiplicities.
+
+    Electron parity gives a minimum multiplicity, not a predicted ground-state
+    spin. Leave the comment empty when no CIF charge is available.
+    """
+    for i, ref in enumerate(refmoleclist):
+        charge = ref.totcharge_cif
+        stem = f"{name}_Ref_{i}_{ref.formula}"
+        if charge is None:
+            writexyz(fdir, f"{stem}.xyz", ref.labels, ref.coord, charge="", spin="")
+        else:
+            n_electrons = (
+                sum(elemdatabase.elementnr[label] for label in ref.labels) - charge
+            )
+            spin = 1 if n_electrons % 2 == 0 else 2
+            writexyz(
+                fdir,
+                f"{stem}_charge_{charge}_lowspin_{spin}.xyz",
+                ref.labels,
+                ref.coord,
+                charge=charge,
+                spin=spin,
+            )
+        logger.debug(
+            "Exported reference molecule %d: %s (CIF charge=%s)", i, ref.formula, charge
+        )
 
 
 def write_input_error_log(message, details=None):

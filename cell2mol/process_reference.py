@@ -23,6 +23,7 @@ from cell2mol.read_cif import (
     check_cif_formula_mismatch,
 )
 from cell2mol.write_results import (
+    extract_refmoleclist_xyz,
     write_cell_molecule_details,
     write_unique_species,
     write_plausible_charges,
@@ -79,6 +80,9 @@ def interpret_reference(input_path, name, current_dir):
                     (refcell.error_cases or {}).get("ref_molecules"),
                 )
                 return refcell
+
+            if logger.isEnabledFor(logging.DEBUG):
+                extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
 
             # Save intermediate success
             _handle_reference_outputs(name, current_dir, refcell)
