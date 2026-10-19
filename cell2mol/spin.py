@@ -26,10 +26,9 @@ elemdatabase = ElementData()
 def predict_metal_spin(metal: Metal) -> Spin | None:
     """Predict metal spin multiplicity (2S + 1) from its assigned charge.
 
-    Use electron-count rules for 3d d0/d1/d9/d10 and non-haptic d2/d3
-    cases; use the Random Forest model for the remaining 3d d2–d8 cases.
-    For heavier d-block metals, use 1 for even and 2 for odd valence
-    electron counts.
+    Use electron-count rules for 3d d0/d1/d9/d10; use the Random Forest
+    model for the remaining 3d d2–d8 cases. For heavier d-block metals,
+    use 1 for even and 2 for odd valence electron counts.
 
     Return None if spin cannot be determined.
     Raise ValueError if required data is missing.
@@ -47,13 +46,6 @@ def predict_metal_spin(metal: Metal) -> Spin | None:
             return 1
         if valence_elec in [1, 9]:
             return 2
-        if valence_elec in [2, 3]:
-            parent = cast("Molecule | None", metal.get_parent("molecule"))
-            if parent is None:
-                raise ValueError(f"Metal {metal.label} has no parent molecule")
-            if not parent.is_haptic:
-                return valence_elec + 1
-
         if valence_elec in [2, 3, 4, 5, 6, 7, 8]:
             if metal.coord_geometry is None or metal.coord_geometry == "Undefined":
                 logger.error(

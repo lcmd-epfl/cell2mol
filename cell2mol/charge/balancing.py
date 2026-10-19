@@ -45,26 +45,24 @@ def balance_unitcell_charge(refcell, unitcell):
         unitcell.unique_indices, refcell.unique_species
     )
 
-    # Distribution preference is disabled pending a data-driven model.
-
     dist_count = len(unique_species_charges)
     unitcell.error_multiple_distrib = dist_count > 1
     unitcell.error_empty_distrib = dist_count == 0
 
     # Try metal states absent from the initial oxidation-state list.
-    if unitcell.error_empty_distrib:
-        inferred_charges = _infer_metal_charge_from_fixed_ligands(
-            unitcell.unique_indices, refcell.unique_species
-        )
-        if inferred_charges is not None:
-            logger.warning(
-                "No standard charge distribution summed to neutrality; "
-                "inferred a non-standard metal oxidation state from the "
-                "ligand charges instead: %s",
-                inferred_charges,
-            )
-            unique_species_charges = [inferred_charges]
-            unitcell.error_empty_distrib = False
+    # if unitcell.error_empty_distrib:
+    #     inferred_charges = _balance_with_observed_metal_os(
+    #         unitcell.unique_indices, refcell.unique_species
+    #     )
+    #     if inferred_charges is not None:
+    #         logger.info(
+    #             "No neutral charge distribution found; "
+    #             "inferred a less common metal oxidation state from the "
+    #             "ligand charges instead: %s",
+    #             inferred_charges,
+    #         )
+    #         unique_species_charges = [inferred_charges]
+    #         unitcell.error_empty_distrib = False
 
     if unitcell.error_multiple_distrib or unitcell.error_empty_distrib:
         logger.error(
@@ -108,6 +106,14 @@ def balance_molecule_charge(molset, input_charge: int = 0):
     dist_count = len(expanded_species_charges)
     molset.error_multiple_distrib = dist_count > 1
     molset.error_empty_distrib = dist_count == 0
+
+    # if molset.error_empty_distrib:
+    #     inferred_charges = _balance_with_observed_metal_os(
+    #         unique_indices, molset.unique_species, input_charge=input_charge
+    #     )
+    #     if inferred_charges is not None:
+    #         unique_species_charges = [inferred_charges]
+    #         molset.error_empty_distrib = False
 
     if molset.error_multiple_distrib or molset.error_empty_distrib:
         logger.error(
@@ -360,6 +366,55 @@ def _preferred_distributions(
             max(burdens),
         )
     return best
+
+
+def _balance_with_observed_metal_os(
+    unique_indices, unique_species, input_charge: int = 0
+) -> List[int] | None:
+    """Balance fixed non-metal charges with one unique metal species.
+
+    Accept an observed integer metal OS outside the common oxidation states.
+    Return charges in unique_species order, or None if no solution exists.
+    """
+    metal_indices = [
+        idx for idx, species in enumerate(unique_species) if species.subtype == "metal"
+    ]
+    if len(metal_indices) != 1:
+        return None
+    metal_idx = metal_indices[0]
+    charges = [0] * len(unique_species)
+    for idx, species in enumerate(unique_species):
+        if idx == metal_idx:
+            continue
+        options = set(_get_ligand_options(species, aromatic=False))
+        if len(options) != 1:
+            return None
+        charges[idx] = options.pop()
+
+    metal_count = sum(idx == metal_idx for idx in unique_indices)
+    if metal_count == 0:
+        return None
+    non_metal_sum = sum(charges[idx] for idx in unique_indices if idx != metal_idx)
+    remainder = input_charge - non_metal_sum
+    if remainder % metal_count:
+        return None
+    metal_charge = remainder // metal_count
+    metal_label = unique_species[metal_idx].label
+    known_os = METAL_OXIDATION_STATES.get(metal_label, [])
+    observed_os = METAL_OS_OBSERVED.get(metal_label, {})
+    if metal_charge in known_os or observed_os.get(metal_charge, 0) <= 0:
+        return None
+
+    charges[metal_idx] = metal_charge
+    logger.warning(
+        "Fixed non-metal charges require %s(%d), observed outside the curated "
+        "oxidation states %s, to balance total charge %d.",
+        metal_label,
+        metal_charge,
+        known_os,
+        input_charge,
+    )
+    return charges
 
 
 def _infer_metal_charge_from_fixed_ligands(

@@ -187,12 +187,12 @@ class Ligand(Species):
                 "kappa_atoms": sorted(contacts - eta_atoms),
                 "eta_groups": [list(site) for site in sorted(eta_sites)],
             }
-            logger.debug(
-                "Ligand %s: metal index=%d, coordination=%s",
-                self.formula,
-                metal_index,
-                result[metal_index],
-            )
+            # logger.debug(
+            #     "Ligand %s: metal index=%d, coordination=%s",
+            #     self.formula,
+            #     metal_index,
+            #     result[metal_index],
+            # )
         return result
 
     @property

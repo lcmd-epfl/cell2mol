@@ -355,13 +355,13 @@ def write_molecule_details(mol, file=None, index=None, *, detailed=False):
     metals = mol.metals or []
     ligands = mol.ligands or []
     metal_by_index = {met.get_parent_index("molecule"): met for met in metals}
-    if metals or ligands:
-        print(
-            "\tCoordination: CIF site labels / XYZ element symbols; "
-            "L1, L2, ... identify ligand copies. "
-            "Atom contacts and sites exclude metal-metal bonds.",
-            file=file,
-        )
+    # if metals or ligands:
+    #     print(
+    #         "\tCoordination: CIF site labels / XYZ element symbols; "
+    #         "L1, L2, ... identify ligand copies. "
+    #         "Atom contacts and sites exclude metal-metal bonds.",
+    #         file=file,
+    #     )
 
     for met in metals:
         parts = [f"\tMetal {_coordination_atom_label(met)}"]
