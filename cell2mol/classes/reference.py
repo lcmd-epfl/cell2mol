@@ -56,7 +56,7 @@ class Reference(Cell):
 
     # Reported CIF metadata
     chemical_name: str | None = None
-    reported_metal_os: list[tuple[str, int]] | None = None
+    reported_metal_os: list[tuple[str, int | None]] | None = None
     # Matched metal-state tokens (e.g. Ni_2) and the fraction with known states.
     reported_metal_os_matched: list[str] | None = None
     metal_os_match_confidence: float | None = None

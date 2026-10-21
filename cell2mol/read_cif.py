@@ -431,22 +431,31 @@ METAL_OS_SPECIAL_CASES = [
 ]
 
 
-def extract_metal_oxidation_states(chemical_name: str) -> list[tuple[str, int]] | None:
+def extract_metal_oxidation_states(
+    chemical_name: str,
+) -> list[tuple[str, int | None]] | None:
     """Extract named oxidation states from Roman numerals and name-encoded special cases."""
-    oxidation_states: list[tuple[str, int]] = []
+    oxidation_states: list[tuple[str, int | None]] = []
+
+    from cell2mol.standardize_metal_os import elemdatabase, PREFIX_MAP
+
+    prefixes = "|".join(sorted(PREFIX_MAP, key=len, reverse=True))
 
     # Check name-encoded states before explicit Roman numerals.
-    name_lower = chemical_name.lower()
-    for fragment, (metal, ox_state) in METAL_OS_SPECIAL_CASES:
-        if fragment in name_lower:
-            oxidation_states.append((fragment, ox_state))
-            break
+    fragments = "|".join(fragment for fragment, _ in METAL_OS_SPECIAL_CASES)
+    special_pattern = rf"\b(?:(?:{prefixes})-?)?(?P<fragment>{fragments})"
+    special_states = dict(METAL_OS_SPECIAL_CASES)
+    for match in re.finditer(special_pattern, chemical_name, re.IGNORECASE):
+        fragment = match.group("fragment").lower()
+        oxidation_states.append((match.group(0).lower(), special_states[fragment][1]))
 
-    # Extract entries such as iron(iii).
-    pattern = r"(\b[a-zA-Z-]+\b)\((iii|ii|iv|v|vi|vii|viii|ix|x|i|0|o)\)"
+    # Accept single states and mixed-valence lists such as di-zirconium(ii,iv).
+    numeral = r"(?:viii|vii|iii|vi|iv|ii|ix|x|v|i|0|o)"
+    pattern = rf"(\b[a-zA-Z-]+\b)\(\s*({numeral}(?:\s*,\s*{numeral})*)\s*\)"
 
-    matches = re.findall(pattern, chemical_name, re.IGNORECASE)
-    for metal, ox_state in matches:
+    matches = list(re.finditer(pattern, chemical_name, re.IGNORECASE))
+    for match in matches:
+        metal, ox_state = match.groups()
         ox_state_map = {
             "0": 0,
             "o": 0,
@@ -461,8 +470,30 @@ def extract_metal_oxidation_states(chemical_name: str) -> list[tuple[str, int]] 
             "ix": 9,  # [IrO4]+
             "x": 10,  # theoretically possible
         }
-        oxidation_state = ox_state_map[ox_state.lower()]
-        oxidation_states.append((metal, oxidation_state))
+        states = [ox_state_map[state.strip().lower()] for state in ox_state.split(",")]
+        if len(states) == 1:
+            oxidation_states.append((match.group(0), states[0]))
+        else:
+            # Each numeral describes one metal; consume the multiplicity prefix
+            # here so downstream expansion does not duplicate every state.
+            metal = re.sub(
+                rf"\b(?:{prefixes})-?([a-z]+)$", r"\1", metal, flags=re.IGNORECASE
+            )
+            oxidation_states.extend((metal, state) for state in states)
+
+    # Bare metal names carry composition information even without an OS.
+    # Keep a directly attached multiplicity, but exclude ligand prefixes.
+    names = "|".join(
+        re.escape(elemdatabase.elementname[symbol].lower())
+        for symbol in sorted(TRANSITION_METALS)
+    )
+    bare_pattern = rf"\b(?:(?:{prefixes})-?)?(?:{names})\b"
+    for match in re.finditer(bare_pattern, chemical_name, re.IGNORECASE):
+        if any(
+            explicit.start() <= match.start() < explicit.end() for explicit in matches
+        ):
+            continue
+        oxidation_states.append((match.group(0), None))
 
     if not oxidation_states:
         return None

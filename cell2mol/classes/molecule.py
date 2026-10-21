@@ -322,7 +322,7 @@ class Molecule(ModelFileMixin, Species):
             met.build_coordination_sphere_formula()
 
         self.map_metal_groups_to_ligands()
-        self.merge_connected_groups()
+        # self.merge_connected_groups()
 
         for lig in self.ligands or []:
             lig.update_hapticity()

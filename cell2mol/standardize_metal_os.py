@@ -81,6 +81,7 @@ def match_special_metal_state(name: str):
 
 def extract_last_name_token(name: str):
     """Extract the final lowercase name token, splitting on hyphens, spaces, or commas."""
+    name = re.sub(r"\((?:[ivx]+|0|o)\)$", "", name, flags=re.IGNORECASE)
     parts = re.split(r"[-\s,]+", name.lower())
     if not parts:
         return ""
@@ -147,10 +148,18 @@ def find_metal_symbols(name: str, metal_list):
 
 
 def extract_prefix_count(name: str):
-    """Return the leading multiplicity prefix count, defaulting to one."""
-    n = name.lower()
+    """Read multiplicity on the final metal token, defaulting to one.
+
+    A ligand prefix such as ``tetra`` in ``tetracyano-iron`` does not
+    describe the number of metal atoms; ``di-iron`` does.
+    """
+    name = re.sub(r"\((?:[ivx]+|0|o)\)$", "", name, flags=re.IGNORECASE)
+    parts = re.split(r"[-\s,]+", name.lower().strip())
+    n = parts[-1]
+    if len(parts) > 1 and parts[-2] in PREFIX_MAP:
+        return PREFIX_MAP[parts[-2]]
     for prefix, count in PREFIX_MAP.items():
-        if n.startswith(prefix + "-") or n.startswith(prefix):
+        if n.startswith(prefix):
             return count
     return 1
 
@@ -221,11 +230,23 @@ def match_reported_metal_states(tms, reported):
     if not expanded:
         return [f"{m}_unknown" for m in metal_list]
 
+    # A name-encoded state describes only that named moiety. In particular,
+    # ferrocene's Fe(II) must not propagate to other iron atoms in a complex.
+    if all(match_special_metal_state(name) for name, _ in reported_list):
+        states = defaultdict(list)
+        for sym, ox in expanded:
+            states[sym].append(ox)
+        result = []
+        for metal in metal_list:
+            ox = states[metal].pop(0) if states[metal] else None
+            result.append(f"{metal}_{ox if ox is not None else 'unknown'}")
+        return result
+
     # Distribute multiple reports across occurrences of each element.
     if len(reported_list) > 1:
         os_queue = defaultdict(list)
         for sym, ox in expanded:
-            if sym in metal_list and ox is not None:
+            if sym in metal_list:
                 os_queue[sym].append(ox)
 
         final_assignments = []
@@ -234,12 +255,20 @@ def match_reported_metal_states(tms, reported):
             if len(ox_list) == 0:
                 final_assignments.extend([f"{m}_unknown"] * needed)
             elif len(set(ox_list)) == 1:
-                final_assignments.extend([f"{m}_{ox_list[0]}"] * needed)
+                state = ox_list[0] if ox_list[0] is not None else "unknown"
+                final_assignments.extend([f"{m}_{state}"] * needed)
             elif len(ox_list) >= needed:
-                final_assignments.extend([f"{m}_{ox}" for ox in ox_list[:needed]])
+                final_assignments.extend(
+                    [
+                        f"{m}_{ox if ox is not None else 'unknown'}"
+                        for ox in ox_list[:needed]
+                    ]
+                )
             else:
                 padded = ox_list + [ox_list[-1]] * (needed - len(ox_list))
-                final_assignments.extend([f"{m}_{ox}" for ox in padded])
+                final_assignments.extend(
+                    [f"{m}_{ox if ox is not None else 'unknown'}" for ox in padded]
+                )
         return final_assignments
 
     # Use positional assignments when expanded and target counts agree.
