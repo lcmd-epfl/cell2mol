@@ -41,9 +41,12 @@ def balance_unitcell_charge(refcell, unitcell):
         return refcell, unitcell
     log_charge_diagnostics(unitcell, refcell)
 
+    warnings = dict(getattr(refcell, "potential_warnings", None) or {})
+    warnings.pop("metal_os_ambiguity", None)
     _, unique_species_charges = resolve_charge_distributions(
-        unitcell.unique_indices, refcell.unique_species
+        unitcell.unique_indices, refcell.unique_species, warnings=warnings
     )
+    refcell.potential_warnings = warnings
 
     dist_count = len(unique_species_charges)
     unitcell.error_multiple_distrib = dist_count > 1
@@ -145,6 +148,7 @@ def resolve_charge_distributions(
     rare: bool = False,
     predict: bool = False,
     aromatic: bool = False,
+    warnings: dict | None = None,
 ):
     """
     Computes all valid charge distributions that sum to the target input_charge.
@@ -161,6 +165,13 @@ def resolve_charge_distributions(
             options = _get_ligand_options(species, aromatic)
 
         if not options:
+            if species.subtype == "metal" and not rare:
+                inferred = _distribute_fixed_ligand_metal_charges(
+                    unique_indices, unique_species, input_charge, warnings=warnings
+                )
+                return [
+                    [charges[i] for i in unique_indices] for charges in inferred
+                ], inferred
             logger.error(
                 "Unique Species %s (Index %d) has no valid charge options.",
                 species.formula,
@@ -207,6 +218,29 @@ def resolve_charge_distributions(
         len(expanded_species_charges),
     )
 
+    if len(unique_species_charges) > 1 and not rare:
+        ranked = _distribute_fixed_ligand_metal_charges(
+            unique_indices,
+            unique_species,
+            input_charge,
+            distributions=unique_species_charges,
+            warnings=warnings,
+        )
+        if ranked:
+            unique_species_charges = ranked
+            expanded_species_charges = [
+                [charges[idx] for idx in unique_indices] for charges in ranked
+            ]
+
+    if not unique_species_charges and not rare:
+        unique_species_charges = _distribute_fixed_ligand_metal_charges(
+            unique_indices, unique_species, input_charge, warnings=warnings
+        )
+        expanded_species_charges = [
+            [charges[idx] for idx in unique_indices]
+            for charges in unique_species_charges
+        ]
+
     return expanded_species_charges, unique_species_charges
 
 
@@ -220,11 +254,13 @@ def _get_metal_options(species, rare: bool, predict: bool) -> List[int]:
     all_possible_m_ox = [0, 1, 2, 3, 4, 5, 6, 7]
 
     if rare:
-        rare_states = [x for x in all_possible_m_ox if x not in species.plausible_os]
+        rare_states = [
+            x for x in all_possible_m_ox if x not in (species.plausible_os or [])
+        ]
         logger.debug("RARE METAL OXIDATION STATES: %s %s", species.formula, rare_states)
         return rare_states
 
-    return list(species.plausible_os)
+    return list(species.plausible_os or [])
 
 
 def _get_ligand_options(species, aromatic: bool) -> List[int]:
@@ -298,6 +334,165 @@ def _filter_by_aromaticity(species, plausible) -> List[int]:
 ############################################################
 # Distribution preferences and metal-charge inference
 ############################################################
+
+
+def _distribute_fixed_ligand_metal_charges(
+    unique_indices, unique_species, input_charge=0, *, distributions=None, warnings=None
+):
+    """Choose metal oxidation states while keeping ligand charges fixed.
+
+    Use donor formal charges to divide ligand charge among metals; shared donors
+    split their contribution equally, and neutral ligands contribute nothing.
+    Choose integer metal charges closest to these targets that balance the total
+    charge, using supplied candidates when available. For ties, select the first
+    in unique_index order and report metal_os_ambiguity.
+
+    Return [chosen_distribution], or [] if data is missing or no solution exists.
+    """
+    metal_indices = [
+        idx for idx, species in enumerate(unique_species) if species.subtype == "metal"
+    ]
+    if not metal_indices:
+        return []
+    counts = [unique_indices.count(idx) for idx in range(len(unique_species))]
+    if any(counts[idx] == 0 for idx in metal_indices):
+        return []
+    # Fix non-metal charges before calculating the total charge metals must supply.
+    charges = [0] * len(unique_species)
+    for idx, species in enumerate(unique_species):
+        if idx in metal_indices:
+            continue
+        states = species.plausible_charge_states or []
+        if len(states) != 1:
+            return []
+        charges[idx] = states[0].species_total_charge
+    remainder = input_charge - sum(
+        charges[idx] for idx in unique_indices if idx not in metal_indices
+    )
+
+    # Use each molecule's own ligand copies so atom charges and coordination
+    # indices refer to the same atom order. Visit each parent molecule once.
+    molecules = {}
+    for idx in metal_indices:
+        metal = unique_species[idx]
+        mol = metal.get_parent("molecule")
+        if mol is not None:
+            molecules[id(mol)] = mol
+    burdens = {idx: [] for idx in metal_indices}
+    for mol in molecules.values():
+        metals = {
+            metal.get_parent_index("molecule"): metal for metal in mol.metals or []
+        }
+        local = {index: 0.0 for index in metals}
+        for ligand in mol.ligands or []:
+            states = ligand.plausible_charge_states or []
+            if len(states) != 1:
+                return []
+            state = states[0]
+            net = state.species_total_charge
+            if net == 0:
+                continue
+            # Map each coordinating ligand atom to the metals it contacts.
+            contacts = {}
+            for index, mode in ligand.coordination.items():
+                if index not in metals:
+                    return []
+                atoms = set(mode["kappa_atoms"])
+                atoms.update(atom for site in mode["eta_groups"] for atom in site)
+                for atom in atoms:
+                    contacts.setdefault(atom, set()).add(index)
+            if not contacts:
+                continue  # Unbound ions affect the total charge, not local targets.
+            atom_charges = state.species_atom_charges
+            if len(atom_charges) != ligand.natoms:
+                return []
+            # Normalize donor weights to the ligand's net charge. This avoids
+            # counting internal positive/negative charge separation as extra charge.
+            weights = {
+                atom: abs(atom_charges[atom])
+                for atom in contacts
+                if atom_charges[atom] * net > 0
+            }
+            weight_sum = sum(weights.values())
+            if not weight_sum:
+                return []  # Cannot divide this ligand's charge using its donors.
+            for atom, weight in weights.items():
+                for index in contacts[atom]:
+                    local[index] -= net * weight / weight_sum / len(contacts[atom])
+        for index, metal in metals.items():
+            unique_idx = metal.unique_index
+            if unique_idx in burdens:
+                burdens[unique_idx].append(local[index])
+
+    if len(metal_indices) > 1 and any(not burdens[idx] for idx in metal_indices):
+        return []
+    # Copies sharing a unique_index must receive the same oxidation state.
+    targets = {
+        idx: sum(burdens[idx]) / len(burdens[idx]) if burdens[idx] else 0.0
+        for idx in metal_indices
+    }
+    n_metals = sum(counts[idx] for idx in metal_indices)
+    # Account for charge not allocated locally, such as unbound counterions.
+    offset = (
+        remainder - sum(counts[idx] * targets[idx] for idx in metal_indices)
+    ) / n_metals
+    targets = {idx: target + offset for idx, target in targets.items()}
+    # For fallback inference, use integer charges spanning zero, the required
+    # metal charge, and the local targets. Supplied candidates bypass this range.
+    lower = math.floor(min(0, remainder, *targets.values()))
+    upper = math.ceil(max(0, remainder, *targets.values()))
+    options = range(lower, upper + 1)
+    if (
+        distributions is None
+        and len(options) ** len(metal_indices) > _MAX_INFERENCE_COMBINATIONS
+    ):
+        return []
+    combinations = (
+        (tuple(dist[idx] for idx in metal_indices) for dist in distributions)
+        if distributions is not None
+        else itertools.product(options, repeat=len(metal_indices))
+    )
+    best_score = math.inf
+    best = []
+    for combo in combinations:
+        if (
+            sum(counts[idx] * charge for idx, charge in zip(metal_indices, combo))
+            != remainder
+        ):
+            continue
+        # Prefer charges close to the targets, counting each actual metal copy.
+        score = sum(
+            counts[idx] * (charge - targets[idx]) ** 2
+            for idx, charge in zip(metal_indices, combo)
+        )
+        if score < best_score and not math.isclose(score, best_score, abs_tol=1e-9):
+            best_score = score
+            best = []
+        if math.isclose(score, best_score, abs_tol=1e-9):
+            candidate = charges.copy()
+            for idx, charge in zip(metal_indices, combo):
+                candidate[idx] = charge
+            best.append(candidate)
+    if best:
+        logger.info(
+            "Metal OS targets: %s; %d best charge distribution(s): %s",
+            targets,
+            len(best),
+            best,
+        )
+    if len(best) > 1:
+        # Make the representative reproducible without claiming the tie is resolved.
+        best.sort()
+        if warnings is not None:
+            warnings["metal_os_ambiguity"] = True
+        logger.warning(
+            "Metal oxidation-state ambiguity: tied distributions %s. "
+            "Selecting %s (unique_index order).",
+            best,
+            best[0],
+        )
+        return best[:1]
+    return best
 
 
 def _preferred_distributions(

@@ -7,6 +7,7 @@ import sys
 import os
 import traceback
 import logging
+from cell2mol.element_utils import symbols2formula
 import pandas as pd
 from pathlib import Path
 import numpy as np
@@ -180,6 +181,7 @@ def get_reference_warning_messages(refcell):
 
     # Active warning messages
     warning_map = {
+        "metal_os_ambiguity": "Metal oxidation-state ambiguity: equally valid alternatives exist.",
         "cif_mismatch": "CIF formula mismatch detected",
         "over_polynuclear_limit": f"Polynuclear complex exceeds metal center limit (> max_metals {config.MAX_METALS})",
         "mixed_metals": "Mixed metal types detected",
@@ -545,11 +547,22 @@ def write_unique_species(object, file):
                 for metal in species.metals or []
             }
             modes = []
+            labels = list(species.labels or [])
             for metal_index, mode in species.coordination.items():
                 counts = []
                 if mode["kappa_atoms"]:
-                    counts.append(f"kappa{len(mode['kappa_atoms'])}")
-                counts.extend(f"eta{len(site)}" for site in mode["eta_groups"])
+                    # Same element order as the formulas: atomic number.
+                    kappa_labels = ",".join(
+                        sorted(
+                            (labels[i] for i in mode["kappa_atoms"]),
+                            key=lambda z: elemdatabase.elementnr[z],
+                        )
+                    )
+                    counts.append(f"kappa{len(mode['kappa_atoms'])}({kappa_labels})")
+                counts.extend(
+                    f"eta{len(site)}({symbols2formula([labels[i] for i in site])})"
+                    for site in mode["eta_groups"]
+                )
                 modes.append(
                     f"{metal_labels.get(metal_index, 'unknown metal')}:"
                     + "+".join(counts)
@@ -561,8 +574,8 @@ def write_unique_species(object, file):
                 parts.append(f"smiles={species.smiles}")
             if getattr(species, "totcharge", None) is not None:
                 parts.append(f"totcharge={species.totcharge}")
-            if getattr(species, "groups", None) is not None:
-                parts.append(f"groups={[group.formula for group in species.groups]}")
+            # if getattr(species, "groups", None) is not None:
+            #     parts.append(f"groups={[group.formula for group in species.groups]}")
 
         else:
             if getattr(species, "smiles", None) is not None:
