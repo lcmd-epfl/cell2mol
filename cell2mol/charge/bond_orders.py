@@ -296,8 +296,12 @@ def generate_rdkit_mol_from_rdDetermineBonds(
 
     rwMol = Chem.RWMol()
 
+    # Every hydrogen is an explicit atom here, so RDKit must not pad an
+    # unsatisfied valence with implicit hydrogens
     for atomic_num in atoms:
-        rwMol.AddAtom(Chem.Atom(atomic_num))
+        atom = Chem.Atom(atomic_num)
+        atom.SetNoImplicit(True)
+        rwMol.AddAtom(atom)
 
     for i in range(n_atoms):
         for j in range(i + 1, n_atoms):

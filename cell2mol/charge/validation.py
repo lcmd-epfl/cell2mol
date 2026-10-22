@@ -21,6 +21,17 @@ def check_rdkit_obj_connectivity(mol: Chem.Mol, natoms: int, charge: int) -> boo
     pt = Chem.GetPeriodicTable()
     is_correct = True
 
+    # All input hydrogens are explicit atoms. Any implicit H added by RDKit
+    # is absent from the input structure and indicates an unfilled valence.
+    padded = [i for i in range(natoms) if mol.GetAtomWithIdx(i).GetNumImplicitHs() > 0]
+    if padded:
+        logger.debug(
+            "   Invalid structure: RDKit requires implicit H on atom indices %s "
+            "to complete valences, but these H atoms are absent from the input.",
+            padded,
+        )
+        is_correct = False
+
     total_formal_charge = sum(
         mol.GetAtomWithIdx(i).GetFormalCharge() for i in range(natoms)
     )
