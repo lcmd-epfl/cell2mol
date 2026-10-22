@@ -962,62 +962,34 @@ def _atom_site_labels(atoms: list[Atom]) -> list[str] | None:
 
 
 def identify_haptic_mode(atoms: list[Atom], use_bond_info: bool | None = None):
-    """
-    Determine haptic coordination mode(s) for a given atoms list.
-    Args:
-        atoms (list): List of Atom objects
-        use_bond_info (bool, optional): Whether to use bond information from CIF
-    Returns:
-        tuple: (is_haptic (bool), haptic_type (str), topology analysis (dict))
+    """Classify a group of atoms coordinating the same metal.
+
+    Apply C2-C8 composition rules, using ring names such as Cp and COT.
+    Otherwise, label a single simple ring etaN(formula)-ring, or a connected
+    group of 4+ atoms etaN(formula).
+
+    ``use_bond_info`` controls CIF bond use and defaults to config.USE_BOND_INFO.
+    Return (is_haptic, haptic_type, topology); haptic_type is None if unmatched.
     """
     labels = [atom.label for atom in atoms]
     group_formula = symbols2formula(labels)
-    is_haptic = False  # old self.hapticity
-    haptic_type = None  # old self.hapttype
+    is_haptic = False
+    haptic_type = None
 
     totnum = len(labels)
-
-    counts = {
-        "C": labels.count("C"),
-        "As": labels.count("As"),
-        "P": labels.count("P"),
-        "O": labels.count("O"),
-    }
 
     if use_bond_info is None:
         use_bond_info = config.USE_BOND_INFO
 
-    # (numC, numAs, numP, numO, total_atoms) → haptic modes
+    # Group formula -> known haptic type.
     HAPTIC_RULES = {
-        # eta2
-        (2, 0, 0, 0, 2): "eta2(C2)",
-        # eta3
-        (3, 0, 0, 0, 3): "eta3(C3)",
-        # eta4
-        (4, 0, 0, 0, 4): "eta4(C4)",
-        (3, 0, 0, 1, 4): "eta4(C3O)",
-        # eta5
-        (5, 0, 0, 0, 5): "eta5(C5)",
-        (0, 5, 0, 0, 5): "eta5(As5)",
-        (0, 0, 5, 0, 5): "eta5(P5)",
-        # eta6+
-        (6, 0, 0, 0, 6): "eta6(C6)",
-        (7, 0, 0, 0, 7): "eta7(C7)",
-        (8, 0, 0, 0, 8): "eta8(C8)",
+        **{f"C{n}": f"eta{n}(C{n})" for n in range(2, 9)},
     }
 
-    key = (
-        counts["C"],
-        counts["As"],
-        counts["P"],
-        counts["O"],
-        totnum,
-    )
-
-    # Fallback: generic single-ring hapticity
+    # Use known haptic types first, then check rings and open chains separately.
     results = analyze_topology(atoms, use_bond_info=use_bond_info)
-    if key in HAPTIC_RULES:
-        haptic_type = HAPTIC_RULES[key]
+    if group_formula in HAPTIC_RULES:
+        haptic_type = HAPTIC_RULES[group_formula]
         is_haptic = True
         if results["is_single_simple_ring"]:
             if group_formula == "C5":
@@ -1039,6 +1011,9 @@ def identify_haptic_mode(atoms: list[Atom], use_bond_info: bool | None = None):
                 haptic_type = "eta5,eta7(azulene)"  # azulene
     else:
         if results["is_single_simple_ring"]:
+            haptic_type = f"eta{totnum}({group_formula})-ring"
+            is_haptic = True
+        elif totnum >= 4 and results["is_connected"] and results["n_rings"] == 0:
             haptic_type = f"eta{totnum}({group_formula})"
             is_haptic = True
     logger.debug(

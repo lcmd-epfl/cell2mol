@@ -166,22 +166,90 @@ def enumerate_protonation_states(species: Species) -> list[Protonation] | None:
     # since they are already handled by the charged moiety rules.
     moiety_atoms = _charged_moiety_atoms(ligand)
 
+    # Aromatic ring charge belongs to the ring system, not to each metal's
+    # group: a pentalene bound eta5/eta5, eta5/eta3 or eta5/eta2/eta2 is -2
+    # either way. Charge each haptically bound all-carbon ring system once.
+    ring_system_atoms: set[int] = set()
+    for atoms, charge, label in _haptic_ring_systems(ligand, groups):
+        counts = _protonate_ring(ligand, label, atoms, charge)
+        for idx, val in counts.items():
+            site_proton_counts[idx] += val
+        ring_system_atoms.update(atoms)
+
+    # An open conjugated chain of sp2 atoms bound to one metal (allyl, azaallyl,
+    # azadienyl, pentadienyl) is a pi ligand even when its composition is not in
+    # the haptic table. Its atoms keep their hydrogens; only a bare carbon is
+    # a proton site. Groups that are subsets of such a chain are skipped.
+    pi_chain_atoms: set[int] = set()
+    for g in groups:
+        parent_indices = g.get_parent_indices("ligand")
+        if _is_conjugated_pi_chain(ligand, parent_indices):
+            pi_chain_atoms.update(parent_indices)
+            logger.debug(
+                "  Group %s is an open conjugated pi chain %s; treated as haptic",
+                g.formula,
+                [ligand.atoms[i].atom_site_label for i in parent_indices],
+            )
+
     for g in groups:
         parent_indices = g.get_parent_indices("ligand")
 
-        if g.is_haptic:  # HAPTIC GROUPS
+        if parent_indices and set(parent_indices) <= ring_system_atoms:
+            logger.debug(
+                "        Group %s (%s) lies in a charged ring system; "
+                "handled at the ligand level",
+                g.formula,
+                g.haptic_type,
+            )
+            continue
+
+        is_pi_chain = _is_conjugated_pi_chain(ligand, parent_indices)
+        if (
+            not is_pi_chain
+            and not g.is_haptic
+            and parent_indices
+            and set(parent_indices) <= pi_chain_atoms
+        ):
+            logger.debug(
+                "        Group %s lies in a conjugated pi chain; handled there",
+                g.formula,
+            )
+            continue
+
+        if g.is_haptic or is_pi_chain:  # HAPTIC GROUPS
             result = _handle_haptic_group(ligand, g, parent_indices)
         else:  # NON-HAPTIC GROUPS
             result = _handle_non_haptic_group(ligand, g, parent_indices, moiety_atoms)
 
+        # An atom shared by several groups (a bridging donor) needs its protons
+        # once, not once per metal.
         for idx, val in result.site_proton_counts.items():
-            site_proton_counts[idx] += val
+            site_proton_counts[idx] = max(site_proton_counts[idx], val)
 
         for idx, val in result.ligand_donor_electrons.items():
-            ligand_donor_electrons[idx] += val
+            ligand_donor_electrons[idx] = max(ligand_donor_electrons[idx], val)
 
         if result.needs_combinatorial:
             combinatorial_site_indices.extend(result.combinatorial_indices)
+
+    # A site one group protonated outright (a bare ring carbon) must not be
+    # protonated a second time by another group's combinatorial sweep.
+    # Sites with donated electrons keep both modes (process_both_modes).
+    already_fixed = [
+        idx
+        for idx in combinatorial_site_indices
+        if site_proton_counts[idx] > 0 and ligand_donor_electrons[idx] == 0
+    ]
+    if already_fixed:
+        logger.debug(
+            "    Sites %s are protonated deterministically by a ring rule; "
+            "removing them from the combinatorial sweep",
+            sorted(set(already_fixed)),
+        )
+        combinatorial_site_indices = [
+            idx for idx in combinatorial_site_indices if idx not in already_fixed
+        ]
+    combinatorial_site_indices = list(dict.fromkeys(combinatorial_site_indices))
     logger.debug("    combinatorial_site_indices: %s", combinatorial_site_indices)
     # Group equivalent donor sites before enumeration.
     site_classes = _environment_classes(ligand, combinatorial_site_indices)
@@ -519,175 +587,16 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
             a.metal_contact_count,
         )
 
-    # Helper: add up to N hydrogens on parent_indices
+    ring_charge = _haptic_ring_charge(ligand, g, parent_indices)
+    if ring_charge is not None:
+        site_proton_counts.update(
+            _protonate_ring(
+                ligand, f"{g.formula} {g.haptic_type}", parent_indices, ring_charge
+            )
+        )
 
-    def _assign_protonation_sites(max_protons: int):
-        molecule = ligand.get_parent("molecule")
-
-        adjacency_dict = {}
-        metal_adjacency_dict = {}
-        for idx in parent_indices:
-            atom = ligand.atoms[idx]
-            adjacency_dict[idx] = [
-                molecule.labels[adj]
-                for adj in atom.neighbor_indices
-                if adj not in atom.metal_contact_indices
-            ]
-            metal_adjacency_dict[idx] = [
-                molecule.labels[adj] for adj in atom.metal_contact_indices
-            ]
-
-        def _select_sites(strict_mode: bool):
-            """Select protonation sites with chemical priority."""
-            protonation_sites = []
-            added = 0
-            skip_cnt = 0
-
-            if strict_mode:
-                candidates = []
-
-                for idx in parent_indices:
-                    adj_labels = adjacency_dict[idx]
-                    nC = adj_labels.count("C")
-                    nH = adj_labels.count("H")
-                    nTot = len(adj_labels)
-
-                    # priority (lower number = higher priority)
-                    if nTot == 2 and nC == 1 and nH == 1:  # C1H1
-                        priority = 0
-                    if nTot == 3 and nC == 1 and nH == 2:  # C1H2
-                        priority = 1
-                    elif nTot == 2 and nC == 2 and nH == 0:  # C2H0
-                        priority = 2
-                    elif nTot == 3 and nC == 2 and nH == 1:  # C2H1
-                        priority = 3
-                    else:
-                        priority = 4
-
-                    candidates.append((priority, idx))
-                logger.debug("  Candidates: %s", candidates)
-                candidates.sort(key=lambda x: x[0])
-
-                for _, idx in candidates:
-                    atom = ligand.atoms[idx]
-
-                    if max_protons == 2 and added == 1 and skip_cnt < 2:
-                        skip_cnt += 1
-                        logger.debug(
-                            f"  Skipping {idx} (count: {skip_cnt}) %s %s",
-                            atom.label,
-                            atom.atom_site_label,
-                        )
-                        continue
-
-                    if added >= max_protons:
-                        break
-
-                    protonation_sites.append(idx)
-                    added += 1
-                    logger.debug(
-                        "  Added proton to %d %s %s %s %s",
-                        idx,
-                        atom.label,
-                        atom.atom_site_label,
-                        adjacency_dict[idx],
-                        metal_adjacency_dict[idx],
-                    )
-
-                return protonation_sites
-
-            for idx in parent_indices:
-                atom = ligand.atoms[idx]
-                adj_labels = adjacency_dict[idx]
-                metal_adj_labels = metal_adjacency_dict[idx]
-
-                if len(metal_adj_labels) >= 2:
-                    continue
-
-                nC = adj_labels.count("C")
-                nTot = len(adj_labels)
-
-                if nTot == 3 and nC == 3:
-                    if max_protons == 2 and added == 1 and skip_cnt < 2:
-                        skip_cnt += 1
-                        logger.debug(
-                            f"  Skipping {idx} (count: {skip_cnt}) %s %s",
-                            atom.label,
-                            atom.atom_site_label,
-                        )
-                        continue
-
-                    protonation_sites.append(idx)
-                    added += 1
-                    logger.debug(
-                        "  Added proton to %d %s %s %s %s",
-                        idx,
-                        atom.label,
-                        atom.atom_site_label,
-                        adjacency_dict[idx],
-                        metal_adjacency_dict[idx],
-                    )
-
-                    if added >= max_protons:
-                        break
-
-            return protonation_sites
-
-        protonation_sites = _select_sites(strict_mode=True)
-
-        if len(protonation_sites) < max_protons:
-            logger.debug("  Falling back to relaxed protonation rules")
-            protonation_sites = _select_sites(strict_mode=False)
-
-        if len(protonation_sites) == max_protons:
-            site_set = set(protonation_sites)
-            for idx in parent_indices:
-                if idx in site_set:
-                    site_proton_counts[idx] = 1
-
-    # Cp-like rings
-    if "eta5(Cp)" in g.haptic_type:
-        _assign_protonation_sites(1)
-
-    elif "eta6(benzene)" in g.haptic_type:
-        pass
-
-    elif "CHT" in g.haptic_type:  # can be anion or cation
-        pass
-
-    elif "COT" in g.haptic_type:
-        _assign_protonation_sites(2)
-
-    elif "pentalene" in g.haptic_type:
-        _assign_protonation_sites(2)
-
-    # As5 / Pentaphosphole (substitution dependent)
-    # e.g. GOCSID, VENNEH
-    elif "eta5(As5)" in g.haptic_type:
-        issubstituted = False
-        for idx in parent_indices:
-            a = ligand.atoms[idx]
-            if a.metal_contact_count == 1:
-                for adj in a.neighbor_indices:
-                    if ligand.get_parent("molecule").labels[adj] != "As":
-                        issubstituted = True
-        _assign_protonation_sites(0 if issubstituted else 1)
-
-    # e.g. IMUCAX
-    elif "eta5(P5)" in g.haptic_type:
-        issubstituted = False
-        for idx in parent_indices:
-            a = ligand.atoms[idx]
-            if a.metal_contact_count == 1:
-                for adj in a.neighbor_indices:
-                    if ligand.get_parent("molecule").labels[adj] != "P":
-                        issubstituted = True
-        _assign_protonation_sites(0 if issubstituted else 1)
-
-    elif "eta3(C3)" in g.haptic_type:
-        _assign_protonation_sites(1)
     # Other hapticities
-    else:
+    if ring_charge is None:
         if ligand.formula == "H8-C8" or (
             g.topology["is_single_simple_ring"] and g.topology["ring_sizes"][0] == 8
         ):
@@ -762,6 +671,300 @@ def _handle_haptic_group(ligand, g, parent_indices) -> ProtonationGroupResult:
         needs_combinatorial=needs_combinatorial,
         combinatorial_indices=combinatorial_indices,
     )
+
+
+############################################################
+# Ring rules for haptic groups
+############################################################
+
+# Protons that make a neutral, closed-shell frame of each aromatic ring: one
+# per unit of ring charge. Rings listed at 0 are neutral but still get their
+# bare carbons protonated.
+_RING_CHARGE_BY_HAPTIC_TYPE = (
+    ("eta5(Cp)", 1),
+    ("eta6(benzene)", 0),
+    ("CHT", 0),  # tropylium (+1) or cycloheptatrienyl anion (-1); left to the sweep
+    ("eta8(COT)", 2),
+    ("pentalene", 2),
+    ("eta3(C3)", 1),
+)
+
+
+# Charge of an all-carbon ring system bound haptically, keyed by its fused ring
+# sizes. Zero-charge systems are listed so their bare carbons still get protons.
+_RING_SYSTEM_CHARGE = {
+    (5,): 1,  # cyclopentadienyl
+    (6,): 0,  # arene
+    (7,): 0,  # cycloheptatrienyl: cation or anion, left to the sweep
+    (8,): 2,  # cyclooctatetraene dianion; requires eta8(COT) on this ring
+    (5, 5): 2,  # pentalene dianion
+    (5, 6): 1,  # indenyl
+    (5, 5, 6): 1,  # fluorenyl
+    (6, 6): 0,  # naphthalene
+}
+
+
+def _haptic_ring_systems(ligand, groups) -> list[tuple[list[int], int, str]]:
+    """All-carbon fused ring systems that carry a haptic group, with their charge.
+
+    Return (ring atoms, charge magnitude, label) per system whose fused ring
+    sizes are listed in _RING_SYSTEM_CHARGE. Other systems keep the per-group rules.
+    """
+    haptic_atoms = {
+        idx for g in groups if g.is_haptic for idx in g.get_parent_indices("ligand")
+    }
+    if not haptic_atoms:
+        return []
+
+    adj = np.asarray(ligand.adjacency_matrix)
+    heavy = [i for i, label in enumerate(ligand.labels) if label != "H"]
+    graph = nx.Graph()
+    graph.add_nodes_from(heavy)
+    graph.add_edges_from((i, j) for i in heavy for j in heavy if i < j and adj[i][j])
+    # Fusing rings: cycles that share an atom belong to one system.
+    cycles = [set(c) for c in nx.minimum_cycle_basis(graph) if len(c) <= 8]
+    fused = nx.Graph()
+    fused.add_nodes_from(range(len(cycles)))
+    fused.add_edges_from(
+        (a, b)
+        for a in range(len(cycles))
+        for b in range(a + 1, len(cycles))
+        if cycles[a] & cycles[b]
+    )
+
+    systems = []
+    for component in nx.connected_components(fused):
+        atoms = sorted(set().union(*(cycles[c] for c in component)))
+        if not haptic_atoms & set(atoms):
+            continue
+        if any(ligand.labels[i] != "C" for i in atoms):
+            continue
+        sizes = tuple(sorted(len(cycles[c]) for c in component))
+        # An eight-carbon ring can also be neutral cyclooctadiene. Only
+        # explicit eta8(COT) coordination identifies the dianionic COT rule.
+        if sizes == (8,) and not any(
+            g.is_haptic
+            and "eta8(COT)" in (g.haptic_type or "")
+            and set(atoms) <= set(g.get_parent_indices("ligand"))
+            for g in groups
+        ):
+            continue
+        charge = _RING_SYSTEM_CHARGE.get(sizes)
+        if charge is None:
+            logger.debug(
+                "  Ring system %s with ring sizes %s has no ring-charge rule; "
+                "its groups are handled one by one",
+                [ligand.atoms[i].atom_site_label for i in atoms],
+                sizes,
+            )
+            continue
+        label = f"ring system {sizes}"
+        logger.debug(
+            "  %s on %s: ring charge %d",
+            label,
+            [ligand.atoms[i].atom_site_label for i in atoms],
+            charge,
+        )
+        systems.append((atoms, charge, label))
+    return systems
+
+
+def _is_conjugated_pi_chain(ligand, parent_indices) -> bool:
+    """True for three or more connected sp2 C/N atoms with no ring: an open
+    pi system (allyl, azaallyl, dienyl, azadienyl) bound side-on to one metal.
+    """
+    if len(parent_indices) < 3:
+        return False
+    if any(ligand.labels[i] not in {"C", "N"} for i in parent_indices):
+        return False
+    adj = np.asarray(ligand.adjacency_matrix)
+    members = set(parent_indices)
+    graph = nx.Graph()
+    graph.add_nodes_from(parent_indices)
+    graph.add_edges_from(
+        (i, j) for i in parent_indices for j in parent_indices if i < j and adj[i][j]
+    )
+    if not nx.is_connected(graph) or not nx.is_tree(graph):
+        return False
+    # sp2: at most three non-metal neighbours (hydrogens included).
+    return all(int(adj[i].sum()) <= 3 for i in parent_indices)
+
+
+def _haptic_ring_charge(ligand, g, parent_indices) -> int | None:
+    """Magnitude of the ring charge a haptic group carries, or None if no rule applies."""
+    haptic_type = g.haptic_type or ""
+    for key, charge in _RING_CHARGE_BY_HAPTIC_TYPE:
+        if key in haptic_type:
+            return charge
+
+    # As5 / pentaphosphole-like rings: anionic only when unsubstituted (GOCSID, VENNEH).
+    if "eta5(As5)" in haptic_type:
+        molecule = ligand.get_parent("molecule")
+        for idx in parent_indices:
+            a = ligand.atoms[idx]
+            if a.metal_contact_count == 1 and any(
+                molecule.labels[adj] != "As" for adj in a.neighbor_indices
+            ):
+                return 0
+        return 1
+    return None
+
+
+def _bare_ring_carbons(ligand, parent_indices) -> list[int]:
+    """Group carbons with two ring neighbours and nothing else: no hydrogen, no
+    substituent. A bridgehead of a fused system has three ring neighbours and
+    is not bare.
+    """
+    adj = ligand.adjacency_matrix
+    members = set(parent_indices)
+    bare = []
+    for idx in parent_indices:
+        if ligand.labels[idx] != "C":
+            continue
+        neighbours = np.nonzero(adj[idx])[0].tolist()
+        if len(neighbours) == 2 and all(n in members for n in neighbours):
+            bare.append(idx)
+    return bare
+
+
+def _adjacent_bare_pairs(ligand, bare: list[int]) -> list[tuple[int, int]]:
+    """Bonded pairs of bare carbons: an in-plane alkyne unit, neutral as a pair."""
+    adj = ligand.adjacency_matrix
+    graph = nx.Graph()
+    graph.add_nodes_from(bare)
+    graph.add_edges_from((i, j) for i in bare for j in bare if i < j and adj[i][j])
+    return sorted(
+        tuple(sorted(e)) for e in nx.max_weight_matching(graph, maxcardinality=True)
+    )
+
+
+def _protonate_ring(ligand, label, parent_indices, ring_charge: int) -> Dict[int, int]:
+    """One proton per bare carbon, then `ring_charge` more on the ring, minus two
+    per adjacent bare pair.
+
+    The frame must stay drawable as a neutral closed shell: the sites are chosen
+    so the remaining sp2 atoms of the group admit a perfect matching.
+    """
+    bare = _bare_ring_carbons(ligand, parent_indices)
+    pairs = _adjacent_bare_pairs(ligand, bare)
+    quota = max(ring_charge - 2 * len(pairs), 0)
+
+    counts: Dict[int, int] = {idx: 1 for idx in bare}
+    if bare:
+        logger.debug(
+            "  %s: bare ring carbon(s) %s get one proton each; %d adjacent "
+            "pair(s) %s counted as a neutral alkyne; %d of %d ring proton(s) left",
+            label,
+            [ligand.atoms[i].atom_site_label for i in bare],
+            len(pairs),
+            [[ligand.atoms[i].atom_site_label for i in pair] for pair in pairs],
+            quota,
+            ring_charge,
+        )
+
+    sites = _select_ring_sites(ligand, parent_indices, quota, exclude=bare)
+    if quota and len(sites) < quota:
+        logger.debug(
+            "  %s: could only place %d of %d ring proton(s)",
+            label,
+            len(sites),
+            quota,
+        )
+    for idx in sites:
+        counts[idx] = counts.get(idx, 0) + 1
+    if sites:
+        logger.debug(
+            "  %s: ring proton(s) on %s",
+            label,
+            [ligand.atoms[i].atom_site_label for i in sites],
+        )
+    return counts
+
+
+def _select_ring_sites(
+    ligand, parent_indices, quota: int, exclude: list[int]
+) -> list[int]:
+    """Choose `quota` group atoms to protonate so the rest still pair into double bonds.
+
+    Preference: a sigma-bound (kappa1) ring carbon first, since the carbanion
+    belongs there even when it is substituted; then unsubstituted C-H carbons;
+    then carbons bound to a single metal; then the most spread-out placement
+    (1,4 on an eight-ring, not 1,2). Return fewer sites when nothing satisfies
+    the matching requirement.
+    """
+    if quota <= 0:
+        return []
+
+    adj = ligand.adjacency_matrix
+    sigma = {
+        idx
+        for g in (ligand.groups or [])
+        if not g.is_haptic
+        for idx in g.get_parent_indices("ligand")
+    }
+    members = [idx for idx in parent_indices if idx not in set(exclude)]
+    graph = nx.Graph()
+    graph.add_nodes_from(parent_indices)
+    graph.add_edges_from(
+        (i, j) for i in parent_indices for j in parent_indices if i < j and adj[i][j]
+    )
+    distance = dict(nx.all_pairs_shortest_path_length(graph))
+
+    def substituted(idx: int) -> bool:
+        neighbours = np.nonzero(adj[idx])[0].tolist()
+        return not any(ligand.labels[n] == "H" for n in neighbours)
+
+    def multi_metal(idx: int) -> bool:
+        return (ligand.atoms[idx].metal_contact_count or 0) >= 2
+
+    def unbound(idx: int) -> bool:
+        return (ligand.atoms[idx].metal_contact_count or 0) == 0
+
+    def leaves_kekule(chosen: tuple[int, ...]) -> bool:
+        rest = [idx for idx in parent_indices if idx not in chosen]
+        if len(rest) % 2:
+            return False
+        if not rest:
+            return True
+        sub = graph.subgraph(rest)
+        matching = nx.max_weight_matching(sub, maxcardinality=True)
+        return 2 * len(matching) == len(rest)
+
+    def spread(chosen: tuple[int, ...]) -> int:
+        return sum(distance[i][j] for i, j in itertools.combinations(chosen, 2))
+
+    def key(chosen: tuple[int, ...]):
+        return (
+            sum(substituted(i) and i not in sigma for i in chosen),
+            -sum(i in sigma for i in chosen),
+            sum(unbound(i) for i in chosen),
+            sum(multi_metal(i) for i in chosen),
+            -spread(chosen),
+            chosen,
+        )
+
+    max_candidates = 12  # C(12, 2) = 66 combinations, C(12, 3) = 220
+    members = sorted(
+        members,
+        key=lambda i: (
+            substituted(i) and i not in sigma,
+            i not in sigma,
+            unbound(i),
+            multi_metal(i),
+            i,
+        ),
+    )[:max_candidates]
+    combos = sorted(itertools.combinations(members, quota), key=key)
+    for chosen in combos:
+        if leaves_kekule(chosen):
+            return list(chosen)
+    logger.debug(
+        "  No %d-site protonation of %s leaves a Kekule structure; using the "
+        "preferred placement anyway",
+        quota,
+        [ligand.atoms[i].atom_site_label for i in parent_indices],
+    )
+    return list(combos[0]) if combos else []
 
 
 def _handle_non_haptic_group(
