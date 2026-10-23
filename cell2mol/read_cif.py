@@ -424,11 +424,20 @@ def extract_chemical_name(
     return None
 
 
-# Match ferrocenium before its shorter ferrocene fragment.
-METAL_OS_SPECIAL_CASES = [
-    ("ferrocenium", ("iron", 3)),  # ferrocenium cation -> Fe(III)
-    ("ferrocen", ("iron", 2)),  # ferrocene / ferrocenyl -> Fe(II)
-]
+ROMAN_OX_STATES = {
+    "0": 0,
+    "o": 0,
+    "i": 1,
+    "ii": 2,
+    "iii": 3,
+    "iv": 4,
+    "v": 5,
+    "vi": 6,
+    "vii": 7,
+    "viii": 8,
+    "ix": 9,  # [IrO4]+
+    "x": 10,  # theoretically possible
+}
 
 
 def extract_metal_oxidation_states(
@@ -437,40 +446,65 @@ def extract_metal_oxidation_states(
     """Extract named oxidation states from Roman numerals and name-encoded special cases."""
     oxidation_states: list[tuple[str, int | None]] = []
 
-    from cell2mol.standardize_metal_os import elemdatabase, PREFIX_MAP
+    from cell2mol.standardize_metal_os import (
+        elemdatabase,
+        GROUP_MULTIPLIER_MAP,
+        METAL_OS_SPECIAL_CASES,
+        PREFIX_MAP,
+    )
 
     prefixes = "|".join(sorted(PREFIX_MAP, key=len, reverse=True))
+    multipliers = "|".join(GROUP_MULTIPLIER_MAP)
+    numeral = r"(?:viii|vii|iii|vi|iv|ii|ix|x|v|i|0|o)"
+    numeral_list = rf"{numeral}(?:\s*,\s*{numeral})*"
 
-    # Check name-encoded states before explicit Roman numerals.
+    # Check name-encoded states before explicit Roman numerals. Substituents
+    # attach directly (dimethylferrocene), so only a multiplicity prefix is
+    # anchored to a word start; bi- also follows a substituent, as in
+    # di-iodobiferrocenium. Numerals on the fragment override its default.
+    # Longer fragments come first, so ferrocenium wins over ferrocen.
     fragments = "|".join(fragment for fragment, _ in METAL_OS_SPECIAL_CASES)
-    special_pattern = rf"\b(?:(?:{prefixes})-?)?(?P<fragment>{fragments})"
+    special_pattern = (
+        rf"(?P<prefix>(?:{multipliers})\(|\b(?:{prefixes})-?|bi)?"
+        rf"(?P<fragment>{fragments})[a-z]*"
+        rf"(?:\(\s*(?P<states>{numeral_list})\s*\))?"
+    )
     special_states = dict(METAL_OS_SPECIAL_CASES)
-    for match in re.finditer(special_pattern, chemical_name, re.IGNORECASE):
+    special_matches = list(re.finditer(special_pattern, chemical_name, re.IGNORECASE))
+    for match in special_matches:
+        prefix = (match.group("prefix") or "").lower()
         fragment = match.group("fragment").lower()
-        oxidation_states.append((match.group(0).lower(), special_states[fragment][1]))
+        if match.group("states") is None:
+            oxidation_states.append((prefix + fragment, special_states[fragment][1]))
+            continue
+        numerals = [s.strip().lower() for s in match.group("states").split(",")]
+        if len(numerals) == 1:
+            oxidation_states.append(
+                (f"{prefix}{fragment}({numerals[0]})", ROMAN_OX_STATES[numerals[0]])
+            )
+        else:
+            # Each numeral describes one unit, as for biferrocenium(ii,iii).
+            oxidation_states.extend(
+                (f"{fragment}({n})", ROMAN_OX_STATES[n]) for n in numerals
+            )
 
     # Accept single states and mixed-valence lists such as di-zirconium(ii,iv).
-    numeral = r"(?:viii|vii|iii|vi|iv|ii|ix|x|v|i|0|o)"
-    pattern = rf"(\b[a-zA-Z-]+\b)\(\s*({numeral}(?:\s*,\s*{numeral})*)\s*\)"
+    pattern = rf"(\b[a-zA-Z-]+\b)\(\s*({numeral_list})\s*\)"
 
-    matches = list(re.finditer(pattern, chemical_name, re.IGNORECASE))
+    # Numerals already consumed by a special fragment are not read twice.
+    matches = [
+        match
+        for match in re.finditer(pattern, chemical_name, re.IGNORECASE)
+        if not any(
+            special.start() <= match.start(2) < special.end()
+            for special in special_matches
+        )
+    ]
     for match in matches:
         metal, ox_state = match.groups()
-        ox_state_map = {
-            "0": 0,
-            "o": 0,
-            "i": 1,
-            "ii": 2,
-            "iii": 3,
-            "iv": 4,
-            "v": 5,
-            "vi": 6,
-            "vii": 7,
-            "viii": 8,
-            "ix": 9,  # [IrO4]+
-            "x": 10,  # theoretically possible
-        }
-        states = [ox_state_map[state.strip().lower()] for state in ox_state.split(",")]
+        states = [
+            ROMAN_OX_STATES[state.strip().lower()] for state in ox_state.split(",")
+        ]
         if len(states) == 1:
             oxidation_states.append((match.group(0), states[0]))
         else:

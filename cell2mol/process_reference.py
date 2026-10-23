@@ -4,7 +4,10 @@ import os
 import logging
 import numpy as np
 from ase.io import read
-from cell2mol.standardize_metal_os import standardize_reported_metal_oxidation_states
+from cell2mol.standardize_metal_os import (
+    is_metallocene,
+    standardize_reported_metal_oxidation_states,
+)
 from cell2mol.utils import config
 from cell2mol.args import parsing_arguments
 from cell2mol.classes import Reference
@@ -173,17 +176,19 @@ def create_reference(input_path, name, cell_vector, cell_param):
         return refcell
 
     metal_label_list = []
+    metallocene_list = []
     for ref in refcell.refmoleclist:
         if ref.metals:
             for metal in ref.metals:
                 metal_label_list.append(metal.label)
+                metallocene_list.append(is_metallocene(metal))
 
     logger.debug(
         f"Reference Metals found: {metal_label_list} with reported oxidation states: {reported_metal_os}"
     )
 
     matched_list, confidence = standardize_reported_metal_oxidation_states(
-        metal_label_list, reported_metal_os
+        metal_label_list, reported_metal_os, metallocene_list
     )
     logger.info(
         f"Reported metal oxidation states standardized to {matched_list} with confidence {confidence:.2f}"
