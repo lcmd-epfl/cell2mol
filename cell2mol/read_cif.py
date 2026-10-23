@@ -450,6 +450,7 @@ def extract_metal_oxidation_states(
         elemdatabase,
         GROUP_MULTIPLIER_MAP,
         METAL_OS_SPECIAL_CASES,
+        METAL_NAME_ROOTS,
         PREFIX_MAP,
     )
 
@@ -521,10 +522,24 @@ def extract_metal_oxidation_states(
         re.escape(elemdatabase.elementname[symbol].lower())
         for symbol in sorted(TRANSITION_METALS)
     )
-    bare_pattern = rf"\b(?:(?:{prefixes})-?)?(?:{names})\b"
+    roots = "|".join(
+        re.escape(root)
+        for root in sorted(
+            {
+                root
+                for symbol in TRANSITION_METALS
+                for root in METAL_NAME_ROOTS.get(symbol, [])
+            },
+            key=len,
+            reverse=True,
+        )
+    )
+    # Try canonical names first, then rooted variants such as mercurio.
+    bare_pattern = rf"\b(?:(?:{prefixes})-?)?(?:{names}|(?:{roots})[a-z]*)\b"
     for match in re.finditer(bare_pattern, chemical_name, re.IGNORECASE):
         if any(
-            explicit.start() <= match.start() < explicit.end() for explicit in matches
+            explicit.start() < match.end() and match.start() < explicit.end()
+            for explicit in [*matches, *special_matches]
         ):
             continue
         oxidation_states.append((match.group(0), None))
