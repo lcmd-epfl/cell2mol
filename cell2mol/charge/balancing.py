@@ -6,6 +6,7 @@ from cell2mol.charge.aromaticity import aromatic_info
 from cell2mol.charge.oxidation_states import METAL_OS_OBSERVED, METAL_OXIDATION_STATES
 from cell2mol.write_results import log_charge_diagnostics
 from cell2mol.charge.charge_assignment import assign_charge_to_species
+from cell2mol.standardize_metal_os import is_metallocene
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +152,7 @@ def resolve_charge_distributions(
     warnings: dict | None = None,
 ):
     """
-    Computes all valid charge distributions that sum to the target input_charge.
+    Find charge-balanced distributions, apply preferences, and expand survivors.
     """
 
     species_charge_options: List[List[int]] = []
@@ -169,6 +170,10 @@ def resolve_charge_distributions(
                 inferred = _distribute_fixed_ligand_metal_charges(
                     unique_indices, unique_species, input_charge, warnings=warnings
                 )
+                if len(inferred) > 1:
+                    inferred = _preferred_distributions(
+                        unique_indices, unique_species, inferred
+                    )
                 return [
                     [charges[i] for i in unique_indices] for charges in inferred
                 ], inferred
@@ -218,6 +223,13 @@ def resolve_charge_distributions(
         len(expanded_species_charges),
     )
 
+    # Apply structural preferences before donor-based metal inference can
+    # collapse multiple candidates to one distribution.
+    if len(unique_species_charges) > 1:
+        unique_species_charges = _preferred_distributions(
+            unique_indices, unique_species, unique_species_charges
+        )
+
     if len(unique_species_charges) > 1 and not rare:
         ranked = _distribute_fixed_ligand_metal_charges(
             unique_indices,
@@ -241,6 +253,11 @@ def resolve_charge_distributions(
             for charges in unique_species_charges
         ]
 
+    # Keep expanded and unique results aligned after every filtering path.
+    expanded_species_charges = [
+        [charges[idx] for idx in unique_indices] for charges in unique_species_charges
+    ]
+    logger.info("Charge distributions remaining: %d", len(unique_species_charges))
     return expanded_species_charges, unique_species_charges
 
 
@@ -498,7 +515,9 @@ def _distribute_fixed_ligand_metal_charges(
 def _preferred_distributions(
     unique_indices, unique_species, distributions: List[List[int]]
 ) -> List[List[int]]:
-    """Prefer common metal oxidation states, then minimize total absolute ligand charge."""
+    """Prefer metallocene Fe(II/III) and avoidable oxygen cations."""
+    if not distributions:
+        return []
     occurrences: dict[int, int] = {}
     for u_idx in unique_indices:
         occurrences[u_idx] = occurrences.get(u_idx, 0) + 1
@@ -507,60 +526,100 @@ def _preferred_distributions(
         idx for idx, species in enumerate(unique_species) if species.subtype == "metal"
     ]
 
-    def separated_charge(distribution: List[int]) -> int:
-        return sum(
-            abs(charge) * occurrences.get(idx, 0)
-            for idx, (charge, species) in enumerate(zip(distribution, unique_species))
-            if species.subtype != "metal"
-        )
-
-    histograms = {
-        idx: _observed_os_histogram(unique_species[idx].label) for idx in metal_indices
-    }
-
-    def metal_likelihood(distribution: List[int]) -> float:
-        """P(oxidation state) across the cell's metals; 1.0 when none is tabulated."""
-        likelihood = 1.0
-        for idx in metal_indices:
-            histogram = histograms[idx]
-            if histogram:
-                likelihood *= histogram.get(distribution[idx], 0) / sum(
-                    histogram.values()
-                )
-        return likelihood
-
-    likelihoods = [metal_likelihood(dist) for dist in distributions]
-    likeliest = max(likelihoods)
-    if likeliest > 0:
-        alive = [
-            dist
-            for dist, likelihood in zip(distributions, likelihoods)
-            if likelihood * _PRIOR_DECISIVE_RATIO >= likeliest
-        ]
-        if len(alive) < len(distributions):
-            logger.info(
-                "Discarded %d of %d distribution(s) whose metal oxidation states "
-                "are over %dx rarer than the likeliest reading.",
-                len(distributions) - len(alive),
-                len(distributions),
-                _PRIOR_DECISIVE_RATIO,
+    ferrocene_indices = [
+        idx
+        for idx in metal_indices
+        if unique_species[idx].label == "Fe"
+        and getattr(unique_species[idx], "groups", None)
+        and is_metallocene(unique_species[idx])
+    ]
+    if ferrocene_indices:
+        penalties = [
+            sum(
+                occurrences.get(idx, 0)
+                for idx in ferrocene_indices
+                if dist[idx] not in (2, 3)
             )
-            distributions = alive
+            for dist in distributions
+        ]
+        lowest_penalty = min(penalties)
+        preferred = [
+            dist
+            for dist, penalty in zip(distributions, penalties)
+            if penalty == lowest_penalty
+        ]
+        if len(preferred) < len(distributions):
+            logger.info(
+                "Metallocene Fe(II/III) preference kept %d of %d distributions.",
+                len(preferred),
+                len(distributions),
+            )
+        distributions = preferred
 
-    burdens = [separated_charge(dist) for dist in distributions]
-    lowest = min(burdens)
-    best = [dist for dist, burden in zip(distributions, burdens) if burden == lowest]
-
-    if len(best) < len(distributions):
-        logger.info(
-            "%d distributions balanced the cell; kept the %d separating the "
-            "least ligand charge (%d, down from %d).",
-            len(distributions),
-            len(best),
-            lowest,
-            max(burdens),
+    # Metal frequency and total absolute ligand charge preferences are disabled.
+    best = distributions
+    # A lower oxygen penalty must not increase internal formal-charge pairing.
+    metrics = [
+        _oxygen_distribution_metrics(unique_indices, unique_species, dist)
+        for dist in best
+    ]
+    survivors = [
+        dist
+        for i, dist in enumerate(best)
+        if metrics[i] is None
+        or not any(
+            other is not None and other[0] < metrics[i][0] and other[1] <= metrics[i][1]
+            for other in metrics
         )
-    return best
+    ]
+    if len(survivors) < len(best):
+        logger.info(
+            "Oxygen cation preference kept %d of %d distributions without "
+            "increasing internal ligand charge separation.",
+            len(survivors),
+            len(best),
+        )
+    return survivors
+
+
+def _oxygen_distribution_metrics(unique_indices, unique_species, distribution):
+    """Return occurrence-weighted (O positive charge, internal charge pairing).
+
+    Use original species structures, never temporarily protonated structures.
+    Missing or nonunique structures leave the distribution unranked.
+    """
+    oxygen = separation = 0
+    for idx, (species, charge) in enumerate(zip(unique_species, distribution)):
+        count = unique_indices.count(idx)
+        if species.subtype == "metal" or not count:
+            continue
+        values = set()
+        for state in getattr(species, "plausible_charge_states", None) or []:
+            if state.species_total_charge != charge:
+                continue
+            mol = getattr(state, "species_rdkit_obj", None)
+            if mol is None:
+                return None
+            atoms = list(mol.GetAtoms())
+            charges = [atom.GetFormalCharge() for atom in atoms]
+            if sum(charges) != charge:
+                return None
+            values.add(
+                (
+                    sum(
+                        max(0, atom.GetFormalCharge())
+                        for atom in atoms
+                        if atom.GetAtomicNum() == 8
+                    ),
+                    (sum(abs(q) for q in charges) - abs(charge)) // 2,
+                )
+            )
+        if len(values) != 1:
+            return None
+        o, pairing = values.pop()
+        oxygen += count * o
+        separation += count * pairing
+    return oxygen, separation
 
 
 def _balance_with_observed_metal_os(
