@@ -30,7 +30,9 @@ def compute_class_weights(graphs: list[HeteroData]) -> torch.Tensor:
     return weights
 
 
-def mask_charges(data: HeteroData, charge_columns: dict[str, tuple[int, ...]], p: float) -> HeteroData:
+def mask_charges(
+    data: HeteroData, charge_columns: dict[str, tuple[int, ...]], p: float
+) -> HeteroData:
     """
     Charge dropout: in each graph of the batch, with probability `p`, zero
     every column in `charge_columns` (Variant.charge_columns) on all its
@@ -49,7 +51,11 @@ def mask_charges(data: HeteroData, charge_columns: dict[str, tuple[int, ...]], p
         store = data[node_type]
         if store.num_nodes == 0:
             continue
-        batch = store.batch if "batch" in store else torch.zeros(store.num_nodes, dtype=torch.long, device=store.x.device)
+        batch = (
+            store.batch
+            if "batch" in store
+            else torch.zeros(store.num_nodes, dtype=torch.long, device=store.x.device)
+        )
         rows = dropped[batch].nonzero(as_tuple=True)[0]
         store.x[rows.unsqueeze(1), torch.tensor(cols, device=store.x.device)] = 0.0
 
@@ -117,7 +123,13 @@ def evaluate_with_predictions(
     total = len(y_true)
     correct = sum(t == p for t, p in zip(y_true, y_pred))
     macro_f1 = (
-        f1_score(y_true, y_pred, labels=list(range(len(OX_STATES))), average="macro", zero_division=0)
+        f1_score(
+            y_true,
+            y_pred,
+            labels=list(range(len(OX_STATES))),
+            average="macro",
+            zero_division=0,
+        )
         if total
         else 0.0
     )
@@ -169,7 +181,9 @@ def fit(
     epochs_without_improvement = 0
 
     for epoch in range(1, epochs + 1):
-        train_loss = train_one_epoch(model, train_loader, optimizer, device, class_weights, train_transform)
+        train_loss = train_one_epoch(
+            model, train_loader, optimizer, device, class_weights, train_transform
+        )
         val = evaluate_with_predictions(model, val_loader, device)
 
         scheduler.step(val["loss"])
@@ -231,7 +245,9 @@ def print_confusion_matrix(y_true: list[int], y_pred: list[int]) -> None:
 
     print("true\\pred".ljust(10) + "".join(f"{ox:>6d}" for ox in OX_STATES))
     for i, ox in enumerate(OX_STATES):
-        print(f"{ox:<10d}" + "".join(f"{matrix[i, j]:>6d}" for j in range(len(OX_STATES))))
+        print(
+            f"{ox:<10d}" + "".join(f"{matrix[i, j]:>6d}" for j in range(len(OX_STATES)))
+        )
 
 
 @torch.no_grad()
@@ -249,5 +265,7 @@ def predict_oxidation_state(
         "oxidation_state": CLASS_TO_OX[pred_class],
         "class_index": pred_class,
         "confidence": float(probs[0, pred_class].item()),
-        "probabilities": {CLASS_TO_OX[i]: float(probs[0, i].item()) for i in range(probs.shape[-1])},
+        "probabilities": {
+            CLASS_TO_OX[i]: float(probs[0, i].item()) for i in range(probs.shape[-1])
+        },
     }

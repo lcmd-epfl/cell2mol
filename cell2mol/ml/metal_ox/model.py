@@ -54,7 +54,10 @@ class MetalOxHeteroGNN(nn.Module):
 
         self.convs = nn.ModuleList(
             HeteroConv(
-                {edge_type: make_gine(hidden_dim, dim) for edge_type, dim in edge_dims.items()},
+                {
+                    edge_type: make_gine(hidden_dim, dim)
+                    for edge_type, dim in edge_dims.items()
+                },
                 aggr="sum",
             )
             for _ in range(num_layers)
@@ -69,10 +72,14 @@ class MetalOxHeteroGNN(nn.Module):
 
     @property
     def node_dims(self) -> dict[str, int]:
-        return {nt: getattr(self, f"{nt}_encoder").in_channels for nt in self.node_types}
+        return {
+            nt: getattr(self, f"{nt}_encoder").in_channels for nt in self.node_types
+        }
 
     def forward(self, data: HeteroData) -> torch.Tensor:
-        x_dict = {nt: getattr(self, f"{nt}_encoder")(data[nt].x) for nt in self.node_types}
+        x_dict = {
+            nt: getattr(self, f"{nt}_encoder")(data[nt].x) for nt in self.node_types
+        }
 
         for conv in self.convs:
             x_new = conv(x_dict, data.edge_index_dict, data.edge_attr_dict)
@@ -108,7 +115,9 @@ def build_model(
     )
 
 
-def checkpoint_metadata(model: MetalOxHeteroGNN, variant: Variant, hparams: dict) -> dict:
+def checkpoint_metadata(
+    model: MetalOxHeteroGNN, variant: Variant, hparams: dict
+) -> dict:
     """Everything `load_model` needs besides the weights. `<nt>_dim` keys are
     the format the original modules wrote, kept so old and new checkpoints
     load the same way."""
@@ -137,7 +146,9 @@ def load_model(
 
     variant = variant or checkpoint.get("variant")
     if variant is None:
-        raise ValueError(f"{checkpoint_path} has no 'variant' recorded; pass variant= explicitly")
+        raise ValueError(
+            f"{checkpoint_path} has no 'variant' recorded; pass variant= explicitly"
+        )
     if isinstance(variant, str):
         variant = get_variant(variant)
     if checkpoint.get("variant", variant.name) != variant.name:
@@ -145,7 +156,11 @@ def load_model(
             f"{checkpoint_path} was trained as {checkpoint['variant']!r}, not {variant.name!r}"
         )
 
-    node_dims = {nt: checkpoint[f"{nt}_dim"] for nt in variant.node_types if f"{nt}_dim" in checkpoint}
+    node_dims = {
+        nt: checkpoint[f"{nt}_dim"]
+        for nt in variant.node_types
+        if f"{nt}_dim" in checkpoint
+    }
 
     if expected_node_dims is not None:
         expected = {nt: expected_node_dims[nt] for nt in variant.node_types}

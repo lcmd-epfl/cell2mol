@@ -27,7 +27,7 @@ from collections import Counter
 
 
 def parse_tag(token: str) -> tuple[str, int | None]:
-    """"Pd_2" -> ("Pd", 2); "Pd_-2" -> ("Pd", -2); "Pd_unknown" -> ("Pd", None)."""
+    """ "Pd_2" -> ("Pd", 2); "Pd_-2" -> ("Pd", -2); "Pd_unknown" -> ("Pd", None)."""
     element, _, charge_text = token.rpartition("_")
     try:
         return element, int(charge_text)

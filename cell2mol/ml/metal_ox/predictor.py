@@ -25,13 +25,20 @@ class MetalOxPredictor:
         from .variants import get_variant, make_builder
 
         self.checkpoint = Path(checkpoint)
-        variant_name = torch.load(self.checkpoint, map_location="cpu", weights_only=False).get("variant")
+        variant_name = torch.load(
+            self.checkpoint, map_location="cpu", weights_only=False
+        ).get("variant")
         if variant_name is None:
             raise ValueError(f"{self.checkpoint} records no variant")
 
         self.variant = get_variant(variant_name)
         self.builder = make_builder(self.variant)
-        self.model = load_model(self.checkpoint, self.variant, "cpu", expected_node_dims=self.builder.node_dims)
+        self.model = load_model(
+            self.checkpoint,
+            self.variant,
+            "cpu",
+            expected_node_dims=self.builder.node_dims,
+        )
 
     def probabilities(self, metal) -> dict[int, float] | None:
         """{oxidation state: probability} for `metal`, or None for a metal
@@ -41,7 +48,9 @@ class MetalOxPredictor:
 
         from .training import predict_oxidation_state
 
-        return predict_oxidation_state(self.model, self.builder.build(metal), "cpu")["probabilities"]
+        return predict_oxidation_state(self.model, self.builder.build(metal), "cpu")[
+            "probabilities"
+        ]
 
 
 @lru_cache(maxsize=4)

@@ -70,9 +70,14 @@ def balance_unitcell_charge(refcell, unitcell):
     #         unique_species_charges = [inferred_charges]
     #         unitcell.error_empty_distrib = False
 
-    if (unitcell.error_multiple_distrib or unitcell.error_empty_distrib) and config.GNN_METAL_OS:
+    if (
+        unitcell.error_multiple_distrib or unitcell.error_empty_distrib
+    ) and config.GNN_METAL_OS:
         resolved = _resolve_with_gnn(
-            unitcell.unique_indices, refcell.unique_species, unique_species_charges, warnings=warnings
+            unitcell.unique_indices,
+            refcell.unique_species,
+            unique_species_charges,
+            warnings=warnings,
         )
         if resolved is not None:
             unique_species_charges = [resolved]
@@ -134,7 +139,9 @@ def balance_molecule_charge(molset, input_charge: int = 0):
     molset.error_multiple_distrib = dist_count > 1
     molset.error_empty_distrib = dist_count == 0
 
-    if (molset.error_multiple_distrib or molset.error_empty_distrib) and config.GNN_METAL_OS:
+    if (
+        molset.error_multiple_distrib or molset.error_empty_distrib
+    ) and config.GNN_METAL_OS:
         resolved = _resolve_with_gnn(
             unique_indices,
             molset.unique_species,
@@ -339,7 +346,9 @@ def _record_step(trace: List[str] | None, step: str, before: str | None = None):
         trace.append(step)
 
 
-def _resolve_with_gnn(unique_indices, unique_species, candidates, input_charge: int = 0, warnings=None):
+def _resolve_with_gnn(
+    unique_indices, unique_species, candidates, input_charge: int = 0, warnings=None
+):
     """
     Settle a failed balance with the metal oxidation-state GNN
     (cell2mol.ml.metal_ox). Each unique metal species gets the GNN's most
@@ -368,7 +377,9 @@ def _resolve_with_gnn(unique_indices, unique_species, candidates, input_charge: 
             continue
         probabilities = predictor.probabilities(species)
         if not probabilities:
-            logger.info("GNN: no prediction for %s (no coordination sphere).", species.formula)
+            logger.info(
+                "GNN: no prediction for %s (no coordination sphere).", species.formula
+            )
             return None
         state, confidence = max(probabilities.items(), key=lambda item: item[1])
         logger.info(
@@ -380,13 +391,18 @@ def _resolve_with_gnn(unique_indices, unique_species, candidates, input_charge: 
         )
         if confidence < config.GNN_METAL_OS_MIN_CONFIDENCE:
             logger.info(
-                "GNN: confidence below %.2f; balance left unresolved.", config.GNN_METAL_OS_MIN_CONFIDENCE
+                "GNN: confidence below %.2f; balance left unresolved.",
+                config.GNN_METAL_OS_MIN_CONFIDENCE,
             )
             return None
         picks[idx] = state
 
     if candidates:
-        matching = [c for c in candidates if all(c[idx] == state for idx, state in picks.items())]
+        matching = [
+            c
+            for c in candidates
+            if all(c[idx] == state for idx, state in picks.items())
+        ]
     else:
         _, matching = resolve_charge_distributions(
             unique_indices,

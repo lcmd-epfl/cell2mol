@@ -91,7 +91,9 @@ def _simple(
     if flags.get("atom_charge"):
         # atom: one-hot + [Z, period, EN, mconnec, other connec] + charge [+ has_charge]
         first = len(ATOM_TYPES) + 5
-        charge_columns["atom"] = (first, first + 1) if flags.get("atom_charge_flag") else (first,)
+        charge_columns["atom"] = (
+            (first, first + 1) if flags.get("atom_charge_flag") else (first,)
+        )
     if ligand_node and ligand_charge:
         charge_columns["ligand"] = (0, 1)  # totcharge, has_totcharge
 
@@ -110,12 +112,19 @@ def _simple(
         description=description,
         node_types=tuple(node_types),
         edges=tuple(edges),
-        builder_kwargs=dict(coord_modes=coord_modes, ligand_node=ligand_node, ligand_charge=ligand_charge, **flags),
+        builder_kwargs=dict(
+            coord_modes=coord_modes,
+            ligand_node=ligand_node,
+            ligand_charge=ligand_charge,
+            **flags,
+        ),
         charge_columns=charge_columns,
     )
 
 
-def _full(name: str, description: str, *, include_haptic: bool, include_ligand: bool) -> Variant:
+def _full(
+    name: str, description: str, *, include_haptic: bool, include_ligand: bool
+) -> Variant:
     m = len(METAL_TYPES)
     return Variant(
         name=name,
@@ -123,7 +132,9 @@ def _full(name: str, description: str, *, include_haptic: bool, include_ligand: 
         description=description,
         node_types=("atom", "metal", "haptic", "ligand"),
         edges=tuple(_FULL_EDGES),
-        builder_kwargs=dict(include_haptic=include_haptic, include_ligand=include_ligand),
+        builder_kwargs=dict(
+            include_haptic=include_haptic, include_ligand=include_ligand
+        ),
         charge_columns={
             "atom": (len(ATOM_TYPES) + 3,),  # one-hot + [Z, period, radius] + charge
             "metal": (m + 6, m + 8),  # total_ligand_charge, coord_atom_charge_sum

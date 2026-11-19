@@ -82,7 +82,10 @@ if __name__ == "__main__":
     if prop in SPIN_PROPS:
         extract = ["elem_nr", "m_ox", "d_elec", "CN", "geom_nr", "rel_m"]
         bad = np.array(
-            [spin_type(int(s), int(n)) == "invalid" for s, n in zip(df[prop], df.d_elec)]
+            [
+                spin_type(int(s), int(n)) == "invalid"
+                for s, n in zip(df[prop], df.d_elec)
+            ]
         )
         print("dropped impossible labels:", int(bad.sum()))
         df = df[~bad]
@@ -151,7 +154,14 @@ if __name__ == "__main__":
         f1_test_macro[rep] = f1_score(y_te, corr_te, average="macro")
         n_corrected += int(np.count_nonzero(pred_te != corr_te))
         oos.extend(
-            zip(Nfix[idx_te], X_te[:, 2].astype(int), y_te, pred_te, corr_te, maxprob.round(4))
+            zip(
+                Nfix[idx_te],
+                X_te[:, 2].astype(int),
+                y_te,
+                pred_te,
+                corr_te,
+                maxprob.round(4),
+            )
         )
 
     # ---- Summary ----
@@ -187,4 +197,7 @@ if __name__ == "__main__":
         json.dump(meta, f, indent=2)
 
     print("Model saved:", model_name)
-    print("Feature importance:", dict(zip(extract, final_model.feature_importances_.round(4))))
+    print(
+        "Feature importance:",
+        dict(zip(extract, final_model.feature_importances_.round(4))),
+    )

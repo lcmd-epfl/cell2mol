@@ -191,7 +191,9 @@ def binding_ligands(metal: Any) -> list[Any]:
     return [lig for lig in (mol.ligands or []) if contains(lig.metals, metal)]
 
 
-def metal_atom_edge_feature(edb: ElementDatabaseAdapter, metal: Any, atom: Any) -> torch.Tensor:
+def metal_atom_edge_feature(
+    edb: ElementDatabaseAdapter, metal: Any, atom: Any
+) -> torch.Tensor:
     d = get_dist(metal.coord, atom.coord)
 
     r_m = safe_get(edb.CovalentRadius3, metal.label)
@@ -208,7 +210,9 @@ def metal_atom_edge_feature(edb: ElementDatabaseAdapter, metal: Any, atom: Any) 
     )
 
 
-def metal_group_edge_feature(edb: ElementDatabaseAdapter, metal: Any, atoms: list[Any]) -> torch.Tensor:
+def metal_group_edge_feature(
+    edb: ElementDatabaseAdapter, metal: Any, atoms: list[Any]
+) -> torch.Tensor:
     """(mean dist, std dist, mean dist-minus-covalent-radius, atom count)
     between `metal` and a group of atoms (a haptic group, or one ligand's
     donor atoms)."""
@@ -293,7 +297,9 @@ def coordination_modes(metal) -> list[tuple[Any, list[Any], list[list[Any]], dic
         try:
             ligand_coordination = ligand.coordination
         except AttributeError as err:
-            raise RuntimeError("coord_modes needs the post-pydantic cell2mol API (ligand.coordination)") from err
+            raise RuntimeError(
+                "coord_modes needs the post-pydantic cell2mol API (ligand.coordination)"
+            ) from err
 
         mode = ligand_coordination.get(metal_index)
         if mode is None:
@@ -318,7 +324,11 @@ def site_topology(metal, ligand, site: list[Any]) -> dict | None:
     groups = metal.groups if metal.groups is not None else ligand.groups
 
     for group in groups or []:
-        if group.is_haptic and group.topology and {id(a) for a in group.atoms or []} == site_ids:
+        if (
+            group.is_haptic
+            and group.topology
+            and {id(a) for a in group.atoms or []} == site_ids
+        ):
             return group.topology
 
     try:
@@ -363,7 +373,9 @@ class SimpleGraphBuilder:
 
     @property
     def node_dims(self) -> dict[str, int]:
-        atom_dim = len(ATOM_TYPES) + 5 + int(self.atom_charge) + int(self.atom_charge_flag)
+        atom_dim = (
+            len(ATOM_TYPES) + 5 + int(self.atom_charge) + int(self.atom_charge_flag)
+        )
 
         metal_dim = len(METAL_TYPES) + 4
         if self.coord_geom:
@@ -428,12 +440,21 @@ class SimpleGraphBuilder:
             ]
 
         if self.coord_modes:
-            donors = {id(a) for _, kappa, sites, _ in modes for a in kappa + [a for s in sites for a in s]}
+            donors = {
+                id(a)
+                for _, kappa, sites, _ in modes
+                for a in kappa + [a for s in sites for a in s]
+            }
             # No coordination-site count (kappa donors + eta sites): it equals
             # metal.coord_nr, and the ligand nodes carry it per ligand.
             x += [
                 float(len(donors)),  # coordinating ligand atoms
-                float(sum(getattr(a, "subtype", None) == "metal" for a in metal.coord_sphere_atoms or [])),
+                float(
+                    sum(
+                        getattr(a, "subtype", None) == "metal"
+                        for a in metal.coord_sphere_atoms or []
+                    )
+                ),
             ]
 
         return torch.tensor(x, dtype=torch.float32)
@@ -468,7 +489,10 @@ class SimpleGraphBuilder:
             float(len(sites)),
             float(sum(len(s) for s in sites)),
             float(len(ligand_coordination)),  # mu
-            1.0 if any(m["kappa_atoms"] for m in all_modes) and any(m["eta_groups"] for m in all_modes) else 0.0,
+            1.0
+            if any(m["kappa_atoms"] for m in all_modes)
+            and any(m["eta_groups"] for m in all_modes)
+            else 0.0,
         ]
         return torch.tensor(x, dtype=torch.float32)
 
@@ -495,7 +519,10 @@ class SimpleGraphBuilder:
             data,
             ("metal", "coordinates", "atom"),
             [[0, atom_index[id(a)]] for a in metal.coord_sphere_atoms or []],
-            [metal_atom_edge_feature(self.elemdatabase, metal, a) for a in metal.coord_sphere_atoms or []],
+            [
+                metal_atom_edge_feature(self.elemdatabase, metal, a)
+                for a in metal.coord_sphere_atoms or []
+            ],
         )
 
         set_label(data, oxidation_state)
@@ -508,7 +535,11 @@ class SimpleGraphBuilder:
 
         modes = coordination_modes(metal)
         kappa_atoms = [a for _, kappa, _, _ in modes for a in kappa]
-        sites = [(ligand, site) for ligand, _, ligand_sites, _ in modes for site in ligand_sites]
+        sites = [
+            (ligand, site)
+            for ligand, _, ligand_sites, _ in modes
+            for site in ligand_sites
+        ]
 
         atom_index: dict[int, int] = {}
         atom_x = []
@@ -520,8 +551,13 @@ class SimpleGraphBuilder:
         data["metal"].x = torch.stack([self.metal_feature(metal, modes)])
         data["atom"].x = stack_or_empty(atom_x, dims["atom"])
         if self.ligand_node:
-            data["ligand"].x = stack_or_empty([self.ligand_feature(*m) for m in modes], dims["ligand"])
-        data["haptic"].x = stack_or_empty([self.haptic_feature(metal, lig, site) for lig, site in sites], dims["haptic"])
+            data["ligand"].x = stack_or_empty(
+                [self.ligand_feature(*m) for m in modes], dims["ligand"]
+            )
+        data["haptic"].x = stack_or_empty(
+            [self.haptic_feature(metal, lig, site) for lig, site in sites],
+            dims["haptic"],
+        )
 
         add_edges(
             data,
@@ -599,10 +635,14 @@ def ligand_charge_features(metal: Any) -> tuple[float, float, float]:
     None for any ligand bound to more than one metal (see
     SimpleGraphBuilder.ligand_feature)."""
     ligands = binding_ligands(metal)
-    total_ligand_charge = sum(float(lig.totcharge) for lig in ligands if lig.totcharge is not None)
+    total_ligand_charge = sum(
+        float(lig.totcharge) for lig in ligands if lig.totcharge is not None
+    )
 
     coord_atom_charge_sum = sum(
-        float(atom.charge) for atom in (metal.coord_sphere_atoms or []) if atom.charge is not None
+        float(atom.charge)
+        for atom in (metal.coord_sphere_atoms or [])
+        if atom.charge is not None
     )
 
     return total_ligand_charge, float(len(ligands)), coord_atom_charge_sum
@@ -657,7 +697,9 @@ class FullGraphBuilder:
         label = metal.label
         edb = self.elemdatabase
 
-        total_ligand_charge, ligand_count, coord_atom_charge_sum = ligand_charge_features(metal)
+        total_ligand_charge, ligand_count, coord_atom_charge_sum = (
+            ligand_charge_features(metal)
+        )
 
         return torch.tensor(
             one_hot(label, METAL_TYPES)
@@ -672,12 +714,16 @@ class FullGraphBuilder:
                 ligand_count,
                 coord_atom_charge_sum,
             ]
-            + one_hot(canonical_coord_geometry(metal.coord_geometry), FULL_COORD_GEOMETRIES),
+            + one_hot(
+                canonical_coord_geometry(metal.coord_geometry), FULL_COORD_GEOMETRIES
+            ),
             dtype=torch.float32,
         )
 
     def haptic_feature(self, group) -> torch.Tensor:
-        haptic_type = canonical_haptic_type(getattr(group, "haptic_type", None), group.atoms)
+        haptic_type = canonical_haptic_type(
+            getattr(group, "haptic_type", None), group.atoms
+        )
         return torch.tensor(
             one_hot(haptic_type, FULL_HAPTIC_TYPES) + [float(len(group.atoms))],
             dtype=torch.float32,
@@ -717,8 +763,12 @@ class FullGraphBuilder:
 
         data["metal"].x = torch.stack([self.metal_feature(metal)])
         data["atom"].x = stack_or_empty(atom_x, dims["atom"])
-        data["haptic"].x = stack_or_empty([self.haptic_feature(g) for g in haptic_groups], dims["haptic"])
-        data["ligand"].x = stack_or_empty([self.ligand_feature(lig) for lig in ligands], dims["ligand"])
+        data["haptic"].x = stack_or_empty(
+            [self.haptic_feature(g) for g in haptic_groups], dims["haptic"]
+        )
+        data["ligand"].x = stack_or_empty(
+            [self.ligand_feature(lig) for lig in ligands], dims["ligand"]
+        )
 
         ma_pairs, ma_attr = [], []
         mh_pairs, mh_attr = [], []
@@ -746,7 +796,9 @@ class FullGraphBuilder:
             for a in (ligand.atoms or [])
             if id(a) in atom_index
         ]
-        add_edges(data, ("metal", "binds", "ligand"), [[0, i] for i in range(len(ligands))])
+        add_edges(
+            data, ("metal", "binds", "ligand"), [[0, i] for i in range(len(ligands))]
+        )
         add_edges(data, ("ligand", "ligand_contains", "atom"), la_pairs)
 
         set_label(data, oxidation_state)

@@ -35,7 +35,9 @@ def cell_path(cell_dir: str | Path, refcode: str) -> str:
     return f"{cell_dir}/{refcode[0]}/{refcode}/Ref_Cell_{refcode}.cell"
 
 
-def collect_records_for_refcode(refcode: str, cell_dir: str | Path, verbose: bool = False) -> list[dict]:
+def collect_records_for_refcode(
+    refcode: str, cell_dir: str | Path, verbose: bool = False
+) -> list[dict]:
     """Load one Reference .cell file and return a raw record per metal in
     each of its complexes."""
     try:
@@ -62,8 +64,14 @@ def collect_records_for_refcode(refcode: str, cell_dir: str | Path, verbose: boo
 
             if verbose:
                 print(refcode, mol.formula, mol.totcharge)
-                print("  ", metal.label, metal.charge, coordinating_atoms_info, ligands_info,
-                      rel_metal_radius(metal))
+                print(
+                    "  ",
+                    metal.label,
+                    metal.charge,
+                    coordinating_atoms_info,
+                    ligands_info,
+                    rel_metal_radius(metal),
+                )
 
             records.append(
                 {
@@ -102,7 +110,9 @@ def _graph_records_for_refcode(
     for record in collect_records_for_refcode(refcode, cell_dir, verbose):
         metal = record.pop("metal")
         for name, builder in builders.items():
-            graph_records[name].append({**record, "graph": builder.build(metal, oxidation_state=metal.charge)})
+            graph_records[name].append(
+                {**record, "graph": builder.build(metal, oxidation_state=metal.charge)}
+            )
 
     return graph_records
 
@@ -153,7 +163,13 @@ def collect_graph_records(
 
     with ProcessPoolExecutor(max_workers=num_workers) as pool:
         futures = [
-            pool.submit(_graph_records_for_refcode_pickled, refcode, cell_dir, variant_names, verbose)
+            pool.submit(
+                _graph_records_for_refcode_pickled,
+                refcode,
+                cell_dir,
+                variant_names,
+                verbose,
+            )
             for refcode in refcodes
         ]
 
@@ -179,7 +195,9 @@ def filter_supported_charges(records: list[dict]) -> list[dict]:
     failed charge assignment) or outside OX_STATES."""
     dropped = [r for r in records if r["metal_charge"] not in OX_STATES]
     if dropped:
-        print(f"\nDropping {len(dropped)} metal centers with unsupported/unassigned charge (not in {OX_STATES}).")
+        print(
+            f"\nDropping {len(dropped)} metal centers with unsupported/unassigned charge (not in {OX_STATES})."
+        )
     return [r for r in records if r["metal_charge"] in OX_STATES]
 
 
@@ -203,7 +221,9 @@ def filter_coordinated_metals(records: list[dict]) -> list[dict]:
 # =============================================================================
 
 
-def save_graph_bundle(graph_records: list[dict], variant_name: str, node_dims: dict[str, int], path) -> None:
+def save_graph_bundle(
+    graph_records: list[dict], variant_name: str, node_dims: dict[str, int], path
+) -> None:
     with open(path, "wb") as f:
         pickle.dump(
             {
@@ -249,14 +269,23 @@ def split_records(
     2026-10-27).
     """
     raw_counts = Counter(r["stratify_label"] for r in records)
-    labels = [r["stratify_label"] if raw_counts[r["stratify_label"]] >= 2 else "Other" for r in records]
+    labels = [
+        r["stratify_label"] if raw_counts[r["stratify_label"]] >= 2 else "Other"
+        for r in records
+    ]
     counts = Counter(labels)
     can_stratify = len(counts) > 1 and min(counts.values()) >= 2
 
     if group_by is None:
-        print("Per-record split, " + ("stratified on metal_label + metal_charge" if can_stratify else "random"))
+        print(
+            "Per-record split, "
+            + ("stratified on metal_label + metal_charge" if can_stratify else "random")
+        )
         return train_test_split(
-            records, test_size=test_size, random_state=random_state, shuffle=True,
+            records,
+            test_size=test_size,
+            random_state=random_state,
+            shuffle=True,
             stratify=labels if can_stratify else None,
         )
 
@@ -264,7 +293,9 @@ def split_records(
     n_splits = max(2, round(1 / test_size))
     if can_stratify:
         print(f"Split grouped by {group_by}, stratified on metal_label + metal_charge")
-        splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+        splitter = StratifiedGroupKFold(
+            n_splits=n_splits, shuffle=True, random_state=random_state
+        )
     else:
         print(f"Split grouped by {group_by} (stratification not possible)")
         splitter = GroupKFold(n_splits=n_splits)
@@ -275,10 +306,14 @@ def split_records(
 
 def nuclearity_bucket(record: dict) -> str:
     n = record.get("mol_n_metals")
-    return {1: "mono", 2: "bi", 3: "tri", 4: "tetra"}.get(n, "unknown" if n is None else f"{n}-nuclear")
+    return {1: "mono", 2: "bi", 3: "tri", 4: "tetra"}.get(
+        n, "unknown" if n is None else f"{n}-nuclear"
+    )
 
 
-def print_accuracy_by_nuclearity(metrics: dict[str, Any], records: list[dict], title: str) -> None:
+def print_accuracy_by_nuclearity(
+    metrics: dict[str, Any], records: list[dict], title: str
+) -> None:
     """Accuracy per nuclearity of each record's molecule (needs mol_n_metals,
     stored by bundles collected since 2026-10-27)."""
     if not records or "mol_n_metals" not in records[0]:
@@ -300,9 +335,13 @@ def print_distribution(records: list[dict], title: str) -> None:
         print(f"{label:10s} {count}")
 
 
-def save_split_metadata(train_records: list[dict], val_records: list[dict], out_dir: Path) -> None:
+def save_split_metadata(
+    train_records: list[dict], val_records: list[dict], out_dir: Path
+) -> None:
     for name, records in (("train", train_records), ("val", val_records)):
-        np.savetxt(out_dir / f"{name}_refcodes.txt", [r["refcode"] for r in records], fmt="%s")
+        np.savetxt(
+            out_dir / f"{name}_refcodes.txt", [r["refcode"] for r in records], fmt="%s"
+        )
 
         with open(out_dir / f"{name}_metal_records.txt", "w") as f:
             for r in records:
@@ -312,16 +351,22 @@ def save_split_metadata(train_records: list[dict], val_records: list[dict], out_
                 )
 
 
-def write_validation_report(metrics: dict[str, Any], val_records: list[dict], csv_path: Path) -> list:
+def write_validation_report(
+    metrics: dict[str, Any], val_records: list[dict], csv_path: Path
+) -> list:
     """Write per-sample val predictions to `csv_path`; print the errors."""
     errors = []
 
     with open(csv_path, "w") as f:
         f.write("refcode,metal_label,formula,true_ox,pred_ox,confidence,correct\n")
 
-        for r, t, p, c in zip(val_records, metrics["y_true"], metrics["y_pred"], metrics["confidence"]):
+        for r, t, p, c in zip(
+            val_records, metrics["y_true"], metrics["y_pred"], metrics["confidence"]
+        ):
             true_ox, pred_ox = CLASS_TO_OX[t], CLASS_TO_OX[p]
-            f.write(f"{r['refcode']},{r['metal_label']},{r['mol_formula']},{true_ox},{pred_ox},{c:.4f},{t == p}\n")
+            f.write(
+                f"{r['refcode']},{r['metal_label']},{r['mol_formula']},{true_ox},{pred_ox},{c:.4f},{t == p}\n"
+            )
             if t != p:
                 errors.append((r, true_ox, pred_ox, c))
 
