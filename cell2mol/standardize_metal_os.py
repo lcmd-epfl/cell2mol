@@ -68,7 +68,7 @@ METAL_NAME_ROOTS = {
     "Ir": ["irid"],
     "Pt": ["plat"],
     "Au": ["aura"],
-    "Hg": ["merc"],
+    "Hg": ["mercur"],
 }
 
 

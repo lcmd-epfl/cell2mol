@@ -46,9 +46,7 @@ from cell2mol.utils.processing import (
     run_cli,
 )
 import gc
-
 import rdkit
-
 logger = logging.getLogger(__name__)
 
 
@@ -57,8 +55,7 @@ def interpret_reference(input_path, name, current_dir):
     logger.info("cell2mol version %s", config.VERSION)
     logger.info("Input CIF: %s", input_path)
     logger.debug("Timeout set to %d seconds", config.TIMEOUT)
-    logger.debug("RDKit version: %s", rdkit.__version__)
-
+    logger.debug("RDKit Version: %s", rdkit.__version__)
     refcell = None
     structure = None
 
@@ -87,8 +84,8 @@ def interpret_reference(input_path, name, current_dir):
                 )
                 return refcell
 
-            if logger.isEnabledFor(logging.DEBUG):
-                extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
+            # if logger.isEnabledFor(logging.DEBUG):
+            #     extract_refmoleclist_xyz(current_dir, refcell.refmoleclist, name)
 
             # Save intermediate success
             _handle_reference_outputs(name, current_dir, refcell)
@@ -248,10 +245,10 @@ def _handle_reference_outputs(name, current_dir, refcell):
         lambda: refcell.save(paths["refcell"] + ".cell", format="pickle"),
         "Failed to save reference as pickle",
     )
-    _safe_run(
-        lambda: refcell.save(paths["refcell"] + ".json", format="json"),
-        "Failed to save reference as JSON",
-    )
+    # _safe_run(
+    #     lambda: refcell.save(paths["refcell"] + ".json", format="json"),
+    #     "Failed to save reference as JSON",
+    # )
     _safe_run(
         lambda: _write_ref_detailed_summary(name, refcell, paths["ref_sum"]),
         "Failed to write reference summary",

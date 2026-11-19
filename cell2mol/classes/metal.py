@@ -6,7 +6,7 @@ import numpy as np
 from pydantic import Field
 from typing_extensions import deprecated
 from cell2mol.classes.atom import Atom
-from cell2mol.spin import predict_metal_spin
+from cell2mol.spin import predict_metal_spin, predict_metal_spin_bos
 from cell2mol.operations import get_dist
 from cell2mol.elementdata import ElementData
 from cell2mol.coordination_sphere import (
@@ -47,6 +47,7 @@ class Metal(Atom):
     unique_index: int | None = None
     plausible_os: list[int] | None = None
     spin: Spin | None = None
+    spin_bos: Spin | None = None
     valence_elec: int | None = None
     removed_from_coordination: list[Atom] | None = None
 
@@ -373,10 +374,24 @@ class Metal(Atom):
         return self.plausible_os
 
     def assign_spin(self):
-        """Assign and store the metal spin multiplicity."""
+        """Assign and store the metal spin multiplicity.
+
+        Also store the BOSTMC model prediction in spin_bos; its failure is
+        logged and leaves spin_bos as None without affecting spin.
+        """
         self.spin = predict_metal_spin(self)
         logger.info(
             "Spin multiplicity of the metal %s is assigned as %s", self.label, self.spin
+        )
+        try:
+            self.spin_bos = predict_metal_spin_bos(self)
+        except Exception as e:
+            self.spin_bos = None
+            logger.warning("BOSTMC spin prediction failed for %s: %s", self.label, e)
+        logger.info(
+            "BOSTMC spin multiplicity of the metal %s is assigned as %s",
+            self.label,
+            self.spin_bos,
         )
 
     def reset_charge(self) -> None:
@@ -384,6 +399,7 @@ class Metal(Atom):
         super().reset_charge()
         self.plausible_os = None
         self.spin = None
+        self.spin_bos = None
         self.valence_elec = None
 
     def __str__(self):

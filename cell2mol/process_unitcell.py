@@ -204,10 +204,10 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
             lambda: refcell.save(paths["refcell"] + ".cell", format="pickle"),
             "Failed to save reference as pickle",
         )
-        _safe_run(
-            lambda: refcell.save(paths["refcell"] + ".json", format="json"),
-            "Failed to save reference as JSON",
-        )
+        # _safe_run(
+        #     lambda: refcell.save(paths["refcell"] + ".json", format="json"),
+        #     "Failed to save reference as JSON",
+        # )
         _safe_run(
             lambda: _write_ref_detailed_summary(
                 name,
@@ -223,10 +223,10 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
             lambda: unitcell.save(paths["unitcell"] + ".cell", format="pickle"),
             "Failed to save unit cell as pickle",
         )
-        _safe_run(
-            lambda: unitcell.save(paths["unitcell"] + ".json", format="json"),
-            "Failed to save unit cell as JSON",
-        )
+        # _safe_run(
+        #     lambda: unitcell.save(paths["unitcell"] + ".json", format="json"),
+        #     "Failed to save unit cell as JSON",
+        # )
         _safe_run(
             lambda: _write_unit_summary(name, unitcell, paths["unit_sum"]),
             "Failed to write unit cell summary",
@@ -243,15 +243,15 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
                         # Apply appropriate prefix based on the message content
                         prefix = "  " if msg.startswith("Skipped:") else "  Warning: "
                         print(f"{prefix}{msg}", file=f)
-    if cells:
-        _safe_run(
-            lambda: cells.save(paths["cells"] + ".cells", format="pickle"),
-            "Failed to save cells (reference + unit cell) as pickle",
-        )
-        _safe_run(
-            lambda: cells.save(paths["cells"] + ".json", format="json"),
-            "Failed to save cells (reference + unit cell) as JSON",
-        )
+    # if cells:
+    #     _safe_run(
+    #         lambda: cells.save(paths["cells"] + ".cells", format="pickle"),
+    #         "Failed to save cells (reference + unit cell) as pickle",
+    #     )
+    #     _safe_run(
+    #         lambda: cells.save(paths["cells"] + ".json", format="json"),
+    #         "Failed to save cells (reference + unit cell) as JSON",
+    #     )
 
 
 def _write_ref_detailed_summary(name, refcell, summary_path, os_method=None):

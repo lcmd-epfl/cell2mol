@@ -81,6 +81,51 @@ def predict_metal_spin(metal: Metal) -> Spin | None:
     return None
 
 
+def predict_metal_spin_bos(metal: Metal) -> Spin | None:
+    """Predict metal spin multiplicity (2S + 1) with the BOSTMC Random Forest model.
+
+    The model is trained on pure LS/IS/HS BOSTMC labels of all d-block metals.
+    Electron counts with a single allowed multiplicity (d0/d1/d9/d10) skip the
+    model; predictions impossible for the electron count are corrected to the
+    corresponding valid LS / IS / HS multiplicity.
+
+    Return None for non-d-block metals or an undefined 3d geometry; heavier
+    metals with an undefined geometry fall back to LS.
+    Raise ValueError if the charge is missing.
+    """
+    charge = metal.charge
+    if charge is None:
+        raise ValueError(f"Metal {metal.label} has no assigned charge")
+    if elemdatabase.elementblock[metal.label] != "d":
+        return None
+    valence_elec = metal.compute_valence_electron_count(charge)
+    allowed = valid_spins(valence_elec)
+    if len(allowed) == 1:
+        return allowed[0]
+
+    if metal.coord_geometry is None or metal.coord_geometry == "Undefined":
+        if elemdatabase.elementperiod[metal.label] > 4:
+            return allowed[0]
+        logger.error("Cannot determine spin: geometry of %s is undefined", metal.label)
+        return None
+
+    feature = build_spin_feature_vector(metal)
+    model = load_spin_model("BOSTMC_77054_RandomForest.joblib")
+    predicted = int(model.predict(feature)[0])
+    spin, label = correct_spin(
+        predicted, valence_elec, model.predict_proba(feature)[0], model.classes_
+    )
+    logger.info(
+        "Metal %s spin predicted as %s (%s) by the BOSTMC Random Forest model "
+        "(raw prediction %s)",
+        metal.label,
+        spin,
+        label,
+        predicted,
+    )
+    return spin
+
+
 @lru_cache(maxsize=None)
 def load_spin_model(filename: str):
     """Load a spin model from the models directory once per process."""
@@ -155,13 +200,15 @@ def predict_corrected(
     return pred, corrected
 
 
-def determine_complex_spin(mol: Molecule) -> Spin | None:
+def determine_complex_spin(mol: Molecule, bos: bool = False) -> Spin | None:
     """Determine complex multiplicity from the constituent metal spins.
 
     Assign missing d-block metal spins and check for nitrosyl ligands.
+    With bos=True, combine the metal spin_bos values instead of spin.
     Return 1 if all metals are singlets, or the spin of the only non-singlet metal.
     Return None for nitrosyls, missing spins, or more than one non-singlet metal.
     """
+    attr = "spin_bos" if bos else "spin"
     metals = mol.metals or []
     ligands = mol.ligands or []
     for metal in metals:
@@ -171,8 +218,8 @@ def determine_complex_spin(mol: Molecule) -> Spin | None:
         if ligand.is_nitrosyl is None:
             ligand.detect_nitrosyl()
 
-    metal_spins = [metal.spin for metal in metals]
-    logger.info("Metal spin multiplicities: %s", metal_spins)
+    metal_spins = [getattr(metal, attr) for metal in metals]
+    logger.info("Metal %s multiplicities: %s", attr, metal_spins)
     if any(ligand.is_nitrosyl for ligand in ligands) or any(
         spin is None for spin in metal_spins
     ):

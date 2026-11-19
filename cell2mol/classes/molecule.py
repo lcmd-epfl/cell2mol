@@ -37,6 +37,7 @@ class Molecule(ModelFileMixin, Species):
     ligands: list[Ligand] | None = Field(default=None)
     metals: list[Metal] | None = Field(default=None)
     spin: Spin | None = None
+    spin_bos: Spin | None = None
     ref_indices: list[int] | None = None
     cell_indices: list[int] | None = None
 
@@ -79,17 +80,22 @@ class Molecule(ModelFileMixin, Species):
         )
 
     def assign_spin(self):
-        """Assign and return spin multiplicity; record and raise assignment failures."""
+        """Assign and return spin multiplicity; record and raise assignment failures.
+
+        Also store spin_bos, combined from the metal BOSTMC predictions.
+        """
         self.error_get_spin = False
 
         try:
             if self.is_metal_complex:
                 self.spin = determine_complex_spin(self)
+                self.spin_bos = determine_complex_spin(self, bos=True)
             else:
                 if (self.eleccount - (self.totcharge or 0)) % 2 == 0:
                     self.spin = 1
                 else:
                     self.spin = 2
+                self.spin_bos = self.spin
 
         except Exception as e:
             self.error_get_spin = True
@@ -98,9 +104,10 @@ class Molecule(ModelFileMixin, Species):
             ) from e
 
         logger.debug(
-            "Assigned spin multiplicity | molecule=%s | spin=%s",
+            "Assigned spin multiplicity | molecule=%s | spin=%s | spin_bos=%s",
             self.formula,
             self.spin,
+            self.spin_bos,
         )
 
         return self.spin
