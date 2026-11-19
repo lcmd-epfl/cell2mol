@@ -964,31 +964,55 @@ def _atom_site_labels(atoms: list[Atom]) -> list[str] | None:
 def identify_haptic_mode(atoms: list[Atom], use_bond_info: bool | None = None):
     """Classify a group of atoms coordinating the same metal.
 
-    Apply C2-C8 composition rules, using ring names such as Cp and COT.
-    Otherwise, label a single simple ring etaN(formula)-ring, or a connected
-    group of 4+ atoms etaN(formula).
+    Apply C2-C8 composition rules, using ring names such as Cp and COT, and
+    the C8/C9/C10 fused ring systems. Otherwise, label a single simple ring
+    etaN(formula)-ring; other open chains are not haptic.
 
     ``use_bond_info`` controls CIF bond use and defaults to config.USE_BOND_INFO.
     Return (is_haptic, haptic_type, topology); haptic_type is None if unmatched.
     """
-    labels = [atom.label for atom in atoms]
+    if use_bond_info is None:
+        use_bond_info = config.USE_BOND_INFO
+
+    results = analyze_topology(atoms, use_bond_info=use_bond_info)
+    is_haptic, haptic_type = classify_haptic_group(
+        [atom.label for atom in atoms], results
+    )
+    return is_haptic, haptic_type, results
+
+
+def classify_haptic_group(
+    labels: list[str], results: TopologyResult
+) -> tuple[bool, str | None]:
+    """Apply the identify_haptic_mode rules to a precomputed group topology.
+
+    Callers that already hold a corrected graph pass graph_topology(subgraph)
+    instead of rebuilding adjacency from the group's coordinates.
+    """
     group_formula = symbols2formula(labels)
     is_haptic = False
     haptic_type = None
 
     totnum = len(labels)
 
-    if use_bond_info is None:
-        use_bond_info = config.USE_BOND_INFO
-
     # Group formula -> known haptic type.
     HAPTIC_RULES = {
         **{f"C{n}": f"eta{n}(C{n})" for n in range(2, 9)},
     }
+    # Group formula -> (fused-ring flag, haptic type); C9/C10 qualify only here.
+    FUSED_RING_RULES = {
+        "C8": ("is_fused_5_5", "eta5,eta5(pentalene)"),
+        "C9": ("is_fused_5_6", "eta5,eta6(indene)"),
+        "C10": ("is_fused_5_7", "eta5,eta7(azulene)"),
+    }
+    fused_rule = FUSED_RING_RULES.get(group_formula)
 
-    # Use known haptic types first, then check rings and open chains separately.
-    results = analyze_topology(atoms, use_bond_info=use_bond_info)
-    if group_formula in HAPTIC_RULES:
+    # Use fused ring systems and known haptic types first, then check rings and
+    # open chains separately.
+    if fused_rule and results["n_rings"] == 2 and results[fused_rule[0]]:
+        haptic_type = fused_rule[1]
+        is_haptic = True
+    elif group_formula in HAPTIC_RULES:
         haptic_type = HAPTIC_RULES[group_formula]
         is_haptic = True
         if results["is_single_simple_ring"]:
@@ -1000,27 +1024,17 @@ def identify_haptic_mode(atoms: list[Atom], use_bond_info: bool | None = None):
                 haptic_type = "eta7(CHT)"  # cycloheptatrienyl
             elif group_formula == "C8":
                 haptic_type = "eta8(COT)"  # cyclooctatetraenyl dianion
-        elif results["n_rings"] == 2 and results["is_fused_5_5"]:
-            if group_formula == "C8":
-                haptic_type = "eta5,eta5(pentalene)"  # pentalene
-        elif results["n_rings"] == 2 and results["is_fused_5_6"]:
-            if group_formula == "C9":
-                haptic_type = "eta5,eta6(indene)"  # indene
-        elif results["n_rings"] == 2 and results["is_fused_5_7"]:
-            if group_formula == "C10":
-                haptic_type = "eta5,eta7(azulene)"  # azulene
-    else:
-        if results["is_single_simple_ring"]:
-            haptic_type = f"eta{totnum}({group_formula})-ring"
-            is_haptic = True
-        elif totnum >= 4 and results["is_connected"] and results["n_rings"] == 0:
-            haptic_type = f"eta{totnum}({group_formula})"
-            is_haptic = True
+    elif results["is_single_simple_ring"]:
+        haptic_type = f"eta{totnum}({group_formula})-ring"
+        is_haptic = True
+    # Open chains with heteroatoms or H (agostic C-H, B-H-M, P-N chelates) are
+    # not haptic: they stay subject to contact pruning. Conjugated C/N chains
+    # are recognized at charge assignment by _is_conjugated_pi_chain instead.
     logger.debug(
         "Identified haptic mode: is_haptic=%s, haptic_type=%s", is_haptic, haptic_type
     )
 
-    return is_haptic, haptic_type, results
+    return is_haptic, haptic_type
 
 
 def is_single_ring(atoms: list[Atom], use_bond_info: bool | None = None) -> bool:
@@ -1079,22 +1093,8 @@ def analyze_topology(
     - fused ring systems (5–5, 5–6, 5–7)
     """
 
-    def _empty_result(is_connected: bool = False) -> TopologyResult:
-        return {
-            "is_connected": is_connected,
-            "n_rings": 0,
-            "ring_sizes": [],
-            "ring_atoms": [],
-            "ring_sets": [],
-            "all_atoms_in_rings": False,
-            "is_single_simple_ring": False,
-            "is_fused_5_5": False,
-            "is_fused_5_6": False,
-            "is_fused_5_7": False,
-        }
-
     if not atoms:
-        return _empty_result(is_connected=False)
+        return _empty_topology()
 
     labels = [atom.label for atom in atoms]
     positions = [atom.coord for atom in atoms]
@@ -1115,13 +1115,30 @@ def analyze_topology(
     )
 
     if adjacency_matrix is None:
-        return _empty_result(is_connected=False)
+        return _empty_topology()
 
-    G = nx.from_numpy_array(np.array(adjacency_matrix))
+    return graph_topology(nx.from_numpy_array(np.array(adjacency_matrix)))
 
-    is_connected = nx.is_connected(G)
-    if not is_connected:
-        return _empty_result(is_connected=False)
+
+def _empty_topology(is_connected: bool = False) -> TopologyResult:
+    return {
+        "is_connected": is_connected,
+        "n_rings": 0,
+        "ring_sizes": [],
+        "ring_atoms": [],
+        "ring_sets": [],
+        "all_atoms_in_rings": False,
+        "is_single_simple_ring": False,
+        "is_fused_5_5": False,
+        "is_fused_5_6": False,
+        "is_fused_5_7": False,
+    }
+
+
+def graph_topology(G: nx.Graph) -> TopologyResult:
+    """Analyze an existing graph; ring atoms are reported as its node labels."""
+    if G.number_of_nodes() == 0 or not nx.is_connected(G):
+        return _empty_topology()
 
     # --- Ring detection ---
     cycle_basis = nx.cycle_basis(G)
