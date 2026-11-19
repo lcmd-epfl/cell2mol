@@ -3,7 +3,7 @@ name = "cell2mol"
 version = "2.0.0rc2"
 description = "Encoding chemistry to interpret crystallographic data"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "ase>=3.26.0",
     "networkx>=3.2.1",
@@ -13,8 +13,15 @@ dependencies = [
     "pydantic-numpy>=6.0.0",
     "pyyaml>=6.0.3",
     "rdkit>=2025.9.1",
-    "scikit-learn>=1.6.1",
+    "joblib>=1.4.0",
+    "scikit-learn>=1.7.2",
     "scipy>=1.13.1",
+]
+
+[project.optional-dependencies]
+gnn = [
+    "torch>=2.8.0",
+    "torch-geometric>=2.6.1",
 ]
 
 [dependency-groups]
@@ -22,9 +29,11 @@ test = [
     "pytest>=7.0",
 ]
 dev = [
+    "ipykernel>=6.31.0",
     "ipython>=8.18.0,<9.0.0",
     "pre-commit>=4.0.0",
     "ruff>=0.14.0",
+    "cell2mol[gnn]",
     { include-group = "test" },
 ]
 
