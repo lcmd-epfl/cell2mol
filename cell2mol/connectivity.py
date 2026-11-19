@@ -43,6 +43,10 @@ logger = logging.getLogger(__name__)
 elemdatabase = ElementData()
 
 
+class ConnectivityError(ValueError):
+    """The bond graph could not be built, e.g. clashing atoms or missing CIF bonds."""
+
+
 def scale_covalent_radii(
     radii, df_block_metal_idxs, s_block_metal_idxs, metal_factor, cov_factor
 ):
@@ -125,6 +129,7 @@ def build_adjacency(
     metal_only: bool = False,
     warn_on_mismatch: bool = False,
     detail: bool = False,
+    radii: NDArray | Sequence[float] | None = None,
 ) -> np.ndarray | None:
     """
     Build an adjacency matrix using distance-based or connectivity-based criteria.
@@ -154,6 +159,7 @@ def build_adjacency(
             positions,
             atom_site_labels=atom_site_labels,
             cutoff=cutoff,
+            radii=radii,
             cov_factor=cov_factor,
             metal_factor=metal_factor,
             metal_only=metal_only,
@@ -904,13 +910,23 @@ def split_species(
     use_bond_info: bool | None = None,
     cov_factor: float | None = None,
     metal_factor: float | None = None,
+    cutoff: float | None = None,
     warn_on_mismatch: bool = False,
     detail: bool = False,
     count_species_only: bool = False,
     apply_graph: bool = False,
 ):
-    """Function that identifies connected groups of atoms from their atomic coordinates and labels."""
+    """Identify connected groups of atoms from their atomic coordinates and labels.
 
+    ``radii`` are unscaled per-atom covalent radii (default: the element table);
+    ``cov_factor``, ``metal_factor`` and ``cutoff`` still apply to them.
+
+    Raises ConnectivityError if the bond graph cannot be built, so a failed
+    structure is not mistaken for an empty one.
+    """
+
+    if len(labels) == 0:
+        return 0 if count_species_only else []
     if radii is None:
         radii = get_radii(labels)
     if indices is None:
@@ -926,14 +942,18 @@ def split_species(
         atom_site_labels=atom_site_labels,
         bond_data=bond_data,
         use_bond_info=use_bond_info,
+        cutoff=cutoff,
         cov_factor=cov_factor,
         metal_factor=metal_factor,
         warn_on_mismatch=warn_on_mismatch,
         detail=detail,
+        radii=radii,
     )
     if adjacency_matrix is None:
-        logger.warning("Adjacency matrix is None. Returning empty blocklist.")
-        return []
+        raise ConnectivityError(
+            f"Could not build connectivity for {len(labels)} atoms "
+            f"({symbols2formula(labels)}): atom clash or missing CIF bond data"
+        )
     neighbor_counts = adjacency_matrix.sum(axis=1)
 
     degree = np.diag(neighbor_counts)
@@ -975,16 +995,22 @@ def split_species(
         return blocklist
 
     if apply_graph:
-        new_blocklist = split_blocks_by_rings(
-            blocklist,
+        # Blocks hold values from ``indices``; ring splitting works on positions.
+        position_of = {value: pos for pos, value in enumerate(indices)}
+        new_local_blocks = split_blocks_by_rings(
+            [[position_of[i] for i in block] for block in blocklist],
             labels,
             positions,
             conn_atom_site_labels=atom_site_labels,
             bond_data=bond_data,
             use_bond_info=use_bond_info,
+            cutoff=cutoff,
             cov_factor=cov_factor,
             metal_factor=metal_factor,
+            radii=radii,
+            adjacency=adjacency_matrix,
         )
+        new_blocklist = [[indices[pos] for pos in block] for block in new_local_blocks]
         log_block_changes(blocklist, new_blocklist)
         return new_blocklist
     return blocklist
@@ -998,14 +1024,23 @@ def split_blocks_by_rings(
     conn_atom_site_labels,
     bond_data,
     use_bond_info: bool | None = None,
+    cutoff: float | None = None,
     cov_factor: float | None = None,
     metal_factor: float | None = None,
+    radii: Sequence[float] | None = None,
+    adjacency: np.ndarray | None = None,
 ):
     """Split a list of atoms into blocks of connected atoms.
 
     If a connected block contains one or more cycles, each cycle is saved as
     a separate block. Non-cycle atoms are split into connected components after
     removing all cycle atoms.
+
+    ``adjacency`` is the already corrected matrix over conn_labels (blocks hold
+    indices into it). When given, each block uses its submatrix, so the rings
+    are found in the same graph that defined the blocks. Otherwise the
+    adjacency is rebuilt per block from the coordinates, which re-runs the
+    valence correction on a partial atom set and can disagree with the whole.
     """
 
     new_blocklist = []
@@ -1013,26 +1048,40 @@ def split_blocks_by_rings(
     for b in blocklist:
         logger.debug("block=%s", b)
 
-        gr_labels = extract_from_list(b, conn_labels, dimension=1)
-        gr_coord = extract_from_list(b, conn_coord, dimension=1)
-        if conn_atom_site_labels is not None:
-            gr_atom_site_labels = extract_from_list(
-                b, conn_atom_site_labels, dimension=1
-            )
+        if adjacency is not None:
+            adjacency_matrix = np.asarray(adjacency)[np.ix_(b, b)]
         else:
-            gr_atom_site_labels = None
+            gr_labels = extract_from_list(b, conn_labels, dimension=1)
+            gr_coord = extract_from_list(b, conn_coord, dimension=1)
+            if conn_atom_site_labels is not None:
+                gr_atom_site_labels = extract_from_list(
+                    b, conn_atom_site_labels, dimension=1
+                )
+            else:
+                gr_atom_site_labels = None
 
-        adjacency_matrix = build_adjacency(
-            labels=gr_labels,
-            positions=np.asarray(gr_coord),
-            atom_site_labels=gr_atom_site_labels,
-            bond_data=bond_data,
-            use_bond_info=use_bond_info,
-            cov_factor=cov_factor,
-            metal_factor=metal_factor,
-            warn_on_mismatch=False,
-            detail=False,
-        )
+            adjacency_matrix = build_adjacency(
+                labels=gr_labels,
+                positions=np.asarray(gr_coord),
+                atom_site_labels=gr_atom_site_labels,
+                bond_data=bond_data,
+                use_bond_info=use_bond_info,
+                cutoff=cutoff,
+                cov_factor=cov_factor,
+                metal_factor=metal_factor,
+                warn_on_mismatch=False,
+                detail=False,
+                radii=(
+                    extract_from_list(b, list(radii), dimension=1)
+                    if radii is not None
+                    else None
+                ),
+            )
+            if adjacency_matrix is None:
+                raise ConnectivityError(
+                    f"Could not build connectivity for block {gr_labels}: "
+                    "atom clash or missing CIF bond data"
+                )
 
         G = nx.from_numpy_array(np.array(adjacency_matrix))
 

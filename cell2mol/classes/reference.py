@@ -9,7 +9,7 @@ from pydantic import Field
 from cell2mol.classes.metal import Metal
 from cell2mol.classes.molecule import Molecule
 from cell2mol.classes.species import Species
-from cell2mol.connectivity import split_species
+from cell2mol.connectivity import ConnectivityError, split_species
 from cell2mol.species_collection import (
     collect_hydrogen_flags,
     update_plausible_charges,
@@ -145,19 +145,23 @@ class Reference(Cell):
                 return []
             blocklist = self.moiety_indices
         else:
-            blocklist = cast(
-                "list[list[int]]",
-                split_species(
-                    ref_labels,
-                    ref_pos,
-                    atom_site_labels=atom_site_labels,
-                    bond_data=bond_data,
-                    cov_factor=cov_factor,
-                    metal_factor=metal_factor,
-                    warn_on_mismatch=True,
-                    detail=True,
-                ),
-            )
+            try:
+                blocklist = cast(
+                    "list[list[int]]",
+                    split_species(
+                        ref_labels,
+                        ref_pos,
+                        atom_site_labels=atom_site_labels,
+                        bond_data=bond_data,
+                        cov_factor=cov_factor,
+                        metal_factor=metal_factor,
+                        warn_on_mismatch=True,
+                        detail=True,
+                    ),
+                )
+            except ConnectivityError as exc:
+                logger.error("Reference cell connectivity failed: %s", exc)
+                return []
             logger.info("Using distance-based species splitting for blocklist")
             if self.moiety_indices is not None:
                 logger.info("CIF bond/moiety information is available but not used")

@@ -4,7 +4,7 @@ from typing import Any, cast
 from ase import Atoms
 from cell2mol.classes import Molecule
 from cell2mol.compare import compare_reference_indices
-from cell2mol.connectivity import split_species
+from cell2mol.connectivity import ConnectivityError, split_species
 from cell2mol.element_utils import get_radii
 from cell2mol.operations import translate, extract_from_list
 from itertools import combinations
@@ -1042,16 +1042,19 @@ def _merge_fragment_pair(
             merged_atom_site_labels = [atom_site_labels[i] for i in merged_ref_indices]
 
         # --- fast reject: must form exactly one species ---
-        numspecs = split_species(
-            labels=merged_labels,
-            positions=np.asarray(merged_coord),
-            atom_site_labels=merged_atom_site_labels,
-            bond_data=bond_data,
-            use_bond_info=use_bond_info,
-            cov_factor=cov_factor,
-            metal_factor=metal_factor,
-            count_species_only=True,
-        )
+        try:
+            numspecs = split_species(
+                labels=merged_labels,
+                positions=np.asarray(merged_coord),
+                atom_site_labels=merged_atom_site_labels,
+                bond_data=bond_data,
+                use_bond_info=use_bond_info,
+                cov_factor=cov_factor,
+                metal_factor=metal_factor,
+                count_species_only=True,
+            )
+        except ConnectivityError:
+            continue  # a merge that cannot be bonded is not a valid merge
         if numspecs != 1:
             continue
 
