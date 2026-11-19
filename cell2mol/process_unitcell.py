@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 def interpret_unitcell(input_path: str, name: str, current_dir: str):
-    """Return cell results; raise ProcessingError on input or runtime failure."""
+    """Return cell results (or the reference if it failed); raise ProcessingError on input or runtime failure."""
 
     refcell: Reference | None = None
     unitcell = None
@@ -51,7 +51,7 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
                 "Failed to create reference cell", config.ERR_CELL2MOL
             )
         if refcell.has_error():
-            return None
+            return refcell
 
         with set_time_limit(config.TIMEOUT):
             structure = read_structure(read, input_path, "cif")
@@ -114,7 +114,9 @@ def interpret_unitcell(input_path: str, name: str, current_dir: str):
             gc.collect()
         logger.error("Unit-cell processing failed: %s", exc)
         write_exception_error_log(exc)
-        raise_processing_error(exc, cells, refcell, unitcell)
+        raise_processing_error(
+            exc, cells if cells is not None else refcell, refcell, unitcell
+        )
 
     finally:
         save_partial_results(

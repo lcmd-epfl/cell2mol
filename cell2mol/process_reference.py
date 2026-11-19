@@ -47,6 +47,8 @@ from cell2mol.utils.processing import (
 )
 import gc
 
+import rdkit
+
 logger = logging.getLogger(__name__)
 
 
@@ -55,6 +57,7 @@ def interpret_reference(input_path, name, current_dir):
     logger.info("cell2mol version %s", config.VERSION)
     logger.info("Input CIF: %s", input_path)
     logger.debug("Timeout set to %d seconds", config.TIMEOUT)
+    logger.debug("RDKit version: %s", rdkit.__version__)
 
     refcell = None
     structure = None
