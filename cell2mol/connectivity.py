@@ -416,6 +416,7 @@ def build_distance_adjacency(
     metal_factor: float | None = None,
     metal_only: bool = False,
     add_atom: bool = False,
+    diagnostics: dict | None = None,
 ):
     """Generates adjacency matrix from atomic positions and covalent radii.
     Args:
@@ -432,6 +433,8 @@ def build_distance_adjacency(
             Defaults to False.
         add_atom (bool, optional): If True, force adding atoms regardless of valence.
             Defaults to False.
+        diagnostics (dict, optional): Filled in place with the valence-correction
+            "removals" and "protections" (see correct_valence_violations).
     Returns:
         isgood (int): 1 if molecule is valid, 0 otherwise.
         adjacency_matrix (list): Adjacency matrix.
@@ -512,25 +515,131 @@ def build_distance_adjacency(
             pos,
             radii,
             atom_site_labels=atom_site_labels,
+            diagnostics=diagnostics,
         )
     return True, (metal_contact_matrix if metal_only else adjacency_matrix), warning
 
 
+# Elements whose valence check is skipped as a center: they are routinely
+# hypervalent or bridging (cage B, halide bridges).
+VALENCE_EXEMPT_ELEMENTS = {"F", "Cl", "Br", "I", "B"}
+# Coordination numbers above the xyz2mol valence table that are ordinary here,
+# such as PF6-, SiF6(2-), AsF6-. Local so the charge code's table is unchanged.
+HYPERVALENT_MAX_COORDINATION = {"P": 6, "Si": 6, "Ge": 6, "As": 6, "Sb": 6}
+
+
+def protect_boron_edges(
+    labels: Sequence[str],
+    nonmetal_adjacency: np.ndarray,
+    *,
+    protect_cages: bool = True,
+) -> tuple[set[tuple[int, int]], set[int], list[dict]]:
+    """Find nonmetal edges that valence counting must not remove.
+
+    These are the edges of closo/nido boranes and carboranes, unclassified B/C
+    cores with at least three B atoms ("possible" cages), H bridging two B atoms
+    (B-H-B), and terminal H on a cage atom. Cage atoms are hypervalent by
+    classical counting, so a valence limit would cut real cage edges.
+
+    ``nonmetal_adjacency`` must have all metal rows and columns zeroed. Return
+    (protected sorted edges, cage atom indices, protection records). With
+    ``protect_cages=False`` only B-H-B bridges are protected.
+    """
+    protected: set[tuple[int, int]] = set()
+    cage_atoms: set[int] = set()
+    protections: list[dict] = []
+    if "B" not in labels:
+        return protected, cage_atoms, protections
+
+    graph = nx.from_numpy_array(np.asarray(nonmetal_adjacency, dtype=int))
+    if protect_cages:
+        # Use the index-returning detectors rather than Species.has_borane:
+        # cached species flags can describe a different (already corrected)
+        # graph. Load classes first to respect the classes/charge import cycle.
+        import cell2mol.classes  # noqa: F401
+        from cell2mol.charge.special_cases.borane import (
+            find_borane_cages,
+            find_borane_cage_indices,
+        )
+
+        atomic_numbers = [elemdatabase.elementnr[label] for label in labels]
+        confirmed_edges: set[tuple[int, int]] = set()
+        for indices, kind in find_borane_cages(atomic_numbers, nonmetal_adjacency):
+            cage_atoms.update(indices)
+            edges = {tuple(sorted(e)) for e in graph.subgraph(indices).edges()}
+            protected.update(edges)
+            confirmed_edges.update(edges)
+            protections.append(
+                {
+                    "atoms": indices,
+                    "reason": "borane_cage",
+                    "cage_type": kind,
+                    "detector": "find_borane_cages",
+                }
+            )
+        core = find_borane_cage_indices(atomic_numbers, nonmetal_adjacency) or []
+        bc = graph.subgraph(core)
+        for block in nx.biconnected_components(bc):
+            if len(block) >= 4 and sum(labels[i] == "B" for i in block) >= 3:
+                edges = {tuple(sorted(e)) for e in bc.subgraph(block).edges()}
+                if edges <= confirmed_edges:
+                    continue
+                cage_atoms.update(block)
+                protected.update(edges)
+                protections.append(
+                    {
+                        "atoms": sorted(block),
+                        "reason": "possible_boron_cage",
+                        "detector": "find_borane_cage_indices",
+                        "cage_type": None,
+                    }
+                )
+    for i, label in enumerate(labels):
+        if label != "H":
+            continue
+        neighbors = list(graph.neighbors(i))
+        if (len(neighbors) == 2 and all(labels[j] == "B" for j in neighbors)) or (
+            len(neighbors) == 1 and neighbors[0] in cage_atoms
+        ):
+            protected.update(tuple(sorted((i, j))) for j in neighbors)
+            protections.append(
+                {"atoms": [i, *sorted(neighbors)], "reason": "boron_hydrogen"}
+            )
+    return protected, cage_atoms, protections
+
+
 def correct_valence_violations(
-    adjacency_matrix, metal_contact_matrix, labels, pos, radii, atom_site_labels=None
+    adjacency_matrix,
+    metal_contact_matrix,
+    labels,
+    pos,
+    radii,
+    atom_site_labels=None,
+    diagnostics: dict | None = None,
 ):
     """Detect and correct valence violations in an adjacency matrix.
+
+    Edges found by protect_boron_edges (borane/carborane cages, B-H-B bridges,
+    terminal cage H) are never removed and do not count toward an atom's
+    valence, so cage atoms and bridging H are not flagged. If ``diagnostics``
+    is given, it receives "removals" (atoms, labels, distance, margin, reason),
+    "protections", and "violations" (atom, initial/final degree, limit, status:
+    resolved, unresolved or exempt) for every atom that started over its limit.
+    Six-coordinate P, Si, Ge, As and Sb are allowed, and metal atoms are not
+    checked at all (their coordination is validated separately). Only unresolved violations
+    set the returned warning flag and are logged.
     Args:
         adjacency_matrix (np.ndarray): Adjacency matrix.
         labels (list): List of atomic labels.
         pos (list): List of atomic positions.
         radii (list): List of atomic radii.
         atom_site_labels (list, optional): List of atomic site labels. Defaults to None.
+        diagnostics (dict, optional): Filled in place; see above.
     Returns:
         adjacency_matrix (np.ndarray): Corrected adjacency matrix.
         metal_contact_matrix (np.ndarray): Corrected metal adjacency matrix.
-        warning (bool): True if any valence violations were found and corrected,
-            False otherwise.
+        warning (bool): True if a valence violation remains after correction
+            (halogens and B, which are exempt, do not count), False otherwise.
     """
     from cell2mol.charge.xyz2mol import atomic_valence
 
@@ -544,39 +653,41 @@ def correct_valence_violations(
         df_block_metal_idxs | post_transition_metal_idxs | s_block_metal_idxs
     )
 
+    nonmetal_ac = np.array(adjacency_matrix, dtype=int)
+    for m in metal_indices:
+        nonmetal_ac[m, :] = 0
+        nonmetal_ac[:, m] = 0
+    protected, _, protections = protect_boron_edges(labels, nonmetal_ac)
+    if diagnostics is not None:
+        diagnostics.setdefault("removals", [])
+        diagnostics.setdefault("protections", []).extend(protections)
+
+    def nonmetal_degree(i: int) -> int:
+        """Nonmetal neighbors that count toward valence (protected bonds do not)."""
+        return sum(
+            int(j) not in metal_indices and tuple(sorted((i, int(j)))) not in protected
+            for j in np.flatnonzero(adjacency_matrix[i])
+        )
+
+    def valence_limit(i: int) -> int:
+        if i in metal_indices:
+            # Metal coordination is validated separately; the xyz2mol table
+            # gives post-transition metals (Al, Sn, ...) organic-style limits.
+            return natoms
+        limit = max(atomic_valence[elemdatabase.elementnr[labels[i]]], default=0)
+        return max(limit, HYPERVALENT_MAX_COORDINATION.get(labels[i], 0))
+
+    limits = [valence_limit(i) for i in range(natoms)]
+    initial_degrees = [nonmetal_degree(i) for i in range(natoms)]
+
     for i in range(natoms):
-        indices = np.where(adjacency_matrix[i])[0]
-        n_connec_metals = len(set(indices) & metal_indices)
-        if n_connec_metals == len(indices):
+        excess = initial_degrees[i] - limits[i]
+        if excess <= 0 or labels[i] in VALENCE_EXEMPT_ELEMENTS:
             continue
-
-        valence = len(indices)
-        atomic_num = elemdatabase.elementnr[labels[i]]
-        max_valence = max(atomic_valence[atomic_num], default=0)
-
-        if valence - n_connec_metals <= max_valence:
-            continue
-
-        logger.warning(
-            "Valence violation: %s%s %s(index:%d), valence=%d > max_valence=%d",
-            labels[i],
-            f"({atom_site_labels[i]})" if atom_site_labels else "",
-            pos[i],
-            i,
-            valence,
-            max_valence,
-        )
-
-        logger.debug(
-            "connections: labels=%s, indices=%s, n_connec_metals=%d",
-            [labels[j] for j in indices],
-            indices.tolist(),
-            n_connec_metals,
-        )
-        warning = True
-
-        if labels[i] in {"F", "Cl", "Br", "I", "B"}:
-            logger.info("Skipping correction for element %s", labels[i])
+        # The current degree can already be lower: a bond removed from a
+        # neighbor also lowers this atom's count.
+        excess = nonmetal_degree(i) - limits[i]
+        if excess <= 0:
             continue
 
         # Only bonds to non-metals are candidates: the valence that is violated
@@ -585,8 +696,8 @@ def correct_valence_violations(
         # most elongated, so leaving them in would cut them first.
         connections = []
         a = np.asarray(pos[i])
-        for j in indices:
-            if j in metal_indices:
+        for j in np.flatnonzero(adjacency_matrix[i]):
+            if j in metal_indices or tuple(sorted((i, int(j)))) in protected:
                 continue
             b = np.asarray(pos[j])
             dist = np.linalg.norm(a - b)
@@ -608,11 +719,24 @@ def correct_valence_violations(
             )
 
         connections.sort(key=lambda x: x[1], reverse=True)
-        to_remove = valence - max_valence - n_connec_metals
 
-        for j, margin in connections[:to_remove]:
+        for j, margin in connections[:excess]:
             if margin > 0.2:
                 adjacency_matrix[i, j] = adjacency_matrix[j, i] = 0
+                distance = float(
+                    np.linalg.norm(np.asarray(pos[i]) - np.asarray(pos[j]))
+                )
+                if diagnostics is not None:
+                    diagnostics["removals"].append(
+                        {
+                            "atoms": [i, int(j)],
+                            "labels": [labels[i], labels[j]],
+                            "stage": "valence",
+                            "reason": "excess_nonmetal_valence",
+                            "distance": distance,
+                            "margin": float(margin),
+                        }
+                    )
                 logger.info(
                     "Removed bond %d-%d %s%s:%s-%s%s:%s, dist=%.3f, margin=%.3f",
                     i,
@@ -623,9 +747,45 @@ def correct_valence_violations(
                     labels[j],
                     f"({atom_site_labels[j]})" if atom_site_labels else "",
                     pos[j],
-                    np.linalg.norm(np.asarray(pos[i]) - np.asarray(pos[j])),
+                    distance,
                     margin,
                 )
+
+    # Report every atom that started over its limit, once the pass is finished.
+    violations = []
+    for i in range(natoms):
+        if initial_degrees[i] <= limits[i]:
+            continue
+        final = nonmetal_degree(i)
+        if final <= limits[i]:
+            status = "resolved"
+        elif labels[i] in VALENCE_EXEMPT_ELEMENTS:
+            status = "exempt"
+        else:
+            status = "unresolved"
+            warning = True
+            logger.warning(
+                "Unresolved valence violation: %s%s %s(index:%d), "
+                "nonmetal neighbors=%d > max_valence=%d",
+                labels[i],
+                f"({atom_site_labels[i]})" if atom_site_labels else "",
+                pos[i],
+                i,
+                final,
+                limits[i],
+            )
+        violations.append(
+            {
+                "atom": i,
+                "label": labels[i],
+                "initial_degree": initial_degrees[i],
+                "final_degree": final,
+                "limit": limits[i],
+                "status": status,
+            }
+        )
+    if diagnostics is not None:
+        diagnostics["violations"] = violations
 
     return adjacency_matrix, metal_contact_matrix, warning
 
