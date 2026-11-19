@@ -51,6 +51,9 @@ def main():
     if args.cif_bond_info:
         config.USE_BOND_INFO = True
 
+    if args.gnn_metal_os:
+        config.GNN_METAL_OS = True
+
     if args.print_config:
         print(config.dump())
         return

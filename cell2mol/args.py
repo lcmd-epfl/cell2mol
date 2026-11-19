@@ -63,6 +63,14 @@ def parsing_arguments():
     )
 
     parser.add_argument(
+        "--gnn-metal-os",
+        dest="gnn_metal_os",
+        action="store_true",
+        help="When unit-cell charge balancing finds several or no distributions, "
+        "resolve it with the metal oxidation-state GNN (needs torch, torch_geometric)",
+    )
+
+    parser.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],

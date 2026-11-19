@@ -177,13 +177,17 @@ def get_reference_error_messages(codes, fallback_code=0):
 
 
 def get_reference_warning_messages(refcell):
-    """Return messages for active warnings (True) and skipped checks (None)."""
+    """Return messages for active warnings (True) and skipped checks (None).
+
+    Works for any object with potential_warnings (reference cell or MoleculeSet).
+    """
 
     # Active warning messages
     warning_map = {
         "metal_os_ambiguity": "Metal oxidation-state ambiguity: equally valid alternatives exist.",
         "cif_mismatch": "CIF formula mismatch detected",
         "over_polynuclear_limit": f"Polynuclear complex exceeds metal center limit (> max_metals {config.MAX_METALS})",
+        "metal_os_from_gnn": "Charge balance settled by the metal oxidation-state GNN (GNN_METAL_OS).",
         "mixed_metals": "Mixed metal types detected",
         "is_mismatch_adj": "Adjacency matrix does not match CIF bond connectivity.",
         "is_mismatch_metal_adj": "Metal adjacency does not match CIF bond connectivity.",

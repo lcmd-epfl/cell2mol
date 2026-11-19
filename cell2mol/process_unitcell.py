@@ -207,7 +207,12 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
             "Failed to save reference as JSON",
         )
         _safe_run(
-            lambda: _write_ref_detailed_summary(name, refcell, paths["ref_sum"]),
+            lambda: _write_ref_detailed_summary(
+                name,
+                refcell,
+                paths["ref_sum"],
+                os_method=getattr(unitcell, "os_method", None) if unitcell else None,
+            ),
             "Failed to write reference summary",
         )
 
@@ -247,8 +252,11 @@ def _save_cell_outputs(name, current_dir, refcell, unitcell, cells):
         )
 
 
-def _write_ref_detailed_summary(name, refcell, summary_path):
-    """Writes the molecules info, species, errors, and warnings to file and log."""
+def _write_ref_detailed_summary(name, refcell, summary_path, os_method=None):
+    """Writes the molecules info, species, errors, and warnings to file and log.
+
+    os_method is the unit cell's oxidation-state trace, set by charge balancing.
+    """
     # Write to File
     with open(summary_path, "w") as f:
         print(name, file=f)
@@ -267,6 +275,10 @@ def _write_ref_detailed_summary(name, refcell, summary_path):
         print(f"  - Reported:   {reported_os}", file=f)
         print(f"  - Matched:    {matched_os}", file=f)
         print(f"  - Confidence: {confidence_str}", file=f)
+        print(
+            f"Metal oxidation states determined by: {' -> '.join(os_method) if os_method else 'N/A'}",
+            file=f,
+        )
 
         write_cell_molecule_details(refcell, file=f)
         write_unique_species(refcell, file=f)
@@ -290,6 +302,11 @@ def _write_unit_summary(name: str, unitcell, summary_path: str):
         )
         print(
             f"Metal oxidation state comparison result: {getattr(unitcell, 'metal_os_comparison', 'N/A')}",
+            file=f,
+        )
+        os_method = getattr(unitcell, "os_method", None)
+        print(
+            f"Metal oxidation states determined by: {' -> '.join(os_method) if os_method else 'N/A'}",
             file=f,
         )
         write_cell_molecule_details(unitcell, file=f)

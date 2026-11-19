@@ -24,6 +24,12 @@ MAX_METALS = 4
 TIMEOUT = 600  # seconds
 MAX_MEM_GB = 12  # GB
 
+# Metal oxidation-state GNN fallback for unit-cell charge balancing (see
+# cell2mol.charge.balancing._resolve_with_gnn). Off by default.
+GNN_METAL_OS = False  # True: use cell2mol/models/metal_ox_gnn.pt to resolve metal OS
+GNN_METAL_OS_CHECKPOINT = None  # None: cell2mol/models/metal_ox_gnn.pt
+GNN_METAL_OS_MIN_CONFIDENCE = 0.9
+
 
 def dump():
     """Return runtime configuration as a formatted string."""
@@ -37,5 +43,7 @@ def dump():
         f"  MAX METALS      = {MAX_METALS}",
         f"  TIMEOUT LIMIT   = {TIMEOUT} seconds",
         f"  MEMORY LIMIT    = {MAX_MEM_GB} GB",
+        f"  GNN METAL OS    = {GNN_METAL_OS} (min confidence {GNN_METAL_OS_MIN_CONFIDENCE}, "
+        f"checkpoint {GNN_METAL_OS_CHECKPOINT or 'default'})",
     ]
     return "\n".join(lines)

@@ -67,6 +67,11 @@ class MoleculeSet(ModelFileMixin, BaseModel):
     # Charge, bond, and spin failures.
     error_multiple_distrib: bool | None = None
     error_empty_distrib: bool | None = None
+    # Metal oxidation-state steps applied during charge balancing, in order
+    # (see balancing._record_step).
+    os_method: list[str] | None = None
+    # Warning flags: True=active, False=clear, None=check skipped.
+    potential_warnings: dict[str, bool | None] | None = None
     error_assign_charge: bool | None = None
     error_create_bonds: bool | None = None
     error_get_spin: bool | None = None

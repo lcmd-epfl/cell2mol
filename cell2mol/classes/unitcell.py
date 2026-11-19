@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import numpy as np
 from cell2mol.classes.cell import Cell
@@ -25,11 +26,21 @@ class UnitCell(Cell):
     # Charge-balancing failures
     error_multiple_distrib: bool | None = None
     error_empty_distrib: bool | None = None
+    # Metal oxidation-state steps applied during charge balancing, in order;
+    # the last one settled the states, or a failed balance shows the steps
+    # tried (see balancing._record_step).
+    os_method: list[str] | None = None
 
     # None until every molecule has an assigned charge.
     is_neutral: bool | None = None
 
     subtype: SubType | None = Field(default="unitcell")
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Discard the GNN flag of legacy pickles; os_method replaces it."""
+        state.get("__dict__", {}).pop("metal_os_from_gnn", None)
+        state.get("__pydantic_fields_set__", set()).discard("metal_os_from_gnn")
+        super().__setstate__(state)
 
     def map_charges_to_unitcell(self, refmoleclist: list[Molecule]):
         """Map reference charges to matching molecules, ligands, and metals."""

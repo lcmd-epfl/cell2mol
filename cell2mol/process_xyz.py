@@ -22,6 +22,7 @@ from cell2mol.connectivity import split_species
 from cell2mol.operations import extract_from_list
 from cell2mol.write_results import (
     get_molecule_error_messages,
+    get_reference_warning_messages,
     write_molecule_details,
     write_unique_species,
     write_plausible_charges,
@@ -69,6 +70,11 @@ def _write_summary(molset, name, path):
             f"{len(molset.moleclist)} molecules, totcharge={molset.totcharge}",
             file=f,
         )
+        os_method = getattr(molset, "os_method", None)
+        print(
+            f"Metal oxidation states determined by: {' -> '.join(os_method) if os_method else 'N/A'}",
+            file=f,
+        )
         for idx, mol in enumerate(molset.moleclist):
             write_molecule_details(mol, file=f, index=idx)
         write_unique_species(molset, file=f)
@@ -77,6 +83,13 @@ def _write_summary(molset, name, path):
             get_molecule_error_messages(molset.error_cases_all, molset.error_case),
             file=f,
         )
+
+        warning_messages = get_reference_warning_messages(molset)
+        if warning_messages:
+            print("\nPotential issues and data status detected:", file=f)
+            for msg in warning_messages:
+                prefix = "  " if msg.startswith("Skipped:") else "  Warning: "
+                print(f"{prefix}{msg}", file=f)
 
 
 # -----------------------------------------------------------------------------

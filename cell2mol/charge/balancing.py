@@ -7,6 +7,7 @@ from cell2mol.charge.oxidation_states import METAL_OS_OBSERVED, METAL_OXIDATION_
 from cell2mol.write_results import log_charge_diagnostics
 from cell2mol.charge.charge_assignment import assign_charge_to_species
 from cell2mol.standardize_metal_os import is_metallocene
+from cell2mol.utils import config
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,9 @@ def balance_unitcell_charge(refcell, unitcell):
 
     warnings = dict(getattr(refcell, "potential_warnings", None) or {})
     warnings.pop("metal_os_ambiguity", None)
+    trace: List[str] = []
     _, unique_species_charges = resolve_charge_distributions(
-        unitcell.unique_indices, refcell.unique_species, warnings=warnings
+        unitcell.unique_indices, refcell.unique_species, warnings=warnings, trace=trace
     )
     refcell.potential_warnings = warnings
 
@@ -68,6 +70,20 @@ def balance_unitcell_charge(refcell, unitcell):
     #         unique_species_charges = [inferred_charges]
     #         unitcell.error_empty_distrib = False
 
+    if (unitcell.error_multiple_distrib or unitcell.error_empty_distrib) and config.GNN_METAL_OS:
+        resolved = _resolve_with_gnn(
+            unitcell.unique_indices, refcell.unique_species, unique_species_charges, warnings=warnings
+        )
+        if resolved is not None:
+            unique_species_charges = [resolved]
+            unitcell.error_multiple_distrib = unitcell.error_empty_distrib = False
+            trace.append("gnn")
+            warnings["metal_os_from_gnn"] = True
+            refcell.potential_warnings = warnings
+
+    # Assign once complete: pydantic stores a copy of the list.
+    unitcell.os_method = trace
+    logger.info("Metal oxidation states determined by: %s", " -> ".join(trace))
     if unitcell.error_multiple_distrib or unitcell.error_empty_distrib:
         logger.error(
             "Balance charges failed. Flags in distribution: Multiple=%s, Empty=%s",
@@ -103,13 +119,39 @@ def balance_molecule_charge(molset, input_charge: int = 0):
 
     unique_indices = [species.unique_index for species in molset.species_list]
 
+    warnings = dict(molset.potential_warnings or {})
+    warnings.pop("metal_os_ambiguity", None)
+    trace: List[str] = []
     expanded_species_charges, unique_species_charges = resolve_charge_distributions(
-        unique_indices, molset.unique_species, input_charge=input_charge
+        unique_indices,
+        molset.unique_species,
+        input_charge=input_charge,
+        warnings=warnings,
+        trace=trace,
     )
 
     dist_count = len(expanded_species_charges)
     molset.error_multiple_distrib = dist_count > 1
     molset.error_empty_distrib = dist_count == 0
+
+    if (molset.error_multiple_distrib or molset.error_empty_distrib) and config.GNN_METAL_OS:
+        resolved = _resolve_with_gnn(
+            unique_indices,
+            molset.unique_species,
+            unique_species_charges,
+            input_charge=input_charge,
+            warnings=warnings,
+        )
+        if resolved is not None:
+            unique_species_charges = [resolved]
+            molset.error_multiple_distrib = molset.error_empty_distrib = False
+            trace.append("gnn")
+            warnings["metal_os_from_gnn"] = True
+
+    # Assign once complete: pydantic stores copies of the list and dict.
+    molset.os_method = trace
+    molset.potential_warnings = warnings
+    logger.info("Metal oxidation states determined by: %s", " -> ".join(trace))
 
     # if molset.error_empty_distrib:
     #     inferred_charges = _balance_with_observed_metal_os(
@@ -150,29 +192,46 @@ def resolve_charge_distributions(
     predict: bool = False,
     aromatic: bool = False,
     warnings: dict | None = None,
+    metal_options: dict[int, List[int]] | None = None,
+    infer: bool = True,
+    trace: List[str] | None = None,
 ):
     """
     Find charge-balanced distributions, apply preferences, and expand survivors.
+
+    metal_options fixes the oxidation-state options of the metal species at
+    those unique_species positions. infer=False skips the fixed-ligand metal
+    inference fallbacks, which could otherwise replace those options.
+    trace, if given, receives the steps applied in order (see _record_step);
+    the last one is the step that settled the metal oxidation states.
     """
+    infer = infer and not rare
 
     species_charge_options: List[List[int]] = []
 
     for idx, species in enumerate(unique_species):
         options = []
 
-        if species.subtype == "metal":
+        if species.subtype == "metal" and metal_options and idx in metal_options:
+            options = list(metal_options[idx])
+        elif species.subtype == "metal":
             options = _get_metal_options(species, rare, predict)
         else:
             options = _get_ligand_options(species, aromatic)
 
         if not options:
-            if species.subtype == "metal" and not rare:
+            if species.subtype == "metal" and infer:
+                _record_step(trace, "ligand_inference")
                 inferred = _distribute_fixed_ligand_metal_charges(
-                    unique_indices, unique_species, input_charge, warnings=warnings
+                    unique_indices,
+                    unique_species,
+                    input_charge,
+                    warnings=warnings,
+                    trace=trace,
                 )
                 if len(inferred) > 1:
                     inferred = _preferred_distributions(
-                        unique_indices, unique_species, inferred
+                        unique_indices, unique_species, inferred, trace=trace
                     )
                 return [
                     [charges[i] for i in unique_indices] for charges in inferred
@@ -222,31 +281,35 @@ def resolve_charge_distributions(
         "Final Count: %d valid distributions found.",
         len(expanded_species_charges),
     )
+    _record_step(trace, "balance")
 
     # Apply structural preferences before donor-based metal inference can
     # collapse multiple candidates to one distribution.
     if len(unique_species_charges) > 1:
         unique_species_charges = _preferred_distributions(
-            unique_indices, unique_species, unique_species_charges
+            unique_indices, unique_species, unique_species_charges, trace=trace
         )
 
-    if len(unique_species_charges) > 1 and not rare:
+    if len(unique_species_charges) > 1 and infer:
         ranked = _distribute_fixed_ligand_metal_charges(
             unique_indices,
             unique_species,
             input_charge,
             distributions=unique_species_charges,
             warnings=warnings,
+            trace=trace,
         )
         if ranked:
+            _record_step(trace, "ligand_inference", before="tie_break")
             unique_species_charges = ranked
             expanded_species_charges = [
                 [charges[idx] for idx in unique_indices] for charges in ranked
             ]
 
-    if not unique_species_charges and not rare:
+    if not unique_species_charges and infer:
+        _record_step(trace, "ligand_inference")
         unique_species_charges = _distribute_fixed_ligand_metal_charges(
-            unique_indices, unique_species, input_charge, warnings=warnings
+            unique_indices, unique_species, input_charge, warnings=warnings, trace=trace
         )
         expanded_species_charges = [
             [charges[idx] for idx in unique_indices]
@@ -259,6 +322,91 @@ def resolve_charge_distributions(
     ]
     logger.info("Charge distributions remaining: %d", len(unique_species_charges))
     return expanded_species_charges, unique_species_charges
+
+
+def _record_step(trace: List[str] | None, step: str, before: str | None = None):
+    """Append a metal oxidation-state step to trace, or insert it before `before`.
+
+    Steps: balance (plausible_os + neutrality), metallocene_pref, oxygen_pref,
+    ligand_inference (donor-charge targets), tie_break (first of tied
+    distributions), gnn (metal oxidation-state GNN).
+    """
+    if trace is None:
+        return
+    if before is not None and before in trace:
+        trace.insert(trace.index(before), step)
+    else:
+        trace.append(step)
+
+
+def _resolve_with_gnn(unique_indices, unique_species, candidates, input_charge: int = 0, warnings=None):
+    """
+    Settle a failed balance with the metal oxidation-state GNN
+    (cell2mol.ml.metal_ox). Each unique metal species gets the GNN's most
+    probable state, which must reach config.GNN_METAL_OS_MIN_CONFIDENCE.
+
+    - Several distributions (candidates): keep those whose metal states are
+      the GNN's picks.
+    - No distribution: search again with each metal fixed to its pick, which
+      may lie outside METAL_OXIDATION_STATES; the ligand options and the
+      neutrality constraint are unchanged.
+
+    Return the unique-species charges if exactly one distribution remains,
+    else None (the balance stays failed).
+    """
+    try:
+        from cell2mol.ml.metal_ox.predictor import load_predictor
+
+        predictor = load_predictor(config.GNN_METAL_OS_CHECKPOINT)
+    except ImportError as err:
+        logger.warning("GNN metal oxidation states unavailable (%s); not used.", err)
+        return None
+
+    picks = {}
+    for idx, species in enumerate(unique_species):
+        if species.subtype != "metal":
+            continue
+        probabilities = predictor.probabilities(species)
+        if not probabilities:
+            logger.info("GNN: no prediction for %s (no coordination sphere).", species.formula)
+            return None
+        state, confidence = max(probabilities.items(), key=lambda item: item[1])
+        logger.info(
+            "GNN: %s predicted oxidation state %d (confidence %.3f; plausible_os %s)",
+            species.label,
+            state,
+            confidence,
+            species.plausible_os,
+        )
+        if confidence < config.GNN_METAL_OS_MIN_CONFIDENCE:
+            logger.info(
+                "GNN: confidence below %.2f; balance left unresolved.", config.GNN_METAL_OS_MIN_CONFIDENCE
+            )
+            return None
+        picks[idx] = state
+
+    if candidates:
+        matching = [c for c in candidates if all(c[idx] == state for idx, state in picks.items())]
+    else:
+        _, matching = resolve_charge_distributions(
+            unique_indices,
+            unique_species,
+            input_charge=input_charge,
+            warnings=warnings,
+            metal_options={idx: [state] for idx, state in picks.items()},
+            infer=False,
+        )
+
+    if len(matching) == 1:
+        logger.info("GNN: resolved the charge distribution: %s", list(matching[0]))
+        return matching[0]
+
+    logger.info(
+        "GNN: %d distributions match the predicted metal oxidation states %s; balance left unresolved.",
+        len(matching),
+        picks,
+    )
+    return None
 
 
 ############################################################
@@ -354,7 +502,13 @@ def _filter_by_aromaticity(species, plausible) -> List[int]:
 
 
 def _distribute_fixed_ligand_metal_charges(
-    unique_indices, unique_species, input_charge=0, *, distributions=None, warnings=None
+    unique_indices,
+    unique_species,
+    input_charge=0,
+    *,
+    distributions=None,
+    warnings=None,
+    trace=None,
 ):
     """Choose metal oxidation states while keeping ligand charges fixed.
 
@@ -502,6 +656,7 @@ def _distribute_fixed_ligand_metal_charges(
         best.sort()
         if warnings is not None:
             warnings["metal_os_ambiguity"] = True
+        _record_step(trace, "tie_break")
         logger.warning(
             "Metal oxidation-state ambiguity: tied distributions %s. "
             "Selecting %s (unique_index order).",
@@ -513,7 +668,10 @@ def _distribute_fixed_ligand_metal_charges(
 
 
 def _preferred_distributions(
-    unique_indices, unique_species, distributions: List[List[int]]
+    unique_indices,
+    unique_species,
+    distributions: List[List[int]],
+    trace: List[str] | None = None,
 ) -> List[List[int]]:
     """Prefer metallocene Fe(II/III) and avoidable oxygen cations."""
     if not distributions:
@@ -549,6 +707,7 @@ def _preferred_distributions(
             if penalty == lowest_penalty
         ]
         if len(preferred) < len(distributions):
+            _record_step(trace, "metallocene_pref")
             logger.info(
                 "Metallocene Fe(II/III) preference kept %d of %d distributions.",
                 len(preferred),
@@ -573,6 +732,7 @@ def _preferred_distributions(
         )
     ]
     if len(survivors) < len(best):
+        _record_step(trace, "oxygen_pref")
         logger.info(
             "Oxygen cation preference kept %d of %d distributions without "
             "increasing internal ligand charge separation.",
