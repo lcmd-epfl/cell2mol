@@ -1,0 +1,26 @@
+{
+  "sklearn_version": "1.7.2",
+  "n_samples": 2260,
+  "features": [
+    "elem_nr",
+    "m_ox",
+    "d_elec",
+    "CN",
+    "geom_nr",
+    "rel_m",
+    "hapticity"
+  ],
+  "classes": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "best_params": {
+    "n_estimators": 100,
+    "max_features": 0.5,
+    "bootstrap": true
+  }
+}
